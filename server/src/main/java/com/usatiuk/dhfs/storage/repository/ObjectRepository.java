@@ -14,5 +14,12 @@ public interface ObjectRepository {
     @Nonnull
     public Uni<Object> readObject(String namespace, String name);
     @Nonnull
-    public Uni<Void> writeObject(String namespace, String name, Object data);
+    public Uni<Void> writeObject(String namespace, String name, ByteBuffer data);
+    @Nonnull
+    public Uni<Void> deleteObject(String namespace, String name);
+
+    @Nonnull
+    public Uni<Void> createNamespace(String namespace);
+    @Nonnull
+    public Uni<Void> deleteNamespace(String namespace);
 }
