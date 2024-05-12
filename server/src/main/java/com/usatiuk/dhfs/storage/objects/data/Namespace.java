@@ -1,4 +1,4 @@
-package com.usatiuk.dhfs.storage.data;
+package com.usatiuk.dhfs.storage.objects.data;
 
 import lombok.Getter;
 import lombok.Setter;

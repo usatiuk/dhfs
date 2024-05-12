@@ -1,7 +1,7 @@
-package com.usatiuk.dhfs.storage.repository;
+package com.usatiuk.dhfs.storage.objects.repository;
 
-import com.usatiuk.dhfs.storage.data.Namespace;
-import com.usatiuk.dhfs.storage.data.Object;
+import com.usatiuk.dhfs.storage.objects.data.Namespace;
+import com.usatiuk.dhfs.storage.objects.data.Object;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;

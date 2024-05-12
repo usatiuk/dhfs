@@ -1,6 +1,6 @@
-package com.usatiuk.dhfs.storage.repository;
+package com.usatiuk.dhfs.storage.objects.repository;
 
-import com.usatiuk.dhfs.storage.data.Object;
+import com.usatiuk.dhfs.storage.objects.data.Object;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 
