@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.storage;
 
 import com.google.protobuf.ByteString;
-import com.usatiuk.dhfs.storage.api.*;
+import com.usatiuk.dhfs.storage.objects.api.*;
 import io.quarkus.grpc.GrpcClient;
 import io.quarkus.test.junit.QuarkusTest;
 import org.eclipse.microprofile.config.inject.ConfigProperty;

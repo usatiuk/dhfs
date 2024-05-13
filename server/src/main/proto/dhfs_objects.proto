@@ -2,7 +2,7 @@ syntax = "proto3";
 
 option java_multiple_files = true;
 option java_package = "com.usatiuk.dhfs.storage.objects.api";
-option java_outer_classname = "DhfsStorageApi";
+option java_outer_classname = "DhfsObjectsApi";
 
 package hello;
 

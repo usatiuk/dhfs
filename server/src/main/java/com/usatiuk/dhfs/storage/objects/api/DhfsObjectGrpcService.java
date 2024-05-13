@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.api;
 
 import com.google.protobuf.ByteString;
-import com.usatiuk.dhfs.storage.api.*;
 import com.usatiuk.dhfs.storage.objects.repository.ObjectRepository;
 import io.quarkus.grpc.GrpcService;
 import io.smallrye.mutiny.Uni;

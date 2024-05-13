@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.usatiuk.dhfs.storage.files.api";
+option java_outer_classname = "DhfsFilesApi";
+
+package hello;
+
+service DhfsFilesGrpc {
+  rpc FindFiles (FindFilesRequest) returns (FindFilesReply) {}
+  rpc ReadFile (ReadFileRequest) returns (ReadFileReply) {}
+  rpc WriteFile (WriteFileRequest) returns (WriteFileReply) {}
+  rpc DeleteFile (DeleteFileRequest) returns (DeleteFileReply) {}
+}
+
+message FindFilesRequest {
+  string namespace = 1;
+  string prefix = 2;
+}
+
+message FindFilesReply {
+  message FindFilesEntry {
+    string name = 1;
+  }
+  repeated FindFilesEntry found = 1;
+}
+
+message ReadFileRequest {
+  string namespace = 1;
+  string name = 2;
+}
+
+message ReadFileReply {
+  bytes data = 10;
+}
+
+message WriteFileRequest {
+  string namespace = 1;
+  string name = 2;
+  bytes data = 10;
+}
+
+message WriteFileReply {
+}
+
+message DeleteFileRequest {
+  string namespace = 1;
+  string name = 2;
+}
+
+message DeleteFileReply {
+}
