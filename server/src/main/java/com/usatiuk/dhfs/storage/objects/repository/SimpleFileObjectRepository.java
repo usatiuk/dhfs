@@ -6,12 +6,14 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.Shutdown;
-import io.quarkus.runtime.Startup;
+import io.quarkus.runtime.StartupEvent;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.core.Vertx;
 import io.vertx.mutiny.core.buffer.Buffer;
+import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -28,8 +30,7 @@ public class SimpleFileObjectRepository implements ObjectRepository {
     @Inject
     Vertx vertx;
 
-    @Startup
-    void init() {
+    void init(@Observes @Priority(200) StartupEvent event) {
         Paths.get(root).toFile().mkdirs();
         Log.info("Initializing with root " + root);
     }
@@ -51,6 +52,17 @@ public class SimpleFileObjectRepository implements ObjectRepository {
                 .transformToMulti(v -> Multi.createFrom().iterable(v))
                 .select().where(n -> n.startsWith(prefix))
                 .map(f -> nsRoot.relativize(Paths.get(f)).toString());
+    }
+
+    @Nonnull
+    @Override
+    public Uni<Boolean> existsObject(String namespace, String name) {
+        Path obj = Paths.get(root, namespace, name);
+
+        if (!obj.toFile().isFile())
+            return Uni.createFrom().item(false);
+
+        return Uni.createFrom().item(true);
     }
 
     @Nonnull

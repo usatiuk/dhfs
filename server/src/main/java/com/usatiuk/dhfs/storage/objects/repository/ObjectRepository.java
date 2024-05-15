@@ -10,6 +10,8 @@ import java.nio.ByteBuffer;
 public interface ObjectRepository {
     @Nonnull
     public Multi<String> findObjects(String namespace, String prefix);
+    @Nonnull
+    public Uni<Boolean> existsObject(String namespace, String name);
 
     @Nonnull
     public Uni<Object> readObject(String namespace, String name);
