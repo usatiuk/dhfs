@@ -26,7 +26,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @ApplicationScoped
-public class DhfsFileServiceImp implements DhfsFileService {
+public class DhfsFileServiceImpl implements DhfsFileService {
     @Inject
     Vertx vertx;
     @Inject
@@ -51,6 +51,7 @@ public class DhfsFileServiceImp implements DhfsFileService {
         Log.info("Shutdown file service");
     }
 
+    // Taken from SerializationUtils
     public static <T> T deserialize(final InputStream inputStream) {
         try (ClassLoaderObjectInputStream in = new ClassLoaderObjectInputStream(Thread.currentThread().getContextClassLoader(), inputStream)) {
             final T obj = (T) in.readObject();

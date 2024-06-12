@@ -12,7 +12,7 @@ import java.time.Duration;
 import java.util.List;
 
 @QuarkusTest
-class DhfsObjectGrpcService extends SimpleFileRepoTest {
+class DhfsObjectGrpcServiceTest extends SimpleFileRepoTest {
     @GrpcClient
     DhfsObjectGrpc dhfsObjectGrpc;
 
