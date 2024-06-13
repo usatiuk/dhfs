@@ -4,11 +4,12 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
-import java.util.Map;
+import java.util.NavigableMap;
+import java.util.TreeMap;
 
 @Accessors(chain = true)
 @Getter
 @Setter
 public class File extends DirEntry {
-    Map<Long, String> chunks;
+    NavigableMap<Long, String> chunks = new TreeMap<>();
 }

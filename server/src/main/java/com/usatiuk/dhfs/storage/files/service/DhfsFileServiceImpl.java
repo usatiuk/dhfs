@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.storage.files.service;
 
+import com.usatiuk.dhfs.storage.files.objects.Chunk;
 import com.usatiuk.dhfs.storage.files.objects.DirEntry;
 import com.usatiuk.dhfs.storage.files.objects.Directory;
 import com.usatiuk.dhfs.storage.files.objects.File;
@@ -25,6 +26,7 @@ import java.nio.file.Path;
 import java.util.Optional;
 import java.util.UUID;
 
+// Note: this is not actually reactive
 @ApplicationScoped
 public class DhfsFileServiceImpl implements DhfsFileService {
     @Inject
@@ -111,6 +113,60 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         var foundDir = (Directory) found.get();
         return Uni.createFrom().item(foundDir.getChildren().stream().map(Pair::getLeft).toList());
+    }
+
+    @Override
+    public Uni<Optional<byte[]>> read(String fileUuid, long offset, int length) {
+        var read = objectRepository.readObject(namespace, fileUuid).map(o -> deserialize(o.getData().array())).await().indefinitely();
+        if (!(read instanceof File file)) {
+            return Uni.createFrom().item(Optional.empty());
+        }
+
+        var chunksAll = file.getChunks();
+        var chunks = chunksAll.tailMap(chunksAll.floorKey(offset)).entrySet().iterator();
+
+        ByteBuffer buf = ByteBuffer.allocate(length);
+
+        long curPos = offset;
+        var chunk = chunks.next();
+
+        while (curPos < offset + length) {
+            var chunkPos = chunk.getKey();
+
+            long offInChunk = curPos - chunkPos;
+
+            long toReadInChunk = (offset + length) - curPos;
+
+            var chunkUuid = chunk.getValue();
+            var chunkRead = objectRepository.readObject(namespace, chunkUuid).map(o -> deserialize(o.getData().array())).await().indefinitely();
+
+            if (!(chunkRead instanceof Chunk chunkObj)) {
+                Log.error("Chunk requested not a chunk: " + chunkUuid);
+                return Uni.createFrom().item(Optional.empty());
+            }
+
+            var chunkBytes = chunkObj.getBytes();
+
+            long readableLen = chunkBytes.length - offInChunk;
+
+            var toReadReally = Math.min(readableLen, toReadInChunk);
+
+            buf.put(chunkBytes, (int) offInChunk, (int) toReadReally);
+
+            if (readableLen > toReadInChunk)
+                break;
+            else
+                curPos += readableLen;
+
+            chunk = chunks.next();
+        }
+
+        return Uni.createFrom().item(Optional.of(buf.array()));
+    }
+
+    @Override
+    public Uni<Optional<Long>> write(String fileUuid, long offset, long length) {
+        return null;
     }
 
     @Override

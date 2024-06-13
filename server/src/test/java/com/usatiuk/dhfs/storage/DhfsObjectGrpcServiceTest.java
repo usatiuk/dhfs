@@ -16,9 +16,6 @@ class DhfsObjectGrpcServiceTest extends SimpleFileRepoTest {
     @GrpcClient
     DhfsObjectGrpc dhfsObjectGrpc;
 
-    @ConfigProperty(name = "dhfs.filerepo.root")
-    String tempDirectory;
-
     @Test
     void writeReadTest() {
         dhfsObjectGrpc.createNamespace(

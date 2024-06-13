@@ -12,5 +12,8 @@ public interface DhfsFileService {
     public Uni<Optional<File>> open(String name);
     public Uni<Iterable<String>> readDir(String name);
 
+    public Uni<Optional<byte[]>> read(String fileUuid, long offset, int length);
+    public Uni<Optional<Long>> write(String fileUuid, long offset, long length);
+
     public Uni<Directory> getRoot();
 }
