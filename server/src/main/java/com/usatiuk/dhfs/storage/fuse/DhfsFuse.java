@@ -89,24 +89,34 @@ public class DhfsFuse extends FuseStubFS {
 
     @Override
     public int read(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
-        var fileOpt = fileService.open(path).await().indefinitely();
-        if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
-        var file = fileOpt.get();
-        var read = fileService.read(file.getUuid().toString(), offset, (int) size).await().indefinitely();
-        if (read.isEmpty()) return 0;
-        buf.put(0, read.get(), 0, read.get().length);
-        return read.get().length;
+        try {
+            var fileOpt = fileService.open(path).await().indefinitely();
+            if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
+            var file = fileOpt.get();
+            var read = fileService.read(file.getUuid().toString(), offset, (int) size).await().indefinitely();
+            if (read.isEmpty()) return 0;
+            buf.put(0, read.get(), 0, read.get().length);
+            return read.get().length;
+        } catch (Exception e) {
+            Log.error("When reading " + path, e);
+            return -ErrorCodes.ENOENT();
+        }
     }
 
     @Override
     public int write(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
-        var fileOpt = fileService.open(path).await().indefinitely();
-        if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
-        var file = fileOpt.get();
-        byte[] buffer = new byte[(int) size];
-        buf.get(0, buffer, 0, (int) size);
-        var written = fileService.write(file.getUuid().toString(), offset, buffer).await().indefinitely();
-        return written.intValue();
+        try {
+            var fileOpt = fileService.open(path).await().indefinitely();
+            if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
+            var file = fileOpt.get();
+            byte[] buffer = new byte[(int) size];
+            buf.get(0, buffer, 0, (int) size);
+            var written = fileService.write(file.getUuid().toString(), offset, buffer).await().indefinitely();
+            return written.intValue();
+        } catch (Exception e) {
+            Log.error("When writing " + path, e);
+            return -ErrorCodes.ENOENT();
+        }
     }
 
     @Override
