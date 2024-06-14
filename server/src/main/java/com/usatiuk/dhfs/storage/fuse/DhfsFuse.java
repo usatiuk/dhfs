@@ -38,7 +38,7 @@ public class DhfsFuse extends FuseStubFS {
         Paths.get(root).toFile().mkdirs();
         Log.info("Mounting with root " + root);
 
-        mount(Paths.get(root), false, true);
+        mount(Paths.get(root), false, true, new String[]{"-o", "direct_io"});
     }
 
     @Override
