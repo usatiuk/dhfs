@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.UUID;
 
 // Note: this is not actually reactive
@@ -72,16 +74,15 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 .map(o -> deserialize(o.getData().array()));
     }
 
-    private Uni<Optional<DirEntry>> traverse(Directory from, Path path) {
+    private Uni<Optional<DirEntry>> traverse(DirEntry from, Path path) {
         if (path.getNameCount() == 0) return Uni.createFrom().item(Optional.of(from));
-        for (var el : from.getChildren()) {
+        if (!(from instanceof Directory dir))
+            return Uni.createFrom().item(Optional.empty());
+        for (var el : dir.getChildren()) {
             if (el.getLeft().equals(path.getName(0).toString())) {
                 var ref = readDirEntry(el.getRight().toString()).await().indefinitely();
-                if (ref instanceof Directory) {
-                    return traverse((Directory) ref, path.subpath(1, path.getNameCount()));
-                } else {
-                    return Uni.createFrom().item(Optional.empty());
-                }
+                if (path.getNameCount() == 1) return Uni.createFrom().item(Optional.of(ref));
+                return traverse(ref, path.subpath(1, path.getNameCount()));
             }
         }
         return Uni.createFrom().item(Optional.empty());
@@ -102,6 +103,22 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         if (found.isEmpty()) return Uni.createFrom().item(Optional.empty());
         if (!(found.get() instanceof File)) return Uni.createFrom().item(Optional.empty());
         return Uni.createFrom().item(Optional.of((File) found.get()));
+    }
+
+    @Override
+    public Uni<Optional<File>> create(String name) {
+        // FIXME:
+        var root = getRoot().await().indefinitely();
+        var found = traverse(root, Path.of(name).getParent()).await().indefinitely();
+        if (found.isEmpty()) return Uni.createFrom().item(Optional.empty());
+        if (!(found.get() instanceof Directory dir)) return Uni.createFrom().item(Optional.empty());
+        var fuuid = UUID.randomUUID();
+        File f = new File();
+        f.setUuid(fuuid);
+        objectRepository.writeObject(namespace, fuuid.toString(), ByteBuffer.wrap(SerializationUtils.serialize(f))).await().indefinitely();
+        dir.getChildren().add(Pair.of(Path.of(name).getFileName().toString(), fuuid));
+        objectRepository.writeObject(namespace, dir.getUuid().toString(), ByteBuffer.wrap(SerializationUtils.serialize(dir))).await().indefinitely();
+        return Uni.createFrom().item(Optional.of((File) f));
     }
 
     @Override
@@ -153,7 +170,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             buf.put(chunkBytes, (int) offInChunk, (int) toReadReally);
 
-            if (readableLen > toReadInChunk)
+            if (readableLen >= toReadInChunk)
                 break;
             else
                 curPos += readableLen;
@@ -165,8 +182,131 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     }
 
     @Override
-    public Uni<Optional<Long>> write(String fileUuid, long offset, long length) {
-        return null;
+    public Uni<Long> write(String fileUuid, long offset, byte[] data) {
+        var read = objectRepository.readObject(namespace, fileUuid).map(o -> deserialize(o.getData().array())).await().indefinitely();
+        if (!(read instanceof File file)) {
+            return Uni.createFrom().item(-1L);
+        }
+
+        var chunksAll = file.getChunks();
+
+        var first = chunksAll.floorEntry(offset);
+        var last = chunksAll.floorEntry((offset + data.length) - 1);
+
+        var newChunks = new TreeMap<Long, String>();
+        for (var c : chunksAll.entrySet()) {
+            if (c.getKey() < offset) newChunks.put(c.getKey(), c.getValue());
+        }
+
+        if (first != null && first.getKey() < offset) {
+            var chunkUuid = first.getValue();
+            var chunkRead = objectRepository.readObject(namespace, chunkUuid).map(o -> deserialize(o.getData().array())).await().indefinitely();
+            if (!(chunkRead instanceof Chunk chunkObj)) {
+                Log.error("Chunk requested not a chunk: " + chunkUuid);
+                return Uni.createFrom().item(-1L);
+            }
+
+            var chunkBytes = chunkObj.getBytes();
+            Chunk newChunk = new Chunk(Arrays.copyOfRange(chunkBytes, 0, (int) (offset - first.getKey())));
+            objectRepository.writeObject(namespace, newChunk.getHash(), ByteBuffer.wrap(SerializationUtils.serialize(newChunk))).await().indefinitely();
+
+            newChunks.put(first.getKey(), newChunk.getHash());
+        }
+
+        {
+            Chunk newChunk = new Chunk(data);
+            objectRepository.writeObject(namespace, newChunk.getHash(), ByteBuffer.wrap(SerializationUtils.serialize(newChunk))).await().indefinitely();
+
+            newChunks.put(offset, newChunk.getHash());
+        }
+        if (last != null) {
+            var lchunkUuid = last.getValue();
+            var lchunkRead = objectRepository.readObject(namespace, lchunkUuid).map(o -> deserialize(o.getData().array())).await().indefinitely();
+            if (!(lchunkRead instanceof Chunk lchunkObj)) {
+                Log.error("Chunk requested not a chunk: " + lchunkUuid);
+                return Uni.createFrom().item(-1L);
+            }
+
+            var lchunkBytes = lchunkObj.getBytes();
+
+            if (last.getKey() + lchunkBytes.length > offset + data.length) {
+                int start = (int) ((offset + data.length) - last.getKey());
+                Chunk newChunk = new Chunk(Arrays.copyOfRange(lchunkBytes, start, lchunkBytes.length - start));
+                objectRepository.writeObject(namespace, newChunk.getHash(), ByteBuffer.wrap(SerializationUtils.serialize(newChunk))).await().indefinitely();
+
+                newChunks.put(first.getKey(), newChunk.getHash());
+            }
+        }
+
+        objectRepository.writeObject(namespace, fileUuid, ByteBuffer.wrap(SerializationUtils.serialize(
+                new File().setChunks(newChunks).setUuid(file.getUuid())
+        ))).await().indefinitely();
+
+        return Uni.createFrom().item((long) data.length);
+    }
+
+    @Override
+    public Uni<Boolean> truncate(String fileUuid, long length) {
+        var read = objectRepository.readObject(namespace, fileUuid).map(o -> deserialize(o.getData().array())).await().indefinitely();
+        if (!(read instanceof File file)) {
+            return Uni.createFrom().item(false);
+        }
+
+        if (length == 0) {
+            objectRepository.writeObject(namespace, fileUuid, ByteBuffer.wrap(SerializationUtils.serialize(
+                    new File().setChunks(new TreeMap<>()).setUuid(file.getUuid())
+            ))).await().indefinitely();
+            return Uni.createFrom().item(true);
+        }
+
+        var chunksAll = file.getChunks();
+
+        var newChunks = chunksAll.subMap(0L, length - 1);
+
+        var lastChunk = newChunks.lastEntry();
+
+        if (lastChunk != null) {
+            var chunkUuid = lastChunk.getValue();
+            var chunkRead = objectRepository.readObject(namespace, chunkUuid).map(o -> deserialize(o.getData().array())).await().indefinitely();
+            if (!(chunkRead instanceof Chunk chunkObj)) {
+                Log.error("Chunk requested not a chunk: " + chunkUuid);
+                return Uni.createFrom().item(false);
+            }
+
+            var chunkBytes = chunkObj.getBytes();
+
+            if (lastChunk.getKey() + chunkBytes.length > 0) {
+                int start = (int) (length - lastChunk.getKey());
+                Chunk newChunk = new Chunk(Arrays.copyOfRange(chunkBytes, 0, (int) (length - start)));
+                objectRepository.writeObject(namespace, newChunk.getHash(), ByteBuffer.wrap(SerializationUtils.serialize(newChunk))).await().indefinitely();
+
+                newChunks.put(lastChunk.getKey(), newChunk.getHash());
+            }
+        }
+
+        objectRepository.writeObject(namespace, fileUuid, ByteBuffer.wrap(SerializationUtils.serialize(
+                new File().setChunks(new TreeMap<>(newChunks)).setUuid(file.getUuid())
+        ))).await().indefinitely();
+
+        return Uni.createFrom().item(true);
+    }
+
+    @Override
+    public Uni<Long> size(File f) {
+        int size = 0;
+        //FIXME:
+        for (var chunk : f.getChunks().entrySet()) {
+            var lchunkUuid = chunk.getValue();
+            var lchunkRead = objectRepository.readObject(namespace, lchunkUuid).map(o -> deserialize(o.getData().array())).await().indefinitely();
+            if (!(lchunkRead instanceof Chunk lchunkObj)) {
+                Log.error("Chunk requested not a chunk: " + lchunkUuid);
+                return Uni.createFrom().item(-1L);
+            }
+
+            var lchunkBytes = lchunkObj.getBytes();
+            size += lchunkBytes.length;
+        }
+        return Uni.createFrom().item((long) size);
     }
 
     @Override

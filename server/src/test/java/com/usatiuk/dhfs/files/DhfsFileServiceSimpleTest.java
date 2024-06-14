@@ -47,7 +47,7 @@ public class DhfsFileServiceSimpleTest extends SimpleFileRepoTest {
 
         {
             for (int start = 0; start < all.length(); start++) {
-                for (int end = start; end < all.length(); end++) {
+                for (int end = start; end <= all.length(); end++) {
                     var read = fileService.read(fuuid.toString(), start, end - start);
                     Assertions.assertArrayEquals(all.substring(start, end).getBytes(), read.await().indefinitely().get());
                 }

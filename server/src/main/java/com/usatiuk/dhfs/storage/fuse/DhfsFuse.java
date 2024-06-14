@@ -20,7 +20,6 @@ import ru.serce.jnrfuse.struct.FileStat;
 import ru.serce.jnrfuse.struct.FuseFileInfo;
 
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.Optional;
 
 import static jnr.posix.FileStat.S_IFDIR;
@@ -48,13 +47,15 @@ public class DhfsFuse extends FuseStubFS {
             found = fileService.getDirEntry(path).await().indefinitely();
         } catch (Exception e) {
             Log.error(e);
-            return ErrorCodes.ENOENT();
+            return -ErrorCodes.ENOENT();
         }
-        if (found.isEmpty()) return ErrorCodes.ENOENT();
-        if (found.get() instanceof File) {
+        if (found.isEmpty()) {
+            return -ErrorCodes.ENOENT();
+        }
+        if (found.get() instanceof File f) {
             stat.st_mode.set(S_IFREG | 0777);
             stat.st_nlink.set(1);
-            stat.st_size.set(0);
+            stat.st_size.set(fileService.size(f).await().indefinitely());
         } else if (found.get() instanceof Directory) {
             stat.st_mode.set(S_IFDIR | 0777);
             stat.st_nlink.set(2);
@@ -64,18 +65,49 @@ public class DhfsFuse extends FuseStubFS {
 
     @Override
     public int open(String path, FuseFileInfo fi) {
-        if (fileService.open(path).await().indefinitely().isEmpty()) return ErrorCodes.ENOENT();
+        if (fileService.open(path).await().indefinitely().isEmpty()) return -ErrorCodes.ENOENT();
         return 0;
     }
 
     @Override
     public int read(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
-        return super.read(path, buf, size, offset, fi);
+        var fileOpt = fileService.open(path).await().indefinitely();
+        if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
+        var file = fileOpt.get();
+        var read = fileService.read(file.getUuid().toString(), offset, (int) size).await().indefinitely();
+        if (read.isEmpty()) return 0;
+        buf.put(0, read.get(), 0, read.get().length);
+        return read.get().length;
     }
 
     @Override
     public int write(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
-        return super.write(path, buf, size, offset, fi);
+        var fileOpt = fileService.open(path).await().indefinitely();
+        if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
+        var file = fileOpt.get();
+        byte[] buffer = new byte[(int) size];
+        buf.get(0, buffer, 0, (int) size);
+        var written = fileService.write(file.getUuid().toString(), offset, buffer).await().indefinitely();
+        return written.intValue();
+    }
+
+    @Override
+    public int create(String path, long mode, FuseFileInfo fi) {
+        var ret = fileService.create(path).await().indefinitely();
+        if (ret.isEmpty()) return -ErrorCodes.ENOSPC();
+        else return 0;
+    }
+
+    @Override
+    public int truncate(String path, long size) {
+        var fileOpt = fileService.open(path).await().indefinitely();
+        if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
+        var file = fileOpt.get();
+        var ok = fileService.truncate(file.getUuid().toString(), size).await().indefinitely();
+        if (ok)
+            return 0;
+        else
+            return -ErrorCodes.ENOSPC();
     }
 
     @Override
@@ -84,7 +116,7 @@ public class DhfsFuse extends FuseStubFS {
         try {
             found = fileService.readDir(path).await().indefinitely();
         } catch (Exception e) {
-            return ErrorCodes.ENOENT();
+            return -ErrorCodes.ENOENT();
         }
 
         filler.apply(buf, ".", null, 0);
