@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.storage.fuse;
 
+import com.sun.security.auth.module.UnixSystem;
 import com.usatiuk.dhfs.storage.files.objects.DirEntry;
 import com.usatiuk.dhfs.storage.files.objects.Directory;
 import com.usatiuk.dhfs.storage.files.objects.File;
@@ -38,7 +39,11 @@ public class DhfsFuse extends FuseStubFS {
         Paths.get(root).toFile().mkdirs();
         Log.info("Mounting with root " + root);
 
-        mount(Paths.get(root), false, true, new String[]{"-o", "direct_io"});
+        var uid = new UnixSystem().getUid();
+        var gid = new UnixSystem().getGid();
+
+        mount(Paths.get(root), false, true,
+                new String[]{"-o", "direct_io", "-o", "uid=" + String.valueOf(uid), "-o", "gid=" + String.valueOf(gid)});
     }
 
     @Override
@@ -66,11 +71,11 @@ public class DhfsFuse extends FuseStubFS {
             return -ErrorCodes.ENOENT();
         }
         if (found.get() instanceof File f) {
-            stat.st_mode.set(S_IFREG | 0777);
+            stat.st_mode.set(S_IFREG | f.getMode());
             stat.st_nlink.set(1);
             stat.st_size.set(fileService.size(f).await().indefinitely());
-        } else if (found.get() instanceof Directory) {
-            stat.st_mode.set(S_IFDIR | 0777);
+        } else if (found.get() instanceof Directory d) {
+            stat.st_mode.set(S_IFDIR | d.getMode());
             stat.st_nlink.set(2);
         }
         return 0;
@@ -106,14 +111,14 @@ public class DhfsFuse extends FuseStubFS {
 
     @Override
     public int create(String path, long mode, FuseFileInfo fi) {
-        var ret = fileService.create(path).await().indefinitely();
+        var ret = fileService.create(path, mode).await().indefinitely();
         if (ret.isEmpty()) return -ErrorCodes.ENOSPC();
         else return 0;
     }
 
     @Override
     public int mkdir(String path, long mode) {
-        var ret = fileService.mkdir(path).await().indefinitely();
+        var ret = fileService.mkdir(path, mode).await().indefinitely();
         if (ret.isEmpty()) return -ErrorCodes.ENOSPC();
         else return 0;
     }
@@ -149,6 +154,13 @@ public class DhfsFuse extends FuseStubFS {
             return 0;
         else
             return -ErrorCodes.ENOSPC();
+    }
+
+    @Override
+    public int chmod(String path, long mode) {
+        var ret = fileService.chmod(path, mode).await().indefinitely();
+        if (ret) return 0;
+        else return -ErrorCodes.EINVAL();
     }
 
     @Override

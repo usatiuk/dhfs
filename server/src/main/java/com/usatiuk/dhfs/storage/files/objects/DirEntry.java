@@ -21,4 +21,6 @@ public abstract class DirEntry extends JObject {
     public String getName() {
         return uuid.toString();
     }
+
+    long mode;
 }

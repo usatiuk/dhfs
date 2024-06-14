@@ -10,8 +10,9 @@ import java.util.Optional;
 public interface DhfsFileService {
     Uni<Optional<DirEntry>> getDirEntry(String name);
     Uni<Optional<File>> open(String name);
-    Uni<Optional<File>> create(String name);
-    Uni<Optional<Directory>> mkdir(String name);
+    Uni<Optional<File>> create(String name, long mode);
+    Uni<Optional<Directory>> mkdir(String name, long mode);
+    Uni<Boolean> chmod(String name, long mode);
     Uni<Boolean> rmdir(String name);
     Uni<Boolean> unlink(String name);
     Uni<Boolean> rename(String from, String to);

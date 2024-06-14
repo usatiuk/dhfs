@@ -39,7 +39,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         Log.info("Initializing file service");
         if (!objectRepository.existsObject(namespace, new UUID(0, 0).toString()).await().indefinitely()) {
             objectRepository.createNamespace(namespace).await().indefinitely();
-            jObjectRepository.writeJObject(namespace, new Directory(new UUID(0, 0))).await().indefinitely();
+            jObjectRepository.writeJObject(namespace, new Directory(new UUID(0, 0)).setMode(0755)).await().indefinitely();
         }
         getRoot().await().indefinitely();
     }
@@ -97,7 +97,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     }
 
     @Override
-    public Uni<Optional<File>> create(String name) {
+    public Uni<Optional<File>> create(String name, long mode) {
         // FIXME:
         var root = getRoot().await().indefinitely();
         var found = traverse(root, Path.of(name).getParent()).await().indefinitely();
@@ -107,6 +107,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         var fuuid = UUID.randomUUID();
         File f = new File(fuuid);
+        f.setMode(mode);
 
         jObjectRepository.writeJObject(namespace, f).await().indefinitely();
         dir.getChildren().put(Path.of(name).getFileName().toString(), fuuid);
@@ -116,7 +117,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     }
 
     @Override
-    public Uni<Optional<Directory>> mkdir(String name) {
+    public Uni<Optional<Directory>> mkdir(String name, long mode) {
         // FIXME:
         var root = getRoot().await().indefinitely();
         var found = traverse(root, Path.of(name).getParent()).await().indefinitely();
@@ -126,6 +127,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         var duuid = UUID.randomUUID();
         Directory d = new Directory(duuid);
+        d.setMode(mode);
 
         jObjectRepository.writeJObject(namespace, d).await().indefinitely();
         dir.getChildren().put(Path.of(name).getFileName().toString(), duuid);
@@ -174,6 +176,18 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         dir.getChildren().put(Path.of(to).getFileName().toString(), dent.get().getUuid());
         jObjectRepository.writeJObject(namespace, dir).await().indefinitely();
+
+        return Uni.createFrom().item(true);
+    }
+
+    @Override
+    public Uni<Boolean> chmod(String name, long mode) {
+        var dent = getDirEntry(name).await().indefinitely();
+        if (dent.isEmpty()) return Uni.createFrom().item(false);
+
+        dent.get().setMode(mode);
+
+        jObjectRepository.writeJObject(namespace, dent.get()).await().indefinitely();
 
         return Uni.createFrom().item(true);
     }
