@@ -46,7 +46,7 @@ public class DhfsFuse extends FuseStubFS {
         try {
             found = fileService.getDirEntry(path).await().indefinitely();
         } catch (Exception e) {
-            Log.error(e);
+            Log.error("When accessing " + path, e);
             return -ErrorCodes.ENOENT();
         }
         if (found.isEmpty()) {

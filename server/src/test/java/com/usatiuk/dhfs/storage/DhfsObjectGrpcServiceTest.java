@@ -4,14 +4,21 @@ import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.storage.objects.api.*;
 import io.quarkus.grpc.GrpcClient;
 import io.quarkus.test.junit.QuarkusTest;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.List;
 
+class Profiles {
+    public static class DhfsObjectGrpcServiceTestProfile implements QuarkusTestProfile {
+    }
+}
+
 @QuarkusTest
+@TestProfile(Profiles.DhfsObjectGrpcServiceTestProfile.class)
 class DhfsObjectGrpcServiceTest extends SimpleFileRepoTest {
     @GrpcClient
     DhfsObjectGrpc dhfsObjectGrpc;

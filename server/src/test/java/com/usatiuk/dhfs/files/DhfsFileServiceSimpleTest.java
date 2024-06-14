@@ -7,13 +7,22 @@ import com.usatiuk.dhfs.storage.files.service.DhfsFileService;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectRepository;
 import com.usatiuk.dhfs.storage.objects.repository.ObjectRepository;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
 
+class Profiles {
+    public static class DhfsFileServiceSimpleTestProfile implements QuarkusTestProfile {
+    }
+}
+
+
 @QuarkusTest
+@TestProfile(Profiles.DhfsFileServiceSimpleTestProfile.class)
 public class DhfsFileServiceSimpleTest extends SimpleFileRepoTest {
     @Inject
     DhfsFileService fileService;
