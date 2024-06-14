@@ -18,6 +18,7 @@ import ru.serce.jnrfuse.FuseFillDir;
 import ru.serce.jnrfuse.FuseStubFS;
 import ru.serce.jnrfuse.struct.FileStat;
 import ru.serce.jnrfuse.struct.FuseFileInfo;
+import ru.serce.jnrfuse.struct.Statvfs;
 
 import java.nio.file.Paths;
 import java.util.Optional;
@@ -37,7 +38,19 @@ public class DhfsFuse extends FuseStubFS {
         Paths.get(root).toFile().mkdirs();
         Log.info("Mounting with root " + root);
 
-        mount(Paths.get(root));
+        mount(Paths.get(root), false, true);
+    }
+
+    @Override
+    public int statfs(String path, Statvfs stbuf) {
+        //FIXME:
+        if ("/".equals(path)) {
+            stbuf.f_blocks.set(1024 * 1024); // total data blocks in file system
+            stbuf.f_frsize.set(1024);        // fs block size
+            stbuf.f_bfree.set(1024 * 1024);  // free blocks in fs
+            stbuf.f_bavail.set(1024 * 1024); // avail blocks in fs
+        }
+        return super.statfs(path, stbuf);
     }
 
     @Override
@@ -95,6 +108,34 @@ public class DhfsFuse extends FuseStubFS {
     public int create(String path, long mode, FuseFileInfo fi) {
         var ret = fileService.create(path).await().indefinitely();
         if (ret.isEmpty()) return -ErrorCodes.ENOSPC();
+        else return 0;
+    }
+
+    @Override
+    public int mkdir(String path, long mode) {
+        var ret = fileService.mkdir(path).await().indefinitely();
+        if (ret.isEmpty()) return -ErrorCodes.ENOSPC();
+        else return 0;
+    }
+
+    @Override
+    public int rmdir(String path) {
+        var ret = fileService.rmdir(path).await().indefinitely();
+        if (!ret) return -ErrorCodes.ENOENT();
+        else return 0;
+    }
+
+    @Override
+    public int rename(String path, String newName) {
+        var ret = fileService.rename(path, newName).await().indefinitely();
+        if (!ret) return -ErrorCodes.ENOENT();
+        else return 0;
+    }
+
+    @Override
+    public int unlink(String path) {
+        var ret = fileService.unlink(path).await().indefinitely();
+        if (!ret) return -ErrorCodes.ENOENT();
         else return 0;
     }
 

@@ -11,6 +11,10 @@ public interface DhfsFileService {
     Uni<Optional<DirEntry>> getDirEntry(String name);
     Uni<Optional<File>> open(String name);
     Uni<Optional<File>> create(String name);
+    Uni<Optional<Directory>> mkdir(String name);
+    Uni<Boolean> rmdir(String name);
+    Uni<Boolean> unlink(String name);
+    Uni<Boolean> rename(String from, String to);
     Uni<Iterable<String>> readDir(String name);
 
     Uni<Long> size(File f);

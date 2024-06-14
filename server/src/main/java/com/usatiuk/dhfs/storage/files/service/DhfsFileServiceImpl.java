@@ -114,6 +114,69 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     }
 
     @Override
+    public Uni<Optional<Directory>> mkdir(String name) {
+        // FIXME:
+        var root = getRoot().await().indefinitely();
+        var found = traverse(root, Path.of(name).getParent()).await().indefinitely();
+        if (found.isEmpty()) return Uni.createFrom().item(Optional.empty());
+
+        if (!(found.get() instanceof Directory dir)) return Uni.createFrom().item(Optional.empty());
+
+        var duuid = UUID.randomUUID();
+        Directory d = new Directory(duuid);
+
+        jObjectRepository.writeJObject(namespace, d).await().indefinitely();
+        dir.getChildren().add(Pair.of(Path.of(name).getFileName().toString(), duuid));
+        jObjectRepository.writeJObject(namespace, dir).await().indefinitely();
+
+        return Uni.createFrom().item(Optional.of(d));
+    }
+
+    private Uni<Boolean> rmdent(String name) {
+        // FIXME:
+        var root = getRoot().await().indefinitely();
+        var found = traverse(root, Path.of(name).getParent()).await().indefinitely();
+        if (found.isEmpty()) return Uni.createFrom().item(false);
+
+        if (!(found.get() instanceof Directory dir)) return Uni.createFrom().item(false);
+
+        boolean removed = dir.getChildren().removeIf(p -> p.getLeft().equals(Path.of(name).getFileName().toString()));
+        if (removed) jObjectRepository.writeJObject(namespace, dir).await().indefinitely();
+
+        return Uni.createFrom().item(removed);
+    }
+
+    @Override
+    public Uni<Boolean> rmdir(String name) {
+        return rmdent(name);
+    }
+
+    @Override
+    public Uni<Boolean> unlink(String name) {
+        return rmdent(name);
+    }
+
+    @Override
+    public Uni<Boolean> rename(String from, String to) {
+        var dent = getDirEntry(from).await().indefinitely();
+        if (dent.isEmpty()) return Uni.createFrom().item(false);
+        if (!rmdent(from).await().indefinitely()) return Uni.createFrom().item(false);
+
+        // FIXME:
+        var root = getRoot().await().indefinitely();
+        var found = traverse(root, Path.of(to).getParent()).await().indefinitely();
+        if (found.isEmpty()) return Uni.createFrom().item(false);
+
+        if (!(found.get() instanceof Directory dir)) return Uni.createFrom().item(false);
+
+
+        dir.getChildren().add(Pair.of(Path.of(to).getFileName().toString(), dent.get().getUuid()));
+        jObjectRepository.writeJObject(namespace, dir).await().indefinitely();
+
+        return Uni.createFrom().item(true);
+    }
+
+    @Override
     public Uni<Iterable<String>> readDir(String name) {
         var root = getRoot().await().indefinitely();
         var found = traverse(root, Path.of(name)).await().indefinitely();
