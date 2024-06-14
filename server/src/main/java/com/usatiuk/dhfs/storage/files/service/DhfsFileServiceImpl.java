@@ -4,6 +4,7 @@ import com.usatiuk.dhfs.storage.files.objects.Chunk;
 import com.usatiuk.dhfs.storage.files.objects.DirEntry;
 import com.usatiuk.dhfs.storage.files.objects.Directory;
 import com.usatiuk.dhfs.storage.files.objects.File;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObjectRepository;
 import com.usatiuk.dhfs.storage.objects.repository.ObjectRepository;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.Shutdown;
@@ -14,13 +15,8 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import org.apache.commons.io.input.ClassLoaderObjectInputStream;
-import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -34,6 +30,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Inject
     Vertx vertx;
     @Inject
+    JObjectRepository jObjectRepository;
+    @Inject
     ObjectRepository objectRepository;
 
     final static String namespace = "dhfs_files";
@@ -42,10 +40,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         Log.info("Initializing file service");
         if (!objectRepository.existsObject(namespace, new UUID(0, 0).toString()).await().indefinitely()) {
             objectRepository.createNamespace(namespace).await().indefinitely();
-            objectRepository.writeObject(namespace, new UUID(0, 0).toString(),
-                    ByteBuffer.wrap(SerializationUtils.serialize(
-                            new Directory().setUuid(new UUID(0, 0)))
-                    )).await().indefinitely();
+            jObjectRepository.writeJObject(namespace, new Directory(new UUID(0, 0))).await().indefinitely();
         }
         getRoot().await().indefinitely();
     }
@@ -55,34 +50,23 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         Log.info("Shutdown file service");
     }
 
-    // Taken from SerializationUtils
-    public static <T> T deserialize(final InputStream inputStream) {
-        try (ClassLoaderObjectInputStream in = new ClassLoaderObjectInputStream(Thread.currentThread().getContextClassLoader(), inputStream)) {
-            final T obj = (T) in.readObject();
-            return obj;
-        } catch (IOException | ClassNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static <T> T deserialize(final byte[] objectData) {
-        return deserialize(new ByteArrayInputStream(objectData));
-    }
-
-    private Uni<DirEntry> readDirEntry(String uuid) {
-        return objectRepository.readObject(namespace, uuid)
-                .map(o -> deserialize(o.getData().array()));
-    }
-
     private Uni<Optional<DirEntry>> traverse(DirEntry from, Path path) {
         if (path.getNameCount() == 0) return Uni.createFrom().item(Optional.of(from));
+
         if (!(from instanceof Directory dir))
             return Uni.createFrom().item(Optional.empty());
+
         for (var el : dir.getChildren()) {
             if (el.getLeft().equals(path.getName(0).toString())) {
-                var ref = readDirEntry(el.getRight().toString()).await().indefinitely();
-                if (path.getNameCount() == 1) return Uni.createFrom().item(Optional.of(ref));
-                return traverse(ref, path.subpath(1, path.getNameCount()));
+                var ref = jObjectRepository.readJObjectChecked(namespace, el.getRight().toString(), DirEntry.class)
+                        .await().indefinitely();
+                if (!ref.isPresent()) {
+                    Log.error("File missing when traversing directory " + from.getName() + ": " + el.getRight().toString());
+                    return Uni.createFrom().item(Optional.empty());
+                }
+                if (path.getNameCount() == 1) return Uni.createFrom().item(ref);
+
+                return traverse(ref.get(), path.subpath(1, path.getNameCount()));
             }
         }
         return Uni.createFrom().item(Optional.empty());
@@ -100,8 +84,13 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         // FIXME:
         var root = getRoot().await().indefinitely();
         var found = traverse(root, Path.of(name)).await().indefinitely();
-        if (found.isEmpty()) return Uni.createFrom().item(Optional.empty());
-        if (!(found.get() instanceof File)) return Uni.createFrom().item(Optional.empty());
+
+        if (found.isEmpty())
+            return Uni.createFrom().item(Optional.empty());
+
+        if (!(found.get() instanceof File))
+            return Uni.createFrom().item(Optional.empty());
+
         return Uni.createFrom().item(Optional.of((File) found.get()));
     }
 
@@ -111,14 +100,17 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var root = getRoot().await().indefinitely();
         var found = traverse(root, Path.of(name).getParent()).await().indefinitely();
         if (found.isEmpty()) return Uni.createFrom().item(Optional.empty());
+
         if (!(found.get() instanceof Directory dir)) return Uni.createFrom().item(Optional.empty());
+
         var fuuid = UUID.randomUUID();
-        File f = new File();
-        f.setUuid(fuuid);
-        objectRepository.writeObject(namespace, fuuid.toString(), ByteBuffer.wrap(SerializationUtils.serialize(f))).await().indefinitely();
+        File f = new File(fuuid);
+
+        jObjectRepository.writeJObject(namespace, f).await().indefinitely();
         dir.getChildren().add(Pair.of(Path.of(name).getFileName().toString(), fuuid));
-        objectRepository.writeObject(namespace, dir.getUuid().toString(), ByteBuffer.wrap(SerializationUtils.serialize(dir))).await().indefinitely();
-        return Uni.createFrom().item(Optional.of((File) f));
+        jObjectRepository.writeJObject(namespace, dir).await().indefinitely();
+
+        return Uni.createFrom().item(Optional.of(f));
     }
 
     @Override
@@ -126,18 +118,19 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var root = getRoot().await().indefinitely();
         var found = traverse(root, Path.of(name)).await().indefinitely();
         if (found.isEmpty()) throw new IllegalArgumentException();
-        if (!(found.get() instanceof Directory)) throw new IllegalArgumentException();
+        if (!(found.get() instanceof Directory foundDir)) throw new IllegalArgumentException();
 
-        var foundDir = (Directory) found.get();
         return Uni.createFrom().item(foundDir.getChildren().stream().map(Pair::getLeft).toList());
     }
 
     @Override
     public Uni<Optional<byte[]>> read(String fileUuid, long offset, int length) {
-        var read = objectRepository.readObject(namespace, fileUuid).map(o -> deserialize(o.getData().array())).await().indefinitely();
-        if (!(read instanceof File file)) {
+        var fileOpt = jObjectRepository.readJObjectChecked(namespace, fileUuid, File.class).await().indefinitely();
+        if (fileOpt.isEmpty()) {
+            Log.error("File not found when trying to read: " + fileUuid);
             return Uni.createFrom().item(Optional.empty());
         }
+        var file = fileOpt.get();
 
         var chunksAll = file.getChunks();
         var chunks = chunksAll.tailMap(chunksAll.floorKey(offset)).entrySet().iterator();
@@ -155,14 +148,14 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             long toReadInChunk = (offset + length) - curPos;
 
             var chunkUuid = chunk.getValue();
-            var chunkRead = objectRepository.readObject(namespace, chunkUuid).map(o -> deserialize(o.getData().array())).await().indefinitely();
+            var chunkRead = jObjectRepository.readJObjectChecked(namespace, chunkUuid, Chunk.class).await().indefinitely();
 
-            if (!(chunkRead instanceof Chunk chunkObj)) {
-                Log.error("Chunk requested not a chunk: " + chunkUuid);
+            if (chunkRead.isEmpty()) {
+                Log.error("Chunk requested not found: " + chunkUuid);
                 return Uni.createFrom().item(Optional.empty());
             }
 
-            var chunkBytes = chunkObj.getBytes();
+            var chunkBytes = chunkRead.get().getBytes();
 
             long readableLen = chunkBytes.length - offInChunk;
 
@@ -183,10 +176,12 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Override
     public Uni<Long> write(String fileUuid, long offset, byte[] data) {
-        var read = objectRepository.readObject(namespace, fileUuid).map(o -> deserialize(o.getData().array())).await().indefinitely();
-        if (!(read instanceof File file)) {
+        var fileOpt = jObjectRepository.readJObjectChecked(namespace, fileUuid, File.class).await().indefinitely();
+        if (fileOpt.isEmpty()) {
+            Log.error("File not found when trying to read: " + fileUuid);
             return Uni.createFrom().item(-1L);
         }
+        var file = fileOpt.get();
 
         var chunksAll = file.getChunks();
 
@@ -200,62 +195,63 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (first != null && first.getKey() < offset) {
             var chunkUuid = first.getValue();
-            var chunkRead = objectRepository.readObject(namespace, chunkUuid).map(o -> deserialize(o.getData().array())).await().indefinitely();
-            if (!(chunkRead instanceof Chunk chunkObj)) {
-                Log.error("Chunk requested not a chunk: " + chunkUuid);
+            var chunkRead = jObjectRepository.readJObjectChecked(namespace, chunkUuid, Chunk.class).await().indefinitely();
+
+            if (chunkRead.isEmpty()) {
+                Log.error("Chunk requested not found: " + chunkUuid);
                 return Uni.createFrom().item(-1L);
             }
 
-            var chunkBytes = chunkObj.getBytes();
+            var chunkBytes = chunkRead.get().getBytes();
             Chunk newChunk = new Chunk(Arrays.copyOfRange(chunkBytes, 0, (int) (offset - first.getKey())));
-            objectRepository.writeObject(namespace, newChunk.getHash(), ByteBuffer.wrap(SerializationUtils.serialize(newChunk))).await().indefinitely();
+            jObjectRepository.writeJObject(namespace, newChunk).await().indefinitely();
 
             newChunks.put(first.getKey(), newChunk.getHash());
         }
 
         {
             Chunk newChunk = new Chunk(data);
-            objectRepository.writeObject(namespace, newChunk.getHash(), ByteBuffer.wrap(SerializationUtils.serialize(newChunk))).await().indefinitely();
+            jObjectRepository.writeJObject(namespace, newChunk).await().indefinitely();
 
             newChunks.put(offset, newChunk.getHash());
         }
         if (last != null) {
             var lchunkUuid = last.getValue();
-            var lchunkRead = objectRepository.readObject(namespace, lchunkUuid).map(o -> deserialize(o.getData().array())).await().indefinitely();
-            if (!(lchunkRead instanceof Chunk lchunkObj)) {
-                Log.error("Chunk requested not a chunk: " + lchunkUuid);
+            var lchunkRead = jObjectRepository.readJObjectChecked(namespace, lchunkUuid, Chunk.class).await().indefinitely();
+
+            if (lchunkRead.isEmpty()) {
+                Log.error("Chunk requested not found: " + lchunkUuid);
                 return Uni.createFrom().item(-1L);
             }
 
-            var lchunkBytes = lchunkObj.getBytes();
+            var lchunkBytes = lchunkRead.get().getBytes();
 
             if (last.getKey() + lchunkBytes.length > offset + data.length) {
                 int start = (int) ((offset + data.length) - last.getKey());
                 Chunk newChunk = new Chunk(Arrays.copyOfRange(lchunkBytes, start, lchunkBytes.length - start));
-                objectRepository.writeObject(namespace, newChunk.getHash(), ByteBuffer.wrap(SerializationUtils.serialize(newChunk))).await().indefinitely();
+                jObjectRepository.writeJObject(namespace, newChunk).await().indefinitely();
 
                 newChunks.put(first.getKey(), newChunk.getHash());
             }
         }
 
-        objectRepository.writeObject(namespace, fileUuid, ByteBuffer.wrap(SerializationUtils.serialize(
-                new File().setChunks(newChunks).setUuid(file.getUuid())
-        ))).await().indefinitely();
+        jObjectRepository.writeJObject(namespace, new File(UUID.fromString(fileUuid)).setChunks(newChunks)).await().indefinitely();
 
         return Uni.createFrom().item((long) data.length);
     }
 
     @Override
     public Uni<Boolean> truncate(String fileUuid, long length) {
-        var read = objectRepository.readObject(namespace, fileUuid).map(o -> deserialize(o.getData().array())).await().indefinitely();
-        if (!(read instanceof File file)) {
+        var fileOpt = jObjectRepository.readJObjectChecked(namespace, fileUuid, File.class).await().indefinitely();
+        if (fileOpt.isEmpty()) {
+            Log.error("File not found when trying to read: " + fileUuid);
             return Uni.createFrom().item(false);
         }
+        var file = fileOpt.get();
 
         if (length == 0) {
-            objectRepository.writeObject(namespace, fileUuid, ByteBuffer.wrap(SerializationUtils.serialize(
-                    new File().setChunks(new TreeMap<>()).setUuid(file.getUuid())
-            ))).await().indefinitely();
+            jObjectRepository.writeJObject(namespace, new File(UUID.fromString(fileUuid)).setChunks(new TreeMap<>()))
+                    .await().indefinitely();
             return Uni.createFrom().item(true);
         }
 
@@ -267,26 +263,25 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (lastChunk != null) {
             var chunkUuid = lastChunk.getValue();
-            var chunkRead = objectRepository.readObject(namespace, chunkUuid).map(o -> deserialize(o.getData().array())).await().indefinitely();
-            if (!(chunkRead instanceof Chunk chunkObj)) {
-                Log.error("Chunk requested not a chunk: " + chunkUuid);
+            var chunkRead = jObjectRepository.readJObjectChecked(namespace, chunkUuid, Chunk.class).await().indefinitely();
+
+            if (chunkRead.isEmpty()) {
+                Log.error("Chunk requested not found: " + chunkUuid);
                 return Uni.createFrom().item(false);
             }
 
-            var chunkBytes = chunkObj.getBytes();
+            var chunkBytes = chunkRead.get().getBytes();
 
             if (lastChunk.getKey() + chunkBytes.length > 0) {
                 int start = (int) (length - lastChunk.getKey());
                 Chunk newChunk = new Chunk(Arrays.copyOfRange(chunkBytes, 0, (int) (length - start)));
-                objectRepository.writeObject(namespace, newChunk.getHash(), ByteBuffer.wrap(SerializationUtils.serialize(newChunk))).await().indefinitely();
+                jObjectRepository.writeJObject(namespace, newChunk).await().indefinitely();
 
                 newChunks.put(lastChunk.getKey(), newChunk.getHash());
             }
         }
 
-        objectRepository.writeObject(namespace, fileUuid, ByteBuffer.wrap(SerializationUtils.serialize(
-                new File().setChunks(new TreeMap<>(newChunks)).setUuid(file.getUuid())
-        ))).await().indefinitely();
+        jObjectRepository.writeJObject(namespace, new File(UUID.fromString(fileUuid)).setChunks(new TreeMap<>(newChunks))).await().indefinitely();
 
         return Uni.createFrom().item(true);
     }
@@ -296,21 +291,26 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         int size = 0;
         //FIXME:
         for (var chunk : f.getChunks().entrySet()) {
-            var lchunkUuid = chunk.getValue();
-            var lchunkRead = objectRepository.readObject(namespace, lchunkUuid).map(o -> deserialize(o.getData().array())).await().indefinitely();
-            if (!(lchunkRead instanceof Chunk lchunkObj)) {
-                Log.error("Chunk requested not a chunk: " + lchunkUuid);
+            var chunkUuid = chunk.getValue();
+            var chunkRead = jObjectRepository.readJObjectChecked(namespace, chunkUuid, Chunk.class).await().indefinitely();
+
+            if (chunkRead.isEmpty()) {
+                Log.error("Chunk requested not found: " + chunkUuid);
                 return Uni.createFrom().item(-1L);
             }
 
-            var lchunkBytes = lchunkObj.getBytes();
-            size += lchunkBytes.length;
+            var chunkBytes = chunkRead.get().getBytes();
+            size += chunkBytes.length;
         }
         return Uni.createFrom().item((long) size);
     }
 
     @Override
     public Uni<Directory> getRoot() {
-        return readDirEntry(new UUID(0, 0).toString()).map(d -> (Directory) d);
+        var read = jObjectRepository.readJObjectChecked(namespace, new UUID(0, 0).toString(), DirEntry.class).await().indefinitely();
+        if (read.isEmpty() || !(read.get() instanceof Directory)) {
+            Log.error("Root directory not found");
+        }
+        return Uni.createFrom().item((Directory) read.get());
     }
 }

@@ -1,12 +1,12 @@
 package com.usatiuk.dhfs.storage.objects.api;
 
 import com.google.protobuf.ByteString;
+import com.usatiuk.dhfs.storage.objects.data.Namespace;
+import com.usatiuk.dhfs.storage.objects.data.Object;
 import com.usatiuk.dhfs.storage.objects.repository.ObjectRepository;
 import io.quarkus.grpc.GrpcService;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
-
-import java.nio.ByteBuffer;
 
 @GrpcService
 public class DhfsObjectGrpcService implements DhfsObjectGrpc {
@@ -29,7 +29,8 @@ public class DhfsObjectGrpcService implements DhfsObjectGrpc {
 
     @Override
     public Uni<WriteObjectReply> writeObject(WriteObjectRequest request) {
-        return objectRepository.writeObject(request.getNamespace(), request.getName(), ByteBuffer.wrap(request.getData().toByteArray()))
+        return objectRepository.writeObject(request.getNamespace(),
+                        new Object(new Namespace(request.getNamespace()), request.getName(), request.getData().toByteArray()))
                 .map(n -> WriteObjectReply.newBuilder().build());
     }
 

@@ -4,14 +4,13 @@ import com.usatiuk.dhfs.storage.SimpleFileRepoTest;
 import com.usatiuk.dhfs.storage.files.objects.Chunk;
 import com.usatiuk.dhfs.storage.files.objects.File;
 import com.usatiuk.dhfs.storage.files.service.DhfsFileService;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObjectRepository;
 import com.usatiuk.dhfs.storage.objects.repository.ObjectRepository;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
-import org.apache.commons.lang3.SerializationUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.nio.ByteBuffer;
 import java.util.UUID;
 
 @QuarkusTest
@@ -20,6 +19,8 @@ public class DhfsFileServiceSimpleTest extends SimpleFileRepoTest {
     DhfsFileService fileService;
     @Inject
     ObjectRepository objectRepository;
+    @Inject
+    JObjectRepository jObjectRepository;
 
     @Test
     void readTest() {
@@ -28,7 +29,7 @@ public class DhfsFileServiceSimpleTest extends SimpleFileRepoTest {
             Chunk c1 = new Chunk("12345".getBytes());
             Chunk c2 = new Chunk("678".getBytes());
             Chunk c3 = new Chunk("91011".getBytes());
-            File f = new File();
+            File f = new File(fuuid);
             f.getChunks().put(0L, c1.getHash());
             f.getChunks().put((long) c1.getBytes().length, c2.getHash());
             f.getChunks().put((long) c1.getBytes().length + c2.getBytes().length, c3.getHash());
@@ -37,10 +38,10 @@ public class DhfsFileServiceSimpleTest extends SimpleFileRepoTest {
 
             objectRepository.createNamespace("dhfs_files");
 
-            objectRepository.writeObject("dhfs_files", c1.getHash(), ByteBuffer.wrap(SerializationUtils.serialize(c1))).await().indefinitely();
-            objectRepository.writeObject("dhfs_files", c2.getHash(), ByteBuffer.wrap(SerializationUtils.serialize(c2))).await().indefinitely();
-            objectRepository.writeObject("dhfs_files", c3.getHash(), ByteBuffer.wrap(SerializationUtils.serialize(c3))).await().indefinitely();
-            objectRepository.writeObject("dhfs_files", fuuid.toString(), ByteBuffer.wrap(SerializationUtils.serialize(f))).await().indefinitely();
+            jObjectRepository.writeJObject("dhfs_files", c1).await().indefinitely();
+            jObjectRepository.writeJObject("dhfs_files", c2).await().indefinitely();
+            jObjectRepository.writeJObject("dhfs_files", c3).await().indefinitely();
+            jObjectRepository.writeJObject("dhfs_files", f).await().indefinitely();
         }
 
         String all = "1234567891011";

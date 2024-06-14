@@ -8,16 +8,16 @@ import io.smallrye.mutiny.Uni;
 import java.util.Optional;
 
 public interface DhfsFileService {
-    public Uni<Optional<DirEntry>> getDirEntry(String name);
-    public Uni<Optional<File>> open(String name);
-    public Uni<Optional<File>> create(String name);
-    public Uni<Iterable<String>> readDir(String name);
+    Uni<Optional<DirEntry>> getDirEntry(String name);
+    Uni<Optional<File>> open(String name);
+    Uni<Optional<File>> create(String name);
+    Uni<Iterable<String>> readDir(String name);
 
-    public Uni<Long> size(File f);
+    Uni<Long> size(File f);
 
-    public Uni<Optional<byte[]>> read(String fileUuid, long offset, int length);
-    public Uni<Long> write(String fileUuid, long offset, byte[] data);
-    public Uni<Boolean> truncate(String fileUuid, long length);
+    Uni<Optional<byte[]>> read(String fileUuid, long offset, int length);
+    Uni<Long> write(String fileUuid, long offset, byte[] data);
+    Uni<Boolean> truncate(String fileUuid, long length);
 
-    public Uni<Directory> getRoot();
+    Uni<Directory> getRoot();
 }

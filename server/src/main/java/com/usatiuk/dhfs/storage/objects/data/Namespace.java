@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.data;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
@@ -7,6 +8,7 @@ import lombok.experimental.Accessors;
 @Accessors(chain = true)
 @Getter
 @Setter
+@AllArgsConstructor
 public class Namespace {
-    String name;
+    final String name;
 }

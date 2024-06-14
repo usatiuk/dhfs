@@ -1,17 +1,17 @@
 package com.usatiuk.dhfs.storage.objects.data;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
-import java.nio.ByteBuffer;
-
 @Accessors(chain = true)
 @Getter
 @Setter
+@AllArgsConstructor
 public class Object {
-    Namespace namespace;
+    final Namespace namespace;
 
-    String name;
-    ByteBuffer data;
+    final String name;
+    final byte[] data;
 }

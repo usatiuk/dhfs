@@ -13,5 +13,9 @@ import java.util.UUID;
 @Getter
 @Setter
 public class Directory extends DirEntry {
+    public Directory(UUID uuid) {
+        super(uuid);
+    }
+
     Collection<Pair<String, UUID>> children = new ArrayList<>();
 }

@@ -18,7 +18,6 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.annotation.Nonnull;
-import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -68,24 +67,20 @@ public class SimpleFileObjectRepository implements ObjectRepository {
     @Nonnull
     @Override
     public Uni<Object> readObject(String namespace, String name) {
-        var ret = new Object();
-
-        ret.setName(name)
-                .setNamespace(new Namespace().setName(namespace));
         var file = Path.of(root, namespace, name);
 
         if (!file.toFile().exists())
             throw new StatusRuntimeException(Status.NOT_FOUND);
 
-        return vertx.fileSystem().readFile(file.toString()).map(r -> ret.setData(ByteBuffer.wrap(r.getBytes())));
+        return vertx.fileSystem().readFile(file.toString()).map(r -> new Object(new Namespace(namespace), name, r.getBytes()));
     }
 
     @Nonnull
     @Override
-    public Uni<Void> writeObject(String namespace, String name, ByteBuffer data) {
-        var file = Path.of(root, namespace, name);
+    public Uni<Void> writeObject(String namespace, Object object) {
+        var file = Path.of(root, namespace, object.getName());
 
-        return vertx.fileSystem().writeFile(file.toString(), Buffer.buffer(data.array()));
+        return vertx.fileSystem().writeFile(file.toString(), Buffer.buffer(object.getData()));
     }
 
     @Nonnull
