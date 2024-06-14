@@ -3,10 +3,9 @@ package com.usatiuk.dhfs.storage.files.objects;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
-import org.apache.commons.lang3.tuple.Pair;
 
-import java.util.ArrayList;
-import java.util.Collection;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 
 @Accessors(chain = true)
@@ -17,5 +16,5 @@ public class Directory extends DirEntry {
         super(uuid);
     }
 
-    Collection<Pair<String, UUID>> children = new ArrayList<>();
+    Map<String, UUID> children = new TreeMap<>();
 }

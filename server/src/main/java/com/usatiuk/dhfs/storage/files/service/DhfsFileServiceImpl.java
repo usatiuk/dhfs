@@ -15,7 +15,6 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import org.apache.commons.lang3.tuple.Pair;
 
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
@@ -56,20 +55,23 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         if (!(from instanceof Directory dir))
             return Uni.createFrom().item(Optional.empty());
 
-        for (var el : dir.getChildren()) {
-            if (el.getLeft().equals(path.getName(0).toString())) {
-                var ref = jObjectRepository.readJObjectChecked(namespace, el.getRight().toString(), DirEntry.class)
-                        .await().indefinitely();
-                if (!ref.isPresent()) {
-                    Log.error("File missing when traversing directory " + from.getName() + ": " + el.getRight().toString());
-                    return Uni.createFrom().item(Optional.empty());
-                }
-                if (path.getNameCount() == 1) return Uni.createFrom().item(ref);
+        var pathFirstPart = path.getName(0).toString();
 
-                return traverse(ref.get(), path.subpath(1, path.getNameCount()));
-            }
+        var found = dir.getChildren().get(pathFirstPart);
+        if (found == null)
+            return Uni.createFrom().item(Optional.empty());
+
+        var ref = jObjectRepository.readJObjectChecked(namespace, found.toString(), DirEntry.class)
+                .await().indefinitely();
+
+        if (!ref.isPresent()) {
+            Log.error("File missing when traversing directory " + from.getName() + ": " + found);
+            return Uni.createFrom().item(Optional.empty());
         }
-        return Uni.createFrom().item(Optional.empty());
+
+        if (path.getNameCount() == 1) return Uni.createFrom().item(ref);
+
+        return traverse(ref.get(), path.subpath(1, path.getNameCount()));
     }
 
     @Override
@@ -107,7 +109,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         File f = new File(fuuid);
 
         jObjectRepository.writeJObject(namespace, f).await().indefinitely();
-        dir.getChildren().add(Pair.of(Path.of(name).getFileName().toString(), fuuid));
+        dir.getChildren().put(Path.of(name).getFileName().toString(), fuuid);
         jObjectRepository.writeJObject(namespace, dir).await().indefinitely();
 
         return Uni.createFrom().item(Optional.of(f));
@@ -126,7 +128,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         Directory d = new Directory(duuid);
 
         jObjectRepository.writeJObject(namespace, d).await().indefinitely();
-        dir.getChildren().add(Pair.of(Path.of(name).getFileName().toString(), duuid));
+        dir.getChildren().put(Path.of(name).getFileName().toString(), duuid);
         jObjectRepository.writeJObject(namespace, dir).await().indefinitely();
 
         return Uni.createFrom().item(Optional.of(d));
@@ -140,10 +142,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (!(found.get() instanceof Directory dir)) return Uni.createFrom().item(false);
 
-        boolean removed = dir.getChildren().removeIf(p -> p.getLeft().equals(Path.of(name).getFileName().toString()));
-        if (removed) jObjectRepository.writeJObject(namespace, dir).await().indefinitely();
+        var removed = dir.getChildren().remove(Path.of(name).getFileName().toString());
+        if (removed != null) jObjectRepository.writeJObject(namespace, dir).await().indefinitely();
 
-        return Uni.createFrom().item(removed);
+        return Uni.createFrom().item(removed != null);
     }
 
     @Override
@@ -170,7 +172,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         if (!(found.get() instanceof Directory dir)) return Uni.createFrom().item(false);
 
 
-        dir.getChildren().add(Pair.of(Path.of(to).getFileName().toString(), dent.get().getUuid()));
+        dir.getChildren().put(Path.of(to).getFileName().toString(), dent.get().getUuid());
         jObjectRepository.writeJObject(namespace, dir).await().indefinitely();
 
         return Uni.createFrom().item(true);
@@ -183,7 +185,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         if (found.isEmpty()) throw new IllegalArgumentException();
         if (!(found.get() instanceof Directory foundDir)) throw new IllegalArgumentException();
 
-        return Uni.createFrom().item(foundDir.getChildren().stream().map(Pair::getLeft).toList());
+        return Uni.createFrom().item(foundDir.getChildren().keySet().stream().toList());
     }
 
     @Override
