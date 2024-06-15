@@ -10,7 +10,7 @@ import java.util.Objects;
 
 @QuarkusTest
 public abstract class SimpleFileRepoTest {
-    @ConfigProperty(name = "dhfs.filerepo.root")
+    @ConfigProperty(name = "dhfs.objects.persistence.files.root")
     String tempDirectory;
 
     void purgeDirectory(File dir) {
