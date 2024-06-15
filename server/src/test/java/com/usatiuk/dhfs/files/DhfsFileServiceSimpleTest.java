@@ -39,9 +39,12 @@ public class DhfsFileServiceSimpleTest extends SimpleFileRepoTest {
             Chunk c2 = new Chunk("678".getBytes());
             Chunk c3 = new Chunk("91011".getBytes());
             File f = new File(fuuid);
-            f.getChunks().put(0L, c1.getHash());
-            f.getChunks().put((long) c1.getBytes().length, c2.getHash());
-            f.getChunks().put((long) c1.getBytes().length + c2.getBytes().length, c3.getHash());
+            Assertions.assertDoesNotThrow(() -> f.runWriteLocked(fileData -> {
+                fileData.getChunks().put(0L, c1.getHash());
+                fileData.getChunks().put((long) c1.getBytes().length, c2.getHash());
+                fileData.getChunks().put((long) c1.getBytes().length + c2.getBytes().length, c3.getHash());
+                return null;
+            }));
 
             // FIXME: dhfs_files
 

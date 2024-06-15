@@ -18,10 +18,8 @@ import jakarta.inject.Inject;
 
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.Optional;
-import java.util.TreeMap;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 // Note: this is not actually reactive
 @ApplicationScoped
@@ -57,11 +55,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         var pathFirstPart = path.getName(0).toString();
 
-        var found = dir.getChildren().get(pathFirstPart);
+        var found = dir.getKid(pathFirstPart);
         if (found == null)
             return Uni.createFrom().item(Optional.empty());
 
-        var ref = jObjectManager.get(namespace, found.toString(), DirEntry.class)
+        var ref = jObjectManager.get(namespace, found.get().toString(), DirEntry.class)
                 .await().indefinitely();
 
         if (!ref.isPresent()) {
@@ -110,7 +108,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         f.setMode(mode);
 
         jObjectManager.put(namespace, f).await().indefinitely();
-        dir.getChildren().put(Path.of(name).getFileName().toString(), fuuid);
+
+        if (!dir.putKid(Path.of(name).getFileName().toString(), fuuid))
+            return Uni.createFrom().item(Optional.empty());
+
         jObjectManager.put(namespace, dir).await().indefinitely();
 
         return Uni.createFrom().item(Optional.of(f));
@@ -130,7 +131,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         d.setMode(mode);
 
         jObjectManager.put(namespace, d).await().indefinitely();
-        dir.getChildren().put(Path.of(name).getFileName().toString(), duuid);
+        if (!dir.putKid(Path.of(name).getFileName().toString(), duuid))
+            return Uni.createFrom().item(Optional.empty());
         jObjectManager.put(namespace, dir).await().indefinitely();
 
         return Uni.createFrom().item(Optional.of(d));
@@ -144,10 +146,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (!(found.get() instanceof Directory dir)) return Uni.createFrom().item(false);
 
-        var removed = dir.getChildren().remove(Path.of(name).getFileName().toString());
-        if (removed != null) jObjectManager.put(namespace, dir).await().indefinitely();
+        var removed = dir.removeKid(Path.of(name).getFileName().toString());
+        if (removed) jObjectManager.put(namespace, dir).await().indefinitely();
 
-        return Uni.createFrom().item(removed != null);
+        return Uni.createFrom().item(removed);
     }
 
     @Override
@@ -173,7 +175,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (!(found.get() instanceof Directory dir)) return Uni.createFrom().item(false);
 
-        dir.getChildren().put(Path.of(to).getFileName().toString(), dent.get().getUuid());
+        if (!dir.putKid(Path.of(to).getFileName().toString(), dent.get().getUuid()))
+            return Uni.createFrom().item(false);
         jObjectManager.put(namespace, dir).await().indefinitely();
 
         return Uni.createFrom().item(true);
@@ -198,7 +201,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         if (found.isEmpty()) throw new IllegalArgumentException();
         if (!(found.get() instanceof Directory foundDir)) throw new IllegalArgumentException();
 
-        return Uni.createFrom().item(foundDir.getChildren().keySet().stream().toList());
+        return Uni.createFrom().item(foundDir.getChildrenList());
     }
 
     @Override
@@ -210,9 +213,20 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
         var file = fileOpt.get();
 
-        var chunksAll = file.getChunks();
-        var chunks = chunksAll.tailMap(chunksAll.floorKey(offset)).entrySet().iterator();
+        AtomicReference<List<Map.Entry<Long, String>>> chunksList = new AtomicReference<>();
 
+        try {
+            file.runReadLocked(fileData -> {
+                var chunksAll = fileData.getChunks();
+                chunksList.set(chunksAll.tailMap(chunksAll.floorKey(offset)).entrySet().stream().toList());
+                return null;
+            });
+        } catch (Exception e) {
+            Log.error("Error reading file: " + fileUuid, e);
+            return Uni.createFrom().item(Optional.empty());
+        }
+
+        var chunks = chunksList.get().iterator();
         ByteBuffer buf = ByteBuffer.allocate(length);
 
         long curPos = offset;
@@ -241,10 +255,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             buf.put(chunkBytes, (int) offInChunk, (int) toReadReally);
 
+            curPos += toReadReally;
+
             if (readableLen > toReadInChunk)
                 break;
-            else
-                curPos += readableLen;
 
             if (!chunks.hasNext()) break;
 
@@ -264,7 +278,20 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
         var file = fileOpt.get();
 
-        var chunksAll = file.getChunks();
+        AtomicReference<TreeMap<Long, String>> chunksAllRef = new AtomicReference<>();
+
+        // FIXME:
+        try {
+            file.runReadLocked(fileData -> {
+                chunksAllRef.set(new TreeMap<>(fileData.getChunks()));
+                return null;
+            });
+        } catch (Exception e) {
+            Log.error("Error reading file: " + fileUuid, e);
+            return Uni.createFrom().item(-1L);
+        }
+
+        var chunksAll = chunksAllRef.get();
 
         var first = chunksAll.floorEntry(offset);
         var last = chunksAll.floorEntry((offset + data.length) - 1);
@@ -316,7 +343,16 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
         }
 
-        file.setChunks(newChunks);
+        try {
+            file.runWriteLocked(fileData -> {
+                fileData.getChunks().clear();
+                fileData.getChunks().putAll(newChunks);
+                return null;
+            });
+        } catch (Exception e) {
+            Log.error("Error writing file chunks: " + fileUuid, e);
+            return Uni.createFrom().item(-1L);
+        }
 
         jObjectManager.put(namespace, file).await().indefinitely();
 
@@ -333,12 +369,32 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var file = fileOpt.get();
 
         if (length == 0) {
-            file.setChunks(new TreeMap<>());
+            try {
+                file.runWriteLocked(fileData -> {
+                    fileData.getChunks().clear();
+                    return null;
+                });
+            } catch (Exception e) {
+                Log.error("Error writing file chunks: " + fileUuid, e);
+                return Uni.createFrom().item(false);
+            }
             jObjectManager.put(namespace, file).await().indefinitely();
             return Uni.createFrom().item(true);
         }
 
-        var chunksAll = file.getChunks();
+        AtomicReference<TreeMap<Long, String>> chunksAllRef = new AtomicReference<>();
+
+        try {
+            file.runReadLocked(fileData -> {
+                chunksAllRef.set(new TreeMap<>(fileData.getChunks()));
+                return null;
+            });
+        } catch (Exception e) {
+            Log.error("Error reading file: " + fileUuid, e);
+            return Uni.createFrom().item(false);
+        }
+
+        var chunksAll = chunksAllRef.get();
 
         var newChunks = chunksAll.subMap(0L, length - 1);
 
@@ -364,7 +420,16 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
         }
 
-        file.setChunks(new TreeMap<>(newChunks));
+        try {
+            file.runWriteLocked(fileData -> {
+                fileData.getChunks().clear();
+                fileData.getChunks().putAll(newChunks);
+                return null;
+            });
+        } catch (Exception e) {
+            Log.error("Error writing file chunks: " + fileUuid, e);
+            return Uni.createFrom().item(false);
+        }
 
         jObjectManager.put(namespace, file).await().indefinitely();
 
@@ -375,7 +440,21 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     public Uni<Long> size(File f) {
         int size = 0;
         //FIXME:
-        for (var chunk : f.getChunks().entrySet()) {
+        AtomicReference<TreeMap<Long, String>> chunksAllRef = new AtomicReference<>();
+
+        try {
+            f.runReadLocked(fileData -> {
+                chunksAllRef.set(new TreeMap<>(fileData.getChunks()));
+                return null;
+            });
+        } catch (Exception e) {
+            Log.error("Error reading file: " + f.getUuid(), e);
+            return Uni.createFrom().item(-1L);
+        }
+
+        var chunksAll = chunksAllRef.get();
+
+        for (var chunk : chunksAll.entrySet()) {
             var chunkUuid = chunk.getValue();
             var chunkRead = jObjectManager.get(namespace, chunkUuid, Chunk.class).await().indefinitely();
 

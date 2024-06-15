@@ -2,15 +2,11 @@ package com.usatiuk.dhfs.storage.files.objects;
 
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import lombok.Getter;
-import lombok.Setter;
-import lombok.experimental.Accessors;
 
 import java.util.UUID;
 
-@Accessors(chain = true)
-@Getter
-@Setter
 public abstract class DirEntry extends JObject {
+    @Getter
     final UUID uuid;
 
     protected DirEntry(UUID uuid) {
@@ -23,4 +19,13 @@ public abstract class DirEntry extends JObject {
     }
 
     long mode;
+
+    public synchronized long getMode() {
+        return mode;
+    }
+
+    public synchronized DirEntry setMode(long mode) {
+        this.mode = mode;
+        return this;
+    }
 }
