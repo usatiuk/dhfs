@@ -46,20 +46,20 @@ public abstract class FsNode extends JObject {
     }
 
     public <R> R runReadLocked(FsNodeFunction<R> fn) {
-        lock.readLock().lock();
+        _lock.readLock().lock();
         try {
             return fn.apply(_fsNodeData);
         } finally {
-            lock.readLock().unlock();
+            _lock.readLock().unlock();
         }
     }
 
     public <R> R runWriteLocked(Function<FsNodeData, R> fn) {
-        lock.writeLock().lock();
+        _lock.writeLock().lock();
         try {
             return fn.apply(_fsNodeData);
         } finally {
-            lock.writeLock().unlock();
+            _lock.writeLock().unlock();
         }
     }
 

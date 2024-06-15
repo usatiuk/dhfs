@@ -10,15 +10,15 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public abstract class JObject implements Serializable {
     public abstract String getName();
 
-    protected final ReadWriteLock lock = new ReentrantReadWriteLock();
+    protected final ReadWriteLock _lock = new ReentrantReadWriteLock();
 
     @Serial
     private void writeObject(ObjectOutputStream oos) throws IOException {
-        lock.readLock().lock();
+        _lock.readLock().lock();
         try {
             oos.defaultWriteObject();
         } finally {
-            lock.readLock().unlock();
+            _lock.readLock().unlock();
         }
     }
 }

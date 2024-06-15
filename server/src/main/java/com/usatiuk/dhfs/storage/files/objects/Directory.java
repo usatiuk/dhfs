@@ -27,20 +27,20 @@ public class Directory extends FsNode {
     }
 
     public <R> R runReadLocked(DirectoryFunction<R> fn) {
-        lock.readLock().lock();
+        _lock.readLock().lock();
         try {
             return fn.apply(_fsNodeData, _directoryData);
         } finally {
-            lock.readLock().unlock();
+            _lock.readLock().unlock();
         }
     }
 
     public <R> R runWriteLocked(DirectoryFunction<R> fn) {
-        lock.writeLock().lock();
+        _lock.writeLock().lock();
         try {
             return fn.apply(_fsNodeData, _directoryData);
         } finally {
-            lock.writeLock().unlock();
+            _lock.writeLock().unlock();
         }
     }
 

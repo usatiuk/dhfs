@@ -29,20 +29,20 @@ public class File extends FsNode {
     }
 
     public <R> R runReadLocked(FileFunction<R> fn) {
-        lock.readLock().lock();
+        _lock.readLock().lock();
         try {
             return fn.apply(_fsNodeData, _fileData);
         } finally {
-            lock.readLock().unlock();
+            _lock.readLock().unlock();
         }
     }
 
     public <R> R runWriteLocked(FileFunction<R> fn) {
-        lock.writeLock().lock();
+        _lock.writeLock().lock();
         try {
             return fn.apply(_fsNodeData, _fileData);
         } finally {
-            lock.writeLock().unlock();
+            _lock.writeLock().unlock();
         }
     }
 }
