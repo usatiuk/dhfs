@@ -10,8 +10,8 @@ import lombok.experimental.Accessors;
 @Setter
 @AllArgsConstructor
 public class Object {
-    final Namespace namespace;
+    final Namespace _namespace;
 
-    final String name;
-    final byte[] data;
+    final String _name;
+    final byte[] _data;
 }

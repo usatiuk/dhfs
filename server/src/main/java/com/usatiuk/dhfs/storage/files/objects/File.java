@@ -6,33 +6,41 @@ import java.io.Serializable;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.UUID;
-import java.util.function.Function;
 
-public class File extends DirEntry {
+public class File extends FsNode {
     public File(UUID uuid) {
         super(uuid);
     }
 
-    @Getter
-    public static class FileData implements Serializable {
-        final NavigableMap<Long, String> chunks = new TreeMap<>();
+    public File(UUID uuid, long mode) {
+        super(uuid, mode);
     }
 
-    final FileData fileData = new FileData();
+    @Getter
+    public static class FileData implements Serializable {
+        private final NavigableMap<Long, String> _chunks = new TreeMap<>();
+    }
 
-    public <T> T runReadLocked(Function<FileData, T> fn) throws Exception {
+    final FileData _fileData = new FileData();
+
+    @FunctionalInterface
+    public interface FileFunction<R> {
+        R apply(FsNodeData fsNodeData, FileData fileData);
+    }
+
+    public <R> R runReadLocked(FileFunction<R> fn) {
         lock.readLock().lock();
         try {
-            return fn.apply(fileData);
+            return fn.apply(_fsNodeData, _fileData);
         } finally {
             lock.readLock().unlock();
         }
     }
 
-    public <T> T runWriteLocked(Function<FileData, T> fn) throws Exception {
+    public <R> R runWriteLocked(FileFunction<R> fn) {
         lock.writeLock().lock();
         try {
-            return fn.apply(fileData);
+            return fn.apply(_fsNodeData, _fileData);
         } finally {
             lock.writeLock().unlock();
         }

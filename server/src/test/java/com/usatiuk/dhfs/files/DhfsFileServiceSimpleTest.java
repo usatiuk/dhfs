@@ -39,7 +39,7 @@ public class DhfsFileServiceSimpleTest extends SimpleFileRepoTest {
             Chunk c2 = new Chunk("678".getBytes());
             Chunk c3 = new Chunk("91011".getBytes());
             File f = new File(fuuid);
-            Assertions.assertDoesNotThrow(() -> f.runWriteLocked(fileData -> {
+            Assertions.assertDoesNotThrow(() -> f.runWriteLocked((fsNodeData, fileData) -> {
                 fileData.getChunks().put(0L, c1.getHash());
                 fileData.getChunks().put((long) c1.getBytes().length, c2.getHash());
                 fileData.getChunks().put((long) c1.getBytes().length + c2.getBytes().length, c3.getHash());

@@ -1,9 +1,9 @@
 package com.usatiuk.dhfs.storage.fuse;
 
 import com.sun.security.auth.module.UnixSystem;
-import com.usatiuk.dhfs.storage.files.objects.DirEntry;
 import com.usatiuk.dhfs.storage.files.objects.Directory;
 import com.usatiuk.dhfs.storage.files.objects.File;
+import com.usatiuk.dhfs.storage.files.objects.FsNode;
 import com.usatiuk.dhfs.storage.files.service.DhfsFileService;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.Shutdown;
@@ -60,7 +60,7 @@ public class DhfsFuse extends FuseStubFS {
 
     @Override
     public int getattr(String path, FileStat stat) {
-        Optional<DirEntry> found;
+        Optional<FsNode> found;
         try {
             found = fileService.getDirEntry(path).await().indefinitely();
         } catch (Exception e) {

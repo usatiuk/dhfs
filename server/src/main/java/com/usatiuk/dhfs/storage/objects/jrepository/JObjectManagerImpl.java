@@ -19,11 +19,11 @@ public class JObjectManagerImpl implements JObjectManager {
     private static class NamedSoftReference extends SoftReference<JObject> {
         public NamedSoftReference(JObject target, ReferenceQueue<? super JObject> q) {
             super(target, q);
-            this.key = target.getName();
+            this._key = target.getName();
         }
 
         @Getter
-        final String key;
+        final String _key;
     }
 
     private final HashMap<String, NamedSoftReference> _map = new HashMap<>();
@@ -33,8 +33,8 @@ public class JObjectManagerImpl implements JObjectManager {
         NamedSoftReference cur;
         while ((cur = (NamedSoftReference) _refQueue.poll()) != null) {
             synchronized (_map) {
-                if (_map.containsKey(cur.key) && (_map.get(cur.key).get() == null))
-                    _map.remove(cur.key);
+                if (_map.containsKey(cur._key) && (_map.get(cur._key).get() == null))
+                    _map.remove(cur._key);
             }
         }
     }

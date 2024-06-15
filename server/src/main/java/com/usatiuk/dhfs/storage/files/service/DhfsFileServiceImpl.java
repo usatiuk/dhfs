@@ -1,9 +1,9 @@
 package com.usatiuk.dhfs.storage.files.service;
 
 import com.usatiuk.dhfs.storage.files.objects.Chunk;
-import com.usatiuk.dhfs.storage.files.objects.DirEntry;
 import com.usatiuk.dhfs.storage.files.objects.Directory;
 import com.usatiuk.dhfs.storage.files.objects.File;
+import com.usatiuk.dhfs.storage.files.objects.FsNode;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.storage.objects.repository.ObjectRepository;
 import io.quarkus.logging.Log;
@@ -37,7 +37,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         Log.info("Initializing file service");
         if (!objectRepository.existsObject(namespace, new UUID(0, 0).toString()).await().indefinitely()) {
             objectRepository.createNamespace(namespace).await().indefinitely();
-            jObjectManager.put(namespace, new Directory(new UUID(0, 0)).setMode(0755)).await().indefinitely();
+            jObjectManager.put(namespace, new Directory(new UUID(0, 0), 0755)).await().indefinitely();
         }
         getRoot().await().indefinitely();
     }
@@ -47,7 +47,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         Log.info("Shutdown file service");
     }
 
-    private Uni<Optional<DirEntry>> traverse(DirEntry from, Path path) {
+    private Uni<Optional<FsNode>> traverse(FsNode from, Path path) {
         if (path.getNameCount() == 0) return Uni.createFrom().item(Optional.of(from));
 
         if (!(from instanceof Directory dir))
@@ -56,13 +56,13 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var pathFirstPart = path.getName(0).toString();
 
         var found = dir.getKid(pathFirstPart);
-        if (found == null)
+        if (found.isEmpty())
             return Uni.createFrom().item(Optional.empty());
 
-        var ref = jObjectManager.get(namespace, found.get().toString(), DirEntry.class)
+        var ref = jObjectManager.get(namespace, found.get().toString(), FsNode.class)
                 .await().indefinitely();
 
-        if (!ref.isPresent()) {
+        if (ref.isEmpty()) {
             Log.error("File missing when traversing directory " + from.getName() + ": " + found);
             return Uni.createFrom().item(Optional.empty());
         }
@@ -73,7 +73,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     }
 
     @Override
-    public Uni<Optional<DirEntry>> getDirEntry(String name) {
+    public Uni<Optional<FsNode>> getDirEntry(String name) {
         var root = getRoot().await().indefinitely();
         var found = traverse(root, Path.of(name)).await().indefinitely();
         return Uni.createFrom().item(found);
@@ -216,7 +216,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         AtomicReference<List<Map.Entry<Long, String>>> chunksList = new AtomicReference<>();
 
         try {
-            file.runReadLocked(fileData -> {
+            file.runReadLocked((fsNodeData, fileData) -> {
                 var chunksAll = fileData.getChunks();
                 chunksList.set(chunksAll.tailMap(chunksAll.floorKey(offset)).entrySet().stream().toList());
                 return null;
@@ -282,7 +282,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         // FIXME:
         try {
-            file.runReadLocked(fileData -> {
+            file.runReadLocked((fsNodeData, fileData) -> {
                 chunksAllRef.set(new TreeMap<>(fileData.getChunks()));
                 return null;
             });
@@ -344,7 +344,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
 
         try {
-            file.runWriteLocked(fileData -> {
+            file.runWriteLocked((fsNodeData, fileData) -> {
                 fileData.getChunks().clear();
                 fileData.getChunks().putAll(newChunks);
                 return null;
@@ -370,7 +370,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (length == 0) {
             try {
-                file.runWriteLocked(fileData -> {
+                file.runWriteLocked((fsNodeData, fileData) -> {
                     fileData.getChunks().clear();
                     return null;
                 });
@@ -385,7 +385,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         AtomicReference<TreeMap<Long, String>> chunksAllRef = new AtomicReference<>();
 
         try {
-            file.runReadLocked(fileData -> {
+            file.runReadLocked((fsNodeData, fileData) -> {
                 chunksAllRef.set(new TreeMap<>(fileData.getChunks()));
                 return null;
             });
@@ -421,7 +421,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
 
         try {
-            file.runWriteLocked(fileData -> {
+            file.runWriteLocked((fsNodeData, fileData) -> {
                 fileData.getChunks().clear();
                 fileData.getChunks().putAll(newChunks);
                 return null;
@@ -443,7 +443,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         AtomicReference<TreeMap<Long, String>> chunksAllRef = new AtomicReference<>();
 
         try {
-            f.runReadLocked(fileData -> {
+            f.runReadLocked((fsNodeData, fileData) -> {
                 chunksAllRef.set(new TreeMap<>(fileData.getChunks()));
                 return null;
             });
@@ -471,7 +471,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Override
     public Uni<Directory> getRoot() {
-        var read = jObjectManager.get(namespace, new UUID(0, 0).toString(), DirEntry.class).await().indefinitely();
+        var read = jObjectManager.get(namespace, new UUID(0, 0).toString(), FsNode.class).await().indefinitely();
         if (read.isEmpty() || !(read.get() instanceof Directory)) {
             Log.error("Root directory not found");
         }

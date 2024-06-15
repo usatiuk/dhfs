@@ -8,16 +8,16 @@ import java.util.Arrays;
 
 @Getter
 public class Chunk extends JObject {
-    final String hash;
-    final byte[] bytes;
+    final String _hash;
+    final byte[] _bytes;
 
     public Chunk(byte[] bytes) {
-        this.bytes = Arrays.copyOf(bytes, bytes.length);
-        this.hash = DigestUtils.sha512Hex(bytes);
+        this._bytes = Arrays.copyOf(bytes, bytes.length);
+        this._hash = DigestUtils.sha512Hex(bytes);
     }
 
     @Override
     public String getName() {
-        return hash;
+        return _hash;
     }
 }

@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.storage.files.service;
 
-import com.usatiuk.dhfs.storage.files.objects.DirEntry;
+import com.usatiuk.dhfs.storage.files.objects.FsNode;
 import com.usatiuk.dhfs.storage.files.objects.Directory;
 import com.usatiuk.dhfs.storage.files.objects.File;
 import io.smallrye.mutiny.Uni;
@@ -8,7 +8,7 @@ import io.smallrye.mutiny.Uni;
 import java.util.Optional;
 
 public interface DhfsFileService {
-    Uni<Optional<DirEntry>> getDirEntry(String name);
+    Uni<Optional<FsNode>> getDirEntry(String name);
     Uni<Optional<File>> open(String name);
     Uni<Optional<File>> create(String name, long mode);
     Uni<Optional<Directory>> mkdir(String name, long mode);
