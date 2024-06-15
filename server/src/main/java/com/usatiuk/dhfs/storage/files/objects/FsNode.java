@@ -14,11 +14,15 @@ public abstract class FsNode extends JObject {
 
     protected FsNode(UUID uuid) {
         this._uuid = uuid;
+        this._fsNodeData._ctime = System.currentTimeMillis();
+        this._fsNodeData._mtime = _fsNodeData._ctime;
     }
 
     protected FsNode(UUID uuid, long mode) {
         this._uuid = uuid;
         this._fsNodeData._mode = mode;
+        this._fsNodeData._ctime = System.currentTimeMillis();
+        this._fsNodeData._mtime = _fsNodeData._ctime;
     }
 
     @Override
@@ -26,10 +30,12 @@ public abstract class FsNode extends JObject {
         return _uuid.toString();
     }
 
+    @Getter
+    @Setter
     public static class FsNodeData implements Serializable {
-        @Getter
-        @Setter
         private long _mode;
+        private long _ctime;
+        private long _mtime;
     }
 
     final FsNodeData _fsNodeData = new FsNodeData();
@@ -67,4 +73,27 @@ public abstract class FsNode extends JObject {
     public long getMode() {
         return runReadLocked(FsNodeData::getMode);
     }
+
+    public void setCtime(long ctime) {
+        runWriteLocked((fsNodeData) -> {
+            fsNodeData.setCtime(ctime);
+            return null;
+        });
+    }
+
+    public long getCtime() {
+        return runReadLocked(FsNodeData::getCtime);
+    }
+
+    public void setMtime(long mtime) {
+        runWriteLocked((fsNodeData) -> {
+            fsNodeData.setMtime(mtime);
+            return null;
+        });
+    }
+
+    public long getMtime() {
+        return runReadLocked(FsNodeData::getMtime);
+    }
+
 }

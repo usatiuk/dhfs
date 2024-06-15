@@ -335,11 +335,12 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             var lchunkBytes = lchunkRead.get().getBytes();
 
             if (last.getKey() + lchunkBytes.length > offset + data.length) {
-                int start = (int) ((offset + data.length) - last.getKey());
-                Chunk newChunk = new Chunk(Arrays.copyOfRange(lchunkBytes, start, lchunkBytes.length - start));
+                var startInFile = offset + data.length;
+                var startInChunk = startInFile - last.getKey();
+                Chunk newChunk = new Chunk(Arrays.copyOfRange(lchunkBytes, (int) startInChunk, lchunkBytes.length));
                 jObjectManager.tryPut(namespace, newChunk).await().indefinitely();
 
-                newChunks.put(first.getKey(), newChunk.getHash());
+                newChunks.put(startInFile, newChunk.getHash());
             }
         }
 
@@ -347,6 +348,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             file.runWriteLocked((fsNodeData, fileData) -> {
                 fileData.getChunks().clear();
                 fileData.getChunks().putAll(newChunks);
+                fsNodeData.setMtime(System.currentTimeMillis());
                 return null;
             });
         } catch (Exception e) {
@@ -372,6 +374,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             try {
                 file.runWriteLocked((fsNodeData, fileData) -> {
                     fileData.getChunks().clear();
+                    fsNodeData.setMtime(System.currentTimeMillis());
                     return null;
                 });
             } catch (Exception e) {
@@ -424,6 +427,31 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             file.runWriteLocked((fsNodeData, fileData) -> {
                 fileData.getChunks().clear();
                 fileData.getChunks().putAll(newChunks);
+                fsNodeData.setMtime(System.currentTimeMillis());
+                return null;
+            });
+        } catch (Exception e) {
+            Log.error("Error writing file chunks: " + fileUuid, e);
+            return Uni.createFrom().item(false);
+        }
+
+        jObjectManager.put(namespace, file).await().indefinitely();
+
+        return Uni.createFrom().item(true);
+    }
+
+    @Override
+    public Uni<Boolean> setTimes(String fileUuid, long atimeMs, long mtimeMs) {
+        var fileOpt = jObjectManager.get(namespace, fileUuid, File.class).await().indefinitely();
+        if (fileOpt.isEmpty()) {
+            Log.error("File not found when trying to read: " + fileUuid);
+            return Uni.createFrom().item(false);
+        }
+        var file = fileOpt.get();
+
+        try {
+            file.runWriteLocked((fsNodeData, fileData) -> {
+                fsNodeData.setMtime(mtimeMs);
                 return null;
             });
         } catch (Exception e) {

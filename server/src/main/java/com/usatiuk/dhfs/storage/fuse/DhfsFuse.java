@@ -20,6 +20,7 @@ import ru.serce.jnrfuse.FuseStubFS;
 import ru.serce.jnrfuse.struct.FileStat;
 import ru.serce.jnrfuse.struct.FuseFileInfo;
 import ru.serce.jnrfuse.struct.Statvfs;
+import ru.serce.jnrfuse.struct.Timespec;
 
 import java.nio.file.Paths;
 import java.util.Optional;
@@ -78,7 +79,36 @@ public class DhfsFuse extends FuseStubFS {
             stat.st_mode.set(S_IFDIR | d.getMode());
             stat.st_nlink.set(2);
         }
+        var foundDent = (FsNode) found.get();
+
+        var ctime = System.currentTimeMillis();
+        stat.st_atim.tv_sec.set(ctime / 1000);
+        stat.st_atim.tv_nsec.set((ctime % 1000) * 1000);
+
+        // FIXME: Race?
+        stat.st_ctim.tv_sec.set(foundDent.getCtime() / 1000);
+        stat.st_ctim.tv_nsec.set((foundDent.getCtime() % 1000) * 1000);
+        stat.st_mtim.tv_sec.set(foundDent.getMtime() / 1000);
+        stat.st_mtim.tv_nsec.set((foundDent.getMtime() % 1000) * 1000);
+
         return 0;
+    }
+
+    @Override
+    public int utimens(String path, Timespec[] timespec) {
+        try {
+            var fileOpt = fileService.open(path).await().indefinitely();
+            if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
+            var file = fileOpt.get();
+            var res = fileService.setTimes(file.getUuid().toString(),
+                    timespec[0].tv_sec.get() * 1000,
+                    timespec[1].tv_sec.get() * 1000).await().indefinitely();
+            if (!res) return -ErrorCodes.EINVAL();
+            else return 0;
+        } catch (Exception e) {
+            Log.error("When setting time " + path, e);
+            return -ErrorCodes.ENOENT();
+        }
     }
 
     @Override
