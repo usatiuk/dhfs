@@ -1,10 +1,5 @@
 package com.usatiuk.dhfs.storage.files.objects;
 
-import lombok.Getter;
-
-import java.io.Serializable;
-import java.util.NavigableMap;
-import java.util.TreeMap;
 import java.util.UUID;
 
 public class File extends FsNode {
@@ -14,11 +9,6 @@ public class File extends FsNode {
 
     public File(UUID uuid, long mode) {
         super(uuid, mode);
-    }
-
-    @Getter
-    public static class FileData implements Serializable {
-        private final NavigableMap<Long, String> _chunks = new TreeMap<>();
     }
 
     final FileData _fileData = new FileData();

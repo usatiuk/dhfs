@@ -2,9 +2,7 @@ package com.usatiuk.dhfs.storage.files.objects;
 
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import lombok.Getter;
-import lombok.Setter;
 
-import java.io.Serializable;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -14,28 +12,20 @@ public abstract class FsNode extends JObject {
 
     protected FsNode(UUID uuid) {
         this._uuid = uuid;
-        this._fsNodeData._ctime = System.currentTimeMillis();
-        this._fsNodeData._mtime = _fsNodeData._ctime;
+        this._fsNodeData.setCtime(System.currentTimeMillis());
+        this._fsNodeData.setMtime(this._fsNodeData.getCtime());
     }
 
     protected FsNode(UUID uuid, long mode) {
         this._uuid = uuid;
-        this._fsNodeData._mode = mode;
-        this._fsNodeData._ctime = System.currentTimeMillis();
-        this._fsNodeData._mtime = _fsNodeData._ctime;
+        this._fsNodeData.setMode(mode);
+        this._fsNodeData.setCtime(System.currentTimeMillis());
+        this._fsNodeData.setMtime(this._fsNodeData.getCtime());
     }
 
     @Override
     public String getName() {
         return _uuid.toString();
-    }
-
-    @Getter
-    @Setter
-    public static class FsNodeData implements Serializable {
-        private long _mode;
-        private long _ctime;
-        private long _mtime;
     }
 
     final FsNodeData _fsNodeData = new FsNodeData();

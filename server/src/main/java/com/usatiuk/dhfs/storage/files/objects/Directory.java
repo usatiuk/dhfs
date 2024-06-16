@@ -14,11 +14,6 @@ public class Directory extends FsNode {
         super(uuid, mode);
     }
 
-    @Getter
-    public static class DirectoryData implements Serializable {
-        private final Map<String, UUID> _children = new TreeMap<>();
-    }
-
     final DirectoryData _directoryData = new DirectoryData();
 
     @FunctionalInterface
