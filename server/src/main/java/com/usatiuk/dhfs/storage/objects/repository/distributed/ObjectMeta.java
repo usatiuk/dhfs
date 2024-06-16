@@ -1,61 +1,50 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
-import lombok.Getter;
-
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class ObjectMeta implements Serializable {
     public ObjectMeta(String name, Boolean assumeUnique) {
-        this._name = name;
-        this._assumeUnique = assumeUnique;
+        _data = new ObjectMetaData(name, assumeUnique);
     }
 
+    private final ObjectMetaData _data;
     private final ReadWriteLock _lock = new ReentrantReadWriteLock();
 
-    @Getter
-    final String _name;
-
-    long _mtime;
-
-    @Getter
-    final Boolean _assumeUnique;
-
-    //FIXME:
-    final List<String> _remoteCopies = new ArrayList<>();
-
     public void setMtime(long mtime) {
-        runWriteLocked(() -> {
-            _mtime = mtime;
+        runWriteLocked((data) -> {
+            data.setMtime(mtime);
             return null;
         });
     }
 
     public long getMtime() {
-        return runReadLocked(() -> _mtime);
+        return runReadLocked((data) -> data.getMtime());
     }
 
-    public <R> R runReadLocked(Callable<R> fn) {
+    public boolean getAssumeUnique() {
+        return runReadLocked((data) -> data.getAssumeUnique());
+    }
+
+    @FunctionalInterface
+    public interface ObjectMetaFn<R> {
+        R apply(ObjectMetaData indexData);
+    }
+
+    public <R> R runReadLocked(ObjectMetaFn<R> fn) {
         _lock.readLock().lock();
         try {
-            return fn.call();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+            return fn.apply(_data);
         } finally {
             _lock.readLock().unlock();
         }
     }
 
-    public <R> R runWriteLocked(Callable<R> fn) {
+    public <R> R runWriteLocked(ObjectMetaFn<R> fn) {
         _lock.writeLock().lock();
         try {
-            return fn.call();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+            return fn.apply(_data);
         } finally {
             _lock.writeLock().unlock();
         }

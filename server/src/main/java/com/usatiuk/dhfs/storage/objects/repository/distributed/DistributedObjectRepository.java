@@ -84,7 +84,7 @@ public class DistributedObjectRepository implements ObjectRepository {
 
         var info = infoOpt.get();
 
-        Optional<byte[]> read = info.runReadLocked(() -> {
+        Optional<byte[]> read = info.runReadLocked((data) -> {
             if (objectPersistentStore.existsObject(name))
                 return Optional.of(objectPersistentStore.readObject(name));
             return Optional.empty();
@@ -92,7 +92,7 @@ public class DistributedObjectRepository implements ObjectRepository {
         if (read.isPresent()) return read.get();
         // Race?
 
-        return info.runWriteLocked(() -> {
+        return info.runWriteLocked((data) -> {
             var obj = remoteObjectServiceClient.getObject(name);
             objectPersistentStore.writeObject(name, obj);
             return obj;
@@ -104,7 +104,7 @@ public class DistributedObjectRepository implements ObjectRepository {
     public void writeObject(String name, byte[] data, Boolean canIgnoreConflict) {
         var info = objectIndexService.getOrCreateMeta(name, canIgnoreConflict);
 
-        info.runWriteLocked(() -> {
+        info.runWriteLocked((metaData) -> {
             objectPersistentStore.writeObject(name, data);
             var prevMtime = info.getMtime();
             info.setMtime(System.currentTimeMillis());

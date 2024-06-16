@@ -33,7 +33,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         var metaOpt = objectIndexService.getMeta(request.getName());
         if (metaOpt.isEmpty()) throw new StatusRuntimeException(Status.NOT_FOUND);
         var meta = metaOpt.get();
-        Optional<Pair<Long, byte[]>> read = meta.runReadLocked(() -> {
+        Optional<Pair<Long, byte[]>> read = meta.runReadLocked((data) -> {
             if (objectPersistentStore.existsObject(request.getName()))
                 return Optional.of(Pair.of(meta.getMtime(), objectPersistentStore.readObject(request.getName())));
             return Optional.empty();

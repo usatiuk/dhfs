@@ -5,7 +5,6 @@ import com.usatiuk.dhfs.objects.repository.distributed.IndexUpdateReply;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.quarkus.logging.Log;
-import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.NotImplementedException;
@@ -22,32 +21,32 @@ public class SyncHandler {
     JObjectManager jObjectManager;
 
     public IndexUpdateReply handleRemoteUpdate(IndexUpdatePush request) {
-        var metaOpt = objectIndexService.getOrCreateMeta(request.getName(), request.getAssumeUnique());
-        metaOpt.runWriteLocked(() -> {
-            if (metaOpt.getMtime() == request.getMtime()) {
-                metaOpt._remoteCopies.add(request.getSelfname());
+        var meta = objectIndexService.getOrCreateMeta(request.getName(), request.getAssumeUnique());
+        meta.runWriteLocked((data) -> {
+            if (meta.getMtime() == request.getMtime()) {
+                data.getRemoteCopies().add(request.getSelfname());
                 return null;
             }
 
-            if (metaOpt.getMtime() != request.getPrevMtime()) {
-                if (!metaOpt.getAssumeUnique()
-                        || (metaOpt.getAssumeUnique() != request.getAssumeUnique())) {
+            if (meta.getMtime() != request.getPrevMtime()) {
+                if (!meta.getAssumeUnique()
+                        || (meta.getAssumeUnique() != request.getAssumeUnique())) {
                     Log.error("Conflict!");
                     throw new NotImplementedException();
                 }
             }
 
-            metaOpt.setMtime(request.getMtime());
+            meta.setMtime(request.getMtime());
 
-            metaOpt._remoteCopies.clear();
-            metaOpt._remoteCopies.add(request.getSelfname());
+            data.getRemoteCopies().clear();
+            data.getRemoteCopies().add(request.getSelfname());
 
             try {
                 objectPersistentStore.deleteObject(request.getName());
             } catch (Exception ignored) {
             }
 
-            jObjectManager.invalidateJObject(metaOpt.getName());
+            jObjectManager.invalidateJObject(data.getName());
 
             return null;
         });
