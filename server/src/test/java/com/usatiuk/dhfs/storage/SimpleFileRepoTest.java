@@ -12,6 +12,8 @@ import java.util.Objects;
 public abstract class SimpleFileRepoTest {
     @ConfigProperty(name = "dhfs.objects.persistence.files.root")
     String tempDirectory;
+    @ConfigProperty(name = "dhfs.objects.distributed.root")
+    String tempDirectoryIdx;
 
     void purgeDirectory(File dir) {
         for (File file : Objects.requireNonNull(dir.listFiles())) {
@@ -24,5 +26,6 @@ public abstract class SimpleFileRepoTest {
     @AfterEach
     void teardown() {
         purgeDirectory(Path.of(tempDirectory).toFile());
+        purgeDirectory(Path.of(tempDirectoryIdx).toFile());
     }
 }

@@ -7,7 +7,7 @@ import com.usatiuk.dhfs.storage.files.objects.FsNode;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.storage.objects.repository.ObjectRepository;
 import io.quarkus.logging.Log;
-import io.quarkus.runtime.Shutdown;
+import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.core.Vertx;
@@ -33,7 +33,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     final static String namespace = "dhfs_files";
 
-    void init(@Observes @Priority(300) StartupEvent event) {
+    void init(@Observes @Priority(500) StartupEvent event) {
         Log.info("Initializing file service");
         if (!objectRepository.existsObject(namespace, new UUID(0, 0).toString()).await().indefinitely()) {
             objectRepository.createNamespace(namespace).await().indefinitely();
@@ -42,9 +42,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         getRoot().await().indefinitely();
     }
 
-    @Shutdown
-    void shutdown() {
-        Log.info("Shutdown file service");
+    void shutdown(@Observes @Priority(100) ShutdownEvent event) {
+        Log.info("Shutdown");
     }
 
     private Uni<Optional<FsNode>> traverse(FsNode from, Path path) {
@@ -312,14 +311,14 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             var chunkBytes = chunkRead.get().getBytes();
             Chunk newChunk = new Chunk(Arrays.copyOfRange(chunkBytes, 0, (int) (offset - first.getKey())));
-            jObjectManager.tryPut(namespace, newChunk).await().indefinitely();
+            jObjectManager.put(namespace, newChunk).await().indefinitely();
 
             newChunks.put(first.getKey(), newChunk.getHash());
         }
 
         {
             Chunk newChunk = new Chunk(data);
-            jObjectManager.tryPut(namespace, newChunk).await().indefinitely();
+            jObjectManager.put(namespace, newChunk).await().indefinitely();
 
             newChunks.put(offset, newChunk.getHash());
         }
@@ -338,7 +337,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 var startInFile = offset + data.length;
                 var startInChunk = startInFile - last.getKey();
                 Chunk newChunk = new Chunk(Arrays.copyOfRange(lchunkBytes, (int) startInChunk, lchunkBytes.length));
-                jObjectManager.tryPut(namespace, newChunk).await().indefinitely();
+                jObjectManager.put(namespace, newChunk).await().indefinitely();
 
                 newChunks.put(startInFile, newChunk.getHash());
             }
@@ -417,7 +416,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (lastChunk.getKey() + chunkBytes.length > 0) {
                 int start = (int) (length - lastChunk.getKey());
                 Chunk newChunk = new Chunk(Arrays.copyOfRange(chunkBytes, 0, (int) (length - start)));
-                jObjectManager.tryPut(namespace, newChunk).await().indefinitely();
+                jObjectManager.put(namespace, newChunk).await().indefinitely();
 
                 newChunks.put(lastChunk.getKey(), newChunk.getHash());
             }

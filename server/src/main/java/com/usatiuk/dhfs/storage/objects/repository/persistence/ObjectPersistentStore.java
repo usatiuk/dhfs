@@ -18,9 +18,4 @@ public interface ObjectPersistentStore {
     Uni<Void> writeObject(String namespace, Object object);
     @Nonnull
     Uni<Void> deleteObject(String namespace, String name);
-
-    @Nonnull
-    Uni<Void> createNamespace(String namespace);
-    @Nonnull
-    Uni<Void> deleteNamespace(String namespace);
 }

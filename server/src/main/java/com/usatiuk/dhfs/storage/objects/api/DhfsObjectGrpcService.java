@@ -5,6 +5,7 @@ import com.usatiuk.dhfs.storage.objects.data.Namespace;
 import com.usatiuk.dhfs.storage.objects.data.Object;
 import com.usatiuk.dhfs.storage.objects.repository.ObjectRepository;
 import io.quarkus.grpc.GrpcService;
+import io.smallrye.common.annotation.RunOnVirtualThread;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 
@@ -22,22 +23,25 @@ public class DhfsObjectGrpcService implements DhfsObjectGrpc {
     }
 
     @Override
+    @RunOnVirtualThread
     public Uni<ReadObjectReply> readObject(ReadObjectRequest request) {
-        return objectRepository.readObject(request.getNamespace(), request.getName())
-                .map(n -> ReadObjectReply.newBuilder().setData(ByteString.copyFrom(n.getData())).build());
+        var read = objectRepository.readObject(request.getNamespace(), request.getName());
+        return Uni.createFrom().item(ReadObjectReply.newBuilder().setData(ByteString.copyFrom(read.getData())).build());
     }
 
     @Override
+    @RunOnVirtualThread
     public Uni<WriteObjectReply> writeObject(WriteObjectRequest request) {
-        return objectRepository.writeObject(request.getNamespace(),
-                        new Object(new Namespace(request.getNamespace()), request.getName(), request.getData().toByteArray()))
-                .map(n -> WriteObjectReply.newBuilder().build());
+        objectRepository.writeObject(request.getNamespace(),
+                new Object(new Namespace(request.getNamespace()), request.getName(), request.getData().toByteArray()));
+        return Uni.createFrom().item(WriteObjectReply.newBuilder().build());
     }
 
     @Override
+    @RunOnVirtualThread
     public Uni<DeleteObjectReply> deleteObject(DeleteObjectRequest request) {
-        return objectRepository.deleteObject(request.getNamespace(), request.getName())
-                .map(n -> DeleteObjectReply.newBuilder().build());
+        objectRepository.deleteObject(request.getNamespace(), request.getName());
+        return Uni.createFrom().item(DeleteObjectReply.newBuilder().build());
     }
 
     @Override

@@ -17,6 +17,11 @@ public class Chunk extends JObject {
     }
 
     @Override
+    public boolean assumeUnique() {
+        return true;
+    }
+
+    @Override
     public String getName() {
         return _hash;
     }

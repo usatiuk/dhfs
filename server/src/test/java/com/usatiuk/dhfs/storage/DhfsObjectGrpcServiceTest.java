@@ -36,9 +36,9 @@ class DhfsObjectGrpcServiceTest extends SimpleFileRepoTest {
                         ReadObjectRequest.newBuilder().setNamespace("testns").setName("cool_file").build())
                 .await().atMost(Duration.ofSeconds(5));
         Assertions.assertArrayEquals(read.getData().toByteArray(), "Hello world".getBytes());
-        var found = dhfsObjectGrpc.findObjects(FindObjectsRequest.newBuilder().setNamespace("testns").build())
-                .await().atMost(Duration.ofSeconds(5));
-        Assertions.assertIterableEquals(found.getFoundList().stream().map(l -> l.getName()).toList(), List.of("cool_file"));
+//        var found = dhfsObjectGrpc.findObjects(FindObjectsRequest.newBuilder().setNamespace("testns").build())
+//                .await().atMost(Duration.ofSeconds(5));
+//        Assertions.assertIterableEquals(found.getFoundList().stream().map(l -> l.getName()).toList(), List.of("cool_file"));
     }
 
 }

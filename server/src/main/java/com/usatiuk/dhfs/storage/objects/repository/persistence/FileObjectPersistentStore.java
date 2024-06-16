@@ -5,7 +5,7 @@ import com.usatiuk.dhfs.storage.objects.data.Object;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
-import io.quarkus.runtime.Shutdown;
+import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
@@ -34,8 +34,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         Log.info("Initializing with root " + root);
     }
 
-    @Shutdown
-    void shutdown() {
+    void shutdown(@Observes @Priority(400) ShutdownEvent event) {
         Log.info("Shutdown");
     }
 
@@ -80,6 +79,10 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     public Uni<Void> writeObject(String namespace, Object object) {
         var file = Path.of(root, namespace, object.getName());
 
+        if (!Paths.get(root, namespace).toFile().isDirectory()
+                && !Paths.get(root, namespace).toFile().mkdirs())
+            throw new StatusRuntimeException(Status.INTERNAL);
+
         return vertx.fileSystem().writeFile(file.toString(), Buffer.buffer(object.getData()));
     }
 
@@ -92,25 +95,5 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
             throw new StatusRuntimeException(Status.NOT_FOUND);
 
         return vertx.fileSystem().delete(file.toString());
-    }
-
-    @Nonnull
-    @Override
-    public Uni<Void> createNamespace(String namespace) {
-        if (Paths.get(root, namespace).toFile().exists())
-            return Uni.createFrom().voidItem();
-        if (!Paths.get(root, namespace).toFile().mkdirs())
-            throw new StatusRuntimeException(Status.INTERNAL);
-        return Uni.createFrom().voidItem();
-    }
-
-    @Nonnull
-    @Override
-    public Uni<Void> deleteNamespace(String namespace) {
-        if (!Paths.get(root, namespace).toFile().exists())
-            throw new StatusRuntimeException(Status.NOT_FOUND);
-        if (!Paths.get(root, namespace).toFile().delete())
-            throw new StatusRuntimeException(Status.INTERNAL);
-        return Uni.createFrom().voidItem();
     }
 }

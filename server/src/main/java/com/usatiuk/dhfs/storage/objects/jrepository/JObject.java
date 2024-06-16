@@ -12,6 +12,10 @@ public abstract class JObject implements Serializable {
 
     protected final ReadWriteLock _lock = new ReentrantReadWriteLock();
 
+    public boolean assumeUnique() {
+        return false;
+    }
+
     @Serial
     private void writeObject(ObjectOutputStream oos) throws IOException {
         _lock.readLock().lock();

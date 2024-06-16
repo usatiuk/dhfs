@@ -50,10 +50,10 @@ public class DhfsFileServiceSimpleTest extends SimpleFileRepoTest {
 
             objectRepository.createNamespace("dhfs_files");
 
-            jObjectRepository.writeJObject("dhfs_files", c1).await().indefinitely();
-            jObjectRepository.writeJObject("dhfs_files", c2).await().indefinitely();
-            jObjectRepository.writeJObject("dhfs_files", c3).await().indefinitely();
-            jObjectRepository.writeJObject("dhfs_files", f).await().indefinitely();
+            jObjectRepository.writeJObject("dhfs_files", c1);
+            jObjectRepository.writeJObject("dhfs_files", c2);
+            jObjectRepository.writeJObject("dhfs_files", c3);
+            jObjectRepository.writeJObject("dhfs_files", f);
         }
 
         String all = "1234567891011";

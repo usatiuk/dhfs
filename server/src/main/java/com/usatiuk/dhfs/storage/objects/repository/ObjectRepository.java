@@ -14,11 +14,11 @@ public interface ObjectRepository {
     Uni<Boolean> existsObject(String namespace, String name);
 
     @Nonnull
-    Uni<Object> readObject(String namespace, String name);
+    Object readObject(String namespace, String name);
     @Nonnull
-    Uni<Void> writeObject(String namespace, Object object);
+    void writeObject(String namespace, Object object);
     @Nonnull
-    Uni<Void> deleteObject(String namespace, String name);
+    void deleteObject(String namespace, String name);
 
     @Nonnull
     Uni<Void> createNamespace(String namespace);

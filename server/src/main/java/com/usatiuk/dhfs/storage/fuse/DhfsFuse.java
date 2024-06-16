@@ -6,7 +6,7 @@ import com.usatiuk.dhfs.storage.files.objects.File;
 import com.usatiuk.dhfs.storage.files.objects.FsNode;
 import com.usatiuk.dhfs.storage.files.service.DhfsFileService;
 import io.quarkus.logging.Log;
-import io.quarkus.runtime.Shutdown;
+import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -45,6 +45,12 @@ public class DhfsFuse extends FuseStubFS {
 
         mount(Paths.get(root), false, false,
                 new String[]{"-o", "direct_io", "-o", "uid=" + uid, "-o", "gid=" + gid});
+    }
+
+    void shutdown(@Observes @Priority(1) ShutdownEvent event) {
+        Log.info("Unmounting");
+        umount();
+        Log.info("Unmounted");
     }
 
     @Override
@@ -220,12 +226,5 @@ public class DhfsFuse extends FuseStubFS {
         }
 
         return 0;
-    }
-
-    @Shutdown
-    void shutdown() {
-        Log.info("Unmounting");
-        umount();
-        Log.info("Unmounted");
     }
 }

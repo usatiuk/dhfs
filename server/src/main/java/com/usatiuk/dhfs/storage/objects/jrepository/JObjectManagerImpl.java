@@ -63,18 +63,18 @@ public class JObjectManagerImpl implements JObjectManager {
             if (inMap != null) return Uni.createFrom().item(Optional.of(inMap));
         }
 
-        return jObjectRepository.readJObjectChecked(namespace, key, clazz).map(read -> {
-            if (read.isEmpty())
-                return Optional.empty();
+        var read = jObjectRepository.readJObjectChecked(namespace, key, clazz);
 
-            synchronized (_map) {
-                var inMap = getFromMap(namespace, key, clazz);
-                if (inMap != null) return Optional.of(inMap);
-                _map.put(key, new NamedSoftReference(read.get(), _refQueue));
-            }
+        if (read.isEmpty())
+            return Uni.createFrom().item(Optional.empty());
 
-            return Optional.of(read.get());
-        });
+        synchronized (_map) {
+            var inMap = getFromMap(namespace, key, clazz);
+            if (inMap != null) return Uni.createFrom().item(Optional.of(inMap));
+            _map.put(key, new NamedSoftReference(read.get(), _refQueue));
+        }
+
+        return Uni.createFrom().item(Optional.of(read.get()));
     }
 
     @Override
@@ -83,27 +83,14 @@ public class JObjectManagerImpl implements JObjectManager {
 
         synchronized (_map) {
             var inMap = getFromMap(namespace, object.getName(), object.getClass());
-            if (inMap != null && inMap != object)
+            if (inMap != null && inMap != object && !object.assumeUnique())
                 throw new IllegalArgumentException("Trying to insert different object with same key");
             else if (inMap == null)
                 _map.put(object.getName(), new NamedSoftReference(object, _refQueue));
         }
 
-        return jObjectRepository.writeJObject(namespace, object);
-    }
-
-    @Override
-    public <T extends JObject> Uni<Optional<T>> tryPut(String namespace, T object) {
-        cleanup();
-
-        synchronized (_map) {
-            var inMap = getFromMap(namespace, object.getName(), object.getClass());
-            if (inMap != null) return Uni.createFrom().item(Optional.of((T) inMap));
-            else
-                _map.put(object.getName(), new NamedSoftReference(object, _refQueue));
-        }
-
-        return jObjectRepository.writeJObject(namespace, object).map(t -> Optional.empty());
+        jObjectRepository.writeJObject(namespace, object);
+        return Uni.createFrom().voidItem();
     }
 
 }
