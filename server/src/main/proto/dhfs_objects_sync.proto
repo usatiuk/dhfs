@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.usatiuk.dhfs.objects.repository.distributed";
+option java_outer_classname = "DhfsObjectSyncApi";
+
+package dhfs.objects.sync;
+
+service DhfsObjectSyncGrpc {
+  rpc GetObject (GetObjectRequest) returns (GetObjectReply) {}
+  rpc GetIndex (GetIndexRequest) returns (GetIndexReply) {}
+  rpc IndexUpdate (IndexUpdatePush) returns (IndexUpdateReply) {}
+}
+
+message ObjectHeader {
+  string namespace = 1;
+  string name = 2;
+  bool assumeUnique = 3;
+  uint64 mtime = 4;
+}
+
+message ApiObject {
+  ObjectHeader header = 1;
+  bytes content = 2;
+}
+
+message GetObjectRequest {
+  string namespace = 1;
+  string name = 2;
+}
+
+message GetObjectReply {
+  ApiObject object = 1;
+}
+
+message GetIndexRequest {
+
+}
+
+message GetIndexReply {
+  repeated ObjectHeader objects = 1;
+}
+
+message IndexUpdatePush {
+  string selfname = 10;
+
+  string namespace = 1;
+  string name = 2;
+  bool assumeUnique = 3;
+  uint64 mtime = 4;
+  uint64 prevMtime = 5;
+}
+
+message IndexUpdateReply {
+
+}

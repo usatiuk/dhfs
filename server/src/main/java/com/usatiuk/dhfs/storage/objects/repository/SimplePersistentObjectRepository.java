@@ -2,7 +2,6 @@ package com.usatiuk.dhfs.storage.objects.repository;
 
 import com.usatiuk.dhfs.storage.objects.data.Object;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
-import io.smallrye.common.annotation.RunOnVirtualThread;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
@@ -35,7 +34,7 @@ public class SimplePersistentObjectRepository implements ObjectRepository {
 
     @Nonnull
     @Override
-    public void writeObject(String namespace, Object object) {
+    public void writeObject(String namespace, Object object, Boolean canIgnoreConflict) {
         objectPersistentStore.writeObject(namespace, object).await().indefinitely();
     }
 

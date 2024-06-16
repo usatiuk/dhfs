@@ -67,36 +67,34 @@ public class DhfsFuse extends FuseStubFS {
 
     @Override
     public int getattr(String path, FileStat stat) {
-        Optional<FsNode> found;
         try {
-            found = fileService.getDirEntry(path).await().indefinitely();
+            Optional<FsNode> found = fileService.getDirEntry(path).await().indefinitely();
+            if (found.isEmpty()) {
+                return -ErrorCodes.ENOENT();
+            }
+            if (found.get() instanceof File f) {
+                stat.st_mode.set(S_IFREG | f.getMode());
+                stat.st_nlink.set(1);
+                stat.st_size.set(fileService.size(f).await().indefinitely());
+            } else if (found.get() instanceof Directory d) {
+                stat.st_mode.set(S_IFDIR | d.getMode());
+                stat.st_nlink.set(2);
+            }
+            var foundDent = (FsNode) found.get();
+
+            var ctime = System.currentTimeMillis();
+            stat.st_atim.tv_sec.set(ctime / 1000);
+            stat.st_atim.tv_nsec.set((ctime % 1000) * 1000);
+
+            // FIXME: Race?
+            stat.st_ctim.tv_sec.set(foundDent.getCtime() / 1000);
+            stat.st_ctim.tv_nsec.set((foundDent.getCtime() % 1000) * 1000);
+            stat.st_mtim.tv_sec.set(foundDent.getMtime() / 1000);
+            stat.st_mtim.tv_nsec.set((foundDent.getMtime() % 1000) * 1000);
         } catch (Exception e) {
             Log.error("When accessing " + path, e);
             return -ErrorCodes.ENOENT();
         }
-        if (found.isEmpty()) {
-            return -ErrorCodes.ENOENT();
-        }
-        if (found.get() instanceof File f) {
-            stat.st_mode.set(S_IFREG | f.getMode());
-            stat.st_nlink.set(1);
-            stat.st_size.set(fileService.size(f).await().indefinitely());
-        } else if (found.get() instanceof Directory d) {
-            stat.st_mode.set(S_IFDIR | d.getMode());
-            stat.st_nlink.set(2);
-        }
-        var foundDent = (FsNode) found.get();
-
-        var ctime = System.currentTimeMillis();
-        stat.st_atim.tv_sec.set(ctime / 1000);
-        stat.st_atim.tv_nsec.set((ctime % 1000) * 1000);
-
-        // FIXME: Race?
-        stat.st_ctim.tv_sec.set(foundDent.getCtime() / 1000);
-        stat.st_ctim.tv_nsec.set((foundDent.getCtime() % 1000) * 1000);
-        stat.st_mtim.tv_sec.set(foundDent.getMtime() / 1000);
-        stat.st_mtim.tv_nsec.set((foundDent.getMtime() % 1000) * 1000);
-
         return 0;
     }
 

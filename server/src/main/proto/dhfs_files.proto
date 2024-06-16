@@ -4,7 +4,7 @@ option java_multiple_files = true;
 option java_package = "com.usatiuk.dhfs.storage.files.api";
 option java_outer_classname = "DhfsFilesApi";
 
-package hello;
+package dhfs.files;
 
 service DhfsFilesGrpc {
   rpc FindFiles (FindFilesRequest) returns (FindFilesReply) {}

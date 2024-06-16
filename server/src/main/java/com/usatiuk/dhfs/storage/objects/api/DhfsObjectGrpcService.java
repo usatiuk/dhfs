@@ -33,7 +33,7 @@ public class DhfsObjectGrpcService implements DhfsObjectGrpc {
     @RunOnVirtualThread
     public Uni<WriteObjectReply> writeObject(WriteObjectRequest request) {
         objectRepository.writeObject(request.getNamespace(),
-                new Object(new Namespace(request.getNamespace()), request.getName(), request.getData().toByteArray()));
+                new Object(new Namespace(request.getNamespace()), request.getName(), request.getData().toByteArray()), false);
         return Uni.createFrom().item(WriteObjectReply.newBuilder().build());
     }
 

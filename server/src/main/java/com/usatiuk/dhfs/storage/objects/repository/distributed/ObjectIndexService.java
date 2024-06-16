@@ -1,13 +1,18 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
+import com.usatiuk.dhfs.objects.repository.distributed.IndexUpdatePush;
+import com.usatiuk.dhfs.objects.repository.distributed.IndexUpdateReply;
 import com.usatiuk.dhfs.storage.DeserializationHelper;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
+import io.smallrye.mutiny.Uni;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.SerializationUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
@@ -46,7 +51,22 @@ public class ObjectIndexService {
         return _index.get(namespace, name);
     }
 
-    public ObjectMeta getOrCreateMeta(String namespace, String name) {
-        return _index.getOrCreate(namespace, name);
+    public ObjectMeta getOrCreateMeta(String namespace, String name, boolean assumeUnique) {
+        return _index.getOrCreate(namespace, name, assumeUnique);
+    }
+
+    @FunctionalInterface
+    public interface ForAllFn {
+        void apply(ImmutablePair<String, String> name, ObjectMeta meta);
+    }
+
+    public void forAllRead(ForAllFn fn) {
+        _index.runReadLocked(() -> {
+            // FIXME:
+            for (var entry : _index._objectMetaMap.entrySet()) {
+                fn.apply(entry.getKey(), entry.getValue());
+            }
+            return null;
+        });
     }
 }

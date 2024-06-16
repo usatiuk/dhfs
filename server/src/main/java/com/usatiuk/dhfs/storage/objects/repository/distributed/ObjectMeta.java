@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
 import lombok.Getter;
-import lombok.Setter;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -11,9 +10,10 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class ObjectMeta implements Serializable {
-    public ObjectMeta(String namespace, String name) {
+    public ObjectMeta(String namespace, String name, Boolean assumeUnique) {
         this._namespace = namespace;
         this._name = name;
+        this._assumeUnique = assumeUnique;
     }
 
     private final ReadWriteLock _lock = new ReentrantReadWriteLock();
@@ -23,12 +23,24 @@ public class ObjectMeta implements Serializable {
     @Getter
     final String _name;
 
-    @Getter
-    @Setter
     long _mtime;
 
     @Getter
-    final List<HostInfo> _remoteCopies = new ArrayList<>();
+    final Boolean _assumeUnique;
+
+    //FIXME:
+    final List<String> _remoteCopies = new ArrayList<>();
+
+    public void setMtime(long mtime) {
+        runWriteLocked(() -> {
+            _mtime = mtime;
+            return null;
+        });
+    }
+
+    public long getMtime() {
+        return runReadLocked(() -> _mtime);
+    }
 
     public <R> R runReadLocked(Callable<R> fn) {
         _lock.readLock().lock();

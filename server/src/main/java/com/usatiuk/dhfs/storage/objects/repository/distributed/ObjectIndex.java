@@ -55,12 +55,15 @@ public class ObjectIndex implements Serializable {
         });
     }
 
-    public ObjectMeta getOrCreate(String namespace, String name) {
+    public ObjectMeta getOrCreate(String namespace, String name, boolean assumeUnique) {
         return runWriteLocked(() -> {
             if (_objectMetaMap.containsKey(new ImmutablePair<>(namespace, name))) {
-                return _objectMetaMap.get(new ImmutablePair<>(namespace, name));
+                var got = _objectMetaMap.get(new ImmutablePair<>(namespace, name));
+                if (got.getAssumeUnique() != assumeUnique)
+                    throw new IllegalArgumentException("assumeUnique mismatch for " + namespace + "/" + name);
+                return got;
             } else {
-                var newObjectMeta = new ObjectMeta(namespace, name);
+                var newObjectMeta = new ObjectMeta(namespace, name, assumeUnique);
                 _objectMetaMap.put(new ImmutablePair<>(namespace, name), newObjectMeta);
                 return newObjectMeta;
             }

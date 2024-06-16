@@ -10,7 +10,6 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.SerializationUtils;
 
 import javax.annotation.Nonnull;
-import java.io.ByteArrayInputStream;
 import java.util.Optional;
 
 @ApplicationScoped
@@ -50,6 +49,6 @@ public class JObjectRepositoryImpl implements JObjectRepository {
                 new Namespace(namespace),
                 object.getName(),
                 SerializationUtils.serialize(object));
-        objectRepository.writeObject(namespace, obj);
+        objectRepository.writeObject(namespace, obj, object.assumeUnique());
     }
 }

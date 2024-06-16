@@ -93,4 +93,10 @@ public class JObjectManagerImpl implements JObjectManager {
         return Uni.createFrom().voidItem();
     }
 
+    @Override
+    public void invalidateJObject(String namespace, String name) {
+        synchronized (_map) {
+            _map.remove(name);
+        }
+    }
 }
