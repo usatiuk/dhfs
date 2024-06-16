@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.files;
 
-import com.usatiuk.dhfs.storage.files.objects.Chunk;
+import com.usatiuk.dhfs.storage.files.objects.ChunkData;
+import com.usatiuk.dhfs.storage.files.objects.ChunkInfo;
 import com.usatiuk.dhfs.storage.files.objects.File;
 import com.usatiuk.dhfs.storage.files.service.DhfsFileService;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectRepository;
@@ -34,9 +35,12 @@ public class DhfsFileServiceSimpleTest {
     void readTest() {
         var fuuid = UUID.randomUUID();
         {
-            Chunk c1 = new Chunk("12345".getBytes());
-            Chunk c2 = new Chunk("678".getBytes());
-            Chunk c3 = new Chunk("91011".getBytes());
+            ChunkData c1 = new ChunkData("12345".getBytes());
+            ChunkInfo c1i = new ChunkInfo(c1.getHash(), c1.getBytes().length);
+            ChunkData c2 = new ChunkData("678".getBytes());
+            ChunkInfo c2i = new ChunkInfo(c2.getHash(), c2.getBytes().length);
+            ChunkData c3 = new ChunkData("91011".getBytes());
+            ChunkInfo c3i = new ChunkInfo(c3.getHash(), c3.getBytes().length);
             File f = new File(fuuid);
             Assertions.assertDoesNotThrow(() -> f.runWriteLocked((fsNodeData, fileData) -> {
                 fileData.getChunks().put(0L, c1.getHash());
@@ -50,6 +54,9 @@ public class DhfsFileServiceSimpleTest {
             jObjectRepository.writeJObject(c1);
             jObjectRepository.writeJObject(c2);
             jObjectRepository.writeJObject(c3);
+            jObjectRepository.writeJObject(c1i);
+            jObjectRepository.writeJObject(c2i);
+            jObjectRepository.writeJObject(c3i);
             jObjectRepository.writeJObject(f);
         }
 
