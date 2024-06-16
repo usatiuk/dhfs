@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs;
 
+import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
@@ -24,6 +25,7 @@ public class TestDataCleaner {
             purgeDirectory(Path.of(tempDirectory).toFile());
             purgeDirectory(Path.of(tempDirectoryIdx).toFile());
         } catch (Exception ignored) {
+            Log.warn("Couldn't cleanup test data on init");
         }
     }
 

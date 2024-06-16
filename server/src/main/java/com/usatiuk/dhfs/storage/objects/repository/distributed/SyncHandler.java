@@ -43,7 +43,8 @@ public class SyncHandler {
 
             try {
                 objectPersistentStore.deleteObject(request.getName());
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                Log.info("Couldn't delete object from persistent store: ", e);
             }
 
             jObjectManager.invalidateJObject(data.getName());

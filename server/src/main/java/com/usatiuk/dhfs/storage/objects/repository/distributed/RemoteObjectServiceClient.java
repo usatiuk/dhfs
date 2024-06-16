@@ -33,7 +33,7 @@ public class RemoteObjectServiceClient {
             var meta = metaOpt.get();
             if (meta.getMtime() != reply.getObject().getHeader().getMtime()) {
                 if (!meta.getAssumeUnique() && (meta.getAssumeUnique() != reply.getObject().getHeader().getAssumeUnique())) {
-                    Log.error("Conflict!");
+                    Log.error("Race when trying to fetch");
                     throw new NotImplementedException();
                 }
             }
