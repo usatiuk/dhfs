@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
 import com.usatiuk.dhfs.storage.DeserializationHelper;
-import com.usatiuk.dhfs.storage.objects.data.Namespace;
 import com.usatiuk.dhfs.storage.objects.data.Object;
 import com.usatiuk.dhfs.storage.objects.repository.ObjectRepository;
 import io.quarkus.logging.Log;
@@ -46,7 +45,7 @@ public class JObjectRepositoryImpl implements JObjectRepository {
     @Override
     public void writeJObject(String namespace, JObject object) {
         final var obj = new Object(
-                new Namespace(namespace),
+                namespace,
                 object.getName(),
                 SerializationUtils.serialize(object));
         objectRepository.writeObject(namespace, obj, object.assumeUnique());

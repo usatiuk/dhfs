@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.storage.objects.repository.persistence;
 
-import com.usatiuk.dhfs.storage.objects.data.Namespace;
 import com.usatiuk.dhfs.storage.objects.data.Object;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -71,7 +70,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         if (!file.toFile().exists())
             throw new StatusRuntimeException(Status.NOT_FOUND);
 
-        return vertx.fileSystem().readFile(file.toString()).map(r -> new Object(new Namespace(namespace), name, r.getBytes()));
+        return vertx.fileSystem().readFile(file.toString()).map(r -> new Object(namespace, name, r.getBytes()));
     }
 
     @Nonnull

@@ -41,7 +41,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         });
         if (read.isEmpty()) throw new StatusRuntimeException(Status.NOT_FOUND);
         var obj = read.get().getRight();
-        var header = ObjectHeader.newBuilder().setName(obj.getName()).setNamespace(obj.getNamespace().getName()).setMtime(read.get().getLeft()).setAssumeUnique(meta.getAssumeUnique()).build();
+        var header = ObjectHeader.newBuilder().setName(obj.getName()).setNamespace(obj.getNamespace()).setMtime(read.get().getLeft()).setAssumeUnique(meta.getAssumeUnique()).build();
         var replyObj = ApiObject.newBuilder().setHeader(header).setContent(ByteString.copyFrom(obj.getData())).build();
         return Uni.createFrom().item(GetObjectReply.newBuilder().setObject(replyObj).build());
     }
@@ -61,7 +61,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Override
     @Blocking
     public Uni<IndexUpdateReply> indexUpdate(IndexUpdatePush request) {
-        Log.info("<-- indexUpdate: " + request.getName() + " from: " + String.valueOf(request.getPrevMtime()) + " to: " + String.valueOf(request.getMtime()));
+        Log.info("<-- indexUpdate: " + request.getName() + " from: " + request.getPrevMtime() + " to: " + request.getMtime());
         return syncHandler.handleRemoteUpdate(request);
     }
 }

@@ -4,7 +4,6 @@ import com.usatiuk.dhfs.objects.repository.distributed.GetIndexRequest;
 import com.usatiuk.dhfs.objects.repository.distributed.GetObjectRequest;
 import com.usatiuk.dhfs.objects.repository.distributed.IndexUpdatePush;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
-import com.usatiuk.dhfs.storage.objects.data.Namespace;
 import com.usatiuk.dhfs.storage.objects.data.Object;
 import io.quarkus.logging.Log;
 import io.smallrye.mutiny.Uni;
@@ -40,7 +39,7 @@ public class RemoteObjectServiceClient {
                 }
             }
             return Uni.createFrom().item(new Object(
-                    new Namespace(reply.getObject().getHeader().getNamespace()),
+                    reply.getObject().getHeader().getNamespace(),
                     reply.getObject().getHeader().getName(),
                     reply.getObject().getContent().toByteArray()
             ));
