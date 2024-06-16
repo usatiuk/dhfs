@@ -56,9 +56,8 @@ public class ObjectIndexService {
     }
 
     public void forAllRead(ForAllFn fn) {
-        _index.runReadLocked(() -> {
-            // FIXME:
-            for (var entry : _index._objectMetaMap.entrySet()) {
+        _index.runReadLocked((data) -> {
+            for (var entry : data.getObjectMetaMap().entrySet()) {
                 fn.apply(entry.getKey(), entry.getValue());
             }
             return null;
