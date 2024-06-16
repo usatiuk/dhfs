@@ -1,9 +1,6 @@
 package com.usatiuk.dhfs.storage.files.service;
 
-import com.usatiuk.dhfs.storage.files.objects.Chunk;
-import com.usatiuk.dhfs.storage.files.objects.Directory;
-import com.usatiuk.dhfs.storage.files.objects.File;
-import com.usatiuk.dhfs.storage.files.objects.FsNode;
+import com.usatiuk.dhfs.storage.files.objects.*;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.storage.objects.repository.ObjectRepository;
 import io.quarkus.logging.Log;
@@ -236,7 +233,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             long toReadInChunk = (offset + length) - curPos;
 
             var chunkUuid = chunk.getValue();
-            var chunkRead = jObjectManager.get(chunkUuid, Chunk.class);
+            var chunkRead = jObjectManager.get(ChunkData.getNameFromHash(chunkUuid), ChunkData.class);
 
             if (chunkRead.isEmpty()) {
                 Log.error("Chunk requested not found: " + chunkUuid);
@@ -299,7 +296,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (first != null && first.getKey() < offset) {
             var chunkUuid = first.getValue();
-            var chunkRead = jObjectManager.get(chunkUuid, Chunk.class);
+            var chunkRead = jObjectManager.get(ChunkData.getNameFromHash(chunkUuid), ChunkData.class);
 
             if (chunkRead.isEmpty()) {
                 Log.error("Chunk requested not found: " + chunkUuid);
@@ -307,21 +304,25 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
 
             var chunkBytes = chunkRead.get().getBytes();
-            Chunk newChunk = new Chunk(Arrays.copyOfRange(chunkBytes, 0, (int) (offset - first.getKey())));
-            jObjectManager.put(newChunk);
+            ChunkData newChunkData = new ChunkData(Arrays.copyOfRange(chunkBytes, 0, (int) (offset - first.getKey())));
+            ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
+            jObjectManager.put(newChunkData);
+            jObjectManager.put(newChunkInfo);
 
-            newChunks.put(first.getKey(), newChunk.getHash());
+            newChunks.put(first.getKey(), newChunkData.getHash());
         }
 
         {
-            Chunk newChunk = new Chunk(data);
-            jObjectManager.put(newChunk);
+            ChunkData newChunkData = new ChunkData(data);
+            ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
+            jObjectManager.put(newChunkData);
+            jObjectManager.put(newChunkInfo);
 
-            newChunks.put(offset, newChunk.getHash());
+            newChunks.put(offset, newChunkData.getHash());
         }
         if (last != null) {
             var lchunkUuid = last.getValue();
-            var lchunkRead = jObjectManager.get(lchunkUuid, Chunk.class);
+            var lchunkRead = jObjectManager.get(ChunkData.getNameFromHash(lchunkUuid), ChunkData.class);
 
             if (lchunkRead.isEmpty()) {
                 Log.error("Chunk requested not found: " + lchunkUuid);
@@ -333,10 +334,12 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (last.getKey() + lchunkBytes.length > offset + data.length) {
                 var startInFile = offset + data.length;
                 var startInChunk = startInFile - last.getKey();
-                Chunk newChunk = new Chunk(Arrays.copyOfRange(lchunkBytes, (int) startInChunk, lchunkBytes.length));
-                jObjectManager.put(newChunk);
+                ChunkData newChunkData = new ChunkData(Arrays.copyOfRange(lchunkBytes, (int) startInChunk, lchunkBytes.length));
+                ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
+                jObjectManager.put(newChunkData);
+                jObjectManager.put(newChunkInfo);
 
-                newChunks.put(startInFile, newChunk.getHash());
+                newChunks.put(startInFile, newChunkData.getHash());
             }
         }
 
@@ -401,7 +404,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (lastChunk != null) {
             var chunkUuid = lastChunk.getValue();
-            var chunkRead = jObjectManager.get(chunkUuid, Chunk.class);
+            var chunkRead = jObjectManager.get(ChunkData.getNameFromHash(chunkUuid), ChunkData.class);
 
             if (chunkRead.isEmpty()) {
                 Log.error("Chunk requested not found: " + chunkUuid);
@@ -412,10 +415,12 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             if (lastChunk.getKey() + chunkBytes.length > 0) {
                 int start = (int) (length - lastChunk.getKey());
-                Chunk newChunk = new Chunk(Arrays.copyOfRange(chunkBytes, 0, (int) (length - start)));
-                jObjectManager.put(newChunk);
+                ChunkData newChunkData = new ChunkData(Arrays.copyOfRange(chunkBytes, 0, (int) (length - start)));
+                ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
+                jObjectManager.put(newChunkData);
+                jObjectManager.put(newChunkInfo);
 
-                newChunks.put(lastChunk.getKey(), newChunk.getHash());
+                newChunks.put(lastChunk.getKey(), newChunkData.getHash());
             }
         }
 
@@ -480,15 +485,14 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         for (var chunk : chunksAll.entrySet()) {
             var chunkUuid = chunk.getValue();
-            var chunkRead = jObjectManager.get(chunkUuid, Chunk.class);
+            var chunkRead = jObjectManager.get(ChunkInfo.getNameFromHash(chunkUuid), ChunkInfo.class);
 
             if (chunkRead.isEmpty()) {
                 Log.error("Chunk requested not found: " + chunkUuid);
                 return -1L;
             }
 
-            var chunkBytes = chunkRead.get().getBytes();
-            size += chunkBytes.length;
+            size += chunkRead.get().getSize();
         }
         return (long) size;
     }
