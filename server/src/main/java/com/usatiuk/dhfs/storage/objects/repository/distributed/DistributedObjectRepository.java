@@ -23,6 +23,7 @@ import java.util.Optional;
 public class DistributedObjectRepository implements ObjectRepository {
     @ConfigProperty(name = "dhfs.objects.distributed.selfname")
     String selfname;
+
     @Inject
     Vertx vertx;
 
@@ -42,14 +43,9 @@ public class DistributedObjectRepository implements ObjectRepository {
         try {
             Log.info("Starting sync");
             var got = remoteObjectServiceClient.getIndex();
-            for (var h : got) {
-                var prevMtime = objectIndexService.exists(h.getName())
-                        ? objectIndexService.getMeta(h.getName()).get().getMtime()
-                        : 0;
-                syncHandler.handleRemoteUpdate(
-                        IndexUpdatePush.newBuilder().setSelfname(selfname).setName(h.getName())
-                                .setAssumeUnique(h.getAssumeUnique())
-                                .setMtime(h.getMtime()).setPrevMtime(prevMtime).build());
+            for (var h : got.getObjectsList()) {
+                syncHandler.handleRemoteUpdate(IndexUpdatePush.newBuilder()
+                        .setSelfname(got.getSelfname()).setHeader(h).build());
             }
             Log.info("Sync complete");
         } catch (Exception e) {
@@ -76,11 +72,9 @@ public class DistributedObjectRepository implements ObjectRepository {
     @Nonnull
     @Override
     public byte[] readObject(String name) {
-        if (!objectIndexService.exists(name))
-            throw new IllegalArgumentException("Object " + name + " doesn't exist");
-
         var infoOpt = objectIndexService.getMeta(name);
-        if (infoOpt.isEmpty()) throw new IllegalArgumentException("Object " + name + " doesn't exist");
+        if (infoOpt.isEmpty())
+            throw new IllegalArgumentException("Object " + name + " doesn't exist");
 
         var info = infoOpt.get();
 
@@ -90,8 +84,8 @@ public class DistributedObjectRepository implements ObjectRepository {
             return Optional.empty();
         });
         if (read.isPresent()) return read.get();
-        // Race?
 
+        // Possible race if it got deleted?
         return info.runWriteLocked((data) -> {
             var obj = remoteObjectServiceClient.getObject(name);
             objectPersistentStore.writeObject(name, obj);
@@ -106,17 +100,17 @@ public class DistributedObjectRepository implements ObjectRepository {
 
         info.runWriteLocked((metaData) -> {
             objectPersistentStore.writeObject(name, data);
-            var prevMtime = info.getMtime();
-            info.setMtime(System.currentTimeMillis());
-            try {
-                remoteObjectServiceClient.notifyUpdate(name, prevMtime);
-            } catch (Exception e) {
-                Log.error("Error when notifying remote update:");
-                Log.error(e);
-                Log.error(e.getCause());
-            }
+            metaData.getChangelog().merge(selfname, 1L, Long::sum);
             return null;
         });
+        // FIXME: Race?
+        try {
+            remoteObjectServiceClient.notifyUpdate(name);
+        } catch (Exception e) {
+            Log.error("Error when notifying remote update:");
+            Log.error(e);
+            Log.error(e.getCause());
+        }
     }
 
     @Nonnull

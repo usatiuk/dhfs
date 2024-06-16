@@ -34,7 +34,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     void init(@Observes @Priority(500) StartupEvent event) {
         Log.info("Initializing file service");
-        if (!objectRepository.existsObject(namespace + new UUID(0, 0))) {
+        if (!objectRepository.existsObject(new UUID(0, 0).toString())) {
             jObjectManager.put(new Directory(new UUID(0, 0), 0755));
         }
         getRoot();

@@ -17,6 +17,9 @@ import java.util.Optional;
 
 @ApplicationScoped
 public class ObjectIndexService {
+    @ConfigProperty(name = "dhfs.objects.distributed.selfname")
+    String selfname;
+
     ObjectIndex _index = new ObjectIndex();
 
     @ConfigProperty(name = "dhfs.objects.distributed.root")
@@ -47,7 +50,12 @@ public class ObjectIndexService {
     }
 
     public ObjectMeta getOrCreateMeta(String name, boolean assumeUnique) {
-        return _index.getOrCreate(name, assumeUnique);
+        var ret = _index.getOrCreate(name, assumeUnique);
+        ret.runWriteLocked(md -> {
+            md.getChangelog().putIfAbsent(selfname, 0L);
+            return null;
+        });
+        return ret;
     }
 
     @FunctionalInterface

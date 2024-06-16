@@ -12,10 +12,19 @@ service DhfsObjectSyncGrpc {
   rpc IndexUpdate (IndexUpdatePush) returns (IndexUpdateReply) {}
 }
 
+message ObjectChangelogEntry {
+  string host = 1;
+  uint64 version = 2;
+}
+
+message ObjectChangelog {
+  repeated ObjectChangelogEntry entries = 1;
+}
+
 message ObjectHeader {
   string name = 2;
   bool assumeUnique = 3;
-  uint64 mtime = 4;
+  ObjectChangelog changelog = 4;
 }
 
 message ApiObject {
@@ -28,6 +37,8 @@ message GetObjectRequest {
 }
 
 message GetObjectReply {
+  string selfname = 10;
+
   ApiObject object = 1;
 }
 
@@ -36,16 +47,15 @@ message GetIndexRequest {
 }
 
 message GetIndexReply {
+  string selfname = 10;
+
   repeated ObjectHeader objects = 1;
 }
 
 message IndexUpdatePush {
   string selfname = 10;
 
-  string name = 2;
-  bool assumeUnique = 3;
-  uint64 mtime = 4;
-  uint64 prevMtime = 5;
+  ObjectHeader header = 1;
 }
 
 message IndexUpdateReply {

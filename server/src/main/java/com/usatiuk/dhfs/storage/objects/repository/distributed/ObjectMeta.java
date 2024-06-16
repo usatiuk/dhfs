@@ -12,17 +12,6 @@ public class ObjectMeta implements Serializable {
     private final ObjectMetaData _data;
     private final ReadWriteLock _lock = new ReentrantReadWriteLock();
 
-    public void setMtime(long mtime) {
-        runWriteLocked((data) -> {
-            data.setMtime(mtime);
-            return null;
-        });
-    }
-
-    public long getMtime() {
-        return runReadLocked((data) -> data.getMtime());
-    }
-
     public boolean getAssumeUnique() {
         return runReadLocked((data) -> data.getAssumeUnique());
     }

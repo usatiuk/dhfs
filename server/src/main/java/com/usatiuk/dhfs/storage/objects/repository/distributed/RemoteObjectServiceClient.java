@@ -1,17 +1,11 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
-import com.usatiuk.dhfs.objects.repository.distributed.GetIndexRequest;
-import com.usatiuk.dhfs.objects.repository.distributed.GetObjectRequest;
-import com.usatiuk.dhfs.objects.repository.distributed.IndexUpdatePush;
-import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
+import com.usatiuk.dhfs.objects.repository.distributed.*;
 import io.quarkus.logging.Log;
-import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.NotImplementedException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-
-import java.util.List;
 
 @ApplicationScoped
 public class RemoteObjectServiceClient {
@@ -26,39 +20,57 @@ public class RemoteObjectServiceClient {
 
     public byte[] getObject(String name) {
         return remoteHostManager.withClient(client -> {
-            var req = GetObjectRequest.newBuilder().setName(name).build();
-            var reply = client.getObject(req);
-            var metaOpt = objectIndexService.getMeta(name);
-            if (metaOpt.isEmpty()) throw new RuntimeException("Oops!");
-            var meta = metaOpt.get();
-            if (meta.getMtime() != reply.getObject().getHeader().getMtime()) {
-                if (!meta.getAssumeUnique() && (meta.getAssumeUnique() != reply.getObject().getHeader().getAssumeUnique())) {
+            var reply = client.getObject(GetObjectRequest.newBuilder().setName(name).build());
+
+            var meta = objectIndexService.getMeta(name).orElseThrow(() -> {
+                Log.error("Race when trying to fetch");
+                return new NotImplementedException();
+            });
+
+            var receivedSelfVer = reply.getObject().getHeader().getChangelog()
+                    .getEntriesList().stream().filter(p -> p.getHost().equals(selfname))
+                    .findFirst().map(ObjectChangelogEntry::getVersion).orElse(0L);
+
+            var receivedTotalVer = reply.getObject().getHeader().getChangelog().getEntriesList()
+                    .stream().map(ObjectChangelogEntry::getVersion).reduce(0L, Long::sum);
+
+            return meta.runReadLocked(md -> {
+                var outdated =
+                        (
+                                (md.getTotalVersion() > receivedTotalVer)
+                                        || (md.getChangelog().get(selfname) > receivedSelfVer)
+                        )
+                                && !md.getAssumeUnique();
+
+                if (outdated) {
                     Log.error("Race when trying to fetch");
                     throw new NotImplementedException();
                 }
-            }
-            return reply.getObject().getContent().toByteArray();
+                return reply.getObject().getContent().toByteArray();
+            });
         });
     }
 
-    public List<ObjectHeader> getIndex() {
+    public GetIndexReply getIndex() {
         return remoteHostManager.withClient(client -> {
             var req = GetIndexRequest.newBuilder().build();
             var reply = client.getIndex(req);
-            return reply.getObjectsList();
+            return reply;
         });
     }
 
-    public Boolean notifyUpdate(String name, long prevMtime) {
+    public Boolean notifyUpdate(String name) {
         return remoteHostManager.withClient(client -> {
-            var metaOpt = objectIndexService.getMeta(name);
-            if (metaOpt.isEmpty()) throw new RuntimeException("Oops!");
-            var meta = metaOpt.get();
+            var meta = objectIndexService.getMeta(name).orElseThrow(() -> {
+                Log.error("Race when trying to notify update");
+                return new NotImplementedException();
+            });
 
-            var req = IndexUpdatePush.newBuilder().setSelfname(selfname).setName(name)
-                    .setAssumeUnique(meta.getAssumeUnique())
-                    .setMtime(meta.getMtime()).setPrevMtime(prevMtime).build();
-            client.indexUpdate(req);
+            var builder = IndexUpdatePush.newBuilder().setSelfname(selfname);
+
+            client.indexUpdate(builder.setHeader(
+                    meta.runReadLocked(ObjectMetaData::toRpcHeader)
+            ).build());
             return true;
         });
     }

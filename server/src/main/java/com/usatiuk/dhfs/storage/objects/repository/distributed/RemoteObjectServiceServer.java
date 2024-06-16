@@ -30,18 +30,20 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Blocking
     public Uni<GetObjectReply> getObject(GetObjectRequest request) {
         Log.info("<-- getObject: " + request.getName());
-        var metaOpt = objectIndexService.getMeta(request.getName());
-        if (metaOpt.isEmpty()) throw new StatusRuntimeException(Status.NOT_FOUND);
-        var meta = metaOpt.get();
-        Optional<Pair<Long, byte[]>> read = meta.runReadLocked((data) -> {
-            if (objectPersistentStore.existsObject(request.getName()))
-                return Optional.of(Pair.of(meta.getMtime(), objectPersistentStore.readObject(request.getName())));
-            return Optional.empty();
+
+        var meta = objectIndexService.getMeta(request.getName()).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
+
+        Optional<Pair<ObjectHeader, byte[]>> readOpt = meta.runReadLocked((data) -> {
+            if (objectPersistentStore.existsObject(request.getName())) {
+                ObjectHeader header = data.toRpcHeader();
+                byte[] bytes = objectPersistentStore.readObject(request.getName());
+                return Optional.of(Pair.of(header, bytes));
+            } else {
+                return Optional.empty();
+            }
         });
-        if (read.isEmpty()) throw new StatusRuntimeException(Status.NOT_FOUND);
-        var obj = read.get().getRight();
-        var header = ObjectHeader.newBuilder().setName(request.getName()).setMtime(read.get().getLeft()).setAssumeUnique(meta.getAssumeUnique()).build();
-        var replyObj = ApiObject.newBuilder().setHeader(header).setContent(ByteString.copyFrom(obj)).build();
+        var read = readOpt.orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
+        var replyObj = ApiObject.newBuilder().setHeader(read.getLeft()).setContent(ByteString.copyFrom(read.getRight())).build();
         return Uni.createFrom().item(GetObjectReply.newBuilder().setObject(replyObj).build());
     }
 
@@ -51,8 +53,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         Log.info("<-- getIndex: ");
         var builder = GetIndexReply.newBuilder();
         objectIndexService.forAllRead((name, meta) -> {
-            var entry = ObjectHeader.newBuilder().setName(name).setMtime(meta.getMtime()).setAssumeUnique(meta.getAssumeUnique()).build();
-            builder.addObjects(entry);
+            builder.addObjects(meta.runReadLocked(ObjectMetaData::toRpcHeader));
         });
         return Uni.createFrom().item(builder.build());
     }
@@ -60,7 +61,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Override
     @Blocking
     public Uni<IndexUpdateReply> indexUpdate(IndexUpdatePush request) {
-        Log.info("<-- indexUpdate: " + request.getName() + " from: " + request.getPrevMtime() + " to: " + request.getMtime());
+        Log.info("<-- indexUpdate: " + request.getHeader().getName());
         return Uni.createFrom().item(syncHandler.handleRemoteUpdate(request));
     }
 }
