@@ -24,7 +24,7 @@ public class RemoteObjectServiceClient {
     @Inject
     RemoteHostManager remoteHostManager;
 
-    public Uni<byte[]> getObject(String name) {
+    public byte[] getObject(String name) {
         return remoteHostManager.withClient(client -> {
             var req = GetObjectRequest.newBuilder().setName(name).build();
             var reply = client.getObject(req);
@@ -37,7 +37,7 @@ public class RemoteObjectServiceClient {
                     throw new NotImplementedException();
                 }
             }
-            return Uni.createFrom().item(reply.getObject().getContent().toByteArray());
+            return reply.getObject().getContent().toByteArray();
         });
     }
 

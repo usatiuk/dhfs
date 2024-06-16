@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
 import io.quarkus.logging.Log;
-import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.Getter;
@@ -56,29 +55,29 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     @Override
-    public <T extends JObject> Uni<Optional<T>> get(String name, Class<T> clazz) {
+    public <T extends JObject> Optional<T> get(String name, Class<T> clazz) {
         cleanup();
         synchronized (_map) {
             var inMap = getFromMap(name, clazz);
-            if (inMap != null) return Uni.createFrom().item(Optional.of(inMap));
+            if (inMap != null) return Optional.of(inMap);
         }
 
         var read = jObjectRepository.readJObjectChecked(name, clazz);
 
         if (read.isEmpty())
-            return Uni.createFrom().item(Optional.empty());
+            return Optional.empty();
 
         synchronized (_map) {
             var inMap = getFromMap(name, clazz);
-            if (inMap != null) return Uni.createFrom().item(Optional.of(inMap));
+            if (inMap != null) return Optional.of(inMap);
             _map.put(name, new NamedSoftReference(read.get(), _refQueue));
         }
 
-        return Uni.createFrom().item(Optional.of(read.get()));
+        return Optional.of(read.get());
     }
 
     @Override
-    public <T extends JObject> Uni<Void> put(T object) {
+    public <T extends JObject> void put(T object) {
         cleanup();
 
         synchronized (_map) {
@@ -90,7 +89,6 @@ public class JObjectManagerImpl implements JObjectManager {
         }
 
         jObjectRepository.writeJObject(object);
-        return Uni.createFrom().voidItem();
     }
 
     @Override

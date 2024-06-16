@@ -6,6 +6,7 @@ import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 
 import javax.annotation.Nonnull;
+import java.util.List;
 
 //@ApplicationScoped
 public class SimplePersistentObjectRepository implements ObjectRepository {
@@ -14,31 +15,31 @@ public class SimplePersistentObjectRepository implements ObjectRepository {
 
     @Nonnull
     @Override
-    public Multi<String> findObjects(String prefix) {
+    public List<String> findObjects(String prefix) {
         return objectPersistentStore.findObjects(prefix);
     }
 
     @Nonnull
     @Override
-    public Uni<Boolean> existsObject(String name) {
+    public Boolean existsObject(String name) {
         return objectPersistentStore.existsObject(name);
     }
 
     @Nonnull
     @Override
     public byte[] readObject(String name) {
-        return objectPersistentStore.readObject(name).await().indefinitely();
+        return objectPersistentStore.readObject(name);
     }
 
     @Nonnull
     @Override
     public void writeObject(String name, byte[] data, Boolean canIgnoreConflict) {
-        objectPersistentStore.writeObject(name, data).await().indefinitely();
+        objectPersistentStore.writeObject(name, data);
     }
 
     @Nonnull
     @Override
     public void deleteObject(String name) {
-        objectPersistentStore.deleteObject(name).await().indefinitely();
+        objectPersistentStore.deleteObject(name);
     }
 }

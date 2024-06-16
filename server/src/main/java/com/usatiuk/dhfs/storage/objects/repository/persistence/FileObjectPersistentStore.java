@@ -6,7 +6,6 @@ import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.core.Vertx;
 import io.vertx.mutiny.core.buffer.Buffer;
 import jakarta.annotation.Priority;
@@ -18,6 +17,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import javax.annotation.Nonnull;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 
 @ApplicationScoped
 public class FileObjectPersistentStore implements ObjectPersistentStore {
@@ -38,7 +38,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     @Nonnull
     @Override
-    public Multi<String> findObjects(String prefix) {
+    public List<String> findObjects(String prefix) {
         Path nsRoot = Paths.get(root);
 
         if (!nsRoot.toFile().isDirectory())
@@ -47,51 +47,48 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         return vertx.fileSystem().readDir(nsRoot.toString()).onItem()
                 .transformToMulti(v -> Multi.createFrom().iterable(v))
                 .select().where(n -> n.startsWith(prefix))
-                .map(f -> nsRoot.relativize(Paths.get(f)).toString());
+                .map(f -> nsRoot.relativize(Paths.get(f)).toString()).collect().asList().await().indefinitely();
     }
 
     @Nonnull
     @Override
-    public Uni<Boolean> existsObject(String name) {
+    public Boolean existsObject(String name) {
         Path obj = Paths.get(root, name);
 
-        if (!obj.toFile().isFile())
-            return Uni.createFrom().item(false);
-
-        return Uni.createFrom().item(true);
+        return obj.toFile().isFile();
     }
 
     @Nonnull
     @Override
-    public Uni<byte[]> readObject(String name) {
+    public byte[] readObject(String name) {
         var file = Path.of(root, name);
 
         if (!file.toFile().exists())
             throw new StatusRuntimeException(Status.NOT_FOUND);
 
-        return vertx.fileSystem().readFile(file.toString()).map(Buffer::getBytes);
+        return vertx.fileSystem().readFile(file.toString()).map(Buffer::getBytes).await().indefinitely();
     }
 
     @Nonnull
     @Override
-    public Uni<Void> writeObject(String name, byte[] data) {
+    public Void writeObject(String name, byte[] data) {
         var file = Path.of(root, name);
 
         if (!Paths.get(root).toFile().isDirectory()
                 && !Paths.get(root).toFile().mkdirs())
             throw new StatusRuntimeException(Status.INTERNAL);
 
-        return vertx.fileSystem().writeFile(file.toString(), Buffer.buffer(data));
+        return vertx.fileSystem().writeFile(file.toString(), Buffer.buffer(data)).await().indefinitely();
     }
 
     @Nonnull
     @Override
-    public Uni<Void> deleteObject(String name) {
+    public Void deleteObject(String name) {
         var file = Path.of(root, name);
 
         if (!file.toFile().exists())
             throw new StatusRuntimeException(Status.NOT_FOUND);
 
-        return vertx.fileSystem().delete(file.toString());
+        return vertx.fileSystem().delete(file.toString()).await().indefinitely();
     }
 }

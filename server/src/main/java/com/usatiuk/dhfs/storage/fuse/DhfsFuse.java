@@ -68,14 +68,14 @@ public class DhfsFuse extends FuseStubFS {
     @Override
     public int getattr(String path, FileStat stat) {
         try {
-            Optional<FsNode> found = fileService.getDirEntry(path).await().indefinitely();
+            Optional<FsNode> found = fileService.getDirEntry(path);
             if (found.isEmpty()) {
                 return -ErrorCodes.ENOENT();
             }
             if (found.get() instanceof File f) {
                 stat.st_mode.set(S_IFREG | f.getMode());
                 stat.st_nlink.set(1);
-                stat.st_size.set(fileService.size(f).await().indefinitely());
+                stat.st_size.set(fileService.size(f));
             } else if (found.get() instanceof Directory d) {
                 stat.st_mode.set(S_IFDIR | d.getMode());
                 stat.st_nlink.set(2);
@@ -101,12 +101,12 @@ public class DhfsFuse extends FuseStubFS {
     @Override
     public int utimens(String path, Timespec[] timespec) {
         try {
-            var fileOpt = fileService.open(path).await().indefinitely();
+            var fileOpt = fileService.open(path);
             if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
             var file = fileOpt.get();
             var res = fileService.setTimes(file.getUuid().toString(),
                     timespec[0].tv_sec.get() * 1000,
-                    timespec[1].tv_sec.get() * 1000).await().indefinitely();
+                    timespec[1].tv_sec.get() * 1000);
             if (!res) return -ErrorCodes.EINVAL();
             else return 0;
         } catch (Exception e) {
@@ -117,17 +117,17 @@ public class DhfsFuse extends FuseStubFS {
 
     @Override
     public int open(String path, FuseFileInfo fi) {
-        if (fileService.open(path).await().indefinitely().isEmpty()) return -ErrorCodes.ENOENT();
+        if (fileService.open(path).isEmpty()) return -ErrorCodes.ENOENT();
         return 0;
     }
 
     @Override
     public int read(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
         try {
-            var fileOpt = fileService.open(path).await().indefinitely();
+            var fileOpt = fileService.open(path);
             if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
             var file = fileOpt.get();
-            var read = fileService.read(file.getUuid().toString(), offset, (int) size).await().indefinitely();
+            var read = fileService.read(file.getUuid().toString(), offset, (int) size);
             if (read.isEmpty()) return 0;
             buf.put(0, read.get(), 0, read.get().length);
             return read.get().length;
@@ -140,12 +140,12 @@ public class DhfsFuse extends FuseStubFS {
     @Override
     public int write(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
         try {
-            var fileOpt = fileService.open(path).await().indefinitely();
+            var fileOpt = fileService.open(path);
             if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
             var file = fileOpt.get();
             byte[] buffer = new byte[(int) size];
             buf.get(0, buffer, 0, (int) size);
-            var written = fileService.write(file.getUuid().toString(), offset, buffer).await().indefinitely();
+            var written = fileService.write(file.getUuid().toString(), offset, buffer);
             return written.intValue();
         } catch (Exception e) {
             Log.error("When writing " + path, e);
@@ -155,45 +155,45 @@ public class DhfsFuse extends FuseStubFS {
 
     @Override
     public int create(String path, long mode, FuseFileInfo fi) {
-        var ret = fileService.create(path, mode).await().indefinitely();
+        var ret = fileService.create(path, mode);
         if (ret.isEmpty()) return -ErrorCodes.ENOSPC();
         else return 0;
     }
 
     @Override
     public int mkdir(String path, long mode) {
-        var ret = fileService.mkdir(path, mode).await().indefinitely();
+        var ret = fileService.mkdir(path, mode);
         if (ret.isEmpty()) return -ErrorCodes.ENOSPC();
         else return 0;
     }
 
     @Override
     public int rmdir(String path) {
-        var ret = fileService.rmdir(path).await().indefinitely();
+        var ret = fileService.rmdir(path);
         if (!ret) return -ErrorCodes.ENOENT();
         else return 0;
     }
 
     @Override
     public int rename(String path, String newName) {
-        var ret = fileService.rename(path, newName).await().indefinitely();
+        var ret = fileService.rename(path, newName);
         if (!ret) return -ErrorCodes.ENOENT();
         else return 0;
     }
 
     @Override
     public int unlink(String path) {
-        var ret = fileService.unlink(path).await().indefinitely();
+        var ret = fileService.unlink(path);
         if (!ret) return -ErrorCodes.ENOENT();
         else return 0;
     }
 
     @Override
     public int truncate(String path, long size) {
-        var fileOpt = fileService.open(path).await().indefinitely();
+        var fileOpt = fileService.open(path);
         if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
         var file = fileOpt.get();
-        var ok = fileService.truncate(file.getUuid().toString(), size).await().indefinitely();
+        var ok = fileService.truncate(file.getUuid().toString(), size);
         if (ok)
             return 0;
         else
@@ -202,7 +202,7 @@ public class DhfsFuse extends FuseStubFS {
 
     @Override
     public int chmod(String path, long mode) {
-        var ret = fileService.chmod(path, mode).await().indefinitely();
+        var ret = fileService.chmod(path, mode);
         if (ret) return 0;
         else return -ErrorCodes.EINVAL();
     }
@@ -211,7 +211,7 @@ public class DhfsFuse extends FuseStubFS {
     public int readdir(String path, Pointer buf, FuseFillDir filler, long offset, FuseFileInfo fi) {
         Iterable<String> found;
         try {
-            found = fileService.readDir(path).await().indefinitely();
+            found = fileService.readDir(path);
         } catch (Exception e) {
             return -ErrorCodes.ENOENT();
         }

@@ -21,7 +21,7 @@ public class SyncHandler {
     @Inject
     JObjectManager jObjectManager;
 
-    public Uni<IndexUpdateReply> handleRemoteUpdate(IndexUpdatePush request) {
+    public IndexUpdateReply handleRemoteUpdate(IndexUpdatePush request) {
         var metaOpt = objectIndexService.getOrCreateMeta(request.getName(), request.getAssumeUnique());
         metaOpt.runWriteLocked(() -> {
             if (metaOpt.getMtime() == request.getMtime()) {
@@ -43,7 +43,7 @@ public class SyncHandler {
             metaOpt._remoteCopies.add(request.getSelfname());
 
             try {
-                objectPersistentStore.deleteObject(request.getName()).await().indefinitely();
+                objectPersistentStore.deleteObject(request.getName());
             } catch (Exception ignored) {
             }
 
@@ -52,7 +52,7 @@ public class SyncHandler {
             return null;
         });
 
-        return Uni.createFrom().item(IndexUpdateReply.newBuilder().build());
+        return IndexUpdateReply.newBuilder().build();
     }
 
 }

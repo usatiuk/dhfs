@@ -6,8 +6,6 @@ import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentS
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.core.Vertx;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -18,6 +16,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 
 @ApplicationScoped
@@ -50,7 +49,7 @@ public class DistributedObjectRepository implements ObjectRepository {
                 syncHandler.handleRemoteUpdate(
                         IndexUpdatePush.newBuilder().setSelfname(selfname).setName(h.getName())
                                 .setAssumeUnique(h.getAssumeUnique())
-                                .setMtime(h.getMtime()).setPrevMtime(prevMtime).build()).await().indefinitely();
+                                .setMtime(h.getMtime()).setPrevMtime(prevMtime).build());
             }
             Log.info("Sync complete");
         } catch (Exception e) {
@@ -64,14 +63,14 @@ public class DistributedObjectRepository implements ObjectRepository {
 
     @Nonnull
     @Override
-    public Multi<String> findObjects(String prefix) {
+    public List<String> findObjects(String prefix) {
         throw new NotImplementedException();
     }
 
     @Nonnull
     @Override
-    public Uni<Boolean> existsObject(String name) {
-        return Uni.createFrom().item(objectIndexService.exists(name));
+    public Boolean existsObject(String name) {
+        return objectIndexService.exists(name);
     }
 
     @Nonnull
@@ -86,18 +85,17 @@ public class DistributedObjectRepository implements ObjectRepository {
         var info = infoOpt.get();
 
         Optional<byte[]> read = info.runReadLocked(() -> {
-            if (objectPersistentStore.existsObject(name).await().indefinitely())
-                return Optional.of(objectPersistentStore.readObject(name).await().indefinitely());
+            if (objectPersistentStore.existsObject(name))
+                return Optional.of(objectPersistentStore.readObject(name));
             return Optional.empty();
         });
         if (read.isPresent()) return read.get();
         // Race?
 
         return info.runWriteLocked(() -> {
-            return remoteObjectServiceClient.getObject(name).map(got -> {
-                objectPersistentStore.writeObject(name, got);
-                return got;
-            }).await().indefinitely();
+            var obj = remoteObjectServiceClient.getObject(name);
+            objectPersistentStore.writeObject(name, obj);
+            return obj;
         });
     }
 
@@ -107,7 +105,7 @@ public class DistributedObjectRepository implements ObjectRepository {
         var info = objectIndexService.getOrCreateMeta(name, canIgnoreConflict);
 
         info.runWriteLocked(() -> {
-            objectPersistentStore.writeObject(name, data).await().indefinitely();
+            objectPersistentStore.writeObject(name, data);
             var prevMtime = info.getMtime();
             info.setMtime(System.currentTimeMillis());
             try {

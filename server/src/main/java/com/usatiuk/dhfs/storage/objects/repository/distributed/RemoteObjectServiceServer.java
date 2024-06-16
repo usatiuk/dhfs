@@ -34,8 +34,8 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         if (metaOpt.isEmpty()) throw new StatusRuntimeException(Status.NOT_FOUND);
         var meta = metaOpt.get();
         Optional<Pair<Long, byte[]>> read = meta.runReadLocked(() -> {
-            if (objectPersistentStore.existsObject(request.getName()).await().indefinitely())
-                return Optional.of(Pair.of(meta.getMtime(), objectPersistentStore.readObject(request.getName()).await().indefinitely()));
+            if (objectPersistentStore.existsObject(request.getName()))
+                return Optional.of(Pair.of(meta.getMtime(), objectPersistentStore.readObject(request.getName())));
             return Optional.empty();
         });
         if (read.isEmpty()) throw new StatusRuntimeException(Status.NOT_FOUND);
@@ -61,6 +61,6 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Blocking
     public Uni<IndexUpdateReply> indexUpdate(IndexUpdatePush request) {
         Log.info("<-- indexUpdate: " + request.getName() + " from: " + request.getPrevMtime() + " to: " + request.getMtime());
-        return syncHandler.handleRemoteUpdate(request);
+        return Uni.createFrom().item(syncHandler.handleRemoteUpdate(request));
     }
 }

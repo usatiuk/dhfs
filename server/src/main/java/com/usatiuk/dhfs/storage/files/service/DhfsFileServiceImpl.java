@@ -9,7 +9,6 @@ import com.usatiuk.dhfs.storage.objects.repository.ObjectRepository;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
-import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.core.Vertx;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -35,179 +34,178 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     void init(@Observes @Priority(500) StartupEvent event) {
         Log.info("Initializing file service");
-        if (!objectRepository.existsObject(namespace + new UUID(0, 0)).await().indefinitely()) {
-            jObjectManager.put(new Directory(new UUID(0, 0), 0755)).await().indefinitely();
+        if (!objectRepository.existsObject(namespace + new UUID(0, 0))) {
+            jObjectManager.put(new Directory(new UUID(0, 0), 0755));
         }
-        getRoot().await().indefinitely();
+        getRoot();
     }
 
     void shutdown(@Observes @Priority(100) ShutdownEvent event) {
         Log.info("Shutdown");
     }
 
-    private Uni<Optional<FsNode>> traverse(FsNode from, Path path) {
-        if (path.getNameCount() == 0) return Uni.createFrom().item(Optional.of(from));
+    private Optional<FsNode> traverse(FsNode from, Path path) {
+        if (path.getNameCount() == 0) return Optional.of(from);
 
         if (!(from instanceof Directory dir))
-            return Uni.createFrom().item(Optional.empty());
+            return Optional.empty();
 
         var pathFirstPart = path.getName(0).toString();
 
         var found = dir.getKid(pathFirstPart);
         if (found.isEmpty())
-            return Uni.createFrom().item(Optional.empty());
+            return Optional.empty();
 
-        var ref = jObjectManager.get(found.get().toString(), FsNode.class)
-                .await().indefinitely();
+        var ref = jObjectManager.get(found.get().toString(), FsNode.class);
 
         if (ref.isEmpty()) {
             Log.error("File missing when traversing directory " + from.getName() + ": " + found);
-            return Uni.createFrom().item(Optional.empty());
+            return Optional.empty();
         }
 
-        if (path.getNameCount() == 1) return Uni.createFrom().item(ref);
+        if (path.getNameCount() == 1) return ref;
 
         return traverse(ref.get(), path.subpath(1, path.getNameCount()));
     }
 
     @Override
-    public Uni<Optional<FsNode>> getDirEntry(String name) {
-        var root = getRoot().await().indefinitely();
-        var found = traverse(root, Path.of(name)).await().indefinitely();
-        return Uni.createFrom().item(found);
+    public Optional<FsNode> getDirEntry(String name) {
+        var root = getRoot();
+        var found = traverse(root, Path.of(name));
+        return found;
     }
 
     @Override
-    public Uni<Optional<File>> open(String name) {
+    public Optional<File> open(String name) {
         // FIXME:
-        var root = getRoot().await().indefinitely();
-        var found = traverse(root, Path.of(name)).await().indefinitely();
+        var root = getRoot();
+        var found = traverse(root, Path.of(name));
 
         if (found.isEmpty())
-            return Uni.createFrom().item(Optional.empty());
+            return Optional.empty();
 
         if (!(found.get() instanceof File))
-            return Uni.createFrom().item(Optional.empty());
+            return Optional.empty();
 
-        return Uni.createFrom().item(Optional.of((File) found.get()));
+        return Optional.of((File) found.get());
     }
 
     @Override
-    public Uni<Optional<File>> create(String name, long mode) {
+    public Optional<File> create(String name, long mode) {
         // FIXME:
-        var root = getRoot().await().indefinitely();
-        var found = traverse(root, Path.of(name).getParent()).await().indefinitely();
-        if (found.isEmpty()) return Uni.createFrom().item(Optional.empty());
+        var root = getRoot();
+        var found = traverse(root, Path.of(name).getParent());
+        if (found.isEmpty()) return Optional.empty();
 
-        if (!(found.get() instanceof Directory dir)) return Uni.createFrom().item(Optional.empty());
+        if (!(found.get() instanceof Directory dir)) return Optional.empty();
 
         var fuuid = UUID.randomUUID();
         File f = new File(fuuid);
         f.setMode(mode);
 
-        jObjectManager.put(f).await().indefinitely();
+        jObjectManager.put(f);
 
         if (!dir.putKid(Path.of(name).getFileName().toString(), fuuid))
-            return Uni.createFrom().item(Optional.empty());
+            return Optional.empty();
 
-        jObjectManager.put(dir).await().indefinitely();
+        jObjectManager.put(dir);
 
-        return Uni.createFrom().item(Optional.of(f));
+        return Optional.of(f);
     }
 
     @Override
-    public Uni<Optional<Directory>> mkdir(String name, long mode) {
+    public Optional<Directory> mkdir(String name, long mode) {
         // FIXME:
-        var root = getRoot().await().indefinitely();
-        var found = traverse(root, Path.of(name).getParent()).await().indefinitely();
-        if (found.isEmpty()) return Uni.createFrom().item(Optional.empty());
+        var root = getRoot();
+        var found = traverse(root, Path.of(name).getParent());
+        if (found.isEmpty()) return Optional.empty();
 
-        if (!(found.get() instanceof Directory dir)) return Uni.createFrom().item(Optional.empty());
+        if (!(found.get() instanceof Directory dir)) return Optional.empty();
 
         var duuid = UUID.randomUUID();
         Directory d = new Directory(duuid);
         d.setMode(mode);
 
-        jObjectManager.put(d).await().indefinitely();
+        jObjectManager.put(d);
         if (!dir.putKid(Path.of(name).getFileName().toString(), duuid))
-            return Uni.createFrom().item(Optional.empty());
-        jObjectManager.put(dir).await().indefinitely();
+            return Optional.empty();
+        jObjectManager.put(dir);
 
-        return Uni.createFrom().item(Optional.of(d));
+        return Optional.of(d);
     }
 
-    private Uni<Boolean> rmdent(String name) {
+    private Boolean rmdent(String name) {
         // FIXME:
-        var root = getRoot().await().indefinitely();
-        var found = traverse(root, Path.of(name).getParent()).await().indefinitely();
-        if (found.isEmpty()) return Uni.createFrom().item(false);
+        var root = getRoot();
+        var found = traverse(root, Path.of(name).getParent());
+        if (found.isEmpty()) return false;
 
-        if (!(found.get() instanceof Directory dir)) return Uni.createFrom().item(false);
+        if (!(found.get() instanceof Directory dir)) return false;
 
         var removed = dir.removeKid(Path.of(name).getFileName().toString());
-        if (removed) jObjectManager.put(dir).await().indefinitely();
+        if (removed) jObjectManager.put(dir);
 
-        return Uni.createFrom().item(removed);
+        return removed;
     }
 
     @Override
-    public Uni<Boolean> rmdir(String name) {
+    public Boolean rmdir(String name) {
         return rmdent(name);
     }
 
     @Override
-    public Uni<Boolean> unlink(String name) {
+    public Boolean unlink(String name) {
         return rmdent(name);
     }
 
     @Override
-    public Uni<Boolean> rename(String from, String to) {
-        var dent = getDirEntry(from).await().indefinitely();
-        if (dent.isEmpty()) return Uni.createFrom().item(false);
-        if (!rmdent(from).await().indefinitely()) return Uni.createFrom().item(false);
+    public Boolean rename(String from, String to) {
+        var dent = getDirEntry(from);
+        if (dent.isEmpty()) return false;
+        if (!rmdent(from)) return false;
 
         // FIXME:
-        var root = getRoot().await().indefinitely();
-        var found = traverse(root, Path.of(to).getParent()).await().indefinitely();
-        if (found.isEmpty()) return Uni.createFrom().item(false);
+        var root = getRoot();
+        var found = traverse(root, Path.of(to).getParent());
+        if (found.isEmpty()) return false;
 
-        if (!(found.get() instanceof Directory dir)) return Uni.createFrom().item(false);
+        if (!(found.get() instanceof Directory dir)) return false;
 
         if (!dir.putKid(Path.of(to).getFileName().toString(), dent.get().getUuid()))
-            return Uni.createFrom().item(false);
-        jObjectManager.put(dir).await().indefinitely();
+            return false;
+        jObjectManager.put(dir);
 
-        return Uni.createFrom().item(true);
+        return true;
     }
 
     @Override
-    public Uni<Boolean> chmod(String name, long mode) {
-        var dent = getDirEntry(name).await().indefinitely();
-        if (dent.isEmpty()) return Uni.createFrom().item(false);
+    public Boolean chmod(String name, long mode) {
+        var dent = getDirEntry(name);
+        if (dent.isEmpty()) return false;
 
         dent.get().setMode(mode);
 
-        jObjectManager.put(dent.get()).await().indefinitely();
+        jObjectManager.put(dent.get());
 
-        return Uni.createFrom().item(true);
+        return true;
     }
 
     @Override
-    public Uni<Iterable<String>> readDir(String name) {
-        var root = getRoot().await().indefinitely();
-        var found = traverse(root, Path.of(name)).await().indefinitely();
+    public Iterable<String> readDir(String name) {
+        var root = getRoot();
+        var found = traverse(root, Path.of(name));
         if (found.isEmpty()) throw new IllegalArgumentException();
         if (!(found.get() instanceof Directory foundDir)) throw new IllegalArgumentException();
 
-        return Uni.createFrom().item(foundDir.getChildrenList());
+        return foundDir.getChildrenList();
     }
 
     @Override
-    public Uni<Optional<byte[]>> read(String fileUuid, long offset, int length) {
-        var fileOpt = jObjectManager.get(fileUuid, File.class).await().indefinitely();
+    public Optional<byte[]> read(String fileUuid, long offset, int length) {
+        var fileOpt = jObjectManager.get(fileUuid, File.class);
         if (fileOpt.isEmpty()) {
             Log.error("File not found when trying to read: " + fileUuid);
-            return Uni.createFrom().item(Optional.empty());
+            return Optional.empty();
         }
         var file = fileOpt.get();
 
@@ -221,7 +219,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             });
         } catch (Exception e) {
             Log.error("Error reading file: " + fileUuid, e);
-            return Uni.createFrom().item(Optional.empty());
+            return Optional.empty();
         }
 
         var chunks = chunksList.get().iterator();
@@ -238,11 +236,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             long toReadInChunk = (offset + length) - curPos;
 
             var chunkUuid = chunk.getValue();
-            var chunkRead = jObjectManager.get(chunkUuid, Chunk.class).await().indefinitely();
+            var chunkRead = jObjectManager.get(chunkUuid, Chunk.class);
 
             if (chunkRead.isEmpty()) {
                 Log.error("Chunk requested not found: " + chunkUuid);
-                return Uni.createFrom().item(Optional.empty());
+                return Optional.empty();
             }
 
             var chunkBytes = chunkRead.get().getBytes();
@@ -264,15 +262,15 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
 
         // FIXME:
-        return Uni.createFrom().item(Optional.of(Arrays.copyOf(buf.array(), (int) (curPos - offset))));
+        return Optional.of(Arrays.copyOf(buf.array(), (int) (curPos - offset)));
     }
 
     @Override
-    public Uni<Long> write(String fileUuid, long offset, byte[] data) {
-        var fileOpt = jObjectManager.get(fileUuid, File.class).await().indefinitely();
+    public Long write(String fileUuid, long offset, byte[] data) {
+        var fileOpt = jObjectManager.get(fileUuid, File.class);
         if (fileOpt.isEmpty()) {
             Log.error("File not found when trying to read: " + fileUuid);
-            return Uni.createFrom().item(-1L);
+            return -1L;
         }
         var file = fileOpt.get();
 
@@ -286,7 +284,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             });
         } catch (Exception e) {
             Log.error("Error reading file: " + fileUuid, e);
-            return Uni.createFrom().item(-1L);
+            return -1L;
         }
 
         var chunksAll = chunksAllRef.get();
@@ -301,33 +299,33 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (first != null && first.getKey() < offset) {
             var chunkUuid = first.getValue();
-            var chunkRead = jObjectManager.get(chunkUuid, Chunk.class).await().indefinitely();
+            var chunkRead = jObjectManager.get(chunkUuid, Chunk.class);
 
             if (chunkRead.isEmpty()) {
                 Log.error("Chunk requested not found: " + chunkUuid);
-                return Uni.createFrom().item(-1L);
+                return -1L;
             }
 
             var chunkBytes = chunkRead.get().getBytes();
             Chunk newChunk = new Chunk(Arrays.copyOfRange(chunkBytes, 0, (int) (offset - first.getKey())));
-            jObjectManager.put(newChunk).await().indefinitely();
+            jObjectManager.put(newChunk);
 
             newChunks.put(first.getKey(), newChunk.getHash());
         }
 
         {
             Chunk newChunk = new Chunk(data);
-            jObjectManager.put(newChunk).await().indefinitely();
+            jObjectManager.put(newChunk);
 
             newChunks.put(offset, newChunk.getHash());
         }
         if (last != null) {
             var lchunkUuid = last.getValue();
-            var lchunkRead = jObjectManager.get(lchunkUuid, Chunk.class).await().indefinitely();
+            var lchunkRead = jObjectManager.get(lchunkUuid, Chunk.class);
 
             if (lchunkRead.isEmpty()) {
                 Log.error("Chunk requested not found: " + lchunkUuid);
-                return Uni.createFrom().item(-1L);
+                return -1L;
             }
 
             var lchunkBytes = lchunkRead.get().getBytes();
@@ -336,7 +334,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 var startInFile = offset + data.length;
                 var startInChunk = startInFile - last.getKey();
                 Chunk newChunk = new Chunk(Arrays.copyOfRange(lchunkBytes, (int) startInChunk, lchunkBytes.length));
-                jObjectManager.put(newChunk).await().indefinitely();
+                jObjectManager.put(newChunk);
 
                 newChunks.put(startInFile, newChunk.getHash());
             }
@@ -351,20 +349,20 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             });
         } catch (Exception e) {
             Log.error("Error writing file chunks: " + fileUuid, e);
-            return Uni.createFrom().item(-1L);
+            return -1L;
         }
 
-        jObjectManager.put(file).await().indefinitely();
+        jObjectManager.put(file);
 
-        return Uni.createFrom().item((long) data.length);
+        return (long) data.length;
     }
 
     @Override
-    public Uni<Boolean> truncate(String fileUuid, long length) {
-        var fileOpt = jObjectManager.get(fileUuid, File.class).await().indefinitely();
+    public Boolean truncate(String fileUuid, long length) {
+        var fileOpt = jObjectManager.get(fileUuid, File.class);
         if (fileOpt.isEmpty()) {
             Log.error("File not found when trying to read: " + fileUuid);
-            return Uni.createFrom().item(false);
+            return false;
         }
         var file = fileOpt.get();
 
@@ -377,10 +375,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 });
             } catch (Exception e) {
                 Log.error("Error writing file chunks: " + fileUuid, e);
-                return Uni.createFrom().item(false);
+                return false;
             }
-            jObjectManager.put(file).await().indefinitely();
-            return Uni.createFrom().item(true);
+            jObjectManager.put(file);
+            return true;
         }
 
         AtomicReference<TreeMap<Long, String>> chunksAllRef = new AtomicReference<>();
@@ -392,7 +390,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             });
         } catch (Exception e) {
             Log.error("Error reading file: " + fileUuid, e);
-            return Uni.createFrom().item(false);
+            return false;
         }
 
         var chunksAll = chunksAllRef.get();
@@ -403,11 +401,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (lastChunk != null) {
             var chunkUuid = lastChunk.getValue();
-            var chunkRead = jObjectManager.get(chunkUuid, Chunk.class).await().indefinitely();
+            var chunkRead = jObjectManager.get(chunkUuid, Chunk.class);
 
             if (chunkRead.isEmpty()) {
                 Log.error("Chunk requested not found: " + chunkUuid);
-                return Uni.createFrom().item(false);
+                return false;
             }
 
             var chunkBytes = chunkRead.get().getBytes();
@@ -415,7 +413,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (lastChunk.getKey() + chunkBytes.length > 0) {
                 int start = (int) (length - lastChunk.getKey());
                 Chunk newChunk = new Chunk(Arrays.copyOfRange(chunkBytes, 0, (int) (length - start)));
-                jObjectManager.put(newChunk).await().indefinitely();
+                jObjectManager.put(newChunk);
 
                 newChunks.put(lastChunk.getKey(), newChunk.getHash());
             }
@@ -430,20 +428,20 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             });
         } catch (Exception e) {
             Log.error("Error writing file chunks: " + fileUuid, e);
-            return Uni.createFrom().item(false);
+            return false;
         }
 
-        jObjectManager.put(file).await().indefinitely();
+        jObjectManager.put(file);
 
-        return Uni.createFrom().item(true);
+        return true;
     }
 
     @Override
-    public Uni<Boolean> setTimes(String fileUuid, long atimeMs, long mtimeMs) {
-        var fileOpt = jObjectManager.get(fileUuid, File.class).await().indefinitely();
+    public Boolean setTimes(String fileUuid, long atimeMs, long mtimeMs) {
+        var fileOpt = jObjectManager.get(fileUuid, File.class);
         if (fileOpt.isEmpty()) {
             Log.error("File not found when trying to read: " + fileUuid);
-            return Uni.createFrom().item(false);
+            return false;
         }
         var file = fileOpt.get();
 
@@ -454,16 +452,16 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             });
         } catch (Exception e) {
             Log.error("Error writing file chunks: " + fileUuid, e);
-            return Uni.createFrom().item(false);
+            return false;
         }
 
-        jObjectManager.put(file).await().indefinitely();
+        jObjectManager.put(file);
 
-        return Uni.createFrom().item(true);
+        return true;
     }
 
     @Override
-    public Uni<Long> size(File f) {
+    public Long size(File f) {
         int size = 0;
         //FIXME:
         AtomicReference<TreeMap<Long, String>> chunksAllRef = new AtomicReference<>();
@@ -475,32 +473,32 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             });
         } catch (Exception e) {
             Log.error("Error reading file: " + f.getUuid(), e);
-            return Uni.createFrom().item(-1L);
+            return -1L;
         }
 
         var chunksAll = chunksAllRef.get();
 
         for (var chunk : chunksAll.entrySet()) {
             var chunkUuid = chunk.getValue();
-            var chunkRead = jObjectManager.get(chunkUuid, Chunk.class).await().indefinitely();
+            var chunkRead = jObjectManager.get(chunkUuid, Chunk.class);
 
             if (chunkRead.isEmpty()) {
                 Log.error("Chunk requested not found: " + chunkUuid);
-                return Uni.createFrom().item(-1L);
+                return -1L;
             }
 
             var chunkBytes = chunkRead.get().getBytes();
             size += chunkBytes.length;
         }
-        return Uni.createFrom().item((long) size);
+        return (long) size;
     }
 
     @Override
-    public Uni<Directory> getRoot() {
-        var read = jObjectManager.get(new UUID(0, 0).toString(), FsNode.class).await().indefinitely();
+    public Directory getRoot() {
+        var read = jObjectManager.get(new UUID(0, 0).toString(), FsNode.class);
         if (read.isEmpty() || !(read.get() instanceof Directory)) {
             Log.error("Root directory not found");
         }
-        return Uni.createFrom().item((Directory) read.get());
+        return (Directory) read.get();
     }
 }
