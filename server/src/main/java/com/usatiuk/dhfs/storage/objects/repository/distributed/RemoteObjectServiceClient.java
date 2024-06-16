@@ -11,7 +11,7 @@ public class RemoteObjectServiceClient {
     ObjectIndexService objectIndexService;
 
     public Uni<Object> getObject(String namespace, String name) {
-        return Uni.createFrom().item(null);
+        return Uni.createFrom().item(() -> null);
     }
 
     public Uni<Boolean> notifyUpdate(String namespace, String name) {

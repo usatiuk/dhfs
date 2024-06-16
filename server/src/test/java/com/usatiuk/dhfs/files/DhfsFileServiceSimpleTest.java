@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.files;
 
-import com.usatiuk.dhfs.storage.SimpleFileRepoTest;
 import com.usatiuk.dhfs.storage.files.objects.Chunk;
 import com.usatiuk.dhfs.storage.files.objects.File;
 import com.usatiuk.dhfs.storage.files.service.DhfsFileService;
@@ -23,7 +22,7 @@ class Profiles {
 
 @QuarkusTest
 @TestProfile(Profiles.DhfsFileServiceSimpleTestProfile.class)
-public class DhfsFileServiceSimpleTest extends SimpleFileRepoTest {
+public class DhfsFileServiceSimpleTest {
     @Inject
     DhfsFileService fileService;
     @Inject

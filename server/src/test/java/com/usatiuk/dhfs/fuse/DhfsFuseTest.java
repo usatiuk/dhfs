@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.fuse;
 
-import com.usatiuk.dhfs.storage.SimpleFileRepoTest;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
@@ -19,7 +18,7 @@ class Profiles {
 
 @QuarkusTest
 @TestProfile(Profiles.DhfsFuseTestProfile.class)
-public class DhfsFuseTest extends SimpleFileRepoTest {
+public class DhfsFuseTest {
     @ConfigProperty(name = "dhfs.fuse.root")
     String root;
 

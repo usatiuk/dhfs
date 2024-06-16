@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
-import java.util.List;
 
 class Profiles {
     public static class DhfsObjectGrpcServiceTestProfile implements QuarkusTestProfile {
@@ -19,7 +18,7 @@ class Profiles {
 
 @QuarkusTest
 @TestProfile(Profiles.DhfsObjectGrpcServiceTestProfile.class)
-class DhfsObjectGrpcServiceTest extends SimpleFileRepoTest {
+class DhfsObjectGrpcServiceTest {
     @GrpcClient
     DhfsObjectGrpc dhfsObjectGrpc;
 
