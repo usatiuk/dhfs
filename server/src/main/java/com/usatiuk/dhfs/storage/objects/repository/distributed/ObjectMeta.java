@@ -10,16 +10,13 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class ObjectMeta implements Serializable {
-    public ObjectMeta(String namespace, String name, Boolean assumeUnique) {
-        this._namespace = namespace;
+    public ObjectMeta(String name, Boolean assumeUnique) {
         this._name = name;
         this._assumeUnique = assumeUnique;
     }
 
     private final ReadWriteLock _lock = new ReentrantReadWriteLock();
 
-    @Getter
-    final String _namespace;
     @Getter
     final String _name;
 

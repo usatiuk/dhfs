@@ -4,7 +4,6 @@ import com.usatiuk.dhfs.objects.repository.distributed.GetIndexRequest;
 import com.usatiuk.dhfs.objects.repository.distributed.GetObjectRequest;
 import com.usatiuk.dhfs.objects.repository.distributed.IndexUpdatePush;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
-import com.usatiuk.dhfs.storage.objects.data.Object;
 import io.quarkus.logging.Log;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -25,11 +24,11 @@ public class RemoteObjectServiceClient {
     @Inject
     RemoteHostManager remoteHostManager;
 
-    public Uni<Object> getObject(String namespace, String name) {
+    public Uni<byte[]> getObject(String name) {
         return remoteHostManager.withClient(client -> {
-            var req = GetObjectRequest.newBuilder().setNamespace(namespace).setName(name).build();
+            var req = GetObjectRequest.newBuilder().setName(name).build();
             var reply = client.getObject(req);
-            var metaOpt = objectIndexService.getMeta(namespace, name);
+            var metaOpt = objectIndexService.getMeta(name);
             if (metaOpt.isEmpty()) throw new RuntimeException("Oops!");
             var meta = metaOpt.get();
             if (meta.getMtime() != reply.getObject().getHeader().getMtime()) {
@@ -38,11 +37,7 @@ public class RemoteObjectServiceClient {
                     throw new NotImplementedException();
                 }
             }
-            return Uni.createFrom().item(new Object(
-                    reply.getObject().getHeader().getNamespace(),
-                    reply.getObject().getHeader().getName(),
-                    reply.getObject().getContent().toByteArray()
-            ));
+            return Uni.createFrom().item(reply.getObject().getContent().toByteArray());
         });
     }
 
@@ -54,14 +49,14 @@ public class RemoteObjectServiceClient {
         });
     }
 
-    public Boolean notifyUpdate(String namespace, String name, long prevMtime) {
+    public Boolean notifyUpdate(String name, long prevMtime) {
         return remoteHostManager.withClient(client -> {
-            var metaOpt = objectIndexService.getMeta(namespace, name);
+            var metaOpt = objectIndexService.getMeta(name);
             if (metaOpt.isEmpty()) throw new RuntimeException("Oops!");
             var meta = metaOpt.get();
 
-            var req = IndexUpdatePush.newBuilder().setSelfname(selfname
-                    ).setNamespace(namespace).setName(name).setAssumeUnique(meta.getAssumeUnique())
+            var req = IndexUpdatePush.newBuilder().setSelfname(selfname).setName(name)
+                    .setAssumeUnique(meta.getAssumeUnique())
                     .setMtime(meta.getMtime()).setPrevMtime(prevMtime).build();
             client.indexUpdate(req);
             return true;

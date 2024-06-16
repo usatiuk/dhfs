@@ -11,13 +11,9 @@ service DhfsObjectGrpc {
   rpc ReadObject (ReadObjectRequest) returns (ReadObjectReply) {}
   rpc WriteObject (WriteObjectRequest) returns (WriteObjectReply) {}
   rpc DeleteObject (DeleteObjectRequest) returns (DeleteObjectReply) {}
-
-  rpc CreateNamespace (CreateNamespaceRequest) returns (CreateNamespaceReply) {}
-  rpc DeleteNamespace (DeleteNamespaceRequest) returns (DeleteNamespaceReply) {}
 }
 
 message FindObjectsRequest {
-  string namespace = 1;
   string prefix = 2;
 }
 
@@ -29,7 +25,6 @@ message FindObjectsReply {
 }
 
 message ReadObjectRequest {
-  string namespace = 1;
   string name = 2;
 }
 
@@ -38,7 +33,6 @@ message ReadObjectReply {
 }
 
 message WriteObjectRequest {
-  string namespace = 1;
   string name = 2;
   bytes data = 10;
 }
@@ -47,24 +41,8 @@ message WriteObjectReply {
 }
 
 message DeleteObjectRequest {
-  string namespace = 1;
   string name = 2;
 }
 
 message DeleteObjectReply {
 }
-
-message DeleteNamespaceRequest {
-  string namespace = 1;
-}
-
-message DeleteNamespaceReply {
-}
-
-message CreateNamespaceRequest {
-  string namespace = 1;
-}
-
-message CreateNamespaceReply {
-}
-

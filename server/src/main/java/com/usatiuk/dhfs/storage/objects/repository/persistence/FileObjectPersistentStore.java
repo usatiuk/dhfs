@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.storage.objects.repository.persistence;
 
-import com.usatiuk.dhfs.storage.objects.data.Object;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -39,8 +38,8 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     @Nonnull
     @Override
-    public Multi<String> findObjects(String namespace, String prefix) {
-        Path nsRoot = Paths.get(root, namespace);
+    public Multi<String> findObjects(String prefix) {
+        Path nsRoot = Paths.get(root);
 
         if (!nsRoot.toFile().isDirectory())
             throw new StatusRuntimeException(Status.NOT_FOUND);
@@ -53,8 +52,8 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     @Nonnull
     @Override
-    public Uni<Boolean> existsObject(String namespace, String name) {
-        Path obj = Paths.get(root, namespace, name);
+    public Uni<Boolean> existsObject(String name) {
+        Path obj = Paths.get(root, name);
 
         if (!obj.toFile().isFile())
             return Uni.createFrom().item(false);
@@ -64,31 +63,31 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     @Nonnull
     @Override
-    public Uni<Object> readObject(String namespace, String name) {
-        var file = Path.of(root, namespace, name);
+    public Uni<byte[]> readObject(String name) {
+        var file = Path.of(root, name);
 
         if (!file.toFile().exists())
             throw new StatusRuntimeException(Status.NOT_FOUND);
 
-        return vertx.fileSystem().readFile(file.toString()).map(r -> new Object(namespace, name, r.getBytes()));
+        return vertx.fileSystem().readFile(file.toString()).map(Buffer::getBytes);
     }
 
     @Nonnull
     @Override
-    public Uni<Void> writeObject(String namespace, Object object) {
-        var file = Path.of(root, namespace, object.getName());
+    public Uni<Void> writeObject(String name, byte[] data) {
+        var file = Path.of(root, name);
 
-        if (!Paths.get(root, namespace).toFile().isDirectory()
-                && !Paths.get(root, namespace).toFile().mkdirs())
+        if (!Paths.get(root).toFile().isDirectory()
+                && !Paths.get(root).toFile().mkdirs())
             throw new StatusRuntimeException(Status.INTERNAL);
 
-        return vertx.fileSystem().writeFile(file.toString(), Buffer.buffer(object.getData()));
+        return vertx.fileSystem().writeFile(file.toString(), Buffer.buffer(data));
     }
 
     @Nonnull
     @Override
-    public Uni<Void> deleteObject(String namespace, String name) {
-        var file = Path.of(root, namespace, name);
+    public Uni<Void> deleteObject(String name) {
+        var file = Path.of(root, name);
 
         if (!file.toFile().exists())
             throw new StatusRuntimeException(Status.NOT_FOUND);

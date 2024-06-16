@@ -5,9 +5,9 @@ import java.util.Optional;
 
 public interface JObjectRepository {
     @Nonnull
-    Optional<JObject> readJObject(String namespace, String name);
+    Optional<JObject> readJObject(String name);
     @Nonnull
-    <T extends JObject> Optional<T> readJObjectChecked(String namespace, String name, Class<T> clazz);
+    <T extends JObject> Optional<T> readJObjectChecked(String name, Class<T> clazz);
     @Nonnull
-    void writeJObject(String namespace, JObject object);
+    void writeJObject(JObject object);
 }

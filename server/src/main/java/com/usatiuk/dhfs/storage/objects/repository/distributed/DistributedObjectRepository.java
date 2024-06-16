@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
 import com.usatiuk.dhfs.objects.repository.distributed.IndexUpdatePush;
-import com.usatiuk.dhfs.storage.objects.data.Object;
 import com.usatiuk.dhfs.storage.objects.repository.ObjectRepository;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.quarkus.logging.Log;
@@ -45,12 +44,12 @@ public class DistributedObjectRepository implements ObjectRepository {
             Log.info("Starting sync");
             var got = remoteObjectServiceClient.getIndex();
             for (var h : got) {
-                var prevMtime = objectIndexService.exists(h.getNamespace(), h.getName())
-                        ? objectIndexService.getMeta(h.getNamespace(), h.getName()).get().getMtime()
+                var prevMtime = objectIndexService.exists(h.getName())
+                        ? objectIndexService.getMeta(h.getName()).get().getMtime()
                         : 0;
                 syncHandler.handleRemoteUpdate(
-                        IndexUpdatePush.newBuilder().setSelfname(selfname
-                                ).setNamespace(h.getNamespace()).setName(h.getName()).setAssumeUnique(h.getAssumeUnique())
+                        IndexUpdatePush.newBuilder().setSelfname(selfname).setName(h.getName())
+                                .setAssumeUnique(h.getAssumeUnique())
                                 .setMtime(h.getMtime()).setPrevMtime(prevMtime).build()).await().indefinitely();
             }
             Log.info("Sync complete");
@@ -65,38 +64,38 @@ public class DistributedObjectRepository implements ObjectRepository {
 
     @Nonnull
     @Override
-    public Multi<String> findObjects(String namespace, String prefix) {
+    public Multi<String> findObjects(String prefix) {
         throw new NotImplementedException();
     }
 
     @Nonnull
     @Override
-    public Uni<Boolean> existsObject(String namespace, String name) {
-        return Uni.createFrom().item(objectIndexService.exists(namespace, name));
+    public Uni<Boolean> existsObject(String name) {
+        return Uni.createFrom().item(objectIndexService.exists(name));
     }
 
     @Nonnull
     @Override
-    public Object readObject(String namespace, String name) {
-        if (!objectIndexService.exists(namespace, name))
+    public byte[] readObject(String name) {
+        if (!objectIndexService.exists(name))
             throw new IllegalArgumentException("Object " + name + " doesn't exist");
 
-        var infoOpt = objectIndexService.getMeta(namespace, name);
+        var infoOpt = objectIndexService.getMeta(name);
         if (infoOpt.isEmpty()) throw new IllegalArgumentException("Object " + name + " doesn't exist");
 
         var info = infoOpt.get();
 
-        Optional<Object> read = info.runReadLocked(() -> {
-            if (objectPersistentStore.existsObject(namespace, name).await().indefinitely())
-                return Optional.of(objectPersistentStore.readObject(namespace, name).await().indefinitely());
+        Optional<byte[]> read = info.runReadLocked(() -> {
+            if (objectPersistentStore.existsObject(name).await().indefinitely())
+                return Optional.of(objectPersistentStore.readObject(name).await().indefinitely());
             return Optional.empty();
         });
         if (read.isPresent()) return read.get();
         // Race?
 
         return info.runWriteLocked(() -> {
-            return remoteObjectServiceClient.getObject(namespace, name).map(got -> {
-                objectPersistentStore.writeObject(namespace, got);
+            return remoteObjectServiceClient.getObject(name).map(got -> {
+                objectPersistentStore.writeObject(name, got);
                 return got;
             }).await().indefinitely();
         });
@@ -104,17 +103,15 @@ public class DistributedObjectRepository implements ObjectRepository {
 
     @Nonnull
     @Override
-    public void writeObject(String namespace, Object object, Boolean canIgnoreConflict) {
-        var info = objectIndexService.getOrCreateMeta(namespace, object.getName(), canIgnoreConflict);
+    public void writeObject(String name, byte[] data, Boolean canIgnoreConflict) {
+        var info = objectIndexService.getOrCreateMeta(name, canIgnoreConflict);
 
         info.runWriteLocked(() -> {
-            objectPersistentStore.writeObject(namespace, object).await().indefinitely();
+            objectPersistentStore.writeObject(name, data).await().indefinitely();
             var prevMtime = info.getMtime();
             info.setMtime(System.currentTimeMillis());
             try {
-                Log.warn("Updating object " + object.getNamespace() + "/" + object.getName() + " from: " + info.getMtime() + " to: " + prevMtime);
-                remoteObjectServiceClient.notifyUpdate(namespace, object.getName(), prevMtime);
-                Log.warn("Updating object complete" + object.getNamespace() + "/" + object.getName() + " from: " + info.getMtime() + " to: " + prevMtime);
+                remoteObjectServiceClient.notifyUpdate(name, prevMtime);
             } catch (Exception e) {
                 Log.error("Error when notifying remote update:");
                 Log.error(e);
@@ -126,19 +123,7 @@ public class DistributedObjectRepository implements ObjectRepository {
 
     @Nonnull
     @Override
-    public void deleteObject(String namespace, String name) {
-        throw new NotImplementedException();
-    }
-
-    @Nonnull
-    @Override
-    public Uni<Void> createNamespace(String namespace) {
-        return Uni.createFrom().voidItem();
-    }
-
-    @Nonnull
-    @Override
-    public Uni<Void> deleteNamespace(String namespace) {
+    public void deleteObject(String name) {
         throw new NotImplementedException();
     }
 }

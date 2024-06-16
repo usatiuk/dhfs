@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.storage.objects.repository.persistence;
 
-import com.usatiuk.dhfs.storage.objects.data.Object;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 
@@ -8,14 +7,14 @@ import javax.annotation.Nonnull;
 
 public interface ObjectPersistentStore {
     @Nonnull
-    Multi<String> findObjects(String namespace, String prefix);
+    Multi<String> findObjects(String prefix);
     @Nonnull
-    Uni<Boolean> existsObject(String namespace, String name);
+    Uni<Boolean> existsObject(String name);
 
     @Nonnull
-    Uni<Object> readObject(String namespace, String name);
+    Uni<byte[]> readObject(String name);
     @Nonnull
-    Uni<Void> writeObject(String namespace, Object object);
+    Uni<Void> writeObject(String name, byte[] data);
     @Nonnull
-    Uni<Void> deleteObject(String namespace, String name);
+    Uni<Void> deleteObject(String name);
 }

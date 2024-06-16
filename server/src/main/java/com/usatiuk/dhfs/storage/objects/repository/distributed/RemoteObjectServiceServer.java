@@ -2,7 +2,6 @@ package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.repository.distributed.*;
-import com.usatiuk.dhfs.storage.objects.data.Object;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -31,18 +30,18 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Blocking
     public Uni<GetObjectReply> getObject(GetObjectRequest request) {
         Log.info("<-- getObject: " + request.getName());
-        var metaOpt = objectIndexService.getMeta(request.getNamespace(), request.getName());
+        var metaOpt = objectIndexService.getMeta(request.getName());
         if (metaOpt.isEmpty()) throw new StatusRuntimeException(Status.NOT_FOUND);
         var meta = metaOpt.get();
-        Optional<Pair<Long, Object>> read = meta.runReadLocked(() -> {
-            if (objectPersistentStore.existsObject(request.getNamespace(), request.getName()).await().indefinitely())
-                return Optional.of(Pair.of(meta.getMtime(), objectPersistentStore.readObject(request.getNamespace(), request.getName()).await().indefinitely()));
+        Optional<Pair<Long, byte[]>> read = meta.runReadLocked(() -> {
+            if (objectPersistentStore.existsObject(request.getName()).await().indefinitely())
+                return Optional.of(Pair.of(meta.getMtime(), objectPersistentStore.readObject(request.getName()).await().indefinitely()));
             return Optional.empty();
         });
         if (read.isEmpty()) throw new StatusRuntimeException(Status.NOT_FOUND);
         var obj = read.get().getRight();
-        var header = ObjectHeader.newBuilder().setName(obj.getName()).setNamespace(obj.getNamespace()).setMtime(read.get().getLeft()).setAssumeUnique(meta.getAssumeUnique()).build();
-        var replyObj = ApiObject.newBuilder().setHeader(header).setContent(ByteString.copyFrom(obj.getData())).build();
+        var header = ObjectHeader.newBuilder().setName(request.getName()).setMtime(read.get().getLeft()).setAssumeUnique(meta.getAssumeUnique()).build();
+        var replyObj = ApiObject.newBuilder().setHeader(header).setContent(ByteString.copyFrom(obj)).build();
         return Uni.createFrom().item(GetObjectReply.newBuilder().setObject(replyObj).build());
     }
 
@@ -52,7 +51,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         Log.info("<-- getIndex: ");
         var builder = GetIndexReply.newBuilder();
         objectIndexService.forAllRead((name, meta) -> {
-            var entry = ObjectHeader.newBuilder().setNamespace(name.getLeft()).setName(name.getRight()).setMtime(meta.getMtime()).setAssumeUnique(meta.getAssumeUnique()).build();
+            var entry = ObjectHeader.newBuilder().setName(name).setMtime(meta.getMtime()).setAssumeUnique(meta.getAssumeUnique()).build();
             builder.addObjects(entry);
         });
         return Uni.createFrom().item(builder.build());

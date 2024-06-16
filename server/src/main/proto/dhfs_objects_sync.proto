@@ -13,7 +13,6 @@ service DhfsObjectSyncGrpc {
 }
 
 message ObjectHeader {
-  string namespace = 1;
   string name = 2;
   bool assumeUnique = 3;
   uint64 mtime = 4;
@@ -25,7 +24,6 @@ message ApiObject {
 }
 
 message GetObjectRequest {
-  string namespace = 1;
   string name = 2;
 }
 
@@ -44,7 +42,6 @@ message GetIndexReply {
 message IndexUpdatePush {
   string selfname = 10;
 
-  string namespace = 1;
   string name = 2;
   bool assumeUnique = 3;
   uint64 mtime = 4;

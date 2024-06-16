@@ -39,13 +39,13 @@ public class JObjectManagerImpl implements JObjectManager {
         }
     }
 
-    private <T extends JObject> T getFromMap(String namespace, String key, Class<T> clazz) {
+    private <T extends JObject> T getFromMap(String key, Class<T> clazz) {
         synchronized (_map) {
             if (_map.containsKey(key)) {
                 var ref = _map.get(key).get();
                 if (ref != null) {
                     if (!clazz.isAssignableFrom(ref.getClass())) {
-                        Log.error("Cached object type mismatch: " + namespace + "/" + key);
+                        Log.error("Cached object type mismatch: " + key);
                         _map.remove(key);
                     } else
                         return (T) ref;
@@ -56,45 +56,45 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     @Override
-    public <T extends JObject> Uni<Optional<T>> get(String namespace, String key, Class<T> clazz) {
+    public <T extends JObject> Uni<Optional<T>> get(String name, Class<T> clazz) {
         cleanup();
         synchronized (_map) {
-            var inMap = getFromMap(namespace, key, clazz);
+            var inMap = getFromMap(name, clazz);
             if (inMap != null) return Uni.createFrom().item(Optional.of(inMap));
         }
 
-        var read = jObjectRepository.readJObjectChecked(namespace, key, clazz);
+        var read = jObjectRepository.readJObjectChecked(name, clazz);
 
         if (read.isEmpty())
             return Uni.createFrom().item(Optional.empty());
 
         synchronized (_map) {
-            var inMap = getFromMap(namespace, key, clazz);
+            var inMap = getFromMap(name, clazz);
             if (inMap != null) return Uni.createFrom().item(Optional.of(inMap));
-            _map.put(key, new NamedSoftReference(read.get(), _refQueue));
+            _map.put(name, new NamedSoftReference(read.get(), _refQueue));
         }
 
         return Uni.createFrom().item(Optional.of(read.get()));
     }
 
     @Override
-    public <T extends JObject> Uni<Void> put(String namespace, T object) {
+    public <T extends JObject> Uni<Void> put(T object) {
         cleanup();
 
         synchronized (_map) {
-            var inMap = getFromMap(namespace, object.getName(), object.getClass());
+            var inMap = getFromMap(object.getName(), object.getClass());
             if (inMap != null && inMap != object && !object.assumeUnique())
                 throw new IllegalArgumentException("Trying to insert different object with same key");
             else if (inMap == null)
                 _map.put(object.getName(), new NamedSoftReference(object, _refQueue));
         }
 
-        jObjectRepository.writeJObject(namespace, object);
+        jObjectRepository.writeJObject(object);
         return Uni.createFrom().voidItem();
     }
 
     @Override
-    public void invalidateJObject(String namespace, String name) {
+    public void invalidateJObject(String name) {
         synchronized (_map) {
             _map.remove(name);
         }

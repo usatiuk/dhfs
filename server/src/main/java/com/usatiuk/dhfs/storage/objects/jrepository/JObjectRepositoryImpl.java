@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
 import com.usatiuk.dhfs.storage.DeserializationHelper;
-import com.usatiuk.dhfs.storage.objects.data.Object;
 import com.usatiuk.dhfs.storage.objects.repository.ObjectRepository;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -18,11 +17,11 @@ public class JObjectRepositoryImpl implements JObjectRepository {
 
     @Nonnull
     @Override
-    public Optional<JObject> readJObject(String namespace, String name) {
-        var read = objectRepository.readObject(namespace, name);
-        java.lang.Object obj = DeserializationHelper.deserialize(read.getData());
+    public Optional<JObject> readJObject(String name) {
+        var read = objectRepository.readObject(name);
+        java.lang.Object obj = DeserializationHelper.deserialize(read);
         if (!(obj instanceof JObject)) {
-            Log.error("Read object is not a JObject: " + namespace + "/" + name);
+            Log.error("Read object is not a JObject: " + name);
             return Optional.empty();
         }
         return Optional.of((JObject) obj);
@@ -30,12 +29,12 @@ public class JObjectRepositoryImpl implements JObjectRepository {
 
     @Nonnull
     @Override
-    public <T extends JObject> Optional<T> readJObjectChecked(String namespace, String name, Class<T> clazz) {
-        var read = readJObject(namespace, name);
+    public <T extends JObject> Optional<T> readJObjectChecked(String name, Class<T> clazz) {
+        var read = readJObject(name);
         if (read.isEmpty()) return Optional.empty();
 
         if (!clazz.isAssignableFrom(read.get().getClass())) {
-            Log.error("Read object type mismatch: " + namespace + "/" + name);
+            Log.error("Read object type mismatch: " + name);
             return Optional.empty();
         }
         return Optional.of((T) read.get());
@@ -43,11 +42,7 @@ public class JObjectRepositoryImpl implements JObjectRepository {
 
     @Nonnull
     @Override
-    public void writeJObject(String namespace, JObject object) {
-        final var obj = new Object(
-                namespace,
-                object.getName(),
-                SerializationUtils.serialize(object));
-        objectRepository.writeObject(namespace, obj, object.assumeUnique());
+    public void writeJObject(JObject object) {
+        objectRepository.writeObject(object.getName(), SerializationUtils.serialize(object), object.assumeUnique());
     }
 }

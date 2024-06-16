@@ -14,7 +14,6 @@ service DhfsFilesGrpc {
 }
 
 message FindFilesRequest {
-  string namespace = 1;
   string prefix = 2;
 }
 
@@ -26,7 +25,6 @@ message FindFilesReply {
 }
 
 message ReadFileRequest {
-  string namespace = 1;
   string name = 2;
 }
 
@@ -35,7 +33,6 @@ message ReadFileReply {
 }
 
 message WriteFileRequest {
-  string namespace = 1;
   string name = 2;
   bytes data = 10;
 }
@@ -44,7 +41,6 @@ message WriteFileReply {
 }
 
 message DeleteFileRequest {
-  string namespace = 1;
   string name = 2;
 }
 

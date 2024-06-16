@@ -47,12 +47,10 @@ public class DhfsFileServiceSimpleTest {
 
             // FIXME: dhfs_files
 
-            objectRepository.createNamespace("dhfs_files");
-
-            jObjectRepository.writeJObject("dhfs_files", c1);
-            jObjectRepository.writeJObject("dhfs_files", c2);
-            jObjectRepository.writeJObject("dhfs_files", c3);
-            jObjectRepository.writeJObject("dhfs_files", f);
+            jObjectRepository.writeJObject(c1);
+            jObjectRepository.writeJObject(c2);
+            jObjectRepository.writeJObject(c3);
+            jObjectRepository.writeJObject(f);
         }
 
         String all = "1234567891011";

@@ -24,15 +24,12 @@ class DhfsObjectGrpcServiceTest {
 
     @Test
     void writeReadTest() {
-        dhfsObjectGrpc.createNamespace(
-                        CreateNamespaceRequest.newBuilder().setNamespace("testns").build())
-                .await().atMost(Duration.ofSeconds(5));
         dhfsObjectGrpc.writeObject(
-                        WriteObjectRequest.newBuilder().setNamespace("testns").setName("cool_file")
+                        WriteObjectRequest.newBuilder().setName("cool_file")
                                 .setData(ByteString.copyFrom("Hello world".getBytes())).build())
                 .await().atMost(Duration.ofSeconds(5));
         var read = dhfsObjectGrpc.readObject(
-                        ReadObjectRequest.newBuilder().setNamespace("testns").setName("cool_file").build())
+                        ReadObjectRequest.newBuilder().setName("cool_file").build())
                 .await().atMost(Duration.ofSeconds(5));
         Assertions.assertArrayEquals(read.getData().toByteArray(), "Hello world".getBytes());
 //        var found = dhfsObjectGrpc.findObjects(FindObjectsRequest.newBuilder().setNamespace("testns").build())

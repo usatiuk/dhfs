@@ -35,9 +35,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     void init(@Observes @Priority(500) StartupEvent event) {
         Log.info("Initializing file service");
-        if (!objectRepository.existsObject(namespace, new UUID(0, 0).toString()).await().indefinitely()) {
-            objectRepository.createNamespace(namespace).await().indefinitely();
-            jObjectManager.put(namespace, new Directory(new UUID(0, 0), 0755)).await().indefinitely();
+        if (!objectRepository.existsObject(namespace + new UUID(0, 0)).await().indefinitely()) {
+            jObjectManager.put(new Directory(new UUID(0, 0), 0755)).await().indefinitely();
         }
         getRoot().await().indefinitely();
     }
@@ -58,7 +57,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         if (found.isEmpty())
             return Uni.createFrom().item(Optional.empty());
 
-        var ref = jObjectManager.get(namespace, found.get().toString(), FsNode.class)
+        var ref = jObjectManager.get(found.get().toString(), FsNode.class)
                 .await().indefinitely();
 
         if (ref.isEmpty()) {
@@ -106,12 +105,12 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         File f = new File(fuuid);
         f.setMode(mode);
 
-        jObjectManager.put(namespace, f).await().indefinitely();
+        jObjectManager.put(f).await().indefinitely();
 
         if (!dir.putKid(Path.of(name).getFileName().toString(), fuuid))
             return Uni.createFrom().item(Optional.empty());
 
-        jObjectManager.put(namespace, dir).await().indefinitely();
+        jObjectManager.put(dir).await().indefinitely();
 
         return Uni.createFrom().item(Optional.of(f));
     }
@@ -129,10 +128,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         Directory d = new Directory(duuid);
         d.setMode(mode);
 
-        jObjectManager.put(namespace, d).await().indefinitely();
+        jObjectManager.put(d).await().indefinitely();
         if (!dir.putKid(Path.of(name).getFileName().toString(), duuid))
             return Uni.createFrom().item(Optional.empty());
-        jObjectManager.put(namespace, dir).await().indefinitely();
+        jObjectManager.put(dir).await().indefinitely();
 
         return Uni.createFrom().item(Optional.of(d));
     }
@@ -146,7 +145,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         if (!(found.get() instanceof Directory dir)) return Uni.createFrom().item(false);
 
         var removed = dir.removeKid(Path.of(name).getFileName().toString());
-        if (removed) jObjectManager.put(namespace, dir).await().indefinitely();
+        if (removed) jObjectManager.put(dir).await().indefinitely();
 
         return Uni.createFrom().item(removed);
     }
@@ -176,7 +175,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (!dir.putKid(Path.of(to).getFileName().toString(), dent.get().getUuid()))
             return Uni.createFrom().item(false);
-        jObjectManager.put(namespace, dir).await().indefinitely();
+        jObjectManager.put(dir).await().indefinitely();
 
         return Uni.createFrom().item(true);
     }
@@ -188,7 +187,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         dent.get().setMode(mode);
 
-        jObjectManager.put(namespace, dent.get()).await().indefinitely();
+        jObjectManager.put(dent.get()).await().indefinitely();
 
         return Uni.createFrom().item(true);
     }
@@ -205,7 +204,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Override
     public Uni<Optional<byte[]>> read(String fileUuid, long offset, int length) {
-        var fileOpt = jObjectManager.get(namespace, fileUuid, File.class).await().indefinitely();
+        var fileOpt = jObjectManager.get(fileUuid, File.class).await().indefinitely();
         if (fileOpt.isEmpty()) {
             Log.error("File not found when trying to read: " + fileUuid);
             return Uni.createFrom().item(Optional.empty());
@@ -239,7 +238,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             long toReadInChunk = (offset + length) - curPos;
 
             var chunkUuid = chunk.getValue();
-            var chunkRead = jObjectManager.get(namespace, chunkUuid, Chunk.class).await().indefinitely();
+            var chunkRead = jObjectManager.get(chunkUuid, Chunk.class).await().indefinitely();
 
             if (chunkRead.isEmpty()) {
                 Log.error("Chunk requested not found: " + chunkUuid);
@@ -270,7 +269,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Override
     public Uni<Long> write(String fileUuid, long offset, byte[] data) {
-        var fileOpt = jObjectManager.get(namespace, fileUuid, File.class).await().indefinitely();
+        var fileOpt = jObjectManager.get(fileUuid, File.class).await().indefinitely();
         if (fileOpt.isEmpty()) {
             Log.error("File not found when trying to read: " + fileUuid);
             return Uni.createFrom().item(-1L);
@@ -302,7 +301,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (first != null && first.getKey() < offset) {
             var chunkUuid = first.getValue();
-            var chunkRead = jObjectManager.get(namespace, chunkUuid, Chunk.class).await().indefinitely();
+            var chunkRead = jObjectManager.get(chunkUuid, Chunk.class).await().indefinitely();
 
             if (chunkRead.isEmpty()) {
                 Log.error("Chunk requested not found: " + chunkUuid);
@@ -311,20 +310,20 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             var chunkBytes = chunkRead.get().getBytes();
             Chunk newChunk = new Chunk(Arrays.copyOfRange(chunkBytes, 0, (int) (offset - first.getKey())));
-            jObjectManager.put(namespace, newChunk).await().indefinitely();
+            jObjectManager.put(newChunk).await().indefinitely();
 
             newChunks.put(first.getKey(), newChunk.getHash());
         }
 
         {
             Chunk newChunk = new Chunk(data);
-            jObjectManager.put(namespace, newChunk).await().indefinitely();
+            jObjectManager.put(newChunk).await().indefinitely();
 
             newChunks.put(offset, newChunk.getHash());
         }
         if (last != null) {
             var lchunkUuid = last.getValue();
-            var lchunkRead = jObjectManager.get(namespace, lchunkUuid, Chunk.class).await().indefinitely();
+            var lchunkRead = jObjectManager.get(lchunkUuid, Chunk.class).await().indefinitely();
 
             if (lchunkRead.isEmpty()) {
                 Log.error("Chunk requested not found: " + lchunkUuid);
@@ -337,7 +336,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 var startInFile = offset + data.length;
                 var startInChunk = startInFile - last.getKey();
                 Chunk newChunk = new Chunk(Arrays.copyOfRange(lchunkBytes, (int) startInChunk, lchunkBytes.length));
-                jObjectManager.put(namespace, newChunk).await().indefinitely();
+                jObjectManager.put(newChunk).await().indefinitely();
 
                 newChunks.put(startInFile, newChunk.getHash());
             }
@@ -355,14 +354,14 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             return Uni.createFrom().item(-1L);
         }
 
-        jObjectManager.put(namespace, file).await().indefinitely();
+        jObjectManager.put(file).await().indefinitely();
 
         return Uni.createFrom().item((long) data.length);
     }
 
     @Override
     public Uni<Boolean> truncate(String fileUuid, long length) {
-        var fileOpt = jObjectManager.get(namespace, fileUuid, File.class).await().indefinitely();
+        var fileOpt = jObjectManager.get(fileUuid, File.class).await().indefinitely();
         if (fileOpt.isEmpty()) {
             Log.error("File not found when trying to read: " + fileUuid);
             return Uni.createFrom().item(false);
@@ -380,7 +379,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 Log.error("Error writing file chunks: " + fileUuid, e);
                 return Uni.createFrom().item(false);
             }
-            jObjectManager.put(namespace, file).await().indefinitely();
+            jObjectManager.put(file).await().indefinitely();
             return Uni.createFrom().item(true);
         }
 
@@ -404,7 +403,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (lastChunk != null) {
             var chunkUuid = lastChunk.getValue();
-            var chunkRead = jObjectManager.get(namespace, chunkUuid, Chunk.class).await().indefinitely();
+            var chunkRead = jObjectManager.get(chunkUuid, Chunk.class).await().indefinitely();
 
             if (chunkRead.isEmpty()) {
                 Log.error("Chunk requested not found: " + chunkUuid);
@@ -416,7 +415,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (lastChunk.getKey() + chunkBytes.length > 0) {
                 int start = (int) (length - lastChunk.getKey());
                 Chunk newChunk = new Chunk(Arrays.copyOfRange(chunkBytes, 0, (int) (length - start)));
-                jObjectManager.put(namespace, newChunk).await().indefinitely();
+                jObjectManager.put(newChunk).await().indefinitely();
 
                 newChunks.put(lastChunk.getKey(), newChunk.getHash());
             }
@@ -434,14 +433,14 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             return Uni.createFrom().item(false);
         }
 
-        jObjectManager.put(namespace, file).await().indefinitely();
+        jObjectManager.put(file).await().indefinitely();
 
         return Uni.createFrom().item(true);
     }
 
     @Override
     public Uni<Boolean> setTimes(String fileUuid, long atimeMs, long mtimeMs) {
-        var fileOpt = jObjectManager.get(namespace, fileUuid, File.class).await().indefinitely();
+        var fileOpt = jObjectManager.get(fileUuid, File.class).await().indefinitely();
         if (fileOpt.isEmpty()) {
             Log.error("File not found when trying to read: " + fileUuid);
             return Uni.createFrom().item(false);
@@ -458,7 +457,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             return Uni.createFrom().item(false);
         }
 
-        jObjectManager.put(namespace, file).await().indefinitely();
+        jObjectManager.put(file).await().indefinitely();
 
         return Uni.createFrom().item(true);
     }
@@ -483,7 +482,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         for (var chunk : chunksAll.entrySet()) {
             var chunkUuid = chunk.getValue();
-            var chunkRead = jObjectManager.get(namespace, chunkUuid, Chunk.class).await().indefinitely();
+            var chunkRead = jObjectManager.get(chunkUuid, Chunk.class).await().indefinitely();
 
             if (chunkRead.isEmpty()) {
                 Log.error("Chunk requested not found: " + chunkUuid);
@@ -498,7 +497,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Override
     public Uni<Directory> getRoot() {
-        var read = jObjectManager.get(namespace, new UUID(0, 0).toString(), FsNode.class).await().indefinitely();
+        var read = jObjectManager.get(new UUID(0, 0).toString(), FsNode.class).await().indefinitely();
         if (read.isEmpty() || !(read.get() instanceof Directory)) {
             Log.error("Root directory not found");
         }

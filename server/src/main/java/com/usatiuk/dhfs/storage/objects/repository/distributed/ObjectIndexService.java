@@ -1,18 +1,13 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
-import com.usatiuk.dhfs.objects.repository.distributed.IndexUpdatePush;
-import com.usatiuk.dhfs.objects.repository.distributed.IndexUpdateReply;
 import com.usatiuk.dhfs.storage.DeserializationHelper;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
-import io.smallrye.mutiny.Uni;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.SerializationUtils;
-import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
@@ -43,21 +38,21 @@ public class ObjectIndexService {
         Log.info("Shutdown");
     }
 
-    public boolean exists(String namespace, String name) {
-        return _index.exists(namespace, name);
+    public boolean exists(String name) {
+        return _index.exists(name);
     }
 
-    public Optional<ObjectMeta> getMeta(String namespace, String name) {
-        return _index.get(namespace, name);
+    public Optional<ObjectMeta> getMeta(String name) {
+        return _index.get(name);
     }
 
-    public ObjectMeta getOrCreateMeta(String namespace, String name, boolean assumeUnique) {
-        return _index.getOrCreate(namespace, name, assumeUnique);
+    public ObjectMeta getOrCreateMeta(String name, boolean assumeUnique) {
+        return _index.getOrCreate(name, assumeUnique);
     }
 
     @FunctionalInterface
     public interface ForAllFn {
-        void apply(ImmutablePair<String, String> name, ObjectMeta meta);
+        void apply(String name, ObjectMeta meta);
     }
 
     public void forAllRead(ForAllFn fn) {

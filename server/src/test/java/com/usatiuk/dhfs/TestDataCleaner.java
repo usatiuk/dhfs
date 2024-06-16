@@ -20,8 +20,11 @@ public class TestDataCleaner {
     String tempDirectoryIdx;
 
     void init(@Observes @Priority(1) StartupEvent event) throws IOException {
-        purgeDirectory(Path.of(tempDirectory).toFile());
-        purgeDirectory(Path.of(tempDirectoryIdx).toFile());
+        try {
+            purgeDirectory(Path.of(tempDirectory).toFile());
+            purgeDirectory(Path.of(tempDirectoryIdx).toFile());
+        } catch (Exception ignored) {
+        }
     }
 
     void shutdown(@Observes @Priority(1000000000) ShutdownEvent event) throws IOException {
