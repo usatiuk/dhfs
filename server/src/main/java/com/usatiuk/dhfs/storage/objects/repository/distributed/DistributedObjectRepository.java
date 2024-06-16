@@ -60,10 +60,10 @@ public class DistributedObjectRepository implements ObjectRepository {
 
         var info = infoOpt.get();
 
-        return info.runReadLocked(() -> {
-            if (objectPersistentStore.existsObject(namespace, name).await().indefinitely())
-                return objectPersistentStore.readObject(namespace, name).await().indefinitely();
+        if (objectPersistentStore.existsObject(namespace, name).await().indefinitely())
+            return objectPersistentStore.readObject(namespace, name).await().indefinitely();
 
+        return info.runWriteLocked(() -> {
             return remoteObjectServiceClient.getObject(namespace, name).map(got -> {
                 objectPersistentStore.writeObject(namespace, got);
                 return got;

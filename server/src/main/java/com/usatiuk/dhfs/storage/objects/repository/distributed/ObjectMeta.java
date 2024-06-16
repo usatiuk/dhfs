@@ -42,13 +42,13 @@ public class ObjectMeta implements Serializable {
     }
 
     public <R> R runWriteLocked(Callable<R> fn) {
-        _lock.readLock().lock();
+        _lock.writeLock().lock();
         try {
             return fn.call();
         } catch (Exception e) {
             throw new RuntimeException(e);
         } finally {
-            _lock.readLock().unlock();
+            _lock.writeLock().unlock();
         }
     }
 }
