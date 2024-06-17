@@ -6,10 +6,8 @@ import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
 import lombok.Getter;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
+import java.util.Map;
 
 public class ObjectMetaData implements Serializable {
     public ObjectMetaData(String name, Boolean assumeUnique) {
@@ -24,13 +22,17 @@ public class ObjectMetaData implements Serializable {
     private final Boolean _assumeUnique;
 
     @Getter
-    private final List<String> _remoteCopies = new ArrayList<>();
+    private final Map<String, Long> _remoteCopies = new LinkedHashMap<>();
 
     @Getter
-    private final HashMap<String, Long> _changelog = new LinkedHashMap<>();
+    private final Map<String, Long> _changelog = new LinkedHashMap<>();
 
     Long getTotalVersion() {
         return _changelog.values().stream().reduce(0L, Long::sum);
+    }
+
+    Long getBestVersion() {
+        return _remoteCopies.values().stream().max(Long::compareTo).get();
     }
 
     ObjectChangelog toRpcChangelog() {

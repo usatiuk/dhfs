@@ -38,6 +38,15 @@ public class SyncHandler {
                 .stream().map(ObjectChangelogEntry::getVersion).reduce(0L, Long::sum);
 
         meta.runWriteLocked((data) -> {
+            if (data.getRemoteCopies().getOrDefault(request.getSelfname(), 0L) > receivedTotalVer) {
+                Log.error("Received older index update than was known for host: "
+                        + request.getSelfname() + " " + request.getHeader().getName());
+                return null;
+            }
+
+            // Before or after conflict resolution?
+            data.getRemoteCopies().put(request.getSelfname(), receivedTotalVer);
+
             var conflict = (data.getChangelog().get(selfname) > receivedSelfVer) && !data.getAssumeUnique();
 
             if (conflict) {
@@ -46,13 +55,6 @@ public class SyncHandler {
             }
 
             if (receivedTotalVer.equals(data.getTotalVersion())) {
-                data.getRemoteCopies().add(request.getSelfname());
-                return null;
-            }
-
-            if (receivedTotalVer < data.getTotalVersion()) {
-                // FIXME?:
-                data.getRemoteCopies().remove(request.getSelfname());
                 return null;
             }
 
@@ -61,9 +63,6 @@ public class SyncHandler {
                 data.getChangelog().put(entry.getHost(), entry.getVersion());
             }
             data.getChangelog().putIfAbsent(selfname, 0L);
-
-            data.getRemoteCopies().clear();
-            data.getRemoteCopies().add(request.getSelfname());
 
             try {
                 objectPersistentStore.deleteObject(request.getHeader().getName());

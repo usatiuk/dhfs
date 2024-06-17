@@ -51,7 +51,8 @@ public class RemoteHostManager {
         var hostInfo = _remoteHosts.get(remoteHostName);
         var channel = NettyChannelBuilder.forAddress(hostInfo.getAddr(), hostInfo.getPort())
                 .usePlaintext().build();
-        var client = DhfsObjectSyncGrpcGrpc.newBlockingStub(channel).withMaxOutboundMessageSize(Integer.MAX_VALUE)
+        var client = DhfsObjectSyncGrpcGrpc.newBlockingStub(channel)
+                .withMaxOutboundMessageSize(Integer.MAX_VALUE)
                 .withMaxInboundMessageSize(Integer.MAX_VALUE);
         try {
             return fn.apply(client);
