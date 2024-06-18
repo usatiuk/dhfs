@@ -32,7 +32,7 @@ public class RemoteObjectServiceClient {
         });
 
         return remoteHostManager.withClientAny(targets, client -> {
-            var reply = client.getObject(GetObjectRequest.newBuilder().setName(name).build());
+            var reply = client.getObject(GetObjectRequest.newBuilder().setSelfname(selfname).setName(name).build());
 
             var receivedSelfVer = reply.getObject().getHeader().getChangelog()
                     .getEntriesList().stream().filter(p -> p.getHost().equals(selfname))
@@ -60,14 +60,14 @@ public class RemoteObjectServiceClient {
 
     public GetIndexReply getIndex(String host) {
         return remoteHostManager.withClient(host, client -> {
-            var req = GetIndexRequest.newBuilder().build();
+            var req = GetIndexRequest.newBuilder().setSelfname(selfname).build();
             var reply = client.getIndex(req);
             return reply;
         });
     }
 
     public void notifyUpdate(String host, String name) {
-         remoteHostManager.withClient(host, client -> {
+        remoteHostManager.withClient(host, client -> {
             var meta = objectIndexService.getMeta(name).orElseThrow(() -> {
                 Log.error("Race when trying to notify update");
                 return new NotImplementedException();

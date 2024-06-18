@@ -30,9 +30,15 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Inject
     SyncHandler syncHandler;
 
+    @Inject
+    RemoteHostManager remoteHostManager;
+
     @Override
     @Blocking
     public Uni<GetObjectReply> getObject(GetObjectRequest request) {
+        if (request.getSelfname().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+        remoteHostManager.handleConnectionSuccess(request.getSelfname());
+
         Log.info("<-- getObject: " + request.getName());
 
         var meta = objectIndexService.getMeta(request.getName()).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
@@ -54,6 +60,9 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Override
     @Blocking
     public Uni<GetIndexReply> getIndex(GetIndexRequest request) {
+        if (request.getSelfname().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+        remoteHostManager.handleConnectionSuccess(request.getSelfname());
+
         Log.info("<-- getIndex: ");
         var builder = GetIndexReply.newBuilder().setSelfname(selfname);
         objectIndexService.forAllRead((name, meta) -> {
@@ -65,12 +74,18 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Override
     @Blocking
     public Uni<IndexUpdateReply> indexUpdate(IndexUpdatePush request) {
+        if (request.getSelfname().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+        remoteHostManager.handleConnectionSuccess(request.getSelfname());
+
         Log.info("<-- indexUpdate: " + request.getHeader().getName());
         return Uni.createFrom().item(syncHandler.handleRemoteUpdate(request));
     }
 
     @Override
     public Uni<PingReply> ping(PingRequest request) {
+        if (request.getSelfname().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+        remoteHostManager.handleConnectionSuccess(request.getSelfname());
+
         return Uni.createFrom().item(PingReply.newBuilder().setSelfname(selfname).build());
     }
 }

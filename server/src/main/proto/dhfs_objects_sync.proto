@@ -43,6 +43,8 @@ message ApiObject {
 }
 
 message GetObjectRequest {
+  string selfname = 10;
+
   string name = 2;
 }
 
@@ -53,6 +55,8 @@ message GetObjectReply {
 }
 
 message GetIndexRequest {
+  string selfname = 10;
+
   bool dontaskme = 1;
 }
 
