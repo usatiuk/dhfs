@@ -56,8 +56,6 @@ message GetObjectReply {
 
 message GetIndexRequest {
   string selfname = 10;
-
-  bool dontaskme = 1;
 }
 
 message GetIndexReply {

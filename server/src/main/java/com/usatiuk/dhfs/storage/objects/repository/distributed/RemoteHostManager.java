@@ -43,9 +43,7 @@ public class RemoteHostManager {
             var shouldTry = _transientPeersState.runReadLocked(d -> {
                 var s = d.getStates().get(host.getName());
                 if (s == null) return true;
-                if (s.getState().equals(TransientPeersStateData.TransientPeerState.ConnectionState.REACHABLE))
-                    return false;
-                return true;
+                return !s.getState().equals(TransientPeersStateData.TransientPeerState.ConnectionState.REACHABLE);
             });
             if (shouldTry) {
                 Log.info("Trying to connect to " + host);

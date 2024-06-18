@@ -18,6 +18,8 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 @ApplicationScoped
 public class SyncHandler {
@@ -54,6 +56,15 @@ public class SyncHandler {
         for (var h : got.getObjectsList()) {
             handleRemoteUpdate(IndexUpdatePush.newBuilder()
                     .setSelfname(got.getSelfname()).setHeader(h).build());
+        }
+        // Push our index to the other peer too, as they might not request it if
+        // they didn't thing we were disconnected
+        List<String> toPush = new ArrayList<>();
+        objectIndexService.forAllRead((name, meta) -> {
+            toPush.add(name);
+        });
+        for (String name : toPush) {
+            remoteObjectServiceClient.notifyUpdate(host, name);
         }
     }
 
