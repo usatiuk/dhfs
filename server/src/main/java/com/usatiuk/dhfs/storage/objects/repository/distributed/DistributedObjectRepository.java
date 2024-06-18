@@ -40,18 +40,7 @@ public class DistributedObjectRepository implements ObjectRepository {
     SyncHandler syncHandler;
 
     void init(@Observes @Priority(400) StartupEvent event) throws IOException {
-        try {
-            Log.info("Starting sync");
-            var got = remoteObjectServiceClient.getIndex();
-            for (var h : got.getObjectsList()) {
-                syncHandler.handleRemoteUpdate(IndexUpdatePush.newBuilder()
-                        .setSelfname(got.getSelfname()).setHeader(h).build());
-            }
-            Log.info("Sync complete");
-        } catch (Exception e) {
-            Log.error("Error when fetching remote index:");
-            Log.error(e);
-        }
+
     }
 
     void shutdown(@Observes @Priority(200) ShutdownEvent event) throws IOException {
@@ -105,7 +94,7 @@ public class DistributedObjectRepository implements ObjectRepository {
         });
         // FIXME: Race?
         try {
-            remoteObjectServiceClient.notifyUpdate(name);
+            syncHandler.notifyUpdateAll(name);
         } catch (Exception e) {
             Log.error("Error when notifying remote update:");
             Log.error(e);

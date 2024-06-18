@@ -7,6 +7,8 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.NotImplementedException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.util.Map;
+
 @ApplicationScoped
 public class RemoteObjectServiceClient {
     @ConfigProperty(name = "dhfs.objects.distributed.selfname")
@@ -19,13 +21,18 @@ public class RemoteObjectServiceClient {
     RemoteHostManager remoteHostManager;
 
     public byte[] getObject(String name) {
-        return remoteHostManager.withClient(client -> {
-            var reply = client.getObject(GetObjectRequest.newBuilder().setName(name).build());
+        var meta = objectIndexService.getMeta(name).orElseThrow(() -> {
+            Log.error("Race when trying to fetch");
+            return new NotImplementedException();
+        });
 
-            var meta = objectIndexService.getMeta(name).orElseThrow(() -> {
-                Log.error("Race when trying to fetch");
-                return new NotImplementedException();
-            });
+        var targets = meta.runReadLocked(d -> {
+            var bestVer = d.getBestVersion();
+            return d.getRemoteCopies().entrySet().stream().filter(entry -> entry.getValue().equals(bestVer)).map(Map.Entry::getKey).toList();
+        });
+
+        return remoteHostManager.withClientAny(targets, client -> {
+            var reply = client.getObject(GetObjectRequest.newBuilder().setName(name).build());
 
             var receivedSelfVer = reply.getObject().getHeader().getChangelog()
                     .getEntriesList().stream().filter(p -> p.getHost().equals(selfname))
@@ -51,16 +58,16 @@ public class RemoteObjectServiceClient {
         });
     }
 
-    public GetIndexReply getIndex() {
-        return remoteHostManager.withClient(client -> {
+    public GetIndexReply getIndex(String host) {
+        return remoteHostManager.withClient(host, client -> {
             var req = GetIndexRequest.newBuilder().build();
             var reply = client.getIndex(req);
             return reply;
         });
     }
 
-    public Boolean notifyUpdate(String name) {
-        return remoteHostManager.withClient(client -> {
+    public void notifyUpdate(String host, String name) {
+         remoteHostManager.withClient(host, client -> {
             var meta = objectIndexService.getMeta(name).orElseThrow(() -> {
                 Log.error("Race when trying to notify update");
                 return new NotImplementedException();
@@ -71,7 +78,7 @@ public class RemoteObjectServiceClient {
             client.indexUpdate(builder.setHeader(
                     meta.runReadLocked(ObjectMetaData::toRpcHeader)
             ).build());
-            return true;
+            return null;
         });
     }
 }

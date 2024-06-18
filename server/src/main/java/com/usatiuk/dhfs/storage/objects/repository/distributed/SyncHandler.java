@@ -8,10 +8,16 @@ import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentS
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
+import io.quarkus.runtime.ShutdownEvent;
+import io.quarkus.runtime.StartupEvent;
+import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.NotImplementedException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import java.io.IOException;
 
 @ApplicationScoped
 public class SyncHandler {
@@ -26,6 +32,30 @@ public class SyncHandler {
 
     @Inject
     JObjectManager jObjectManager;
+
+    @Inject
+    RemoteHostManager remoteHostManager;
+
+    @Inject
+    RemoteObjectServiceClient remoteObjectServiceClient;
+
+    void init(@Observes @Priority(340) StartupEvent event) throws IOException {
+        remoteHostManager.addConnectionSuccessHandler((host) -> {
+            doInitialResync(host);
+            return null;
+        });
+    }
+
+    void shutdown(@Observes @Priority(240) ShutdownEvent event) throws IOException {
+    }
+
+    private void doInitialResync(String host) {
+        var got = remoteObjectServiceClient.getIndex(host);
+        for (var h : got.getObjectsList()) {
+            handleRemoteUpdate(IndexUpdatePush.newBuilder()
+                    .setSelfname(got.getSelfname()).setHeader(h).build());
+        }
+    }
 
     public IndexUpdateReply handleRemoteUpdate(IndexUpdatePush request) {
         var meta = objectIndexService.getOrCreateMeta(request.getHeader().getName(), request.getHeader().getAssumeUnique());
@@ -79,6 +109,23 @@ public class SyncHandler {
         });
 
         return IndexUpdateReply.newBuilder().build();
+    }
+
+    public void notifyUpdateAll(String name) {
+        for (var host : remoteHostManager.getAvailableHosts())
+            remoteHostManager.withClient(host, client -> {
+                var meta = objectIndexService.getMeta(name).orElseThrow(() -> {
+                    Log.error("Race when trying to notify update");
+                    return new NotImplementedException();
+                });
+
+                var builder = IndexUpdatePush.newBuilder().setSelfname(selfname);
+
+                client.indexUpdate(builder.setHeader(
+                        meta.runReadLocked(ObjectMetaData::toRpcHeader)
+                ).build());
+                return null;
+            });
     }
 
 }

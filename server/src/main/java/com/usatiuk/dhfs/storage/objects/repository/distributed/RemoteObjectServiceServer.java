@@ -11,12 +11,16 @@ import io.smallrye.common.annotation.Blocking;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.Optional;
 
 // Note: RunOnVirtualThread hangs somehow
 @GrpcService
 public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
+    @ConfigProperty(name = "dhfs.objects.distributed.selfname")
+    String selfname;
+
     @Inject
     ObjectPersistentStore objectPersistentStore;
 
@@ -51,7 +55,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Blocking
     public Uni<GetIndexReply> getIndex(GetIndexRequest request) {
         Log.info("<-- getIndex: ");
-        var builder = GetIndexReply.newBuilder();
+        var builder = GetIndexReply.newBuilder().setSelfname(selfname);
         objectIndexService.forAllRead((name, meta) -> {
             builder.addObjects(meta.runReadLocked(ObjectMetaData::toRpcHeader));
         });
@@ -63,5 +67,10 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     public Uni<IndexUpdateReply> indexUpdate(IndexUpdatePush request) {
         Log.info("<-- indexUpdate: " + request.getHeader().getName());
         return Uni.createFrom().item(syncHandler.handleRemoteUpdate(request));
+    }
+
+    @Override
+    public Uni<PingReply> ping(PingRequest request) {
+        return Uni.createFrom().item(PingReply.newBuilder().setSelfname(selfname).build());
     }
 }

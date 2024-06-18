@@ -10,6 +10,16 @@ service DhfsObjectSyncGrpc {
   rpc GetObject (GetObjectRequest) returns (GetObjectReply) {}
   rpc GetIndex (GetIndexRequest) returns (GetIndexReply) {}
   rpc IndexUpdate (IndexUpdatePush) returns (IndexUpdateReply) {}
+
+  rpc Ping (PingRequest) returns (PingReply) {}
+}
+
+message PingRequest {
+  string selfname = 1;
+}
+
+message PingReply {
+  string selfname = 1;
 }
 
 message ObjectChangelogEntry {
@@ -43,7 +53,7 @@ message GetObjectReply {
 }
 
 message GetIndexRequest {
-
+  bool dontaskme = 1;
 }
 
 message GetIndexReply {
