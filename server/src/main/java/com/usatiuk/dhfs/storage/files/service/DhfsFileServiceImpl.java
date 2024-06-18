@@ -211,12 +211,20 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         try {
             file.runReadLocked((fsNodeData, fileData) -> {
                 var chunksAll = fileData.getChunks();
+                if (chunksAll.isEmpty()) {
+                    chunksList.set(new ArrayList<>());
+                    return null;
+                }
                 chunksList.set(chunksAll.tailMap(chunksAll.floorKey(offset)).entrySet().stream().toList());
                 return null;
             });
         } catch (Exception e) {
             Log.error("Error reading file: " + fileUuid, e);
             return Optional.empty();
+        }
+
+        if (chunksList.get().isEmpty()) {
+            return Optional.of(new byte[0]);
         }
 
         var chunks = chunksList.get().iterator();
