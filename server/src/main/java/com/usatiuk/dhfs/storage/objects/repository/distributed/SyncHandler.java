@@ -3,7 +3,6 @@ package com.usatiuk.dhfs.storage.objects.repository.distributed;
 import com.usatiuk.dhfs.objects.repository.distributed.IndexUpdatePush;
 import com.usatiuk.dhfs.objects.repository.distributed.IndexUpdateReply;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelogEntry;
-import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
@@ -17,7 +16,6 @@ import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.inject.literal.NamedLiteral;
 import jakarta.inject.Inject;
-import org.apache.commons.lang3.NotImplementedException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
@@ -100,8 +98,13 @@ public class SyncHandler {
             var conflict = data.getChangelog().get(selfname) > receivedSelfVer;
 
             if (conflict) {
-                handleConflict(request.getSelfname(), request.getHeader(), data);
-                return null;
+                var resolver = conflictResolvers.select(NamedLiteral.of(meta.getConflictResolver()));
+                var result = resolver.get().resolve(request.getSelfname(), request.getHeader(), data);
+                if (result.equals(ConflictResolver.ConflictResolutionResult.RESOLVED)) {
+                    Log.info("Resolved conflict for " + request.getSelfname() + " " + request.getHeader().getName());
+                    return null;
+                } else
+                    Log.error("Failed conflict resolution for " + request.getSelfname() + " " + request.getHeader().getName());
             }
 
             if (receivedTotalVer.equals(data.getTotalVersion())) {
@@ -129,34 +132,5 @@ public class SyncHandler {
         });
 
         return IndexUpdateReply.newBuilder().build();
-    }
-
-    public void handleConflict(String conflictHost, ObjectHeader conflictSource,
-                               ObjectMetaData localMeta) {
-        var resolver = conflictResolvers.select(NamedLiteral.of(localMeta.getConflictResolver()));
-        var theirs = remoteObjectServiceClient.getSpecificObject(conflictHost, conflictSource.getName());
-        var oursData = objectPersistentStore.readObject(localMeta.getName());
-        var res = resolver.get().resolve(oursData, localMeta.toRpcHeader(), theirs.getRight(), theirs.getLeft(), conflictHost);
-
-        if (res.getType().equals(ConflictResolver.ConflictResolutionResult.Type.FAILED)) {
-            Log.error("Failed resolving conflict");
-            throw new NotImplementedException();
-        }
-        if (res.getType().equals(ConflictResolver.ConflictResolutionResult.Type.RESOLVED)) {
-            Log.error("Resolved conflict for " + localMeta.getName());
-            for (var obj : res.getResults()) {
-                objectIndexService.getOrCreateMeta(obj.getLeft().getName(), obj.getLeft().getConflictResolver()).runWriteLocked(m -> {
-                    m.getChangelog().clear();
-                    for (var entry : obj.getLeft().getChangelog().getEntriesList()) {
-                        m.getChangelog().put(entry.getHost(), entry.getVersion());
-                    }
-                    m.getChangelog().putIfAbsent(selfname, 0L);
-
-                    objectPersistentStore.writeObject(m.getName(), obj.getRight());
-                    return null;
-                });
-                invalidationQueueService.pushInvalidationToAll(obj.getLeft().getName());
-            }
-        }
     }
 }

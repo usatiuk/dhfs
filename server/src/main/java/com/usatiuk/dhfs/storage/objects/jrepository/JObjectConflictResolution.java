@@ -3,12 +3,12 @@ package com.usatiuk.dhfs.storage.objects.jrepository;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
 import com.usatiuk.dhfs.storage.DeserializationHelper;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
-import io.quarkus.logging.Log;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetaData;
+import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
-import org.apache.commons.lang3.NotImplementedException;
 
 @ApplicationScoped
 @Named("JObjectConflictResolution")
@@ -16,15 +16,14 @@ public class JObjectConflictResolution implements ConflictResolver {
     @Inject
     Instance<ConflictResolver> conflictResolvers;
 
+    @Inject
+    ObjectPersistentStore objectPersistentStore;
+
     @Override
     public ConflictResolutionResult
-    resolve(byte[] oursData, ObjectHeader oursHeader, byte[] theirsData, ObjectHeader theirsHeader, String theirsSelfname) {
+    resolve(String conflictHost, ObjectHeader conflictSource, ObjectMetaData localMeta) {
+        var oursData = objectPersistentStore.readObject(localMeta.getName());
         var ours = (JObject) DeserializationHelper.deserialize(oursData);
-        var theirs = (JObject) DeserializationHelper.deserialize(theirsData);
-        if (!ours.getClass().equals(theirs.getClass())) {
-            Log.error("Object type mismatch!");
-            throw new NotImplementedException();
-        }
-        return conflictResolvers.select(ours.getConflictResolver()).get().resolve(oursData, oursHeader, theirsData, theirsHeader, theirsSelfname);
+        return conflictResolvers.select(ours.getConflictResolver()).get().resolve(conflictHost, conflictSource, localMeta);
     }
 }
