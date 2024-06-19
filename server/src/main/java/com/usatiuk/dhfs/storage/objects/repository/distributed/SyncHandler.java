@@ -98,7 +98,7 @@ public class SyncHandler {
 
             data.getRemoteCopies().put(request.getSelfname(), receivedTotalVer);
 
-            if (Objects.equals(data.getTotalVersion(), receivedTotalVer)) {
+            if (Objects.equals(data.getOurVersion(), receivedTotalVer)) {
                 for (var e : request.getHeader().getChangelog().getEntriesList()) {
                     if (!Objects.equals(data.getChangelog().getOrDefault(e.getHost(), 0L),
                             e.getVersion())) return true;
@@ -106,14 +106,14 @@ public class SyncHandler {
             }
 
             // TODO: recheck this
-            if (data.getTotalVersion() > receivedTotalVer) {
+            if (data.getOurVersion() > receivedTotalVer) {
                 Log.info("Received older index update than known: "
                         + request.getSelfname() + " " + request.getHeader().getName());
                 return false;
             }
 
             // data.getBestVersion() > data.getTotalVersion() should also work
-            if (receivedTotalVer > data.getTotalVersion()) {
+            if (receivedTotalVer > data.getOurVersion()) {
                 try {
                     Log.info("Deleting " + request.getHeader().getName() + " as per invalidation from " + request.getSelfname());
                     objectPersistentStore.deleteObject(request.getHeader().getName());

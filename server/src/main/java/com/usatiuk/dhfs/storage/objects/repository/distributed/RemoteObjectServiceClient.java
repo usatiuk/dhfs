@@ -51,7 +51,7 @@ public class RemoteObjectServiceClient {
 
             return meta.runReadLocked(md -> {
                 var outdated =
-                        (md.getTotalVersion() > receivedTotalVer)
+                        (md.getOurVersion() > receivedTotalVer)
                                 || (md.getChangelog().get(selfname) > receivedSelfVer);
 
                 if (outdated) {

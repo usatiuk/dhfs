@@ -105,10 +105,10 @@ public class DirectoryConflictResolver implements ConflictResolver {
                 new NotImplementedException("Race when conflict resolving")).runWriteLocked(m -> {
 
             if (wasChanged)
-                if (m.getBestVersion() >= newMetaData.getTotalVersion())
+                if (m.getBestVersion() >= newMetaData.getOurVersion())
                     throw new NotImplementedException("Race when conflict resolving");
 
-            if (m.getBestVersion() > newMetaData.getTotalVersion())
+            if (m.getBestVersion() > newMetaData.getOurVersion())
                 throw new NotImplementedException("Race when conflict resolving");
 
             m.getChangelog().clear();

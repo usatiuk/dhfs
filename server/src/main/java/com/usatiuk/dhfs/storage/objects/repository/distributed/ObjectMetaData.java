@@ -27,7 +27,7 @@ public class ObjectMetaData implements Serializable {
     @Getter
     private final Map<String, Long> _changelog = new LinkedHashMap<>();
 
-    public Long getTotalVersion() {
+    public Long getOurVersion() {
         return _changelog.values().stream().reduce(0L, Long::sum);
     }
 
