@@ -72,7 +72,9 @@ public class DirectoryConflictResolver implements ConflictResolver {
             newMetaData.getChangelog().merge(entry.getHost(), entry.getVersion(), Long::max);
         }
 
-        newMetaData.getChangelog().merge(selfname, 1L, Long::sum);
+        if (mergedChildren.size() != ours.getChildrenMap().size()) {
+            newMetaData.getChangelog().merge(selfname, 1L, Long::sum);
+        }
 
         var newHdr = newMetaData.toRpcHeader();
 
@@ -88,9 +90,10 @@ public class DirectoryConflictResolver implements ConflictResolver {
         objectIndexService.getMeta(localName).orElseThrow(() ->
                 new NotImplementedException("Race when conflict resolving")).runWriteLocked(m -> {
 
-            if ((m.getBestVersion() >= newMetaData.getTotalVersion())
-                    || (m.getTotalVersion() >= newMetaData.getTotalVersion()))
-                throw new NotImplementedException("Race when conflict resolving");
+            if (mergedChildren.size() != ours.getChildrenMap().size())
+                if ((m.getBestVersion() >= newMetaData.getTotalVersion())
+                        || (m.getTotalVersion() >= newMetaData.getTotalVersion()))
+                    throw new NotImplementedException("Race when conflict resolving");
 
             m.getChangelog().clear();
             m.getChangelog().putAll(newMetaData.getChangelog());

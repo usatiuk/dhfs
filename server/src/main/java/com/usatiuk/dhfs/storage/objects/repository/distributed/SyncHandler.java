@@ -101,11 +101,32 @@ public class SyncHandler {
 
             assert Objects.equals(data.getBestVersion(), data.getTotalVersion());
 
+            if (Objects.equals(data.getTotalVersion(), receivedTotalVer)) {
+                for (var e : request.getHeader().getChangelog().getEntriesList()) {
+                    if (!Objects.equals(data.getChangelog().getOrDefault(e.getHost(), 0L),
+                            e.getVersion())) return true;
+                }
+            }
+
             // TODO: recheck this
-            if (data.getBestVersion() >= receivedTotalVer) {
+            if (data.getTotalVersion() > receivedTotalVer) {
                 Log.info("Received older index update than known: "
                         + request.getSelfname() + " " + request.getHeader().getName());
                 return false;
+            }
+
+            if (receivedTotalVer > data.getTotalVersion()) {
+                try {
+                    Log.info("Deleting " + request.getHeader().getName() + " as per invalidation from " + request.getSelfname());
+                    objectPersistentStore.deleteObject(request.getHeader().getName());
+                } catch (StatusRuntimeException sx) {
+                    if (sx.getStatus() != Status.NOT_FOUND)
+                        Log.info("Couldn't delete object from persistent store: ", sx);
+                } catch (Exception e) {
+                    Log.info("Couldn't delete object from persistent store: ", e);
+                }
+
+                jObjectManager.invalidateJObject(data.getName());
             }
 
             data.getChangelog().clear();
@@ -113,17 +134,6 @@ public class SyncHandler {
                 data.getChangelog().put(entry.getHost(), entry.getVersion());
             }
             data.getChangelog().putIfAbsent(selfname, 0L);
-
-            try {
-                objectPersistentStore.deleteObject(request.getHeader().getName());
-            } catch (StatusRuntimeException sx) {
-                if (sx.getStatus() != Status.NOT_FOUND)
-                    Log.info("Couldn't delete object from persistent store: ", sx);
-            } catch (Exception e) {
-                Log.info("Couldn't delete object from persistent store: ", e);
-            }
-
-            jObjectManager.invalidateJObject(data.getName());
 
             return false;
         });
