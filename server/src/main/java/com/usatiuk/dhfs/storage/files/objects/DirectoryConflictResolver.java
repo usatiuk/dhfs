@@ -13,6 +13,7 @@ import org.apache.commons.lang3.SerializationUtils;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.LinkedHashMap;
+import java.util.Objects;
 import java.util.UUID;
 
 @ApplicationScoped
@@ -58,8 +59,20 @@ public class DirectoryConflictResolver implements ConflictResolver {
 
         LinkedHashMap<String, UUID> mergedChildren = new LinkedHashMap<>(ours.getChildrenMap());
         for (var entry : theirs.getChildrenMap().entrySet()) {
-            if (mergedChildren.containsKey(entry.getKey())) {
-                mergedChildren.put(entry.getValue() + ".conflict." + conflictHost, entry.getValue());
+            if (mergedChildren.containsKey(entry.getKey()) &&
+                    !Objects.equals(mergedChildren.get(entry.getKey()), entry.getValue())) {
+                int i = 0;
+                do {
+                    String name = entry.getKey() + ".conflict." + i + "." + conflictHost;
+                    if (mergedChildren.containsKey(name)) {
+                        i++;
+                        continue;
+                    }
+                    mergedChildren.put(name, entry.getValue());
+                    break;
+                } while (true);
+            } else {
+                mergedChildren.put(entry.getKey(), entry.getValue());
             }
         }
 
