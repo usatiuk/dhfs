@@ -32,8 +32,8 @@ public class ObjectMetaData implements Serializable {
     }
 
     public Long getBestVersion() {
-        if (_remoteCopies.isEmpty()) return 0L;
-        return _remoteCopies.values().stream().max(Long::compareTo).get();
+        if (_remoteCopies.isEmpty()) return getOurVersion();
+        return Math.max(getOurVersion(), _remoteCopies.values().stream().max(Long::compareTo).get());
     }
 
     public ObjectChangelog toRpcChangelog() {
