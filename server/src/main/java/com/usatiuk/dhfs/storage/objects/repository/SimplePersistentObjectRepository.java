@@ -33,7 +33,7 @@ public class SimplePersistentObjectRepository implements ObjectRepository {
 
     @Nonnull
     @Override
-    public void writeObject(String name, byte[] data, Boolean canIgnoreConflict) {
+    public void writeObject(String name, byte[] data, String conflictResolver) {
         objectPersistentStore.writeObject(name, data);
     }
 

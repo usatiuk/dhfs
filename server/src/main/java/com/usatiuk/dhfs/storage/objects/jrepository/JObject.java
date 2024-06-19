@@ -1,5 +1,8 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
+import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
+import org.apache.commons.lang3.NotImplementedException;
+
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.Serial;
@@ -12,8 +15,8 @@ public abstract class JObject implements Serializable {
 
     protected final ReadWriteLock _lock = new ReentrantReadWriteLock();
 
-    public boolean assumeUnique() {
-        return false;
+    public Class<? extends ConflictResolver> getConflictResolver() {
+        throw new NotImplementedException();
     }
 
     @Serial

@@ -10,16 +10,16 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class ObjectMetaData implements Serializable {
-    public ObjectMetaData(String name, Boolean assumeUnique) {
+    public ObjectMetaData(String name, String conflictResolver) {
         _name = name;
-        _assumeUnique = assumeUnique;
+        _conflictResolver = conflictResolver;
     }
 
     @Getter
     private final String _name;
 
     @Getter
-    private final Boolean _assumeUnique;
+    private final String _conflictResolver;
 
     @Getter
     private final Map<String, Long> _remoteCopies = new LinkedHashMap<>();
@@ -35,7 +35,7 @@ public class ObjectMetaData implements Serializable {
         return _remoteCopies.values().stream().max(Long::compareTo).get();
     }
 
-    ObjectChangelog toRpcChangelog() {
+    public   ObjectChangelog toRpcChangelog() {
         var changelogBuilder = ObjectChangelog.newBuilder();
         for (var m : getChangelog().entrySet()) {
             changelogBuilder.addEntries(ObjectChangelogEntry.newBuilder().setHost(m.getKey()).setVersion(m.getValue()).build());
@@ -43,9 +43,9 @@ public class ObjectMetaData implements Serializable {
         return changelogBuilder.build();
     }
 
-    ObjectHeader toRpcHeader() {
+    public ObjectHeader toRpcHeader() {
         var headerBuilder = ObjectHeader.newBuilder().setName(getName());
-        headerBuilder.setAssumeUnique(getAssumeUnique());
+        headerBuilder.setConflictResolver(getConflictResolver());
         headerBuilder.setChangelog(toRpcChangelog());
         return headerBuilder.build();
     }

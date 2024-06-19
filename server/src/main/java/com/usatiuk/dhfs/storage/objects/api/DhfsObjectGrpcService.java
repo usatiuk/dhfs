@@ -33,7 +33,7 @@ public class DhfsObjectGrpcService implements DhfsObjectGrpc {
     @Override
     @Blocking
     public Uni<WriteObjectReply> writeObject(WriteObjectRequest request) {
-        objectRepository.writeObject(request.getName(), request.getData().toByteArray(), false);
+        objectRepository.writeObject(request.getName(), request.getData().toByteArray(), "none");
         return Uni.createFrom().item(WriteObjectReply.newBuilder().build());
     }
 

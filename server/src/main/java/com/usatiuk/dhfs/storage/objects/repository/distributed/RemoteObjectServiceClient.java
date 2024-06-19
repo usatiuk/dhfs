@@ -5,6 +5,7 @@ import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.NotImplementedException;
+import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.Map;
@@ -19,6 +20,13 @@ public class RemoteObjectServiceClient {
 
     @Inject
     RemoteHostManager remoteHostManager;
+
+    public Pair<ObjectHeader, byte[]> getSpecificObject(String host, String name) {
+        return remoteHostManager.withClient(host, client -> {
+            var reply = client.getObject(GetObjectRequest.newBuilder().setSelfname(selfname).setName(name).build());
+            return Pair.of(reply.getObject().getHeader(), reply.getObject().getContent().toByteArray());
+        });
+    }
 
     public byte[] getObject(String name) {
         var meta = objectIndexService.getMeta(name).orElseThrow(() -> {
@@ -43,11 +51,8 @@ public class RemoteObjectServiceClient {
 
             return meta.runReadLocked(md -> {
                 var outdated =
-                        (
-                                (md.getTotalVersion() > receivedTotalVer)
-                                        || (md.getChangelog().get(selfname) > receivedSelfVer)
-                        )
-                                && !md.getAssumeUnique();
+                        (md.getTotalVersion() > receivedTotalVer)
+                                || (md.getChangelog().get(selfname) > receivedSelfVer);
 
                 if (outdated) {
                     Log.error("Race when trying to fetch");

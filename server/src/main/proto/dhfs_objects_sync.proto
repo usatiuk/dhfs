@@ -33,7 +33,7 @@ message ObjectChangelog {
 
 message ObjectHeader {
   string name = 2;
-  bool assumeUnique = 3;
+  string conflictResolver = 3;
   ObjectChangelog changelog = 4;
 }
 

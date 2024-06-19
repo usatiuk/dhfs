@@ -86,8 +86,8 @@ public class DistributedObjectRepository implements ObjectRepository {
 
     @Nonnull
     @Override
-    public void writeObject(String name, byte[] data, Boolean canIgnoreConflict) {
-        var info = objectIndexService.getOrCreateMeta(name, canIgnoreConflict);
+    public void writeObject(String name, byte[] data, String conflictResolver) {
+        var info = objectIndexService.getOrCreateMeta(name, conflictResolver);
 
         info.runWriteLocked((metaData) -> {
             objectPersistentStore.writeObject(name, data);

@@ -1,8 +1,7 @@
 package com.usatiuk.dhfs.storage.files.objects;
 
-import lombok.Getter;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 
-import java.io.Serializable;
 import java.util.*;
 
 public class Directory extends FsNode {
@@ -66,5 +65,10 @@ public class Directory extends FsNode {
 
     public List<String> getChildrenList() {
         return runReadLocked((fsNodeData, directoryData) -> directoryData.getChildren().keySet().stream().toList());
+    }
+
+    @Override
+    public Class<DirectoryConflictResolver> getConflictResolver() {
+        return DirectoryConflictResolver.class;
     }
 }

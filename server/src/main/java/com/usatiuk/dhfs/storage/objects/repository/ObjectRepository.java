@@ -15,7 +15,7 @@ public interface ObjectRepository {
     @Nonnull
     byte[] readObject(String name);
     @Nonnull
-    void writeObject(String name, byte[] data, Boolean canIgnoreConflict);
+    void writeObject(String name, byte[] data, String conflictResolver);
     @Nonnull
     void deleteObject(String name);
 }

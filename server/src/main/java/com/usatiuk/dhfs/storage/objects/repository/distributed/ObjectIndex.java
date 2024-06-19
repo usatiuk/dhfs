@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
 import java.io.Serializable;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -49,15 +50,15 @@ public class ObjectIndex implements Serializable {
         });
     }
 
-    public ObjectMeta getOrCreate(String name, boolean assumeUnique) {
+    public ObjectMeta getOrCreate(String name, String conflictResolver) {
         return runWriteLocked((data) -> {
             if (data.getObjectMetaMap().containsKey(name)) {
                 var got = data.getObjectMetaMap().get(name);
-                if (got.getAssumeUnique() != assumeUnique)
-                    throw new IllegalArgumentException("assumeUnique mismatch for " + name);
+                if (!Objects.equals(got.getConflictResolver(), conflictResolver))
+                    throw new IllegalArgumentException("conflictResolver mismatch for " + name);
                 return got;
             } else {
-                var newObjectMeta = new ObjectMeta(name, assumeUnique);
+                var newObjectMeta = new ObjectMeta(name, conflictResolver);
                 data.getObjectMetaMap().put(name, newObjectMeta);
                 return newObjectMeta;
             }

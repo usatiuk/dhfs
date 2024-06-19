@@ -43,6 +43,7 @@ public class JObjectRepositoryImpl implements JObjectRepository {
     @Nonnull
     @Override
     public void writeJObject(JObject object) {
-        objectRepository.writeObject(object.getName(), SerializationUtils.serialize(object), object.assumeUnique());
+        objectRepository.writeObject(object.getName(), SerializationUtils.serialize(object),
+                "JObjectConflictResolution");
     }
 }

@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.storage.objects.repository.distributed;
 import com.usatiuk.dhfs.objects.repository.distributed.IndexUpdatePush;
 import com.usatiuk.dhfs.objects.repository.distributed.IndexUpdateReply;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelogEntry;
+import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
@@ -13,6 +14,8 @@ import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import jakarta.enterprise.inject.Instance;
+import jakarta.enterprise.inject.literal.NamedLiteral;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.NotImplementedException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -44,6 +47,9 @@ public class SyncHandler {
     @Inject
     InvalidationQueueService invalidationQueueService;
 
+    @Inject
+    Instance<ConflictResolver> conflictResolvers;
+
     void init(@Observes @Priority(340) StartupEvent event) throws IOException {
         remoteHostManager.addConnectionSuccessHandler((host) -> {
             doInitialResync(host);
@@ -72,7 +78,7 @@ public class SyncHandler {
     }
 
     public IndexUpdateReply handleRemoteUpdate(IndexUpdatePush request) {
-        var meta = objectIndexService.getOrCreateMeta(request.getHeader().getName(), request.getHeader().getAssumeUnique());
+        var meta = objectIndexService.getOrCreateMeta(request.getHeader().getName(), request.getHeader().getConflictResolver());
 
         var receivedSelfVer = request.getHeader().getChangelog()
                 .getEntriesList().stream().filter(p -> p.getHost().equals(selfname))
@@ -91,11 +97,11 @@ public class SyncHandler {
             // Before or after conflict resolution?
             data.getRemoteCopies().put(request.getSelfname(), receivedTotalVer);
 
-            var conflict = (data.getChangelog().get(selfname) > receivedSelfVer) && !data.getAssumeUnique();
+            var conflict = data.getChangelog().get(selfname) > receivedSelfVer;
 
             if (conflict) {
-                Log.error("Conflict when updating: " + request.getHeader().getName());
-                throw new NotImplementedException();
+                handleConflict(request.getSelfname(), request.getHeader(), data);
+                return null;
             }
 
             if (receivedTotalVer.equals(data.getTotalVersion())) {
@@ -123,5 +129,34 @@ public class SyncHandler {
         });
 
         return IndexUpdateReply.newBuilder().build();
+    }
+
+    public void handleConflict(String conflictHost, ObjectHeader conflictSource,
+                               ObjectMetaData localMeta) {
+        var resolver = conflictResolvers.select(NamedLiteral.of(localMeta.getConflictResolver()));
+        var theirs = remoteObjectServiceClient.getSpecificObject(conflictHost, conflictSource.getName());
+        var oursData = objectPersistentStore.readObject(localMeta.getName());
+        var res = resolver.get().resolve(oursData, localMeta.toRpcHeader(), theirs.getRight(), theirs.getLeft(), conflictHost);
+
+        if (res.getType().equals(ConflictResolver.ConflictResolutionResult.Type.FAILED)) {
+            Log.error("Failed resolving conflict");
+            throw new NotImplementedException();
+        }
+        if (res.getType().equals(ConflictResolver.ConflictResolutionResult.Type.RESOLVED)) {
+            Log.error("Resolved conflict for " + localMeta.getName());
+            for (var obj : res.getResults()) {
+                objectIndexService.getOrCreateMeta(obj.getLeft().getName(), obj.getLeft().getConflictResolver()).runWriteLocked(m -> {
+                    m.getChangelog().clear();
+                    for (var entry : obj.getLeft().getChangelog().getEntriesList()) {
+                        m.getChangelog().put(entry.getHost(), entry.getVersion());
+                    }
+                    m.getChangelog().putIfAbsent(selfname, 0L);
+
+                    objectPersistentStore.writeObject(m.getName(), obj.getRight());
+                    return null;
+                });
+                invalidationQueueService.pushInvalidationToAll(obj.getLeft().getName());
+            }
+        }
     }
 }

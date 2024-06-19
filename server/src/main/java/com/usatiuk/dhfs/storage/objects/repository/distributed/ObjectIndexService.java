@@ -49,8 +49,8 @@ public class ObjectIndexService {
         return _index.get(name);
     }
 
-    public ObjectMeta getOrCreateMeta(String name, boolean assumeUnique) {
-        var ret = _index.getOrCreate(name, assumeUnique);
+    public ObjectMeta getOrCreateMeta(String name, String conflictResolver) {
+        var ret = _index.getOrCreate(name, conflictResolver);
         ret.runWriteLocked(md -> {
             md.getChangelog().putIfAbsent(selfname, 0L);
             return null;
