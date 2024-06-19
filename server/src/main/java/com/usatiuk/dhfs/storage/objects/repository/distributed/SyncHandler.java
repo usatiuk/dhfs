@@ -41,6 +41,9 @@ public class SyncHandler {
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
 
+    @Inject
+    InvalidationQueueService invalidationQueueService;
+
     void init(@Observes @Priority(340) StartupEvent event) throws IOException {
         remoteHostManager.addConnectionSuccessHandler((host) -> {
             doInitialResync(host);
@@ -64,7 +67,7 @@ public class SyncHandler {
             toPush.add(name);
         });
         for (String name : toPush) {
-            remoteObjectServiceClient.notifyUpdate(host, name);
+            invalidationQueueService.pushInvalidationToOne(host, name);
         }
     }
 
@@ -121,22 +124,4 @@ public class SyncHandler {
 
         return IndexUpdateReply.newBuilder().build();
     }
-
-    public void notifyUpdateAll(String name) {
-        for (var host : remoteHostManager.getAvailableHosts())
-            remoteHostManager.withClient(host, client -> {
-                var meta = objectIndexService.getMeta(name).orElseThrow(() -> {
-                    Log.error("Race when trying to notify update");
-                    return new NotImplementedException();
-                });
-
-                var builder = IndexUpdatePush.newBuilder().setSelfname(selfname);
-
-                client.indexUpdate(builder.setHeader(
-                        meta.runReadLocked(ObjectMetaData::toRpcHeader)
-                ).build());
-                return null;
-            });
-    }
-
 }

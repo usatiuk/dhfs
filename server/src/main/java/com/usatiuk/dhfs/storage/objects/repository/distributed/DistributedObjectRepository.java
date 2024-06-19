@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
-import com.usatiuk.dhfs.objects.repository.distributed.IndexUpdatePush;
 import com.usatiuk.dhfs.storage.objects.repository.ObjectRepository;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.quarkus.logging.Log;
@@ -38,6 +37,9 @@ public class DistributedObjectRepository implements ObjectRepository {
 
     @Inject
     SyncHandler syncHandler;
+
+    @Inject
+    InvalidationQueueService invalidationQueueService;
 
     void init(@Observes @Priority(400) StartupEvent event) throws IOException {
 
@@ -94,7 +96,7 @@ public class DistributedObjectRepository implements ObjectRepository {
         });
         // FIXME: Race?
         try {
-            syncHandler.notifyUpdateAll(name);
+            invalidationQueueService.pushInvalidationToAll(name);
         } catch (Exception e) {
             Log.error("Error when notifying remote update:");
             Log.error(e);

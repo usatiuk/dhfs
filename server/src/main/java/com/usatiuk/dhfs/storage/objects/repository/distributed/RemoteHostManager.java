@@ -9,6 +9,7 @@ import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
+import io.smallrye.common.annotation.RunOnVirtualThread;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -37,7 +38,8 @@ public class RemoteHostManager {
     void shutdown(@Observes @Priority(250) ShutdownEvent event) throws IOException {
     }
 
-    @Scheduled(every = "10s")
+    @Scheduled(every = "10s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    @RunOnVirtualThread
     public void tryConnectAll() {
         for (var host : persistentRemoteHostsService.getHosts()) {
             var shouldTry = _transientPeersState.runReadLocked(d -> {
@@ -170,4 +172,11 @@ public class RemoteHostManager {
                 .filter(e -> e.getValue().getState().equals(TransientPeersStateData.TransientPeerState.ConnectionState.REACHABLE))
                 .map(Map.Entry::getKey).toList());
     }
+
+    public List<String> getSeenHosts() {
+        return _transientPeersState.runReadLocked(d -> d.getStates().entrySet().stream()
+                .filter(e -> !e.getValue().getState().equals(TransientPeersStateData.TransientPeerState.ConnectionState.NOT_SEEN))
+                .map(Map.Entry::getKey).toList());
+    }
+
 }
