@@ -91,15 +91,12 @@ public class SyncHandler {
             if (data.getRemoteCopies().getOrDefault(request.getSelfname(), 0L) > receivedTotalVer) {
                 Log.error("Received older index update than was known for host: "
                         + request.getSelfname() + " " + request.getHeader().getName());
-                return null;
+                return false;
             }
-
 
             if (data.getChangelog().get(selfname) > receivedSelfVer) return true;
 
             data.getRemoteCopies().put(request.getSelfname(), receivedTotalVer);
-
-            assert Objects.equals(data.getBestVersion(), data.getTotalVersion());
 
             if (Objects.equals(data.getTotalVersion(), receivedTotalVer)) {
                 for (var e : request.getHeader().getChangelog().getEntriesList()) {
@@ -115,6 +112,7 @@ public class SyncHandler {
                 return false;
             }
 
+            // data.getBestVersion() > data.getTotalVersion() should also work
             if (receivedTotalVer > data.getTotalVersion()) {
                 try {
                     Log.info("Deleting " + request.getHeader().getName() + " as per invalidation from " + request.getSelfname());
@@ -143,7 +141,6 @@ public class SyncHandler {
             var result = resolver.get().resolve(request.getSelfname(), request.getHeader(), request.getHeader().getName());
             if (result.equals(ConflictResolver.ConflictResolutionResult.RESOLVED)) {
                 Log.info("Resolved conflict for " + request.getSelfname() + " " + request.getHeader().getName());
-                return null;
             } else {
                 Log.error("Failed conflict resolution for " + request.getSelfname() + " " + request.getHeader().getName());
                 throw new NotImplementedException();

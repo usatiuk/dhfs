@@ -2,6 +2,8 @@ package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
 import com.usatiuk.dhfs.storage.objects.repository.ObjectRepository;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -65,7 +67,7 @@ public class DistributedObjectRepository implements ObjectRepository {
     public byte[] readObject(String name) {
         var infoOpt = objectIndexService.getMeta(name);
         if (infoOpt.isEmpty())
-            throw new IllegalArgumentException("Object " + name + " doesn't exist");
+            throw new StatusRuntimeException(Status.NOT_FOUND.withDescription("Object " + name + " doesn't exist"));
 
         var info = infoOpt.get();
 

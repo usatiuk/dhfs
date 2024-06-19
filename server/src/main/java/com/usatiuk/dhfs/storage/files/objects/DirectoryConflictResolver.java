@@ -72,7 +72,8 @@ public class DirectoryConflictResolver implements ConflictResolver {
             newMetaData.getChangelog().merge(entry.getHost(), entry.getVersion(), Long::max);
         }
 
-        if (mergedChildren.size() != ours.getChildrenMap().size()) {
+        boolean wasChanged = mergedChildren.size() != ours.getChildrenMap().size();
+        if (wasChanged) {
             newMetaData.getChangelog().merge(selfname, 1L, Long::sum);
         }
 
@@ -90,10 +91,12 @@ public class DirectoryConflictResolver implements ConflictResolver {
         objectIndexService.getMeta(localName).orElseThrow(() ->
                 new NotImplementedException("Race when conflict resolving")).runWriteLocked(m -> {
 
-            if (mergedChildren.size() != ours.getChildrenMap().size())
-                if ((m.getBestVersion() >= newMetaData.getTotalVersion())
-                        || (m.getTotalVersion() >= newMetaData.getTotalVersion()))
+            if (wasChanged)
+                if (m.getBestVersion() >= newMetaData.getTotalVersion())
                     throw new NotImplementedException("Race when conflict resolving");
+
+            if (m.getBestVersion() > newMetaData.getTotalVersion())
+                throw new NotImplementedException("Race when conflict resolving");
 
             m.getChangelog().clear();
             m.getChangelog().putAll(newMetaData.getChangelog());
