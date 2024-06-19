@@ -4,12 +4,13 @@ import com.usatiuk.dhfs.objects.repository.distributed.DhfsObjectSyncGrpcGrpc;
 import com.usatiuk.dhfs.objects.repository.distributed.PingRequest;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
-import io.smallrye.common.annotation.RunOnVirtualThread;
+import io.smallrye.common.annotation.Blocking;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -39,7 +40,7 @@ public class RemoteHostManager {
     }
 
     @Scheduled(every = "10s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
-    @RunOnVirtualThread
+    @Blocking
     public void tryConnectAll() {
         for (var host : persistentRemoteHostsService.getHosts()) {
             var shouldTry = _transientPeersState.runReadLocked(d -> {
@@ -101,7 +102,7 @@ public class RemoteHostManager {
     }
 
     private <R> R withClient(String addr, int port, Optional<Long> timeout, ClientFunction<R> fn) {
-        var channel = NettyChannelBuilder.forAddress(addr, port)
+        var channel = NettyChannelBuilder.forAddress(addr, port).negotiationType(NegotiationType.PLAINTEXT)
                 .usePlaintext().build();
         var client = DhfsObjectSyncGrpcGrpc.newBlockingStub(channel)
                 .withMaxOutboundMessageSize(Integer.MAX_VALUE)
@@ -119,7 +120,7 @@ public class RemoteHostManager {
     // FIXME:
     private boolean reachable(HostInfo hostInfo) {
         try {
-            return withClient(hostInfo.getAddr(), hostInfo.getPort(), Optional.of(4000L /*ms*/), c -> {
+            return withClient(hostInfo.getAddr(), hostInfo.getPort(), Optional.of(30000L /*ms*/), c -> {
                 var ret = c.ping(PingRequest.newBuilder().setSelfname(selfname).build());
                 if (!ret.getSelfname().equals(hostInfo.getName())) {
                     throw new IllegalStateException("Ping selfname returned " + ret.getSelfname() + " but expected " + hostInfo.getName());

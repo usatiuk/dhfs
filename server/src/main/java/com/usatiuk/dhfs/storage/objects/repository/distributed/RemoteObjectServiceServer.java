@@ -82,6 +82,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     }
 
     @Override
+    @Blocking
     public Uni<PingReply> ping(PingRequest request) {
         if (request.getSelfname().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
         remoteHostManager.handleConnectionSuccess(request.getSelfname());

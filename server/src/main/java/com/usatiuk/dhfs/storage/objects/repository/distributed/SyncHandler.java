@@ -94,10 +94,10 @@ public class SyncHandler {
                 return null;
             }
 
-            // Before or after conflict resolution?
-            data.getRemoteCopies().put(request.getSelfname(), receivedTotalVer);
 
             if (data.getChangelog().get(selfname) > receivedSelfVer) return true;
+
+            data.getRemoteCopies().put(request.getSelfname(), receivedTotalVer);
 
             assert Objects.equals(data.getBestVersion(), data.getTotalVersion());
 
@@ -105,7 +105,7 @@ public class SyncHandler {
             if (data.getBestVersion() >= receivedTotalVer) {
                 Log.info("Received older index update than known: "
                         + request.getSelfname() + " " + request.getHeader().getName());
-                return null;
+                return false;
             }
 
             data.getChangelog().clear();
