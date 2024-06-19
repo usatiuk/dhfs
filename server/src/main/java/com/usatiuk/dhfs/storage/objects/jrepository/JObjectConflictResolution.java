@@ -3,7 +3,6 @@ package com.usatiuk.dhfs.storage.objects.jrepository;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
 import com.usatiuk.dhfs.storage.DeserializationHelper;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetaData;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
@@ -21,9 +20,9 @@ public class JObjectConflictResolution implements ConflictResolver {
 
     @Override
     public ConflictResolutionResult
-    resolve(String conflictHost, ObjectHeader conflictSource, ObjectMetaData localMeta) {
-        var oursData = objectPersistentStore.readObject(localMeta.getName());
+    resolve(String conflictHost, ObjectHeader conflictSource, String localName) {
+        var oursData = objectPersistentStore.readObject(localName);
         var ours = (JObject) DeserializationHelper.deserialize(oursData);
-        return conflictResolvers.select(ours.getConflictResolver()).get().resolve(conflictHost, conflictSource, localMeta);
+        return conflictResolvers.select(ours.getConflictResolver()).get().resolve(conflictHost, conflictSource, localName);
     }
 }

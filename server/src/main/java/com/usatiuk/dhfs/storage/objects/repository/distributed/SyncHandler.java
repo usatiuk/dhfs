@@ -87,7 +87,7 @@ public class SyncHandler {
         var receivedTotalVer = request.getHeader().getChangelog().getEntriesList()
                 .stream().map(ObjectChangelogEntry::getVersion).reduce(0L, Long::sum);
 
-        meta.runWriteLocked((data) -> {
+        boolean conflict = meta.runWriteLocked((data) -> {
             if (data.getRemoteCopies().getOrDefault(request.getSelfname(), 0L) > receivedTotalVer) {
                 Log.error("Received older index update than was known for host: "
                         + request.getSelfname() + " " + request.getHeader().getName());
@@ -97,19 +97,7 @@ public class SyncHandler {
             // Before or after conflict resolution?
             data.getRemoteCopies().put(request.getSelfname(), receivedTotalVer);
 
-            var conflict = data.getChangelog().get(selfname) > receivedSelfVer;
-
-            if (conflict) {
-                var resolver = conflictResolvers.select(NamedLiteral.of(meta.getConflictResolver()));
-                var result = resolver.get().resolve(request.getSelfname(), request.getHeader(), data);
-                if (result.equals(ConflictResolver.ConflictResolutionResult.RESOLVED)) {
-                    Log.info("Resolved conflict for " + request.getSelfname() + " " + request.getHeader().getName());
-                    return null;
-                } else {
-                    Log.error("Failed conflict resolution for " + request.getSelfname() + " " + request.getHeader().getName());
-                    throw new NotImplementedException();
-                }
-            }
+            if (data.getChangelog().get(selfname) > receivedSelfVer) return true;
 
             assert Objects.equals(data.getBestVersion(), data.getTotalVersion());
 
@@ -137,8 +125,21 @@ public class SyncHandler {
 
             jObjectManager.invalidateJObject(data.getName());
 
-            return null;
+            return false;
         });
+
+        if (conflict) {
+            var resolver = conflictResolvers.select(NamedLiteral.of(meta.getConflictResolver()));
+            var result = resolver.get().resolve(request.getSelfname(), request.getHeader(), request.getHeader().getName());
+            if (result.equals(ConflictResolver.ConflictResolutionResult.RESOLVED)) {
+                Log.info("Resolved conflict for " + request.getSelfname() + " " + request.getHeader().getName());
+                return null;
+            } else {
+                Log.error("Failed conflict resolution for " + request.getSelfname() + " " + request.getHeader().getName());
+                throw new NotImplementedException();
+            }
+        }
+
 
         return IndexUpdateReply.newBuilder().build();
     }

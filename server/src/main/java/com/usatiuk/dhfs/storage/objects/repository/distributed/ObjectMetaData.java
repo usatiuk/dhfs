@@ -27,15 +27,15 @@ public class ObjectMetaData implements Serializable {
     @Getter
     private final Map<String, Long> _changelog = new LinkedHashMap<>();
 
-    Long getTotalVersion() {
+    public Long getTotalVersion() {
         return _changelog.values().stream().reduce(0L, Long::sum);
     }
 
-    Long getBestVersion() {
+    public Long getBestVersion() {
         return _remoteCopies.values().stream().max(Long::compareTo).get();
     }
 
-    public   ObjectChangelog toRpcChangelog() {
+    public ObjectChangelog toRpcChangelog() {
         var changelogBuilder = ObjectChangelog.newBuilder();
         for (var m : getChangelog().entrySet()) {
             changelogBuilder.addEntries(ObjectChangelogEntry.newBuilder().setHost(m.getKey()).setVersion(m.getValue()).build());

@@ -38,11 +38,15 @@ public class DirectoryConflictResolver implements ConflictResolver {
     @Override
     public ConflictResolutionResult resolve(String conflictHost,
                                             ObjectHeader conflictSource,
-                                            ObjectMetaData localMeta) {
-        var oursData = objectPersistentStore.readObject(localMeta.getName());
+                                            String localName) {
+
+        var oursData = objectPersistentStore.readObject(localName);
         var theirsData = remoteObjectServiceClient.getSpecificObject(conflictHost, conflictSource.getName());
 
-        var oursHeader = localMeta.toRpcHeader();
+        var localMeta = objectIndexService.getMeta(localName).orElseThrow(() ->
+                new NotImplementedException("Race when conflict resolving"));
+
+        var oursHeader = localMeta.runReadLocked(ObjectMetaData::toRpcHeader);
         var theirsHeader = theirsData.getLeft();
 
         var ours = (Directory) DeserializationHelper.deserialize(oursData);
@@ -52,8 +56,8 @@ public class DirectoryConflictResolver implements ConflictResolver {
             throw new NotImplementedException();
         }
 
-        LinkedHashMap<String, UUID> mergedChildren = new LinkedHashMap<>(((Directory) ours).getChildrenMap());
-        for (var entry : ((Directory) theirs).getChildrenMap().entrySet()) {
+        LinkedHashMap<String, UUID> mergedChildren = new LinkedHashMap<>(ours.getChildrenMap());
+        for (var entry : theirs.getChildrenMap().entrySet()) {
             if (mergedChildren.containsKey(entry.getKey())) {
                 mergedChildren.put(entry.getValue() + ".conflict." + conflictHost, entry.getValue());
             }
@@ -72,7 +76,7 @@ public class DirectoryConflictResolver implements ConflictResolver {
 
         var newHdr = newMetaData.toRpcHeader();
 
-        var newDir = new Directory(((Directory) ours).getUuid(), ((Directory) ours).getMode());
+        var newDir = new Directory(ours.getUuid(), ours.getMode());
         for (var entry : mergedChildren.entrySet()) newDir.putKid(entry.getKey(), entry.getValue());
 
         // FIXME:
@@ -81,7 +85,13 @@ public class DirectoryConflictResolver implements ConflictResolver {
 
         var newBytes = SerializationUtils.serialize(newDir);
 
-        objectIndexService.getOrCreateMeta(oursHeader.getName(), oursHeader.getConflictResolver()).runWriteLocked(m -> {
+        objectIndexService.getMeta(localName).orElseThrow(() ->
+                new NotImplementedException("Race when conflict resolving")).runWriteLocked(m -> {
+
+            if ((m.getBestVersion() >= newMetaData.getTotalVersion())
+                    || (m.getTotalVersion() >= newMetaData.getTotalVersion()))
+                throw new NotImplementedException("Race when conflict resolving");
+
             m.getChangelog().clear();
             m.getChangelog().putAll(newMetaData.getChangelog());
 
@@ -90,7 +100,6 @@ public class DirectoryConflictResolver implements ConflictResolver {
         });
         invalidationQueueService.pushInvalidationToAll(oursHeader.getName());
         jObjectManager.invalidateJObject(oursHeader.getName());
-
 
         return ConflictResolutionResult.RESOLVED;
     }
