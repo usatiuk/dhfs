@@ -1,8 +1,8 @@
 package com.usatiuk.dhfs.storage.files.objects;
 
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import lombok.Getter;
-import org.apache.commons.codec.digest.DigestUtils;
 
 @Getter
 public class ChunkInfo extends JObject {
@@ -12,6 +12,11 @@ public class ChunkInfo extends JObject {
     public ChunkInfo(String hash, Integer size) {
         this._hash = hash;
         this._size = size;
+    }
+
+    @Override
+    public Class<? extends ConflictResolver> getConflictResolver() {
+        return NoOpConflictResolver.class;
     }
 
     @Override

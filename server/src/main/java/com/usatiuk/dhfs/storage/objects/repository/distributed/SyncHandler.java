@@ -16,11 +16,13 @@ import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.inject.literal.NamedLiteral;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.NotImplementedException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @ApplicationScoped
 public class SyncHandler {
@@ -103,11 +105,18 @@ public class SyncHandler {
                 if (result.equals(ConflictResolver.ConflictResolutionResult.RESOLVED)) {
                     Log.info("Resolved conflict for " + request.getSelfname() + " " + request.getHeader().getName());
                     return null;
-                } else
+                } else {
                     Log.error("Failed conflict resolution for " + request.getSelfname() + " " + request.getHeader().getName());
+                    throw new NotImplementedException();
+                }
             }
 
-            if (receivedTotalVer.equals(data.getTotalVersion())) {
+            assert Objects.equals(data.getBestVersion(), data.getTotalVersion());
+
+            // TODO: recheck this
+            if (data.getBestVersion() >= receivedTotalVer) {
+                Log.info("Received older index update than known: "
+                        + request.getSelfname() + " " + request.getHeader().getName());
                 return null;
             }
 
