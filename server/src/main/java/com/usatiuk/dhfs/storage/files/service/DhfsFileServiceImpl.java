@@ -168,8 +168,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (!(found.get() instanceof Directory dir)) return false;
 
-        if (!dir.putKid(Path.of(to).getFileName().toString(), dent.get().getUuid()))
-            return false;
+        dir.runWriteLocked((n, d) -> {
+            d.getChildren().put(Path.of(to).getFileName().toString(), dent.get().getUuid());
+            return null;
+        });
         jObjectManager.put(dir);
 
         return true;
