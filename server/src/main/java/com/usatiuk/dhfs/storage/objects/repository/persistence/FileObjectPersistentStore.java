@@ -5,17 +5,17 @@ import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
-import io.vertx.mutiny.core.Vertx;
-import io.vertx.mutiny.core.buffer.Buffer;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
-import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.annotation.Nonnull;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,9 +23,6 @@ import java.util.List;
 public class FileObjectPersistentStore implements ObjectPersistentStore {
     @ConfigProperty(name = "dhfs.objects.persistence.files.root")
     String root;
-
-    @Inject
-    Vertx vertx;
 
     void init(@Observes @Priority(200) StartupEvent event) {
         Paths.get(root).toFile().mkdirs();
@@ -44,10 +41,11 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         if (!nsRoot.toFile().isDirectory())
             throw new StatusRuntimeException(Status.NOT_FOUND);
 
-        var read = vertx.fileSystem().readDir(nsRoot.toString()).await().indefinitely();
+        var read = nsRoot.toFile().listFiles();
+        if (read == null) return List.of();
         ArrayList<String> out = new ArrayList<>();
         for (var s : read) {
-            var rel = nsRoot.relativize(Paths.get(s)).toString();
+            var rel = nsRoot.relativize(s.toPath()).toString();
             if (rel.startsWith(prefix))
                 out.add(rel);
         }
@@ -70,29 +68,44 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         if (!file.toFile().exists())
             throw new StatusRuntimeException(Status.NOT_FOUND);
 
-        return vertx.fileSystem().readFile(file.toString()).map(Buffer::getBytes).await().indefinitely();
+        try {
+            return Files.readAllBytes(file);
+        } catch (IOException e) {
+            Log.error("Error reading file " + file, e);
+            throw new StatusRuntimeException(Status.INTERNAL);
+        }
     }
 
     @Nonnull
     @Override
-    public Void writeObject(String name, byte[] data) {
+    public void writeObject(String name, byte[] data) {
         var file = Path.of(root, name);
 
         if (!Paths.get(root).toFile().isDirectory()
                 && !Paths.get(root).toFile().mkdirs())
             throw new StatusRuntimeException(Status.INTERNAL);
 
-        return vertx.fileSystem().writeFile(file.toString(), Buffer.buffer(data)).await().indefinitely();
+        try {
+            Files.write(file, data, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
+        } catch (IOException e) {
+            Log.error("Error writing file " + file, e);
+            throw new StatusRuntimeException(Status.INTERNAL);
+        }
     }
 
     @Nonnull
     @Override
-    public Void deleteObject(String name) {
+    public void deleteObject(String name) {
         var file = Path.of(root, name);
 
         if (!file.toFile().exists())
             throw new StatusRuntimeException(Status.NOT_FOUND);
 
-        return vertx.fileSystem().delete(file.toString()).await().indefinitely();
+        try {
+            Files.delete(file);
+        } catch (IOException e) {
+            Log.error("Error deleting file " + file, e);
+            throw new StatusRuntimeException(Status.INTERNAL);
+        }
     }
 }

@@ -15,7 +15,7 @@ public interface ObjectPersistentStore {
     @Nonnull
     byte[] readObject(String name);
     @Nonnull
-    Void writeObject(String name, byte[] data);
+    void writeObject(String name, byte[] data);
     @Nonnull
-    Void deleteObject(String name);
+    void deleteObject(String name);
 }

@@ -2,7 +2,6 @@ package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
 import io.quarkus.logging.Log;
 import io.quarkus.scheduler.Scheduled;
-import io.smallrye.common.annotation.Blocking;
 import io.smallrye.common.annotation.RunOnVirtualThread;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -18,7 +17,7 @@ public class InvalidationQueueService {
     RemoteObjectServiceClient remoteObjectServiceClient;
 
     @Scheduled(every = "1s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
-    @Blocking
+    @RunOnVirtualThread
     public void trySend() {
         var data = _data.runReadLocked(InvalidationQueueData::pullAll);
         for (var forHost : data.entrySet()) {

@@ -87,6 +87,10 @@ public class JObjectWriteback {
 
     public void markDirty(String name, JObject<?> object) {
         synchronized (this) {
+            if (_objects.containsKey(name)) {
+                return;
+            }
+
             // FIXME: better logic
             if (_objects.size() < 5000) {
                 _objects.put(name, object);
