@@ -57,10 +57,10 @@ public class DhfsFuse extends FuseStubFS {
     public int statfs(String path, Statvfs stbuf) {
         //FIXME:
         if ("/".equals(path)) {
-            stbuf.f_blocks.set(1024 * 1024); // total data blocks in file system
+            stbuf.f_blocks.set(1024 * 1024 * 1024); // total data blocks in file system
             stbuf.f_frsize.set(1024);        // fs block size
-            stbuf.f_bfree.set(1024 * 1024);  // free blocks in fs
-            stbuf.f_bavail.set(1024 * 1024); // avail blocks in fs
+            stbuf.f_bfree.set(1024 * 1024 * 1024);  // free blocks in fs
+            stbuf.f_bavail.set(1024 * 1024 * 1024); // avail blocks in fs
         }
         return super.statfs(path, stbuf);
     }
