@@ -35,7 +35,6 @@ public class RemoteHostManager {
     TransientPeersState _transientPeersState = new TransientPeersState();
 
     void init(@Observes @Priority(350) StartupEvent event) throws IOException {
-        tryConnectAll();
     }
 
     void shutdown(@Observes @Priority(250) ShutdownEvent event) throws IOException {
