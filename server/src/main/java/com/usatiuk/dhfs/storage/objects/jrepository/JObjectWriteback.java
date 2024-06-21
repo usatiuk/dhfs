@@ -57,20 +57,28 @@ public class JObjectWriteback {
 
     private void writeback() {
         try {
+            boolean wait = false;
             while (true) {
+                if (wait) {
+                    Thread.sleep(100);
+                    wait = false;
+                }
                 JObject<?> obj;
                 synchronized (_objects) {
-                    if (_objects.isEmpty())
+                    while (_objects.isEmpty())
                         _objects.wait();
 
-                    if (System.currentTimeMillis() - _objects.firstEntry().getValue().getLeft() < 100L)
-                        Thread.sleep(100);
+                    if ((System.currentTimeMillis() - _objects.firstEntry().getValue().getLeft()) < 100L) {
+                        wait = true;
+                        continue;
+                    }
 
                     var entry = _objects.pollFirstEntry();
                     if (entry == null) break;
                     obj = entry.getValue().getRight();
                 }
                 flushOne(obj);
+                if (Thread.interrupted()) break;
             }
         } catch (InterruptedException e) {
             Log.info("Writeback thread exiting");
@@ -106,7 +114,6 @@ public class JObjectWriteback {
     public void remove(String name) {
         synchronized (_objects) {
             _objects.remove(name);
-            _objects.notifyAll();
         }
     }
 

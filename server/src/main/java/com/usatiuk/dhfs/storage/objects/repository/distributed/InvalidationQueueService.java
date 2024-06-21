@@ -45,7 +45,7 @@ public class InvalidationQueueService {
 
     public Map<String, Set<String>> pullAll() throws InterruptedException {
         synchronized (this) {
-            if (_hostToInvObj.isEmpty())
+            while (_hostToInvObj.isEmpty())
                 this.wait();
             var ret = _hostToInvObj;
             _hostToInvObj = new LinkedHashMap<>();
@@ -56,6 +56,7 @@ public class InvalidationQueueService {
     private void sender() {
         try {
             while (true) {
+                Thread.sleep(500);
                 var data = pullAll();
                 for (var forHost : data.entrySet()) {
                     for (var obj : forHost.getValue()) {
@@ -67,6 +68,7 @@ public class InvalidationQueueService {
                         }
                     }
                 }
+                if (Thread.interrupted()) break;
             }
         } catch (InterruptedException e) {
             Log.info("Invalidation sender exiting");

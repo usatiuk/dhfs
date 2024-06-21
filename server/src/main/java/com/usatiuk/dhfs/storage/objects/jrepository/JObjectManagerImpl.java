@@ -73,6 +73,7 @@ public class JObjectManagerImpl implements JObjectManager {
                     if (_map.containsKey(cur._key) && (_map.get(cur._key).get() == null))
                         _map.remove(cur._key);
                 }
+                if (Thread.interrupted()) break;
             }
         } catch (InterruptedException ignored) {
             Log.info("Ref cleanup thread exiting");
@@ -85,7 +86,7 @@ public class JObjectManagerImpl implements JObjectManager {
                 LinkedHashSet<String> got;
 
                 synchronized (_writebackQueue) {
-                    if (_writebackQueue.get().isEmpty())
+                    while (_writebackQueue.get().isEmpty())
                         _writebackQueue.wait();
                     got = _writebackQueue.get();
                     _writebackQueue.set(new LinkedHashSet<>());
@@ -96,6 +97,7 @@ public class JObjectManagerImpl implements JObjectManager {
                         _nurseryRefcounts.remove(s);
                     }
                 }
+                if (Thread.interrupted()) break;
             }
         } catch (InterruptedException ignored) {
             Log.info("Ref cleanup thread exiting");
