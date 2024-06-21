@@ -302,90 +302,70 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
         var file = fileOpt.get();
 
-        AtomicReference<TreeMap<Long, String>> chunksAllRef = new AtomicReference<>();
-
         // FIXME:
-        try {
-            file.runReadLocked((fsNodeData, fileData) -> {
-                chunksAllRef.set(new TreeMap<>(fileData.getChunks()));
-                return null;
-            });
-        } catch (Exception e) {
-            Log.error("Error reading file: " + fileUuid, e);
-            return -1L;
-        }
+        file.runWriteLocked((meta, fData, bump) -> {
+            var chunksAll = fData.getChunks();
+            var first = chunksAll.floorEntry(offset);
+            var last = chunksAll.floorEntry((offset + data.length) - 1);
 
-        var chunksAll = chunksAllRef.get();
-
-        var first = chunksAll.floorEntry(offset);
-        var last = chunksAll.floorEntry((offset + data.length) - 1);
-
-        if (!chunksAll.isEmpty()) {
-            var between = chunksAll.subMap(first.getKey(), true, last.getKey(), true);
-            between.clear();
-        }
-
-        if (first != null && first.getKey() < offset) {
-            var chunkUuid = first.getValue();
-            var chunkRead = jObjectManager.get(ChunkData.getNameFromHash(chunkUuid), ChunkData.class);
-
-            if (chunkRead.isEmpty()) {
-                Log.error("Chunk requested not found: " + chunkUuid);
-                return -1L;
+            if (!chunksAll.isEmpty()) {
+                var between = chunksAll.subMap(first.getKey(), true, last.getKey(), true);
+                between.clear();
             }
 
-            var chunkBytes = chunkRead.get().runReadLocked((m, d) -> d.getBytes());
-            ChunkData newChunkData = new ChunkData(Arrays.copyOfRange(chunkBytes, 0, (int) (offset - first.getKey())));
-            ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
-            jObjectManager.put(newChunkData);
-            jObjectManager.put(newChunkInfo);
+            if (first != null && first.getKey() < offset) {
+                var chunkUuid = first.getValue();
+                var chunkRead = jObjectManager.get(ChunkData.getNameFromHash(chunkUuid), ChunkData.class);
 
-            chunksAll.put(first.getKey(), newChunkData.getHash());
-        }
+                if (chunkRead.isEmpty()) {
+                    Log.error("Chunk requested not found: " + chunkUuid);
+                    return -1L;
+                }
 
-        {
-            ChunkData newChunkData = new ChunkData(data);
-            ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
-            jObjectManager.put(newChunkData);
-            jObjectManager.put(newChunkInfo);
-
-            chunksAll.put(offset, newChunkData.getHash());
-        }
-        if (last != null) {
-            var lchunkUuid = last.getValue();
-            var lchunkRead = jObjectManager.get(ChunkData.getNameFromHash(lchunkUuid), ChunkData.class);
-
-            if (lchunkRead.isEmpty()) {
-                Log.error("Chunk requested not found: " + lchunkUuid);
-                return -1L;
-            }
-
-            var lchunkBytes = lchunkRead.get().runReadLocked((m, d) -> d.getBytes());
-
-            if (last.getKey() + lchunkBytes.length > offset + data.length) {
-                var startInFile = offset + data.length;
-                var startInChunk = startInFile - last.getKey();
-                ChunkData newChunkData = new ChunkData(Arrays.copyOfRange(lchunkBytes, (int) startInChunk, lchunkBytes.length));
+                var chunkBytes = chunkRead.get().runReadLocked((m, d) -> d.getBytes());
+                ChunkData newChunkData = new ChunkData(Arrays.copyOfRange(chunkBytes, 0, (int) (offset - first.getKey())));
                 ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
                 jObjectManager.put(newChunkData);
                 jObjectManager.put(newChunkInfo);
 
-                chunksAll.put(startInFile, newChunkData.getHash());
+                chunksAll.put(first.getKey(), newChunkData.getHash());
             }
-        }
 
-        try {
-            file.runWriteLocked((m, fileData, bump) -> {
-                bump.apply();
-                fileData.getChunks().clear();
-                fileData.getChunks().putAll(chunksAll);
-                fileData.setMtime(System.currentTimeMillis());
-                return null;
-            });
-        } catch (Exception e) {
-            Log.error("Error writing file chunks: " + fileUuid, e);
-            return -1L;
-        }
+            {
+                ChunkData newChunkData = new ChunkData(data);
+                ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
+                jObjectManager.put(newChunkData);
+                jObjectManager.put(newChunkInfo);
+
+                chunksAll.put(offset, newChunkData.getHash());
+            }
+            if (last != null) {
+                var lchunkUuid = last.getValue();
+                var lchunkRead = jObjectManager.get(ChunkData.getNameFromHash(lchunkUuid), ChunkData.class);
+
+                if (lchunkRead.isEmpty()) {
+                    Log.error("Chunk requested not found: " + lchunkUuid);
+                    return -1L;
+                }
+
+                var lchunkBytes = lchunkRead.get().runReadLocked((m, d) -> d.getBytes());
+
+                if (last.getKey() + lchunkBytes.length > offset + data.length) {
+                    var startInFile = offset + data.length;
+                    var startInChunk = startInFile - last.getKey();
+                    ChunkData newChunkData = new ChunkData(Arrays.copyOfRange(lchunkBytes, (int) startInChunk, lchunkBytes.length));
+                    ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
+                    jObjectManager.put(newChunkData);
+                    jObjectManager.put(newChunkInfo);
+
+                    chunksAll.put(startInFile, newChunkData.getHash());
+                }
+            }
+
+            bump.apply();
+            fData.setMtime(System.currentTimeMillis());
+            return null;
+        });
 
         return (long) data.length;
     }
@@ -414,56 +394,42 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             return true;
         }
 
-        AtomicReference<TreeMap<Long, String>> chunksAllRef = new AtomicReference<>();
-
         try {
-            file.runReadLocked((fsNodeData, fileData) -> {
-                chunksAllRef.set(new TreeMap<>(fileData.getChunks()));
+            file.runWriteLocked((m, fData, bump) -> {
+                var chunksAll = fData.getChunks();
+                var newChunks = chunksAll.subMap(0L, length - 1);
+
+                var lastChunk = newChunks.lastEntry();
+
+                if (lastChunk != null) {
+                    var chunkUuid = lastChunk.getValue();
+                    var chunkRead = jObjectManager.get(ChunkData.getNameFromHash(chunkUuid), ChunkData.class);
+
+                    if (chunkRead.isEmpty()) {
+                        Log.error("Chunk requested not found: " + chunkUuid);
+                        return false;
+                    }
+
+                    var chunkBytes = chunkRead.get().runReadLocked((m2, d) -> d.getBytes());
+
+                    if (lastChunk.getKey() + chunkBytes.length > 0) {
+                        int start = (int) (length - lastChunk.getKey());
+                        ChunkData newChunkData = new ChunkData(Arrays.copyOfRange(chunkBytes, 0, (int) (length - start)));
+                        ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
+                        jObjectManager.put(newChunkData);
+                        jObjectManager.put(newChunkInfo);
+
+                        newChunks.put(lastChunk.getKey(), newChunkData.getHash());
+                    }
+                }
+
+                bump.apply();
+                fData.setMtime(System.currentTimeMillis());
+
                 return null;
             });
         } catch (Exception e) {
             Log.error("Error reading file: " + fileUuid, e);
-            return false;
-        }
-
-        var chunksAll = chunksAllRef.get();
-
-        var newChunks = chunksAll.subMap(0L, length - 1);
-
-        var lastChunk = newChunks.lastEntry();
-
-        if (lastChunk != null) {
-            var chunkUuid = lastChunk.getValue();
-            var chunkRead = jObjectManager.get(ChunkData.getNameFromHash(chunkUuid), ChunkData.class);
-
-            if (chunkRead.isEmpty()) {
-                Log.error("Chunk requested not found: " + chunkUuid);
-                return false;
-            }
-
-            var chunkBytes = chunkRead.get().runReadLocked((m, d) -> d.getBytes());
-
-            if (lastChunk.getKey() + chunkBytes.length > 0) {
-                int start = (int) (length - lastChunk.getKey());
-                ChunkData newChunkData = new ChunkData(Arrays.copyOfRange(chunkBytes, 0, (int) (length - start)));
-                ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
-                jObjectManager.put(newChunkData);
-                jObjectManager.put(newChunkInfo);
-
-                newChunks.put(lastChunk.getKey(), newChunkData.getHash());
-            }
-        }
-
-        try {
-            file.runWriteLocked((m, fileData, bump) -> {
-                bump.apply();
-                fileData.getChunks().clear();
-                fileData.getChunks().putAll(newChunks);
-                fileData.setMtime(System.currentTimeMillis());
-                return null;
-            });
-        } catch (Exception e) {
-            Log.error("Error writing file chunks: " + fileUuid, e);
             return false;
         }
 
