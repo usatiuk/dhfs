@@ -3,10 +3,11 @@ package com.usatiuk.dhfs.storage.files.objects;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import lombok.Getter;
-import org.apache.commons.codec.digest.DigestUtils;
+import net.openhft.hashing.LongTupleHashFunction;
 
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Getter
 public class ChunkData extends JObjectData {
@@ -16,7 +17,8 @@ public class ChunkData extends JObjectData {
     public ChunkData(byte[] bytes) {
         super();
         this._bytes = Arrays.copyOf(bytes, bytes.length);
-        this._hash = DigestUtils.sha512Hex(bytes);
+        this._hash = Arrays.stream(LongTupleHashFunction.xx128().hashBytes(bytes))
+                .mapToObj(Long::toHexString).collect(Collectors.joining());
     }
 
     @Override
