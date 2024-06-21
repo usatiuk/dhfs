@@ -66,4 +66,22 @@ public class DhfsFileServiceSimpleTest {
         }
     }
 
+    @Test
+    void writeTest() {
+        var ret = fileService.create("/a", 777);
+        Assertions.assertTrue(ret.isPresent());
+
+        var uuid = ret.get();
+
+        fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get());
+        fileService.write(uuid, 4, new byte[]{10, 11, 12});
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 12, 7, 8, 9}, fileService.read(uuid, 0, 10).get());
+        fileService.write(uuid, 10, new byte[]{13, 14});
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 12, 7, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).get());
+        fileService.write(uuid, 6, new byte[]{15, 16});
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 15, 16, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).get());
+        fileService.write(uuid, 3, new byte[]{17, 18});
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 17, 18, 11, 15, 16, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).get());
+    }
 }
