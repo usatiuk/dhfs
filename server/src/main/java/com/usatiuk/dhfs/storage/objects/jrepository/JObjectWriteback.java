@@ -60,7 +60,7 @@ public class JObjectWriteback {
             boolean wait = false;
             while (true) {
                 if (wait) {
-                    Thread.sleep(100);
+                    Thread.sleep(500);
                     wait = false;
                 }
                 JObject<?> obj;
@@ -68,7 +68,7 @@ public class JObjectWriteback {
                     while (_objects.isEmpty())
                         _objects.wait();
 
-                    if ((System.currentTimeMillis() - _objects.firstEntry().getValue().getLeft()) < 100L) {
+                    if ((System.currentTimeMillis() - _objects.firstEntry().getValue().getLeft()) < 500L) {
                         wait = true;
                         continue;
                     }
