@@ -110,6 +110,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (!dir.runWriteLocked((m, d, bump) -> {
             bump.apply();
+            d.setMtime(System.currentTimeMillis());
             return d.putKid(Path.of(name).getFileName().toString(), fuuid);
         }))
             return Optional.empty();
@@ -134,6 +135,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         jObjectManager.put(d);
         if (!dir.runWriteLocked((m, dd, bump) -> {
             bump.apply();
+            d.setMtime(System.currentTimeMillis());
             return dd.putKid(Path.of(name).getFileName().toString(), duuid);
         }))
             return Optional.empty();
@@ -152,6 +154,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var dir = (JObject<Directory>) found.get();
         return dir.runWriteLocked((m, d, bump) -> {
             bump.apply();
+            d.setMtime(System.currentTimeMillis());
             return d.removeKid(Path.of(name).getFileName().toString());
         });
     }
@@ -183,6 +186,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         dir.runWriteLocked((m, d, bump) -> {
             bump.apply();
+            d.setMtime(System.currentTimeMillis());
             d.getChildren().put(Path.of(to).getFileName().toString(), UUID.fromString(dent.get().getName()));
             return null;
         });
@@ -197,6 +201,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         dent.get().runWriteLocked((m, d, bump) -> {
             bump.apply();
+            d.setMtime(System.currentTimeMillis());
             d.setMode(mode);
             return null;
         });

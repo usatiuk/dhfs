@@ -22,10 +22,6 @@ public class Directory extends FsNode {
         return DirectoryConflictResolver.class;
     }
 
-    public Map<String, UUID> getChildrenMap() {
-        return new TreeMap<>(_children);
-    }
-
     public Optional<UUID> getKid(String name) {
         if (_children.containsKey(name))
             return Optional.of(_children.get(name));
