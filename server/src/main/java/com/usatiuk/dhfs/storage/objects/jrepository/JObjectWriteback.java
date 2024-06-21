@@ -11,6 +11,7 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.SerializationUtils;
 
 import java.util.LinkedHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @ApplicationScoped
 public class JObjectWriteback {
@@ -18,9 +19,21 @@ public class JObjectWriteback {
     @Inject
     ObjectPersistentStore objectPersistentStore;
 
+    AtomicBoolean _writing = new AtomicBoolean(false);
+
     private final LinkedHashMap<String, JObject<?>> _objects = new LinkedHashMap<>();
 
     void shutdown(@Observes @Priority(10) ShutdownEvent event) {
+        // FIXME: Hack!
+        while (true) {
+            synchronized (this) {
+                if (_objects.isEmpty() && !_writing.get()) break;
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException ignored) {
+            }
+        }
         flush();
     }
 
@@ -32,18 +45,38 @@ public class JObjectWriteback {
             synchronized (this) {
                 var entry = _objects.pollFirstEntry();
                 if (entry == null) break;
+                _writing.set(true);
                 obj = entry.getValue();
             }
-            obj.runReadLocked((m) -> {
-                objectPersistentStore.writeObject("meta_" + m.getName(), SerializationUtils.serialize(m));
-                if (obj.isResolved())
-                    obj.runReadLocked((m2, d) -> {
-                        objectPersistentStore.writeObject(m.getName(), SerializationUtils.serialize(d));
-                        return null;
-                    });
-                return null;
-            });
+            flushOne(obj);
         }
+        synchronized (this) {
+            _writing.set(false);
+        }
+    }
+
+    private void flushOne(JObject<?> obj) {
+        obj.runReadLocked((m) -> {
+            objectPersistentStore.writeObject("meta_" + m.getName(), SerializationUtils.serialize(m));
+            if (obj.isResolved())
+                obj.runReadLocked((m2, d) -> {
+                    objectPersistentStore.writeObject(m.getName(), SerializationUtils.serialize(d));
+                    return null;
+                });
+            return null;
+        });
+    }
+
+    private void flushOneImmediate(JObject<?> obj) {
+        obj.runWriteLockedMeta((m, a, b) -> {
+            objectPersistentStore.writeObject("meta_" + m.getName(), SerializationUtils.serialize(m));
+            if (obj.isResolved())
+                obj.runWriteLocked((m2, d, bump) -> {
+                    objectPersistentStore.writeObject(m.getName(), SerializationUtils.serialize(d));
+                    return null;
+                });
+            return null;
+        });
     }
 
     public void remove(String name) {
@@ -54,7 +87,12 @@ public class JObjectWriteback {
 
     public void markDirty(String name, JObject<?> object) {
         synchronized (this) {
-            _objects.put(name, object);
+            // FIXME: better logic
+            if (_objects.size() < 5000) {
+                _objects.put(name, object);
+                return;
+            }
         }
+        flushOneImmediate(object);
     }
 }
