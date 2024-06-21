@@ -4,7 +4,6 @@ import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentS
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.scheduler.Scheduled;
 import io.smallrye.common.annotation.Blocking;
-import io.smallrye.common.annotation.RunOnVirtualThread;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -44,7 +43,7 @@ public class JObjectWriteback {
     }
 
     @Scheduled(every = "2s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
-    @RunOnVirtualThread
+    @Blocking
     public void flush() {
         while (true) {
             JObject<?> obj;
