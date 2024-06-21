@@ -6,6 +6,7 @@ import lombok.Getter;
 import org.apache.commons.codec.digest.DigestUtils;
 
 import java.util.Arrays;
+import java.util.Objects;
 
 @Getter
 public class ChunkData extends JObject {
@@ -29,5 +30,18 @@ public class ChunkData extends JObject {
 
     public static String getNameFromHash(String hash) {
         return hash + "_data";
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ChunkData chunkData = (ChunkData) o;
+        return Objects.equals(_hash, chunkData._hash);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(_hash);
     }
 }

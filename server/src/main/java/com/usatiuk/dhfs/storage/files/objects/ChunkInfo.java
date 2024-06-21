@@ -4,6 +4,8 @@ import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import lombok.Getter;
 
+import java.util.Objects;
+
 @Getter
 public class ChunkInfo extends JObject {
     final String _hash;
@@ -26,5 +28,18 @@ public class ChunkInfo extends JObject {
 
     public static String getNameFromHash(String hash) {
         return hash + "_info";
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ChunkInfo chunkInfo = (ChunkInfo) o;
+        return Objects.equals(_hash, chunkInfo._hash) && Objects.equals(_size, chunkInfo._size);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(_hash, _size);
     }
 }

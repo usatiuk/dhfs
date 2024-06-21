@@ -1,7 +1,5 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
-import com.usatiuk.dhfs.storage.files.objects.ChunkData;
-import com.usatiuk.dhfs.storage.files.objects.ChunkInfo;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -10,6 +8,7 @@ import lombok.Getter;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.Optional;
 
 @ApplicationScoped
@@ -84,10 +83,7 @@ public class JObjectManagerImpl implements JObjectManager {
 
         synchronized (_map) {
             var inMap = getFromMap(object.getName(), object.getClass());
-            if (inMap != null && inMap != object) {
-                //FIXME:
-                if (object instanceof ChunkInfo) return;
-                if (object instanceof ChunkData) return;
+            if (inMap != null && inMap != object && !Objects.equals(inMap, object)) {
                 throw new IllegalArgumentException("Trying to insert different object with same key");
             } else if (inMap == null)
                 _map.put(object.getName(), new NamedSoftReference(object, _refQueue));
