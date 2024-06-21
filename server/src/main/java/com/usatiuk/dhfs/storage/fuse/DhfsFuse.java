@@ -68,14 +68,17 @@ public class DhfsFuse extends FuseStubFS {
     @Override
     public int getattr(String path, FileStat stat) {
         try {
-            Optional<FsNode> found = fileService.getDirEntry(path);
+            var fileOpt = fileService.open(path);
+            if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
+            var uuid = fileOpt.get();
+            Optional<FsNode> found = fileService.getattr(uuid);
             if (found.isEmpty()) {
                 return -ErrorCodes.ENOENT();
             }
             if (found.get() instanceof File f) {
                 stat.st_mode.set(S_IFREG | f.getMode());
                 stat.st_nlink.set(1);
-                stat.st_size.set(fileService.size(f));
+                stat.st_size.set(fileService.size(uuid));
             } else if (found.get() instanceof Directory d) {
                 stat.st_mode.set(S_IFDIR | d.getMode());
                 stat.st_nlink.set(2);
@@ -104,7 +107,7 @@ public class DhfsFuse extends FuseStubFS {
             var fileOpt = fileService.open(path);
             if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
             var file = fileOpt.get();
-            var res = fileService.setTimes(file.getUuid().toString(),
+            var res = fileService.setTimes(file,
                     timespec[0].tv_sec.get() * 1000,
                     timespec[1].tv_sec.get() * 1000);
             if (!res) return -ErrorCodes.EINVAL();
@@ -127,7 +130,7 @@ public class DhfsFuse extends FuseStubFS {
             var fileOpt = fileService.open(path);
             if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
             var file = fileOpt.get();
-            var read = fileService.read(file.getUuid().toString(), offset, (int) size);
+            var read = fileService.read(fileOpt.get(), offset, (int) size);
             if (read.isEmpty()) return 0;
             buf.put(0, read.get(), 0, read.get().length);
             return read.get().length;
@@ -142,10 +145,9 @@ public class DhfsFuse extends FuseStubFS {
         try {
             var fileOpt = fileService.open(path);
             if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
-            var file = fileOpt.get();
             byte[] buffer = new byte[(int) size];
             buf.get(0, buffer, 0, (int) size);
-            var written = fileService.write(file.getUuid().toString(), offset, buffer);
+            var written = fileService.write(fileOpt.get(), offset, buffer);
             return written.intValue();
         } catch (Exception e) {
             Log.error("When writing " + path, e);
@@ -193,7 +195,7 @@ public class DhfsFuse extends FuseStubFS {
         var fileOpt = fileService.open(path);
         if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
         var file = fileOpt.get();
-        var ok = fileService.truncate(file.getUuid().toString(), size);
+        var ok = fileService.truncate(file, size);
         if (ok)
             return 0;
         else

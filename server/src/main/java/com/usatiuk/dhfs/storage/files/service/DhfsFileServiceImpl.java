@@ -1,8 +1,10 @@
 package com.usatiuk.dhfs.storage.files.service;
 
 import com.usatiuk.dhfs.storage.files.objects.*;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
-import com.usatiuk.dhfs.storage.objects.repository.ObjectRepository;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -24,16 +26,12 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     Vertx vertx;
     @Inject
     JObjectManager jObjectManager;
-    @Inject
-    ObjectRepository objectRepository;
 
     final static String namespace = "dhfs_files";
 
     void init(@Observes @Priority(500) StartupEvent event) {
         Log.info("Initializing file service");
-        if (!objectRepository.existsObject(new UUID(0, 0).toString())) {
-            jObjectManager.put(new Directory(new UUID(0, 0), 0755));
-        }
+        jObjectManager.getOrPut(new UUID(0, 0).toString(), new Directory(new UUID(0, 0), 0755));
         getRoot();
     }
 
@@ -41,39 +39,49 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         Log.info("Shutdown");
     }
 
-    private Optional<FsNode> traverse(FsNode from, Path path) {
+    private Optional<JObject<? extends FsNode>> traverse(JObject<? extends FsNode> from, Path path) {
         if (path.getNameCount() == 0) return Optional.of(from);
 
-        if (!(from instanceof Directory dir))
+        if (!(from.isOf(Directory.class)))
             return Optional.empty();
 
         var pathFirstPart = path.getName(0).toString();
 
-        var found = dir.getKid(pathFirstPart);
-        if (found.isEmpty())
-            return Optional.empty();
+        return ((JObject<Directory>) from).runReadLocked((m, d) -> {
+            var found = d.getKid(pathFirstPart);
+            if (found.isEmpty())
+                return Optional.empty();
+            Optional<JObject<? extends FsNode>> ref = jObjectManager.get(found.get().toString(), FsNode.class);
 
-        var ref = jObjectManager.get(found.get().toString(), FsNode.class);
+            if (ref.isEmpty()) {
+                Log.error("File missing when traversing directory " + from.getName() + ": " + found);
+                return Optional.empty();
+            }
 
-        if (ref.isEmpty()) {
-            Log.error("File missing when traversing directory " + from.getName() + ": " + found);
-            return Optional.empty();
-        }
+            if (path.getNameCount() == 1) return ref;
 
-        if (path.getNameCount() == 1) return ref;
-
-        return traverse(ref.get(), path.subpath(1, path.getNameCount()));
+            return traverse(ref.get(), path.subpath(1, path.getNameCount()));
+        });
     }
 
-    @Override
-    public Optional<FsNode> getDirEntry(String name) {
+    private Optional<JObject<? extends FsNode>> getDirEntry(String name) {
         var root = getRoot();
         var found = traverse(root, Path.of(name));
         return found;
     }
 
     @Override
-    public Optional<File> open(String name) {
+    public Optional<FsNode> getattr(String uuid) {
+        Optional<JObject<? extends FsNode>> ref = jObjectManager.get(uuid, FsNode.class);
+        if (ref.isEmpty()) return Optional.empty();
+        return ref.get().runReadLocked((m, d) -> {
+            //FIXME:
+            return Optional.of(d);
+        });
+    }
+
+    @Override
+    public Optional<String> open(String name) {
         // FIXME:
         var root = getRoot();
         var found = traverse(root, Path.of(name));
@@ -81,54 +89,54 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         if (found.isEmpty())
             return Optional.empty();
 
-        if (!(found.get() instanceof File))
-            return Optional.empty();
-
-        return Optional.of((File) found.get());
+        return Optional.of(found.get().getName());
     }
 
     @Override
-    public Optional<File> create(String name, long mode) {
+    public Optional<String> create(String name, long mode) {
         // FIXME:
         var root = getRoot();
         var found = traverse(root, Path.of(name).getParent());
         if (found.isEmpty()) return Optional.empty();
 
-        if (!(found.get() instanceof Directory dir)) return Optional.empty();
+        if (!(found.get().isOf(Directory.class))) return Optional.empty();
 
+        var dir = (JObject<Directory>) found.get();
         var fuuid = UUID.randomUUID();
         File f = new File(fuuid);
         f.setMode(mode);
 
         jObjectManager.put(f);
 
-        if (!dir.putKid(Path.of(name).getFileName().toString(), fuuid))
+        if (!dir.runWriteLocked((m, d) -> {
+            return d.putKid(Path.of(name).getFileName().toString(), fuuid);
+        }))
             return Optional.empty();
 
-        jObjectManager.put(dir);
-
-        return Optional.of(f);
+        return Optional.of(f.getName());
     }
 
     @Override
-    public Optional<Directory> mkdir(String name, long mode) {
+    public Optional<String> mkdir(String name, long mode) {
         // FIXME:
         var root = getRoot();
         var found = traverse(root, Path.of(name).getParent());
         if (found.isEmpty()) return Optional.empty();
 
-        if (!(found.get() instanceof Directory dir)) return Optional.empty();
+        if (!(found.get().isOf(Directory.class))) return Optional.empty();
 
         var duuid = UUID.randomUUID();
         Directory d = new Directory(duuid);
         d.setMode(mode);
+        var dir = (JObject<Directory>) found.get();
 
         jObjectManager.put(d);
-        if (!dir.putKid(Path.of(name).getFileName().toString(), duuid))
+        if (!dir.runWriteLocked((m, dd) -> {
+            return dd.putKid(Path.of(name).getFileName().toString(), duuid);
+        }))
             return Optional.empty();
-        jObjectManager.put(dir);
 
-        return Optional.of(d);
+        return Optional.of(d.getName());
     }
 
     private Boolean rmdent(String name) {
@@ -137,12 +145,12 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var found = traverse(root, Path.of(name).getParent());
         if (found.isEmpty()) return false;
 
-        if (!(found.get() instanceof Directory dir)) return false;
+        if (!(found.get().isOf(Directory.class))) return false;
 
-        var removed = dir.removeKid(Path.of(name).getFileName().toString());
-        if (removed) jObjectManager.put(dir);
-
-        return removed;
+        var dir = (JObject<Directory>) found.get();
+        return dir.runWriteLocked((m, d) -> {
+            return d.removeKid(Path.of(name).getFileName().toString());
+        });
     }
 
     @Override
@@ -166,13 +174,14 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var found = traverse(root, Path.of(to).getParent());
         if (found.isEmpty()) return false;
 
-        if (!(found.get() instanceof Directory dir)) return false;
+        if (!(found.get().isOf(Directory.class))) return false;
 
-        dir.runWriteLocked((n, d) -> {
-            d.getChildren().put(Path.of(to).getFileName().toString(), dent.get().getUuid());
+        var dir = (JObject<Directory>) found.get();
+
+        dir.runWriteLocked((m, d) -> {
+            d.getChildren().put(Path.of(to).getFileName().toString(), UUID.fromString(dent.get().getName()));
             return null;
         });
-        jObjectManager.put(dir);
 
         return true;
     }
@@ -182,9 +191,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var dent = getDirEntry(name);
         if (dent.isEmpty()) return false;
 
-        dent.get().setMode(mode);
-
-        jObjectManager.put(dent.get());
+        dent.get().runWriteLocked((m, d) -> {
+            d.setMode(mode);
+            return null;
+        });
 
         return true;
     }
@@ -194,9 +204,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var root = getRoot();
         var found = traverse(root, Path.of(name));
         if (found.isEmpty()) throw new IllegalArgumentException();
-        if (!(found.get() instanceof Directory foundDir)) throw new IllegalArgumentException();
+        if (!(found.get().isOf(Directory.class))) throw new IllegalArgumentException();
+        var dir = (JObject<Directory>) found.get();
 
-        return foundDir.getChildrenList();
+        return dir.runReadLocked((m, d) -> d.getChildrenList());
     }
 
     @Override
@@ -211,7 +222,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         AtomicReference<List<Map.Entry<Long, String>>> chunksList = new AtomicReference<>();
 
         try {
-            file.runReadLocked((fsNodeData, fileData) -> {
+            file.runReadLocked((md, fileData) -> {
                 var chunksAll = fileData.getChunks();
                 if (chunksAll.isEmpty()) {
                     chunksList.set(new ArrayList<>());
@@ -250,7 +261,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 return Optional.empty();
             }
 
-            var chunkBytes = chunkRead.get().getBytes();
+            var chunkBytes = chunkRead.get().runWriteLocked((m, d) -> d.getBytes());
 
             long readableLen = chunkBytes.length - offInChunk;
 
@@ -313,7 +324,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 return -1L;
             }
 
-            var chunkBytes = chunkRead.get().getBytes();
+            var chunkBytes = chunkRead.get().runWriteLocked((m, d) -> d.getBytes());
             ChunkData newChunkData = new ChunkData(Arrays.copyOfRange(chunkBytes, 0, (int) (offset - first.getKey())));
             ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
             jObjectManager.put(newChunkData);
@@ -339,7 +350,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 return -1L;
             }
 
-            var lchunkBytes = lchunkRead.get().getBytes();
+            var lchunkBytes = lchunkRead.get().runWriteLocked((m, d) -> d.getBytes());
 
             if (last.getKey() + lchunkBytes.length > offset + data.length) {
                 var startInFile = offset + data.length;
@@ -354,18 +365,16 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
 
         try {
-            file.runWriteLocked((fsNodeData, fileData) -> {
+            file.runWriteLocked((m, fileData) -> {
                 fileData.getChunks().clear();
                 fileData.getChunks().putAll(newChunks);
-                fsNodeData.setMtime(System.currentTimeMillis());
+                fileData.setMtime(System.currentTimeMillis());
                 return null;
             });
         } catch (Exception e) {
             Log.error("Error writing file chunks: " + fileUuid, e);
             return -1L;
         }
-
-        jObjectManager.put(file);
 
         return (long) data.length;
     }
@@ -381,16 +390,15 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (length == 0) {
             try {
-                file.runWriteLocked((fsNodeData, fileData) -> {
+                file.runWriteLocked((m, fileData) -> {
                     fileData.getChunks().clear();
-                    fsNodeData.setMtime(System.currentTimeMillis());
+                    fileData.setMtime(System.currentTimeMillis());
                     return null;
                 });
             } catch (Exception e) {
                 Log.error("Error writing file chunks: " + fileUuid, e);
                 return false;
             }
-            jObjectManager.put(file);
             return true;
         }
 
@@ -421,7 +429,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 return false;
             }
 
-            var chunkBytes = chunkRead.get().getBytes();
+            var chunkBytes = chunkRead.get().runWriteLocked((m, d) -> d.getBytes());
 
             if (lastChunk.getKey() + chunkBytes.length > 0) {
                 int start = (int) (length - lastChunk.getKey());
@@ -435,18 +443,16 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
 
         try {
-            file.runWriteLocked((fsNodeData, fileData) -> {
+            file.runWriteLocked((m, fileData) -> {
                 fileData.getChunks().clear();
                 fileData.getChunks().putAll(newChunks);
-                fsNodeData.setMtime(System.currentTimeMillis());
+                fileData.setMtime(System.currentTimeMillis());
                 return null;
             });
         } catch (Exception e) {
             Log.error("Error writing file chunks: " + fileUuid, e);
             return false;
         }
-
-        jObjectManager.put(file);
 
         return true;
     }
@@ -461,8 +467,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var file = fileOpt.get();
 
         try {
-            file.runWriteLocked((fsNodeData, fileData) -> {
-                fsNodeData.setMtime(mtimeMs);
+            file.runWriteLocked((m, fileData) -> {
+                fileData.setMtime(mtimeMs);
                 return null;
             });
         } catch (Exception e) {
@@ -470,24 +476,24 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             return false;
         }
 
-        jObjectManager.put(file);
-
         return true;
     }
 
     @Override
-    public Long size(File f) {
+    public Long size(String uuid) {
         int size = 0;
         //FIXME:
         AtomicReference<TreeMap<Long, String>> chunksAllRef = new AtomicReference<>();
+        var read = jObjectManager.get(uuid, File.class)
+                .orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
         try {
-            f.runReadLocked((fsNodeData, fileData) -> {
+            read.runReadLocked((fsNodeData, fileData) -> {
                 chunksAllRef.set(new TreeMap<>(fileData.getChunks()));
                 return null;
             });
         } catch (Exception e) {
-            Log.error("Error reading file: " + f.getUuid(), e);
+            Log.error("Error reading file: " + uuid, e);
             return -1L;
         }
 
@@ -502,17 +508,16 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 return -1L;
             }
 
-            size += chunkRead.get().getSize();
+            size += chunkRead.get().runReadLocked((m, d) -> d.getSize());
         }
         return (long) size;
     }
 
-    @Override
-    public Directory getRoot() {
-        var read = jObjectManager.get(new UUID(0, 0).toString(), FsNode.class);
-        if (read.isEmpty() || !(read.get() instanceof Directory)) {
+    private JObject<Directory> getRoot() {
+        var read = jObjectManager.get(new UUID(0, 0).toString(), Directory.class);
+        if (read.isEmpty()) {
             Log.error("Root directory not found");
         }
-        return (Directory) read.get();
+        return (JObject<Directory>) read.get();
     }
 }

@@ -3,6 +3,8 @@ package com.usatiuk.dhfs.storage.objects.repository.distributed;
 import com.usatiuk.dhfs.objects.repository.distributed.IndexUpdatePush;
 import com.usatiuk.dhfs.objects.repository.distributed.IndexUpdateReply;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelogEntry;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
@@ -14,14 +16,11 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Instance;
-import jakarta.enterprise.inject.literal.NamedLiteral;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.NotImplementedException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 
 @ApplicationScoped
@@ -31,9 +30,6 @@ public class SyncHandler {
 
     @Inject
     ObjectPersistentStore objectPersistentStore;
-
-    @Inject
-    ObjectIndexService objectIndexService;
 
     @Inject
     JObjectManager jObjectManager;
@@ -66,19 +62,26 @@ public class SyncHandler {
             handleRemoteUpdate(IndexUpdatePush.newBuilder()
                     .setSelfname(got.getSelfname()).setHeader(h).build());
         }
-        // Push our index to the other peer too, as they might not request it if
-        // they didn't thing we were disconnected
-        List<String> toPush = new ArrayList<>();
-        objectIndexService.forAllRead((name, meta) -> {
-            toPush.add(name);
-        });
-        for (String name : toPush) {
-            invalidationQueueService.pushInvalidationToOne(host, name);
-        }
+//        // Push our index to the other peer too, as they might not request it if
+//        // they didn't thing we were disconnected
+//        List<String> toPush = new ArrayList<>();
+//        objectIndexService.forAllRead((name, meta) -> {
+//            toPush.add(name);
+//        });
+//        for (String name : toPush) {
+//            invalidationQueueService.pushInvalidationToOne(host, name);
+//        }
     }
 
     public IndexUpdateReply handleRemoteUpdate(IndexUpdatePush request) {
-        var meta = objectIndexService.getOrCreateMeta(request.getHeader().getName(), request.getHeader().getConflictResolver());
+        JObject<?> found;
+        try {
+            found = jObjectManager.getOrPut(request.getHeader().getName(), new ObjectMetadata(
+                    request.getHeader().getName(), request.getHeader().getConflictResolver(), (Class<? extends JObjectData>) Class.forName(request.getHeader().getType())
+            ));
+        } catch (ClassNotFoundException ex) {
+            throw new NotImplementedException(ex);
+        }
 
         var receivedSelfVer = request.getHeader().getChangelog()
                 .getEntriesList().stream().filter(p -> p.getHost().equals(selfname))
@@ -87,33 +90,33 @@ public class SyncHandler {
         var receivedTotalVer = request.getHeader().getChangelog().getEntriesList()
                 .stream().map(ObjectChangelogEntry::getVersion).reduce(0L, Long::sum);
 
-        boolean conflict = meta.runWriteLocked((data) -> {
-            if (data.getRemoteCopies().getOrDefault(request.getSelfname(), 0L) > receivedTotalVer) {
+        boolean conflict = found.runWriteLocked((md) -> {
+            if (md.getRemoteCopies().getOrDefault(request.getSelfname(), 0L) > receivedTotalVer) {
                 Log.error("Received older index update than was known for host: "
                         + request.getSelfname() + " " + request.getHeader().getName());
                 return false;
             }
 
-            if (data.getChangelog().get(selfname) > receivedSelfVer) return true;
+            if (md.getChangelog().get(selfname) > receivedSelfVer) return true;
 
-            data.getRemoteCopies().put(request.getSelfname(), receivedTotalVer);
+            md.getRemoteCopies().put(request.getSelfname(), receivedTotalVer);
 
-            if (Objects.equals(data.getOurVersion(), receivedTotalVer)) {
+            if (Objects.equals(md.getOurVersion(), receivedTotalVer)) {
                 for (var e : request.getHeader().getChangelog().getEntriesList()) {
-                    if (!Objects.equals(data.getChangelog().getOrDefault(e.getHost(), 0L),
+                    if (!Objects.equals(md.getChangelog().getOrDefault(e.getHost(), 0L),
                             e.getVersion())) return true;
                 }
             }
 
             // TODO: recheck this
-            if (data.getOurVersion() > receivedTotalVer) {
+            if (md.getOurVersion() > receivedTotalVer) {
                 Log.info("Received older index update than known: "
                         + request.getSelfname() + " " + request.getHeader().getName());
                 return false;
             }
 
-            // data.getBestVersion() > data.getTotalVersion() should also work
-            if (receivedTotalVer > data.getOurVersion()) {
+            // md.getBestVersion() > md.getTotalVersion() should also work
+            if (receivedTotalVer > md.getOurVersion()) {
                 try {
                     Log.info("Deleting " + request.getHeader().getName() + " as per invalidation from " + request.getSelfname());
                     objectPersistentStore.deleteObject(request.getHeader().getName());
@@ -123,21 +126,19 @@ public class SyncHandler {
                 } catch (Exception e) {
                     Log.info("Couldn't delete object from persistent store: ", e);
                 }
-
-                jObjectManager.invalidateJObject(data.getName());
             }
 
-            data.getChangelog().clear();
+            md.getChangelog().clear();
             for (var entry : request.getHeader().getChangelog().getEntriesList()) {
-                data.getChangelog().put(entry.getHost(), entry.getVersion());
+                md.getChangelog().put(entry.getHost(), entry.getVersion());
             }
-            data.getChangelog().putIfAbsent(selfname, 0L);
+            md.getChangelog().putIfAbsent(selfname, 0L);
 
             return false;
         });
 
         if (conflict) {
-            var resolver = conflictResolvers.select(NamedLiteral.of(meta.getConflictResolver()));
+            var resolver = conflictResolvers.select(found.getConflictResolver());
             var result = resolver.get().resolve(request.getSelfname(), request.getHeader(), request.getHeader().getName());
             if (result.equals(ConflictResolver.ConflictResolutionResult.RESOLVED)) {
                 Log.info("Resolved conflict for " + request.getSelfname() + " " + request.getHeader().getName());

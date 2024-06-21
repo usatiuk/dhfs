@@ -1,12 +1,18 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
-import io.quarkus.logging.Log;
+import com.usatiuk.dhfs.storage.DeserializationHelper;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
+import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.Getter;
+import org.apache.commons.lang3.NotImplementedException;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.Optional;
@@ -14,10 +20,13 @@ import java.util.Optional;
 @ApplicationScoped
 public class JObjectManagerImpl implements JObjectManager {
     @Inject
-    JObjectRepository jObjectRepository;
+    ObjectPersistentStore objectPersistentStore;
 
-    private static class NamedSoftReference extends SoftReference<JObject> {
-        public NamedSoftReference(JObject target, ReferenceQueue<? super JObject> q) {
+    @Inject
+    JObjectResolver jObjectResolver;
+
+    private static class NamedSoftReference extends SoftReference<JObject<?>> {
+        public NamedSoftReference(JObject<?> target, ReferenceQueue<JObject<?>> q) {
             super(target, q);
             this._key = target.getName();
         }
@@ -27,7 +36,7 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     private final HashMap<String, NamedSoftReference> _map = new HashMap<>();
-    private final ReferenceQueue<JObject> _refQueue = new ReferenceQueue<>();
+    private final ReferenceQueue<JObject<?>> _refQueue = new ReferenceQueue<>();
 
     private void cleanup() {
         NamedSoftReference cur;
@@ -39,16 +48,12 @@ public class JObjectManagerImpl implements JObjectManager {
         }
     }
 
-    private <T extends JObject> T getFromMap(String key, Class<T> clazz) {
+    private JObject<?> getFromMap(String key) {
         synchronized (_map) {
             if (_map.containsKey(key)) {
                 var ref = _map.get(key).get();
                 if (ref != null) {
-                    if (!clazz.isAssignableFrom(ref.getClass())) {
-                        Log.error("Cached object type mismatch: " + key);
-                        _map.remove(key);
-                    } else
-                        return (T) ref;
+                    return ref;
                 }
             }
         }
@@ -56,46 +61,122 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     @Override
-    public <T extends JObject> Optional<T> get(String name, Class<T> clazz) {
+    public Optional<JObject<?>> get(String name) {
         cleanup();
         synchronized (_map) {
-            var inMap = getFromMap(name, clazz);
+            var inMap = getFromMap(name);
             if (inMap != null) return Optional.of(inMap);
         }
 
-        var read = jObjectRepository.readJObjectChecked(name, clazz);
-
-        if (read.isEmpty())
+        byte[] readMd;
+        try {
+            readMd = objectPersistentStore.readObject("meta_" + name);
+        } catch (StatusRuntimeException ex) {
+            if (!ex.getStatus().equals(Status.NOT_FOUND)) throw ex;
             return Optional.empty();
+        }
+        var meta = DeserializationHelper.deserialize(readMd);
+        if (!(meta instanceof ObjectMetadata))
+            throw new NotImplementedException("Unexpected metadata type for " + name);
 
         synchronized (_map) {
-            var inMap = getFromMap(name, clazz);
+            var inMap = getFromMap(name);
             if (inMap != null) return Optional.of(inMap);
-            _map.put(name, new NamedSoftReference(read.get(), _refQueue));
+            JObject<?> newObj = new JObject<>(jObjectResolver, (ObjectMetadata) meta);
+            _map.put(name, new NamedSoftReference(newObj, _refQueue));
+            return Optional.of(newObj);
         }
-
-        return Optional.of(read.get());
     }
 
     @Override
-    public <T extends JObject> void put(T object) {
+    public <D extends JObjectData> Optional<JObject<? extends D>> get(String name, Class<D> klass) {
+        var got = get(name);
+        if (got.isEmpty()) return Optional.of((JObject<? extends D>) got.get());
+        if (!got.get().isOf(klass)) throw new NotImplementedException("Class mismatch for " + name);
+        return Optional.of((JObject<? extends D>) got.get());
+    }
+
+    @Override
+    public Collection<JObject<?>> find(String prefix) {
+        throw new NotImplementedException();
+    }
+
+    @Override
+    public <D extends JObjectData> JObject<D> put(D object) {
         cleanup();
 
         synchronized (_map) {
-            var inMap = getFromMap(object.getName(), object.getClass());
-            if (inMap != null && inMap != object && !Objects.equals(inMap, object)) {
-                throw new IllegalArgumentException("Trying to insert different object with same key");
-            } else if (inMap == null)
-                _map.put(object.getName(), new NamedSoftReference(object, _refQueue));
+            var inMap = getFromMap(object.getName());
+            if (inMap != null) {
+                inMap.runReadLocked((m, d) -> {
+                    if (!Objects.equals(d, object))
+                        throw new IllegalArgumentException("Trying to insert different object with same key");
+                    return null;
+                });
+                return (JObject<D>) inMap;
+            } else {
+                var created = new JObject<D>(jObjectResolver, object.getName(), object.getConflictResolver().getName(), object);
+                _map.put(object.getName(), new NamedSoftReference(created, _refQueue));
+                jObjectResolver.notifyWrite(created);
+                return created;
+            }
         }
-
-        jObjectRepository.writeJObject(object);
     }
 
     @Override
-    public void invalidateJObject(String name) {
+    public JObject<?> getOrPut(String name, ObjectMetadata md) {
+        cleanup();
+
+        var got = get(name);
+
+        if (got.isPresent()) {
+            if (!got.get().isOf(md.getType())) {
+                throw new NotImplementedException("Type mismatch for " + name);
+            }
+            return got.get();
+        }
+
         synchronized (_map) {
-            _map.remove(name);
+            var inMap = getFromMap(md.getName());
+            if (inMap != null) {
+                return inMap;
+            } else {
+                var created = new JObject<>(jObjectResolver, md);
+                _map.put(md.getName(), new NamedSoftReference(created, _refQueue));
+                jObjectResolver.notifyWrite(created);
+                return created;
+            }
+        }
+    }
+
+    @Override
+    public <D extends JObjectData> JObject<D> getOrPut(String name, D object) {
+        cleanup();
+
+        var got = get(name);
+        if (got.isPresent()) {
+            if (!got.get().isOf(object.getClass())) {
+                throw new NotImplementedException("Type mismatch for " + name);
+            }
+            return (JObject<D>) got.get();
+        }
+
+        synchronized (_map) {
+            var inMap = getFromMap(object.getName());
+            if (inMap != null) {
+                var ok = inMap.runReadLocked((m) -> {
+                    return object.getClass().isAssignableFrom(m.getType());
+                });
+                if (ok)
+                    return (JObject<D>) inMap;
+                else
+                    throw new NotImplementedException("Type mismatch for " + name);
+            } else {
+                var created = new JObject<D>(jObjectResolver, object.getName(), object.getConflictResolver().getName(), object);
+                _map.put(object.getName(), new NamedSoftReference(created, _refQueue));
+                jObjectResolver.notifyWrite(created);
+                return created;
+            }
         }
     }
 }

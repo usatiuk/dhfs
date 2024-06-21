@@ -3,16 +3,18 @@ package com.usatiuk.dhfs.storage.objects.repository.distributed;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelog;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelogEntry;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import lombok.Getter;
 
 import java.io.Serializable;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-public class ObjectMetaData implements Serializable {
-    public ObjectMetaData(String name, String conflictResolver) {
+public class ObjectMetadata implements Serializable {
+    public ObjectMetadata(String name, String conflictResolver, Class<? extends JObjectData> type) {
         _name = name;
         _conflictResolver = conflictResolver;
+        _type = type;
     }
 
     @Getter
@@ -20,6 +22,9 @@ public class ObjectMetaData implements Serializable {
 
     @Getter
     private final String _conflictResolver;
+
+    @Getter
+    private final Class<? extends JObjectData> _type;
 
     @Getter
     private final Map<String, Long> _remoteCopies = new LinkedHashMap<>();

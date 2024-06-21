@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.repository.distributed.*;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -10,10 +11,9 @@ import io.quarkus.logging.Log;
 import io.smallrye.common.annotation.Blocking;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-
-import java.util.Optional;
 
 // Note: RunOnVirtualThread hangs somehow
 @GrpcService
@@ -25,10 +25,10 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     ObjectPersistentStore objectPersistentStore;
 
     @Inject
-    ObjectIndexService objectIndexService;
+    SyncHandler syncHandler;
 
     @Inject
-    SyncHandler syncHandler;
+    JObjectManager jObjectManager;
 
     @Inject
     RemoteHostManager remoteHostManager;
@@ -37,22 +37,17 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Blocking
     public Uni<GetObjectReply> getObject(GetObjectRequest request) {
         if (request.getSelfname().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+
         remoteHostManager.handleConnectionSuccess(request.getSelfname());
 
         Log.info("<-- getObject: " + request.getName());
 
-        var meta = objectIndexService.getMeta(request.getName()).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
+        var obj = jObjectManager.get(request.getName()).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
-        Optional<Pair<ObjectHeader, byte[]>> readOpt = meta.runReadLocked((data) -> {
-            if (objectPersistentStore.existsObject(request.getName())) {
-                ObjectHeader header = data.toRpcHeader();
-                byte[] bytes = objectPersistentStore.readObject(request.getName());
-                return Optional.of(Pair.of(header, bytes));
-            } else {
-                return Optional.empty();
-            }
+        Pair<ObjectHeader, byte[]> read = obj.runReadLocked((meta, data) -> {
+            byte[] bytes = objectPersistentStore.readObject(request.getName());
+            return Pair.of(meta.toRpcHeader(), SerializationUtils.serialize(data));
         });
-        var read = readOpt.orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
         var replyObj = ApiObject.newBuilder().setHeader(read.getLeft()).setContent(ByteString.copyFrom(read.getRight())).build();
         return Uni.createFrom().item(GetObjectReply.newBuilder().setObject(replyObj).build());
     }
@@ -65,9 +60,15 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
         Log.info("<-- getIndex: ");
         var builder = GetIndexReply.newBuilder().setSelfname(selfname);
-        objectIndexService.forAllRead((name, meta) -> {
-            builder.addObjects(meta.runReadLocked(ObjectMetaData::toRpcHeader));
-        });
+
+        var objs = jObjectManager.find("");
+
+        for (var obj : objs) {
+            obj.runReadLocked((meta) -> {
+                builder.addObjects(meta.toRpcHeader());
+                return null;
+            });
+        }
         return Uni.createFrom().item(builder.build());
     }
 

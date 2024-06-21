@@ -34,7 +34,8 @@ message ObjectChangelog {
 message ObjectHeader {
   string name = 2;
   string conflictResolver = 3;
-  ObjectChangelog changelog = 4;
+  string type = 4;
+  ObjectChangelog changelog = 5;
 }
 
 message ApiObject {
