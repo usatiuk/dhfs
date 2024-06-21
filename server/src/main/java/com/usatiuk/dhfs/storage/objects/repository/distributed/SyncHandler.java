@@ -40,17 +40,7 @@ public class SyncHandler {
     @Inject
     Instance<ConflictResolver> conflictResolvers;
 
-    void init(@Observes @Priority(340) StartupEvent event) throws IOException {
-        remoteHostManager.addConnectionSuccessHandler((host) -> {
-            doInitialResync(host);
-            return null;
-        });
-    }
-
-    void shutdown(@Observes @Priority(240) ShutdownEvent event) throws IOException {
-    }
-
-    private void doInitialResync(String host) {
+    public void doInitialResync(String host) {
         var got = remoteObjectServiceClient.getIndex(host);
         for (var h : got.getObjectsList()) {
             handleRemoteUpdate(IndexUpdatePush.newBuilder()

@@ -20,7 +20,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 
 @ApplicationScoped
 public class RemoteHostManager {
@@ -29,6 +28,9 @@ public class RemoteHostManager {
 
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
+
+    @Inject
+    SyncHandler syncHandler;
 
     TransientPeersState _transientPeersState = new TransientPeersState();
 
@@ -57,9 +59,6 @@ public class RemoteHostManager {
         }
     }
 
-    private final ArrayList<Function<String, Void>> _connectionSuccessHandlers = new ArrayList<>();
-    private final ArrayList<Function<String, Void>> _connectionErrorHandlers = new ArrayList<>();
-
     public void handleConnectionSuccess(String host) {
         Log.info("Connected to " + host);
         if (_transientPeersState.runReadLocked(d -> d.getStates().getOrDefault(
@@ -71,9 +70,7 @@ public class RemoteHostManager {
             curState.setState(TransientPeersStateData.TransientPeerState.ConnectionState.REACHABLE);
             return null;
         });
-        for (var h : _connectionSuccessHandlers) {
-            h.apply(host);
-        }
+        syncHandler.doInitialResync(host);
     }
 
     public void handleConnectionError(String host) {
@@ -84,18 +81,8 @@ public class RemoteHostManager {
             curState.setState(TransientPeersStateData.TransientPeerState.ConnectionState.UNREACHABLE);
             return null;
         });
-        for (var h : _connectionErrorHandlers) {
-            h.apply(host);
-        }
     }
 
-    public void addConnectionSuccessHandler(Function<String, Void> handler) {
-        _connectionSuccessHandlers.add(handler);
-    }
-
-    public void addConnectionErrorHandler(Function<String, Void> handler) {
-        _connectionErrorHandlers.add(handler);
-    }
 
     @FunctionalInterface
     public interface ClientFunction<R> {
