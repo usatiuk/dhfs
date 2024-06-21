@@ -7,11 +7,11 @@ import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentS
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-@ApplicationScoped
+@Singleton
 public class JObjectResolver {
     @Inject
     ObjectPersistentStore objectPersistentStore;

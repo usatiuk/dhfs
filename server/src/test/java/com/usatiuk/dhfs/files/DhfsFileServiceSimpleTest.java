@@ -4,8 +4,7 @@ import com.usatiuk.dhfs.storage.files.objects.ChunkData;
 import com.usatiuk.dhfs.storage.files.objects.ChunkInfo;
 import com.usatiuk.dhfs.storage.files.objects.File;
 import com.usatiuk.dhfs.storage.files.service.DhfsFileService;
-import com.usatiuk.dhfs.storage.objects.jrepository.JObjectRepository;
-import com.usatiuk.dhfs.storage.objects.repository.ObjectRepository;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
@@ -27,9 +26,7 @@ public class DhfsFileServiceSimpleTest {
     @Inject
     DhfsFileService fileService;
     @Inject
-    ObjectRepository objectRepository;
-    @Inject
-    JObjectRepository jObjectRepository;
+    JObjectManager jObjectManager;
 
     @Test
     void readTest() {
@@ -42,22 +39,19 @@ public class DhfsFileServiceSimpleTest {
             ChunkData c3 = new ChunkData("91011".getBytes());
             ChunkInfo c3i = new ChunkInfo(c3.getHash(), c3.getBytes().length);
             File f = new File(fuuid);
-            Assertions.assertDoesNotThrow(() -> f.runWriteLocked((fsNodeData, fileData) -> {
-                fileData.getChunks().put(0L, c1.getHash());
-                fileData.getChunks().put((long) c1.getBytes().length, c2.getHash());
-                fileData.getChunks().put((long) c1.getBytes().length + c2.getBytes().length, c3.getHash());
-                return null;
-            }));
+            f.getChunks().put(0L, c1.getHash());
+            f.getChunks().put((long) c1.getBytes().length, c2.getHash());
+            f.getChunks().put((long) c1.getBytes().length + c2.getBytes().length, c3.getHash());
 
             // FIXME: dhfs_files
 
-            jObjectRepository.writeJObject(c1);
-            jObjectRepository.writeJObject(c2);
-            jObjectRepository.writeJObject(c3);
-            jObjectRepository.writeJObject(c1i);
-            jObjectRepository.writeJObject(c2i);
-            jObjectRepository.writeJObject(c3i);
-            jObjectRepository.writeJObject(f);
+            jObjectManager.put(c1);
+            jObjectManager.put(c2);
+            jObjectManager.put(c3);
+            jObjectManager.put(c1i);
+            jObjectManager.put(c2i);
+            jObjectManager.put(c3i);
+            jObjectManager.put(f);
         }
 
         String all = "1234567891011";

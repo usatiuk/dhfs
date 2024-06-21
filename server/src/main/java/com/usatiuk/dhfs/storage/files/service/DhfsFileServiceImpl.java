@@ -320,9 +320,9 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var first = chunksAll.floorEntry(offset);
         var last = chunksAll.floorEntry((offset + data.length) - 1);
 
-        var newChunks = new TreeMap<Long, String>();
-        for (var c : chunksAll.entrySet()) {
-            if (c.getKey() < offset) newChunks.put(c.getKey(), c.getValue());
+        if (!chunksAll.isEmpty()) {
+            var between = chunksAll.subMap(first.getKey(), true, last.getKey(), true);
+            between.clear();
         }
 
         if (first != null && first.getKey() < offset) {
@@ -340,7 +340,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             jObjectManager.put(newChunkData);
             jObjectManager.put(newChunkInfo);
 
-            newChunks.put(first.getKey(), newChunkData.getHash());
+            chunksAll.put(first.getKey(), newChunkData.getHash());
         }
 
         {
@@ -349,7 +349,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             jObjectManager.put(newChunkData);
             jObjectManager.put(newChunkInfo);
 
-            newChunks.put(offset, newChunkData.getHash());
+            chunksAll.put(offset, newChunkData.getHash());
         }
         if (last != null) {
             var lchunkUuid = last.getValue();
@@ -370,7 +370,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 jObjectManager.put(newChunkData);
                 jObjectManager.put(newChunkInfo);
 
-                newChunks.put(startInFile, newChunkData.getHash());
+                chunksAll.put(startInFile, newChunkData.getHash());
             }
         }
 
@@ -378,7 +378,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             file.runWriteLocked((m, fileData, bump) -> {
                 bump.apply();
                 fileData.getChunks().clear();
-                fileData.getChunks().putAll(newChunks);
+                fileData.getChunks().putAll(chunksAll);
                 fileData.setMtime(System.currentTimeMillis());
                 return null;
             });
