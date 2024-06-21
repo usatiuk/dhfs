@@ -49,7 +49,7 @@ public class RemoteHostManager {
                 return !s.getState().equals(TransientPeersStateData.TransientPeerState.ConnectionState.REACHABLE);
             });
             if (shouldTry) {
-                Log.info("Trying to connect to " + host);
+                Log.info("Trying to connect to " + host.getName());
                 if (reachable(host)) {
                     Log.info("Connected to " + host);
                     handleConnectionSuccess(host.getName());
