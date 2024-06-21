@@ -10,7 +10,7 @@ import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
-import io.smallrye.common.annotation.Blocking;
+import io.smallrye.common.annotation.RunOnVirtualThread;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -40,7 +40,7 @@ public class RemoteHostManager {
     }
 
     @Scheduled(every = "2s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
-    @Blocking
+    @RunOnVirtualThread
     public void tryConnectAll() {
         for (var host : persistentRemoteHostsService.getHosts()) {
             var shouldTry = _transientPeersState.runReadLocked(d -> {

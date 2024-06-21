@@ -18,7 +18,7 @@ public class InvalidationQueueService {
     RemoteObjectServiceClient remoteObjectServiceClient;
 
     @Scheduled(every = "1s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
-    @Blocking
+    @RunOnVirtualThread
     public void trySend() {
         var data = _data.runReadLocked(InvalidationQueueData::pullAll);
         for (var forHost : data.entrySet()) {

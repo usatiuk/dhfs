@@ -12,6 +12,7 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.SerializationUtils;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @ApplicationScoped
@@ -26,6 +27,7 @@ public class JObjectWriteback {
     AtomicBoolean _writing = new AtomicBoolean(false);
 
     private final LinkedHashMap<String, JObject<?>> _objects = new LinkedHashMap<>();
+    private final LinkedHashSet<String> _toIgnore = new LinkedHashSet<>();
 
     void shutdown(@Observes @Priority(10) ShutdownEvent event) {
         // FIXME: Hack!
@@ -42,7 +44,7 @@ public class JObjectWriteback {
     }
 
     @Scheduled(every = "1s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
-    @Blocking
+    @RunOnVirtualThread
     public void flush() {
         while (true) {
             JObject<?> obj;

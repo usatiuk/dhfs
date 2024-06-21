@@ -12,10 +12,7 @@ import org.apache.commons.lang3.NotImplementedException;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Optional;
+import java.util.*;
 
 @ApplicationScoped
 public class JObjectManagerImpl implements JObjectManager {
@@ -41,6 +38,7 @@ public class JObjectManagerImpl implements JObjectManager {
     private final HashMap<String, NamedSoftReference> _map = new HashMap<>();
     private final HashMap<String, Long> _nurseryRefcounts = new HashMap<>();
     private final ReferenceQueue<JObject<?>> _refQueue = new ReferenceQueue<>();
+    private final LinkedHashSet<String> _writebackQueue = new LinkedHashSet<>();
 
     private void cleanup() {
         NamedSoftReference cur;
@@ -48,6 +46,14 @@ public class JObjectManagerImpl implements JObjectManager {
             synchronized (this) {
                 if (_map.containsKey(cur._key) && (_map.get(cur._key).get() == null))
                     _map.remove(cur._key);
+            }
+        }
+        synchronized (this) {
+            synchronized (_writebackQueue) {
+                for (var s : _writebackQueue) {
+                    _nurseryRefcounts.remove(s);
+                }
+                _writebackQueue.clear();
             }
         }
     }
@@ -190,13 +196,15 @@ public class JObjectManagerImpl implements JObjectManager {
         synchronized (this) {
             if (!objectPersistentStore.existsObject("meta_" + name))
                 _nurseryRefcounts.merge(name, 1L, Long::sum);
+            else
+                _nurseryRefcounts.remove(name);
         }
     }
 
     @Override
     public void onWriteback(String name) {
-        synchronized (this) {
-            _nurseryRefcounts.remove(name);
+        synchronized (_writebackQueue) {
+            _writebackQueue.add(name);
         }
     }
 
@@ -204,19 +212,17 @@ public class JObjectManagerImpl implements JObjectManager {
     public void unref(JObject<?> object) {
         object.runWriteLockedMeta((m, a, b) -> {
             String name = m.getName();
-            boolean removed = false;
             synchronized (this) {
+                if (objectPersistentStore.existsObject("meta_" + name)) {
+                    _nurseryRefcounts.remove(name);
+                    return null;
+                }
+
                 if (!_nurseryRefcounts.containsKey(name)) return null;
                 _nurseryRefcounts.merge(name, -1L, Long::sum);
                 if (_nurseryRefcounts.get(name) <= 0) {
                     _nurseryRefcounts.remove(name);
-                    removed = true;
-                }
-            }
-            // Race?
-            if (removed) {
-                jObjectWriteback.remove(name);
-                synchronized (this) {
+                    jObjectWriteback.remove(name);
                     if (!objectPersistentStore.existsObject("meta_" + name))
                         _map.remove(name);
                 }
