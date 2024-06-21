@@ -5,6 +5,7 @@ import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelogEntry;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import lombok.Getter;
+import org.eclipse.microprofile.config.ConfigProvider;
 
 import java.io.Serializable;
 import java.util.LinkedHashMap;
@@ -41,6 +42,10 @@ public class ObjectMetadata implements Serializable {
         return Math.max(getOurVersion(), _remoteCopies.values().stream().max(Long::compareTo).get());
     }
 
+    public void bumpVersion(String selfname) {
+        _changelog.merge(selfname, 1L, Long::sum);
+    }
+
     public ObjectChangelog toRpcChangelog() {
         var changelogBuilder = ObjectChangelog.newBuilder();
         for (var m : getChangelog().entrySet()) {
@@ -53,6 +58,7 @@ public class ObjectMetadata implements Serializable {
         var headerBuilder = ObjectHeader.newBuilder().setName(getName());
         headerBuilder.setConflictResolver(getConflictResolver());
         headerBuilder.setChangelog(toRpcChangelog());
+        headerBuilder.setType(_type.getName());
         return headerBuilder.build();
     }
 }

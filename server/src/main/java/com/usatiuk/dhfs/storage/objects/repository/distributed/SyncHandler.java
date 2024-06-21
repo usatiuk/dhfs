@@ -62,22 +62,23 @@ public class SyncHandler {
             handleRemoteUpdate(IndexUpdatePush.newBuilder()
                     .setSelfname(got.getSelfname()).setHeader(h).build());
         }
-//        // Push our index to the other peer too, as they might not request it if
-//        // they didn't thing we were disconnected
-//        List<String> toPush = new ArrayList<>();
-//        objectIndexService.forAllRead((name, meta) -> {
-//            toPush.add(name);
-//        });
-//        for (String name : toPush) {
-//            invalidationQueueService.pushInvalidationToOne(host, name);
-//        }
+        // Push our index to the other peer too, as they might not request it if
+        // they didn't thing we were disconnected
+        var objs = jObjectManager.find("");
+
+        for (var obj : objs) {
+            obj.runReadLocked((meta) -> {
+                invalidationQueueService.pushInvalidationToOne(host, obj.getName());
+                return null;
+            });
+        }
     }
 
     public IndexUpdateReply handleRemoteUpdate(IndexUpdatePush request) {
         JObject<?> found;
         try {
             found = jObjectManager.getOrPut(request.getHeader().getName(), new ObjectMetadata(
-                    request.getHeader().getName(), request.getHeader().getConflictResolver(), (Class<? extends JObjectData>) Class.forName(request.getHeader().getType())
+                    request.getHeader().getName(), request.getHeader().getConflictResolver(), (Class<? extends JObjectData>) Class.forName(request.getHeader().getType(), true, JObject.class.getClassLoader())
             ));
         } catch (ClassNotFoundException ex) {
             throw new NotImplementedException(ex);
@@ -90,14 +91,14 @@ public class SyncHandler {
         var receivedTotalVer = request.getHeader().getChangelog().getEntriesList()
                 .stream().map(ObjectChangelogEntry::getVersion).reduce(0L, Long::sum);
 
-        boolean conflict = found.runWriteLocked((md) -> {
+        boolean conflict = found.runWriteLockedMeta((md, bump, invalidate) -> {
             if (md.getRemoteCopies().getOrDefault(request.getSelfname(), 0L) > receivedTotalVer) {
                 Log.error("Received older index update than was known for host: "
                         + request.getSelfname() + " " + request.getHeader().getName());
                 return false;
             }
 
-            if (md.getChangelog().get(selfname) > receivedSelfVer) return true;
+            if (md.getChangelog().getOrDefault(selfname, 0L) > receivedSelfVer) return true;
 
             md.getRemoteCopies().put(request.getSelfname(), receivedTotalVer);
 
@@ -117,6 +118,7 @@ public class SyncHandler {
 
             // md.getBestVersion() > md.getTotalVersion() should also work
             if (receivedTotalVer > md.getOurVersion()) {
+                invalidate.apply();
                 try {
                     Log.info("Deleting " + request.getHeader().getName() + " as per invalidation from " + request.getSelfname());
                     objectPersistentStore.deleteObject(request.getHeader().getName());

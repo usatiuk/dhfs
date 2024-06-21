@@ -5,7 +5,6 @@ import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
-import io.smallrye.mutiny.Multi;
 import io.vertx.mutiny.core.Vertx;
 import io.vertx.mutiny.core.buffer.Buffer;
 import jakarta.annotation.Priority;
@@ -17,6 +16,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import javax.annotation.Nonnull;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 
 @ApplicationScoped
@@ -44,10 +44,14 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         if (!nsRoot.toFile().isDirectory())
             throw new StatusRuntimeException(Status.NOT_FOUND);
 
-        return vertx.fileSystem().readDir(nsRoot.toString()).onItem()
-                .transformToMulti(v -> Multi.createFrom().iterable(v))
-                .select().where(n -> n.startsWith(prefix))
-                .map(f -> nsRoot.relativize(Paths.get(f)).toString()).collect().asList().await().indefinitely();
+        var read = vertx.fileSystem().readDir(nsRoot.toString()).await().indefinitely();
+        ArrayList<String> out = new ArrayList<>();
+        for (var s : read) {
+            var rel = nsRoot.relativize(Paths.get(s)).toString();
+            if (rel.startsWith(prefix))
+                out.add(rel);
+        }
+        return out;
     }
 
     @Nonnull

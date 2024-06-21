@@ -19,7 +19,7 @@ public class Directory extends FsNode {
 
     @Override
     public Class<? extends ConflictResolver> getConflictResolver() {
-        return NotImplementedConflictResolver.class;
+        return DirectoryConflictResolver.class;
     }
 
     public Map<String, UUID> getChildrenMap() {

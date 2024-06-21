@@ -108,7 +108,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         jObjectManager.put(f);
 
-        if (!dir.runWriteLocked((m, d) -> {
+        if (!dir.runWriteLocked((m, d, bump) -> {
+            bump.apply();
             return d.putKid(Path.of(name).getFileName().toString(), fuuid);
         }))
             return Optional.empty();
@@ -131,7 +132,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var dir = (JObject<Directory>) found.get();
 
         jObjectManager.put(d);
-        if (!dir.runWriteLocked((m, dd) -> {
+        if (!dir.runWriteLocked((m, dd, bump) -> {
+            bump.apply();
             return dd.putKid(Path.of(name).getFileName().toString(), duuid);
         }))
             return Optional.empty();
@@ -148,7 +150,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         if (!(found.get().isOf(Directory.class))) return false;
 
         var dir = (JObject<Directory>) found.get();
-        return dir.runWriteLocked((m, d) -> {
+        return dir.runWriteLocked((m, d, bump) -> {
+            bump.apply();
             return d.removeKid(Path.of(name).getFileName().toString());
         });
     }
@@ -178,7 +181,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         var dir = (JObject<Directory>) found.get();
 
-        dir.runWriteLocked((m, d) -> {
+        dir.runWriteLocked((m, d, bump) -> {
+            bump.apply();
             d.getChildren().put(Path.of(to).getFileName().toString(), UUID.fromString(dent.get().getName()));
             return null;
         });
@@ -191,7 +195,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var dent = getDirEntry(name);
         if (dent.isEmpty()) return false;
 
-        dent.get().runWriteLocked((m, d) -> {
+        dent.get().runWriteLocked((m, d, bump) -> {
+            bump.apply();
             d.setMode(mode);
             return null;
         });
@@ -261,7 +266,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 return Optional.empty();
             }
 
-            var chunkBytes = chunkRead.get().runWriteLocked((m, d) -> d.getBytes());
+            var chunkBytes = chunkRead.get().runReadLocked((m, d) -> d.getBytes());
 
             long readableLen = chunkBytes.length - offInChunk;
 
@@ -324,7 +329,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 return -1L;
             }
 
-            var chunkBytes = chunkRead.get().runWriteLocked((m, d) -> d.getBytes());
+            var chunkBytes = chunkRead.get().runReadLocked((m, d) -> d.getBytes());
             ChunkData newChunkData = new ChunkData(Arrays.copyOfRange(chunkBytes, 0, (int) (offset - first.getKey())));
             ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
             jObjectManager.put(newChunkData);
@@ -350,7 +355,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 return -1L;
             }
 
-            var lchunkBytes = lchunkRead.get().runWriteLocked((m, d) -> d.getBytes());
+            var lchunkBytes = lchunkRead.get().runReadLocked((m, d) -> d.getBytes());
 
             if (last.getKey() + lchunkBytes.length > offset + data.length) {
                 var startInFile = offset + data.length;
@@ -365,7 +370,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
 
         try {
-            file.runWriteLocked((m, fileData) -> {
+            file.runWriteLocked((m, fileData, bump) -> {
+                bump.apply();
                 fileData.getChunks().clear();
                 fileData.getChunks().putAll(newChunks);
                 fileData.setMtime(System.currentTimeMillis());
@@ -390,7 +396,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (length == 0) {
             try {
-                file.runWriteLocked((m, fileData) -> {
+                file.runWriteLocked((m, fileData, bump) -> {
+                    bump.apply();
                     fileData.getChunks().clear();
                     fileData.setMtime(System.currentTimeMillis());
                     return null;
@@ -429,7 +436,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 return false;
             }
 
-            var chunkBytes = chunkRead.get().runWriteLocked((m, d) -> d.getBytes());
+            var chunkBytes = chunkRead.get().runReadLocked((m, d) -> d.getBytes());
 
             if (lastChunk.getKey() + chunkBytes.length > 0) {
                 int start = (int) (length - lastChunk.getKey());
@@ -443,7 +450,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
 
         try {
-            file.runWriteLocked((m, fileData) -> {
+            file.runWriteLocked((m, fileData, bump) -> {
+                bump.apply();
                 fileData.getChunks().clear();
                 fileData.getChunks().putAll(newChunks);
                 fileData.setMtime(System.currentTimeMillis());
@@ -467,7 +475,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var file = fileOpt.get();
 
         try {
-            file.runWriteLocked((m, fileData) -> {
+            file.runWriteLocked((m, fileData, bump) -> {
+                bump.apply();
                 fileData.setMtime(mtimeMs);
                 return null;
             });

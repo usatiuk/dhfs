@@ -9,13 +9,11 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.Getter;
 import org.apache.commons.lang3.NotImplementedException;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 @ApplicationScoped
 public class JObjectManagerImpl implements JObjectManager {
@@ -98,7 +96,13 @@ public class JObjectManagerImpl implements JObjectManager {
 
     @Override
     public Collection<JObject<?>> find(String prefix) {
-        throw new NotImplementedException();
+        var ret = new ArrayList<JObject<?>>();
+        for (var f : objectPersistentStore.findObjects("meta_")) {
+            var got = get(f.substring(5));
+            if (got.isPresent())
+                ret.add(got.get());
+        }
+        return ret;
     }
 
     @Override
