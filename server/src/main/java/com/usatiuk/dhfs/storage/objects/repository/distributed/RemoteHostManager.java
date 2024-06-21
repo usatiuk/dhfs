@@ -120,7 +120,7 @@ public class RemoteHostManager {
     // FIXME:
     private boolean reachable(HostInfo hostInfo) {
         try {
-            return withClient(hostInfo.getAddr(), hostInfo.getPort(), Optional.of(30000L /*ms*/), c -> {
+            return withClient(hostInfo.getAddr(), hostInfo.getPort(), Optional.of(5000L /*ms*/), c -> {
                 var ret = c.ping(PingRequest.newBuilder().setSelfname(selfname).build());
                 if (!ret.getSelfname().equals(hostInfo.getName())) {
                     throw new IllegalStateException("Ping selfname returned " + ret.getSelfname() + " but expected " + hostInfo.getName());

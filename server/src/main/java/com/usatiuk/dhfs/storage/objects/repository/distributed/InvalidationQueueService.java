@@ -66,12 +66,12 @@ public class InvalidationQueueService {
                             remoteObjectServiceClient.notifyUpdate(forHost.getKey(), obj);
                             sent++;
                         } catch (Exception e) {
-                            if (e.getCause().getClass().equals(InterruptedException.class)) {
-                                Log.info("Invalidation sender exiting");
-                                return;
-                            }
                             Log.info("Failed to send invalidation to " + forHost.getKey() + " of " + obj + ": " + e.getMessage() + " will retry");
                             pushInvalidationToOne(forHost.getKey(), obj);
+                        }
+                        if (Thread.interrupted()) {
+                            Log.info("Invalidation sender exiting");
+                            return;
                         }
                     }
                     stats += forHost.getKey() + ": " + sent + " ";
