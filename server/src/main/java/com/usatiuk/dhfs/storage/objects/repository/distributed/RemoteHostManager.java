@@ -60,7 +60,6 @@ public class RemoteHostManager {
     }
 
     public void handleConnectionSuccess(String host) {
-        Log.info("Connected to " + host);
         if (_transientPeersState.runReadLocked(d -> d.getStates().getOrDefault(
                 host, new TransientPeersStateData.TransientPeerState(TransientPeersStateData.TransientPeerState.ConnectionState.NOT_SEEN)
         )).getState().equals(TransientPeersStateData.TransientPeerState.ConnectionState.REACHABLE)) return;
@@ -70,6 +69,7 @@ public class RemoteHostManager {
             curState.setState(TransientPeersStateData.TransientPeerState.ConnectionState.REACHABLE);
             return null;
         });
+        Log.info("Connected to " + host);
         syncHandler.doInitialResync(host);
     }
 
