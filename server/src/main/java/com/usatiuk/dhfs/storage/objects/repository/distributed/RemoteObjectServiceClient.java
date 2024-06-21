@@ -70,13 +70,15 @@ public class RemoteObjectServiceClient {
     }
 
     public void notifyUpdate(String host, String name) {
-        var obj = jObjectManager.get(name).orElseThrow(() -> new NotImplementedException("Race when invalidating"));
+        var obj = jObjectManager.get(name);
+
+        if (obj.isEmpty()) return;
 
         remoteHostManager.withClient(host, client -> {
             var builder = IndexUpdatePush.newBuilder().setSelfname(selfname);
 
             client.indexUpdate(builder.setHeader(
-                    obj.runReadLocked(ObjectMetadata::toRpcHeader)
+                    obj.get().runReadLocked(ObjectMetadata::toRpcHeader)
             ).build());
             return null;
         });

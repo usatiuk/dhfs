@@ -40,4 +40,9 @@ public class ChunkData extends JObjectData {
     public static String getNameFromHash(String hash) {
         return "data_" + hash;
     }
+
+    @Override
+    public boolean assumeUnique() {
+        return true;
+    }
 }

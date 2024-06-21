@@ -71,7 +71,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         if (request.getSelfname().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
         remoteHostManager.handleConnectionSuccess(request.getSelfname());
 
-        Log.info("<-- indexUpdate: " + request.getHeader().getName());
+//        Log.info("<-- indexUpdate: " + request.getHeader().getName());
         return Uni.createFrom().item(syncHandler.handleRemoteUpdate(request));
     }
 

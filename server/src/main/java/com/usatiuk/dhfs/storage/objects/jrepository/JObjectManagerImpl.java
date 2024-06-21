@@ -12,7 +12,10 @@ import org.apache.commons.lang3.NotImplementedException;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Optional;
 
 @ApplicationScoped
 public class JObjectManagerImpl implements JObjectManager {
@@ -92,7 +95,7 @@ public class JObjectManagerImpl implements JObjectManager {
     @Override
     public <D extends JObjectData> Optional<JObject<? extends D>> get(String name, Class<D> klass) {
         var got = get(name);
-        if (got.isEmpty()) return Optional.of((JObject<? extends D>) got.get());
+        if (got.isEmpty()) return Optional.empty();
         if (!got.get().isOf(klass)) throw new NotImplementedException("Class mismatch for " + name);
         return Optional.of((JObject<? extends D>) got.get());
     }
@@ -115,18 +118,15 @@ public class JObjectManagerImpl implements JObjectManager {
         synchronized (this) {
             var inMap = getFromMap(object.getName());
             if (inMap != null) {
-                inMap.runReadLocked((m, d) -> {
-                    if (!Objects.equals(d, object))
-                        throw new IllegalArgumentException("Trying to insert different object with same key");
-                    return null;
-                });
-                _nurseryRefcounts.merge(object.getName(), 1L, Long::sum);
+                if (!object.assumeUnique())
+                    throw new IllegalArgumentException("Trying to insert different object with same key");
+                addToNursery(object.getName());
                 return (JObject<D>) inMap;
             } else {
                 var created = new JObject<D>(jObjectResolver, object.getName(), object.getConflictResolver().getName(), object);
                 _map.put(object.getName(), new NamedSoftReference(created, _refQueue));
                 jObjectResolver.notifyWrite(created);
-                _nurseryRefcounts.merge(object.getName(), 1L, Long::sum);
+                addToNursery(created.getName());
                 return created;
             }
         }
@@ -173,10 +173,7 @@ public class JObjectManagerImpl implements JObjectManager {
         synchronized (this) {
             var inMap = getFromMap(object.getName());
             if (inMap != null) {
-                var ok = inMap.runReadLocked((m) -> {
-                    return object.getClass().isAssignableFrom(m.getType());
-                });
-                if (ok)
+                if (inMap.isOf(object.getClass()))
                     return (JObject<D>) inMap;
                 else
                     throw new NotImplementedException("Type mismatch for " + name);
@@ -189,6 +186,13 @@ public class JObjectManagerImpl implements JObjectManager {
         }
     }
 
+    private void addToNursery(String name) {
+        synchronized (this) {
+            if (!objectPersistentStore.existsObject("meta_" + name))
+                _nurseryRefcounts.merge(name, 1L, Long::sum);
+        }
+    }
+
     @Override
     public void onWriteback(String name) {
         synchronized (this) {
@@ -198,19 +202,26 @@ public class JObjectManagerImpl implements JObjectManager {
 
     @Override
     public void unref(JObject<?> object) {
-        synchronized (this) {
-            object.runWriteLockedMeta((m, a, b) -> {
-                String name = m.getName();
+        object.runWriteLockedMeta((m, a, b) -> {
+            String name = m.getName();
+            boolean removed = false;
+            synchronized (this) {
                 if (!_nurseryRefcounts.containsKey(name)) return null;
                 _nurseryRefcounts.merge(name, -1L, Long::sum);
                 if (_nurseryRefcounts.get(name) <= 0) {
                     _nurseryRefcounts.remove(name);
-                    jObjectWriteback.remove(name);
+                    removed = true;
+                }
+            }
+            // Race?
+            if (removed) {
+                jObjectWriteback.remove(name);
+                synchronized (this) {
                     if (!objectPersistentStore.existsObject("meta_" + name))
                         _map.remove(name);
                 }
-                return null;
-            });
-        }
+            }
+            return null;
+        });
     }
 }

@@ -297,6 +297,28 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         return Optional.of(Arrays.copyOf(buf.array(), (int) (curPos - offset)));
     }
 
+    private Integer getChunkSize(String uuid) {
+        var chunkRead = jObjectManager.get(ChunkInfo.getNameFromHash(uuid), ChunkInfo.class);
+
+        if (chunkRead.isEmpty()) {
+            Log.error("Chunk requested not found: " + uuid);
+            throw new StatusRuntimeException(Status.NOT_FOUND);
+        }
+
+        return chunkRead.get().runReadLocked((m, d) -> d.getSize());
+    }
+
+    private byte[] readChunk(String uuid) {
+        var chunkRead = jObjectManager.get(ChunkData.getNameFromHash(uuid), ChunkData.class);
+
+        if (chunkRead.isEmpty()) {
+            Log.error("Chunk requested not found: " + uuid);
+            throw new StatusRuntimeException(Status.NOT_FOUND);
+        }
+
+        return chunkRead.get().runReadLocked((m, d) -> d.getBytes());
+    }
+
     @Override
     public Long write(String fileUuid, long offset, byte[] data) {
         var fileOpt = jObjectManager.get(fileUuid, File.class);
@@ -307,69 +329,139 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var file = fileOpt.get();
 
         // FIXME:
-        file.runWriteLocked((meta, fData, bump) -> {
+        var removedChunksOuter = file.runWriteLocked((meta, fData, bump) -> {
             var chunksAll = fData.getChunks();
             var first = chunksAll.floorEntry(offset);
             var last = chunksAll.floorEntry((offset + data.length) - 1);
 
+            TreeSet<String> removedChunks = new TreeSet<>();
+
+            long start = 0;
+
             if (!chunksAll.isEmpty()) {
                 var between = chunksAll.subMap(first.getKey(), true, last.getKey(), true);
+                removedChunks.addAll(between.values());
+                start = first.getKey();
                 between.clear();
             }
 
+            NavigableMap<Long, String> beforeFirst = first != null ? chunksAll.headMap(first.getKey(), false) : Collections.emptyNavigableMap();
+            NavigableMap<Long, String> afterLast = last != null ? chunksAll.tailMap(last.getKey(), false) : Collections.emptyNavigableMap();
+
+            List<byte[]> pendingWrites = new LinkedList<>();
+            int combinedSize = 0;
+
             if (first != null && first.getKey() < offset) {
-                var chunkUuid = first.getValue();
-                var chunkRead = jObjectManager.get(ChunkData.getNameFromHash(chunkUuid), ChunkData.class);
-
-                if (chunkRead.isEmpty()) {
-                    Log.error("Chunk requested not found: " + chunkUuid);
-                    return -1L;
-                }
-
-                var chunkBytes = chunkRead.get().runReadLocked((m, d) -> d.getBytes());
-                ChunkData newChunkData = new ChunkData(Arrays.copyOfRange(chunkBytes, 0, (int) (offset - first.getKey())));
-                ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
-                jObjectManager.put(newChunkData);
-                jObjectManager.put(newChunkInfo);
-
-                chunksAll.put(first.getKey(), newChunkData.getHash());
+                var chunkBytes = readChunk(first.getValue());
+                pendingWrites.addLast(Arrays.copyOfRange(chunkBytes, 0, (int) (offset - first.getKey())));
+                combinedSize += pendingWrites.getLast().length;
             }
+            pendingWrites.addLast(data);
+            combinedSize += pendingWrites.getLast().length;
 
-            {
-                ChunkData newChunkData = new ChunkData(data);
-                ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
-                jObjectManager.put(newChunkData);
-                jObjectManager.put(newChunkInfo);
-
-                chunksAll.put(offset, newChunkData.getHash());
-            }
             if (last != null) {
-                var lchunkUuid = last.getValue();
-                var lchunkRead = jObjectManager.get(ChunkData.getNameFromHash(lchunkUuid), ChunkData.class);
-
-                if (lchunkRead.isEmpty()) {
-                    Log.error("Chunk requested not found: " + lchunkUuid);
-                    return -1L;
-                }
-
-                var lchunkBytes = lchunkRead.get().runReadLocked((m, d) -> d.getBytes());
-
+                var lchunkBytes = readChunk(last.getValue());
                 if (last.getKey() + lchunkBytes.length > offset + data.length) {
                     var startInFile = offset + data.length;
                     var startInChunk = startInFile - last.getKey();
-                    ChunkData newChunkData = new ChunkData(Arrays.copyOfRange(lchunkBytes, (int) startInChunk, lchunkBytes.length));
+                    pendingWrites.addLast(Arrays.copyOfRange(lchunkBytes, (int) startInChunk, lchunkBytes.length));
+                    combinedSize += pendingWrites.getLast().length;
+                }
+            }
+
+            if (Math.abs(combinedSize - targetChunkSize) > targetChunkSize * 0.1) {
+                if (combinedSize < targetChunkSize) {
+                    boolean leftDone = false;
+                    boolean rightDone = false;
+                    while (!leftDone && !rightDone) {
+                        if (beforeFirst.isEmpty()) leftDone = true;
+                        if (!beforeFirst.isEmpty() && !leftDone) {
+                            var takeLeft = beforeFirst.lastEntry();
+
+                            var cuuid = takeLeft.getValue();
+
+                            if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * 1.2)) {
+                                leftDone = true;
+                                continue;
+                            }
+
+                            beforeFirst.pollLastEntry();
+                            start = takeLeft.getKey();
+                            pendingWrites.addFirst(readChunk(cuuid));
+                            combinedSize += getChunkSize(cuuid);
+                            chunksAll.remove(takeLeft.getKey());
+                            removedChunks.add(cuuid);
+                        }
+                        if (afterLast.isEmpty()) rightDone = true;
+                        if (!afterLast.isEmpty() && !rightDone) {
+                            var takeRight = afterLast.firstEntry();
+
+                            var cuuid = takeRight.getValue();
+
+                            if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * 1.2)) {
+                                rightDone = true;
+                                continue;
+                            }
+
+                            afterLast.pollFirstEntry();
+                            pendingWrites.addLast(readChunk(cuuid));
+                            combinedSize += getChunkSize(cuuid);
+                            chunksAll.remove(takeRight.getKey());
+                            removedChunks.add(cuuid);
+                        }
+                    }
+                }
+            }
+
+            // FIXME:!
+
+            byte[] realbytes = new byte[combinedSize];
+            {
+                int cur = 0;
+                for (var b : pendingWrites) {
+                    System.arraycopy(b, 0, realbytes, cur, b.length);
+                    cur += b.length;
+                }
+                pendingWrites.clear();
+            }
+
+            {
+                int cur = 0;
+                while (cur < combinedSize) {
+                    int end;
+                    if ((combinedSize - cur) > (targetChunkSize * 1.5)) {
+                        end = cur + targetChunkSize;
+                    } else {
+                        end = combinedSize;
+                    }
+
+                    byte[] thisChunk = new byte[end - cur];
+                    System.arraycopy(realbytes, cur, thisChunk, 0, thisChunk.length);
+
+                    ChunkData newChunkData = new ChunkData(thisChunk);
                     ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
                     jObjectManager.put(newChunkData);
                     jObjectManager.put(newChunkInfo);
+                    chunksAll.put(start, newChunkInfo.getHash());
 
-                    chunksAll.put(startInFile, newChunkData.getHash());
+                    start += thisChunk.length;
+                    cur = end;
                 }
             }
 
             bump.apply();
             fData.setMtime(System.currentTimeMillis());
-            return null;
+            return removedChunks;
         });
+
+        for (var v : removedChunksOuter) {
+            var ci = jObjectManager.get(ChunkInfo.getNameFromHash(v), ChunkInfo.class);
+            if (ci.isPresent())
+                jObjectManager.unref(ci.get());
+            var cd = jObjectManager.get(ChunkData.getNameFromHash(v), ChunkData.class);
+            if (cd.isPresent())
+                jObjectManager.unref(cd.get());
+        }
 
         return (long) data.length;
     }

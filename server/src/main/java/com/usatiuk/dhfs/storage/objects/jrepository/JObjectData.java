@@ -7,4 +7,8 @@ import java.io.Serializable;
 public abstract class JObjectData implements Serializable {
     public abstract String getName();
     public abstract Class<? extends ConflictResolver> getConflictResolver();
+
+    public boolean assumeUnique() {
+        return false;
+    }
 }

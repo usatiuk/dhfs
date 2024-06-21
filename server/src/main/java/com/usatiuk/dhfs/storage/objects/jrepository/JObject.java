@@ -72,7 +72,7 @@ public class JObject<T extends JObjectData> implements Serializable {
     }
 
     public <X> boolean isOf(Class<X> klass) {
-        return runReadLocked((m) -> (klass.isAssignableFrom(m.getType())));
+        return (klass.isAssignableFrom(_metaPart.getType()));
     }
 
     public <R> R runReadLocked(ObjectMetaFn<R> fn) {
