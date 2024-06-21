@@ -1,10 +1,12 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
+import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.scheduler.Scheduled;
-import io.smallrye.common.annotation.Blocking;
 import io.smallrye.common.annotation.RunOnVirtualThread;
+import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.SerializationUtils;
 
@@ -18,9 +20,13 @@ public class JObjectWriteback {
 
     private final LinkedHashMap<String, JObject<?>> _objects = new LinkedHashMap<>();
 
+    void shutdown(@Observes @Priority(10) ShutdownEvent event) {
+        flush();
+    }
+
     @Scheduled(every = "1s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     @RunOnVirtualThread
-    public void write() {
+    public void flush() {
         while (true) {
             JObject<?> obj;
             synchronized (this) {
