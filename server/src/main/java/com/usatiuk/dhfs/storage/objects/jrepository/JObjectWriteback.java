@@ -19,6 +19,9 @@ public class JObjectWriteback {
     @Inject
     ObjectPersistentStore objectPersistentStore;
 
+    @Inject
+    JObjectManager jObjectManager;
+
     AtomicBoolean _writing = new AtomicBoolean(false);
 
     private final LinkedHashMap<String, JObject<?>> _objects = new LinkedHashMap<>();
@@ -63,6 +66,7 @@ public class JObjectWriteback {
                     objectPersistentStore.writeObject(m.getName(), SerializationUtils.serialize(d));
                     return null;
                 });
+            jObjectManager.onWriteback(m.getName());
             return null;
         });
     }
@@ -75,6 +79,7 @@ public class JObjectWriteback {
                     objectPersistentStore.writeObject(m.getName(), SerializationUtils.serialize(d));
                     return null;
                 });
+            jObjectManager.onWriteback(m.getName());
             return null;
         });
     }

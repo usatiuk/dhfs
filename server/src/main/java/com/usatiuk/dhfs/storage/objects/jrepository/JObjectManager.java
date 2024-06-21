@@ -15,4 +15,7 @@ public interface JObjectManager {
     <T extends JObjectData> JObject<T> put(T object);
     JObject<?> getOrPut(String name, ObjectMetadata md);
     <T extends JObjectData> JObject<T> getOrPut(String name, T object);
+
+    void onWriteback(String name);
+    void unref(JObject<?> object);
 }

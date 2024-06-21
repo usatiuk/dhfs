@@ -13,6 +13,7 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
@@ -26,6 +27,9 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     Vertx vertx;
     @Inject
     JObjectManager jObjectManager;
+
+    @ConfigProperty(name = "dhfs.storage.files.target_chunk_size")
+    Integer targetChunkSize;
 
     final static String namespace = "dhfs_files";
 

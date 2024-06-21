@@ -22,6 +22,9 @@ public class JObjectManagerImpl implements JObjectManager {
     @Inject
     JObjectResolver jObjectResolver;
 
+    @Inject
+    JObjectWriteback jObjectWriteback;
+
     private static class NamedSoftReference extends SoftReference<JObject<?>> {
         public NamedSoftReference(JObject<?> target, ReferenceQueue<JObject<?>> q) {
             super(target, q);
@@ -33,6 +36,7 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     private final HashMap<String, NamedSoftReference> _map = new HashMap<>();
+    private final HashMap<String, Long> _nurseryRefcounts = new HashMap<>();
     private final ReferenceQueue<JObject<?>> _refQueue = new ReferenceQueue<>();
 
     private void cleanup() {
@@ -116,11 +120,13 @@ public class JObjectManagerImpl implements JObjectManager {
                         throw new IllegalArgumentException("Trying to insert different object with same key");
                     return null;
                 });
+                _nurseryRefcounts.merge(object.getName(), 1L, Long::sum);
                 return (JObject<D>) inMap;
             } else {
                 var created = new JObject<D>(jObjectResolver, object.getName(), object.getConflictResolver().getName(), object);
                 _map.put(object.getName(), new NamedSoftReference(created, _refQueue));
                 jObjectResolver.notifyWrite(created);
+                _nurseryRefcounts.merge(object.getName(), 1L, Long::sum);
                 return created;
             }
         }
@@ -180,6 +186,31 @@ public class JObjectManagerImpl implements JObjectManager {
                 jObjectResolver.notifyWrite(created);
                 return created;
             }
+        }
+    }
+
+    @Override
+    public void onWriteback(String name) {
+        synchronized (this) {
+            _nurseryRefcounts.remove(name);
+        }
+    }
+
+    @Override
+    public void unref(JObject<?> object) {
+        synchronized (this) {
+            object.runWriteLockedMeta((m, a, b) -> {
+                String name = m.getName();
+                if (!_nurseryRefcounts.containsKey(name)) return null;
+                _nurseryRefcounts.merge(name, -1L, Long::sum);
+                if (_nurseryRefcounts.get(name) <= 0) {
+                    _nurseryRefcounts.remove(name);
+                    jObjectWriteback.remove(name);
+                    if (!objectPersistentStore.existsObject("meta_" + name))
+                        _map.remove(name);
+                }
+                return null;
+            });
         }
     }
 }
