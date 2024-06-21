@@ -51,7 +51,6 @@ public class RemoteHostManager {
             if (shouldTry) {
                 Log.info("Trying to connect to " + host.getName());
                 if (reachable(host)) {
-                    Log.info("Connected to " + host);
                     handleConnectionSuccess(host.getName());
                 }
             }
@@ -62,6 +61,7 @@ public class RemoteHostManager {
     private final ArrayList<Function<String, Void>> _connectionErrorHandlers = new ArrayList<>();
 
     public void handleConnectionSuccess(String host) {
+        Log.info("Connected to " + host);
         if (_transientPeersState.runReadLocked(d -> d.getStates().getOrDefault(
                 host, new TransientPeersStateData.TransientPeerState(TransientPeersStateData.TransientPeerState.ConnectionState.NOT_SEEN)
         )).getState().equals(TransientPeersStateData.TransientPeerState.ConnectionState.REACHABLE)) return;
@@ -77,6 +77,7 @@ public class RemoteHostManager {
     }
 
     public void handleConnectionError(String host) {
+        Log.info("Lost connection to " + host);
         _transientPeersState.runWriteLocked(d -> {
             d.getStates().putIfAbsent(host, new TransientPeersStateData.TransientPeerState());
             var curState = d.getStates().get(host);
