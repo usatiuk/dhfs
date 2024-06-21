@@ -40,9 +40,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
         var obj = jObjectManager.get(request.getName()).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
-        Pair<ObjectHeader, byte[]> read = obj.runReadLocked((meta, data) -> {
-            return Pair.of(meta.toRpcHeader(), SerializationUtils.serialize(data));
-        });
+        Pair<ObjectHeader, byte[]> read = obj.runReadLocked((meta, data) -> Pair.of(meta.toRpcHeader(), SerializationUtils.serialize(data)));
         var replyObj = ApiObject.newBuilder().setHeader(read.getLeft()).setContent(ByteString.copyFrom(read.getRight())).build();
         return Uni.createFrom().item(GetObjectReply.newBuilder().setObject(replyObj).build());
     }

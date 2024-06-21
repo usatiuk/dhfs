@@ -472,7 +472,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Override
     public Boolean setTimes(String fileUuid, long atimeMs, long mtimeMs) {
-        var fileOpt = jObjectManager.get(fileUuid, File.class);
+        var fileOpt = jObjectManager.get(fileUuid, FsNode.class);
         if (fileOpt.isEmpty()) {
             Log.error("File not found when trying to read: " + fileUuid);
             return false;

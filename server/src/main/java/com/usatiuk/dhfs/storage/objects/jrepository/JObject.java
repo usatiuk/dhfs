@@ -7,7 +7,6 @@ import org.apache.commons.lang3.NotImplementedException;
 import java.io.Serializable;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class JObject<T extends JObjectData> implements Serializable {
@@ -28,7 +27,7 @@ public class JObject<T extends JObjectData> implements Serializable {
         return runReadLocked(ObjectMetadata::getName);
     }
 
-    protected final ReadWriteLock _lock = new ReentrantReadWriteLock();
+    protected final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
     private final ObjectMetadata _metaPart;
     private final JObjectResolver _resolver;
     private final AtomicReference<T> _dataPart = new AtomicReference<>();
@@ -91,7 +90,7 @@ public class JObject<T extends JObjectData> implements Serializable {
             var ver = _metaPart.getOurVersion();
             VoidFn invalidateFn = () -> {
                 _dataPart.set(null);
-                _resolver.removeLocal(_metaPart.getName());
+                _resolver.removeLocal(this, _metaPart.getName());
             };
             var ret = fn.apply(_metaPart, () -> _resolver.bumpVersionSelf(this), invalidateFn);
             if (!Objects.equals(ver, _metaPart.getOurVersion()))
@@ -139,5 +138,10 @@ public class JObject<T extends JObjectData> implements Serializable {
         } finally {
             _lock.writeLock().unlock();
         }
+    }
+
+    public void assertRWLock() {
+        if (!_lock.isWriteLockedByCurrentThread())
+            throw new IllegalStateException("Expected to be write-locked there: " + getName() + " " + Thread.currentThread().getName());
     }
 }

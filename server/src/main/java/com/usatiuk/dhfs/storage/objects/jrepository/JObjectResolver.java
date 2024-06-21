@@ -9,7 +9,6 @@ import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.apache.commons.lang3.SerializationUtils;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 @ApplicationScoped
@@ -23,6 +22,9 @@ public class JObjectResolver {
     @Inject
     InvalidationQueueService invalidationQueueService;
 
+    @Inject
+    JObjectWriteback jObjectWriteback;
+
     @ConfigProperty(name = "dhfs.objects.distributed.selfname")
     String selfname;
 
@@ -35,9 +37,11 @@ public class JObjectResolver {
         return DeserializationHelper.deserialize(obj);
     }
 
-    public void removeLocal(String name) {
+    public void removeLocal(JObject<?> jObject, String name) {
+        jObject.assertRWLock();
         try {
             Log.info("Deleting " + name);
+            jObjectWriteback.remove(name);
             objectPersistentStore.deleteObject(name);
         } catch (StatusRuntimeException sx) {
             if (sx.getStatus() != Status.NOT_FOUND)
@@ -48,9 +52,8 @@ public class JObjectResolver {
     }
 
     public void notifyWrite(JObject<?> self) {
-        objectPersistentStore.writeObject("meta_" + self.getName(), self.runReadLocked((m) -> SerializationUtils.serialize(m)));
+        jObjectWriteback.markDirty(self.getName(), self);
         if (self.isResolved()) {
-            objectPersistentStore.writeObject(self.getName(), self.runReadLocked((m, d) -> SerializationUtils.serialize(d)));
             // FIXME:?
             invalidationQueueService.pushInvalidationToAll(self.getName());
         }

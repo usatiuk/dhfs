@@ -38,7 +38,7 @@ public class JObjectManagerImpl implements JObjectManager {
     private void cleanup() {
         NamedSoftReference cur;
         while ((cur = (NamedSoftReference) _refQueue.poll()) != null) {
-            synchronized (_map) {
+            synchronized (this) {
                 if (_map.containsKey(cur._key) && (_map.get(cur._key).get() == null))
                     _map.remove(cur._key);
             }
@@ -46,7 +46,7 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     private JObject<?> getFromMap(String key) {
-        synchronized (_map) {
+        synchronized (this) {
             if (_map.containsKey(key)) {
                 var ref = _map.get(key).get();
                 if (ref != null) {
@@ -60,7 +60,7 @@ public class JObjectManagerImpl implements JObjectManager {
     @Override
     public Optional<JObject<?>> get(String name) {
         cleanup();
-        synchronized (_map) {
+        synchronized (this) {
             var inMap = getFromMap(name);
             if (inMap != null) return Optional.of(inMap);
         }
@@ -76,7 +76,7 @@ public class JObjectManagerImpl implements JObjectManager {
         if (!(meta instanceof ObjectMetadata))
             throw new NotImplementedException("Unexpected metadata type for " + name);
 
-        synchronized (_map) {
+        synchronized (this) {
             var inMap = getFromMap(name);
             if (inMap != null) return Optional.of(inMap);
             JObject<?> newObj = new JObject<>(jObjectResolver, (ObjectMetadata) meta);
@@ -108,7 +108,7 @@ public class JObjectManagerImpl implements JObjectManager {
     public <D extends JObjectData> JObject<D> put(D object) {
         cleanup();
 
-        synchronized (_map) {
+        synchronized (this) {
             var inMap = getFromMap(object.getName());
             if (inMap != null) {
                 inMap.runReadLocked((m, d) -> {
@@ -139,7 +139,7 @@ public class JObjectManagerImpl implements JObjectManager {
             return got.get();
         }
 
-        synchronized (_map) {
+        synchronized (this) {
             var inMap = getFromMap(md.getName());
             if (inMap != null) {
                 return inMap;
@@ -164,7 +164,7 @@ public class JObjectManagerImpl implements JObjectManager {
             return (JObject<D>) got.get();
         }
 
-        synchronized (_map) {
+        synchronized (this) {
             var inMap = getFromMap(object.getName());
             if (inMap != null) {
                 var ok = inMap.runReadLocked((m) -> {
