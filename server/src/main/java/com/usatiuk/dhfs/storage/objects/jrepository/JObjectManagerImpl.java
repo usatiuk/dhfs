@@ -81,17 +81,20 @@ public class JObjectManagerImpl implements JObjectManager {
 
     private void nurseryCleanupThread() {
         try {
-            LinkedHashSet<String> got;
+            while (true) {
+                LinkedHashSet<String> got;
 
-            synchronized (_writebackQueue) {
-                _writebackQueue.wait();
-                got = _writebackQueue.get();
-                _writebackQueue.set(new LinkedHashSet<>());
-            }
+                synchronized (_writebackQueue) {
+                    if (_writebackQueue.get().isEmpty())
+                        _writebackQueue.wait();
+                    got = _writebackQueue.get();
+                    _writebackQueue.set(new LinkedHashSet<>());
+                }
 
-            synchronized (this) {
-                for (var s : got) {
-                    _nurseryRefcounts.remove(s);
+                synchronized (this) {
+                    for (var s : got) {
+                        _nurseryRefcounts.remove(s);
+                    }
                 }
             }
         } catch (InterruptedException ignored) {
@@ -230,8 +233,6 @@ public class JObjectManagerImpl implements JObjectManager {
         synchronized (this) {
             if (!objectPersistentStore.existsObject("meta_" + name))
                 _nurseryRefcounts.merge(name, 1L, Long::sum);
-            else
-                _nurseryRefcounts.remove(name);
         }
     }
 
@@ -248,18 +249,12 @@ public class JObjectManagerImpl implements JObjectManager {
         object.runWriteLockedMeta((m, a, b) -> {
             String name = m.getName();
             synchronized (this) {
-                if (objectPersistentStore.existsObject("meta_" + name)) {
-                    _nurseryRefcounts.remove(name);
-                    return null;
-                }
-
                 if (!_nurseryRefcounts.containsKey(name)) return null;
                 _nurseryRefcounts.merge(name, -1L, Long::sum);
                 if (_nurseryRefcounts.get(name) <= 0) {
                     _nurseryRefcounts.remove(name);
                     jObjectWriteback.remove(name);
-                    if (!objectPersistentStore.existsObject("meta_" + name))
-                        _map.remove(name);
+                    _map.remove(name);
                 }
             }
             return null;

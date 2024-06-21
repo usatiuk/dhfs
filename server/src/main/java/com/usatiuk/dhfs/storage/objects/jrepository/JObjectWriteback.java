@@ -1,18 +1,20 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
+import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
-import io.quarkus.scheduler.Scheduled;
-import io.smallrye.common.annotation.Blocking;
+import io.quarkus.runtime.Startup;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.SerializationUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 @ApplicationScoped
 public class JObjectWriteback {
@@ -23,40 +25,55 @@ public class JObjectWriteback {
     @Inject
     JObjectManager jObjectManager;
 
-    AtomicBoolean _writing = new AtomicBoolean(false);
-
-    private final LinkedHashMap<String, JObject<?>> _objects = new LinkedHashMap<>();
+    private final LinkedHashMap<String, Pair<Long, JObject<?>>> _objects = new LinkedHashMap<>();
     private final LinkedHashSet<String> _toIgnore = new LinkedHashSet<>();
 
+    private Thread _writebackThread;
+
+    @Startup
+    void init() {
+        _writebackThread = new Thread(this::writeback);
+        _writebackThread.setName("JObject writeback thread");
+        _writebackThread.start();
+    }
+
     void shutdown(@Observes @Priority(10) ShutdownEvent event) {
-        // FIXME: Hack!
-        while (true) {
-            synchronized (this) {
-                if (_objects.isEmpty() && !_writing.get()) break;
-            }
+        _writebackThread.interrupt();
+        while (_writebackThread.isAlive()) {
             try {
-                Thread.sleep(100);
+                _writebackThread.join();
             } catch (InterruptedException ignored) {
             }
         }
-        flush();
+
+        Collection<Pair<Long, JObject<?>>> toWrite;
+        synchronized (_objects) {
+            toWrite = new ArrayList<>(_objects.values());
+        }
+        for (var v : toWrite) {
+            flushOne(v.getRight());
+        }
     }
 
-    @Scheduled(every = "2s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
-    @Blocking
-    public void flush() {
-        while (true) {
-            JObject<?> obj;
-            synchronized (this) {
-                var entry = _objects.pollFirstEntry();
-                if (entry == null) break;
-                _writing.set(true);
-                obj = entry.getValue();
+    private void writeback() {
+        try {
+            while (true) {
+                JObject<?> obj;
+                synchronized (_objects) {
+                    if (_objects.isEmpty())
+                        _objects.wait();
+
+                    if (System.currentTimeMillis() - _objects.firstEntry().getValue().getLeft() < 100L)
+                        Thread.sleep(100);
+
+                    var entry = _objects.pollFirstEntry();
+                    if (entry == null) break;
+                    obj = entry.getValue().getRight();
+                }
+                flushOne(obj);
             }
-            flushOne(obj);
-        }
-        synchronized (this) {
-            _writing.set(false);
+        } catch (InterruptedException e) {
+            Log.info("Writeback thread exiting");
         }
     }
 
@@ -87,20 +104,22 @@ public class JObjectWriteback {
     }
 
     public void remove(String name) {
-        synchronized (this) {
+        synchronized (_objects) {
             _objects.remove(name);
+            _objects.notifyAll();
         }
     }
 
     public void markDirty(String name, JObject<?> object) {
-        synchronized (this) {
+        synchronized (_objects) {
             if (_objects.containsKey(name)) {
                 return;
             }
 
             // FIXME: better logic
             if (_objects.size() < 10000) {
-                _objects.put(name, object);
+                _objects.put(name, Pair.of(System.currentTimeMillis(), object));
+                _objects.notifyAll();
                 return;
             }
         }
