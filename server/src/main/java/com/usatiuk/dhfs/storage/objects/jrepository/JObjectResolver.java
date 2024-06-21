@@ -4,6 +4,9 @@ import com.usatiuk.dhfs.storage.DeserializationHelper;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.InvalidationQueueService;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.SerializationUtils;
@@ -30,6 +33,18 @@ public class JObjectResolver {
         var obj = remoteObjectServiceClient.getObject(jObject);
         objectPersistentStore.writeObject(jObject.getName(), obj);
         return DeserializationHelper.deserialize(obj);
+    }
+
+    public void removeLocal(String name) {
+        try {
+            Log.info("Deleting " + name);
+            objectPersistentStore.deleteObject(name);
+        } catch (StatusRuntimeException sx) {
+            if (sx.getStatus() != Status.NOT_FOUND)
+                Log.info("Couldn't delete object from persistent store: ", sx);
+        } catch (Exception e) {
+            Log.info("Couldn't delete object from persistent store: ", e);
+        }
     }
 
     public void notifyWrite(JObject<?> self) {

@@ -6,9 +6,6 @@ import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelogEntry;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
-import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -27,9 +24,6 @@ import java.util.Objects;
 public class SyncHandler {
     @ConfigProperty(name = "dhfs.objects.distributed.selfname")
     String selfname;
-
-    @Inject
-    ObjectPersistentStore objectPersistentStore;
 
     @Inject
     JObjectManager jObjectManager;
@@ -119,15 +113,6 @@ public class SyncHandler {
             // md.getBestVersion() > md.getTotalVersion() should also work
             if (receivedTotalVer > md.getOurVersion()) {
                 invalidate.apply();
-                try {
-                    Log.info("Deleting " + request.getHeader().getName() + " as per invalidation from " + request.getSelfname());
-                    objectPersistentStore.deleteObject(request.getHeader().getName());
-                } catch (StatusRuntimeException sx) {
-                    if (sx.getStatus() != Status.NOT_FOUND)
-                        Log.info("Couldn't delete object from persistent store: ", sx);
-                } catch (Exception e) {
-                    Log.info("Couldn't delete object from persistent store: ", e);
-                }
             }
 
             md.getChangelog().clear();

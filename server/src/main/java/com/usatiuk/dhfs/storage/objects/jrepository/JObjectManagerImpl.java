@@ -9,7 +9,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.Getter;
 import org.apache.commons.lang3.NotImplementedException;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;

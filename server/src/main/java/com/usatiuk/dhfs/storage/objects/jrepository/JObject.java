@@ -91,6 +91,7 @@ public class JObject<T extends JObjectData> implements Serializable {
             var ver = _metaPart.getOurVersion();
             VoidFn invalidateFn = () -> {
                 _dataPart.set(null);
+                _resolver.removeLocal(_metaPart.getName());
             };
             var ret = fn.apply(_metaPart, () -> _resolver.bumpVersionSelf(this), invalidateFn);
             if (!Objects.equals(ver, _metaPart.getOurVersion()))

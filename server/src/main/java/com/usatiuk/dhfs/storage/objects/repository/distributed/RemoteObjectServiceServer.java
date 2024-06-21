@@ -3,7 +3,6 @@ package com.usatiuk.dhfs.storage.objects.repository.distributed;
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.repository.distributed.*;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
-import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.grpc.GrpcService;
@@ -20,9 +19,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @ConfigProperty(name = "dhfs.objects.distributed.selfname")
     String selfname;
-
-    @Inject
-    ObjectPersistentStore objectPersistentStore;
 
     @Inject
     SyncHandler syncHandler;
@@ -45,7 +41,6 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         var obj = jObjectManager.get(request.getName()).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
         Pair<ObjectHeader, byte[]> read = obj.runReadLocked((meta, data) -> {
-            byte[] bytes = objectPersistentStore.readObject(request.getName());
             return Pair.of(meta.toRpcHeader(), SerializationUtils.serialize(data));
         });
         var replyObj = ApiObject.newBuilder().setHeader(read.getLeft()).setContent(ByteString.copyFrom(read.getRight())).build();
