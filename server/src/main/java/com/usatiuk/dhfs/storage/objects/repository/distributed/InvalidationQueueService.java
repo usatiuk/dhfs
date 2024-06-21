@@ -75,6 +75,7 @@ public class InvalidationQueueService {
                         }
                     }
                     stats += forHost.getKey() + ": " + sent + " ";
+                    Log.info(stats);
                 }
                 if (Thread.interrupted()) break;
             }
