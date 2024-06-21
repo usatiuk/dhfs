@@ -12,6 +12,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.Getter;
 import org.apache.commons.lang3.NotImplementedException;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
@@ -22,6 +23,9 @@ import java.util.concurrent.atomic.AtomicReference;
 public class JObjectManagerImpl implements JObjectManager {
     @Inject
     ObjectPersistentStore objectPersistentStore;
+
+    @ConfigProperty(name = "dhfs.objects.distributed.selfname")
+    String selfname;
 
     @Inject
     JObjectResolver jObjectResolver;
@@ -173,6 +177,9 @@ public class JObjectManagerImpl implements JObjectManager {
                 return (JObject<D>) inMap;
             } else {
                 var created = new JObject<D>(jObjectResolver, object.getName(), object.getConflictResolver().getName(), object);
+                // FIXME:
+                if (object.assumeUnique())
+                    created.runWriteLockedMeta((m, a, b) -> m.getChangelog().put(selfname, 0L));
                 _map.put(object.getName(), new NamedSoftReference(created, _refQueue));
                 jObjectResolver.notifyWrite(created);
                 addToNursery(created.getName());

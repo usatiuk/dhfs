@@ -58,15 +58,23 @@ public class InvalidationQueueService {
             while (true) {
                 Thread.sleep(500);
                 var data = pullAll();
+                String stats = "Sent invalidation: ";
                 for (var forHost : data.entrySet()) {
+                    long sent = 0;
                     for (var obj : forHost.getValue()) {
                         try {
                             remoteObjectServiceClient.notifyUpdate(forHost.getKey(), obj);
+                            sent++;
                         } catch (Exception e) {
+                            if (e.getCause().getClass().equals(InterruptedException.class)) {
+                                Log.info("Invalidation sender exiting");
+                                return;
+                            }
                             Log.info("Failed to send invalidation to " + forHost.getKey() + " of " + obj + ": " + e.getMessage() + " will retry");
                             pushInvalidationToOne(forHost.getKey(), obj);
                         }
                     }
+                    stats += forHost.getKey() + ": " + sent + " ";
                 }
                 if (Thread.interrupted()) break;
             }
