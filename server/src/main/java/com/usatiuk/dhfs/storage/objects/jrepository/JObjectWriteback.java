@@ -43,7 +43,7 @@ public class JObjectWriteback {
         flush();
     }
 
-    @Scheduled(every = "1s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    @Scheduled(every = "2s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     @RunOnVirtualThread
     public void flush() {
         while (true) {
@@ -100,7 +100,7 @@ public class JObjectWriteback {
             }
 
             // FIXME: better logic
-            if (_objects.size() < 5000) {
+            if (_objects.size() < 10000) {
                 _objects.put(name, object);
                 return;
             }
