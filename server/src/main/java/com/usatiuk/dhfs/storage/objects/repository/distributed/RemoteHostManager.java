@@ -129,11 +129,11 @@ public class RemoteHostManager {
 
     public void notifyAddr(UUID host, String addr, Integer port) {
         if (!persistentRemoteHostsService.existsHost(host)) {
-            Log.info("Ignoring new address from unknown host " + ": addr=" + addr + " port=" + port);
+//            Log.info("Ignoring new address from unknown host " + ": addr=" + addr + " port=" + port);
             return;
         }
         _transientPeersState.runWriteLocked(d -> {
-            Log.info("Updating connection info for " + host + ": addr=" + addr + " port=" + port);
+//            Log.info("Updating connection info for " + host + ": addr=" + addr + " port=" + port);
             d.getStates().putIfAbsent(host, new TransientPeerState());
             d.getStates().get(host).setAddr(addr);
             d.getStates().get(host).setPort(port);

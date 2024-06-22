@@ -91,8 +91,8 @@ public class LocalPeerDiscoveryBroadcaster {
                                 continue;
                             }
 
-                            Log.info(getClass().getName() + "Broadcast sent to: " + broadcast.getHostAddress()
-                                    + ", at: " + networkInterface.getDisplayName());
+//                            Log.info(getClass().getName() + "Broadcast sent to: " + broadcast.getHostAddress()
+//                                    + ", at: " + networkInterface.getDisplayName());
                         }
                     }
 
