@@ -10,6 +10,7 @@ import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.RemoteObjectServiceClient;
 import io.quarkus.logging.Log;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.tuple.Pair;
@@ -17,6 +18,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import java.util.Objects;
 import java.util.UUID;
 
+@ApplicationScoped
 public class FileConflictResolver implements ConflictResolver {
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
