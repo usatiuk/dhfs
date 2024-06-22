@@ -8,7 +8,7 @@ import jakarta.ws.rs.Path;
 import java.util.List;
 
 @Path("/objects-manage")
-public class ManagmentApi {
+public class ManagementApi {
     @Inject
     RemoteHostManager remoteHostManager;
 
