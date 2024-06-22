@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.usatiuk.dhfs.objects.repository.distributed.peersync";
+option java_outer_classname = "DhfsObjectPeerSyncApi";
+
+package dhfs.objects.peersync;
+
+service DhfsObjectPeerSyncGrpc {
+  rpc SyncPeers (SyncPeersData) returns (SyncPeersData) {}
+}
+
+message PeerInfo {
+  string uuid = 1;
+}
+
+message SyncPeersData {
+  string selfUuid = 1;
+
+  repeated PeerInfo my_peers = 2;
+}

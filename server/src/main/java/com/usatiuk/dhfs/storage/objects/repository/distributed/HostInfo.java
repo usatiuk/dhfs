@@ -1,9 +1,9 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
+import com.usatiuk.dhfs.objects.repository.distributed.peersync.PeerInfo;
 import jakarta.json.bind.annotation.JsonbCreator;
 import jakarta.json.bind.annotation.JsonbProperty;
 import lombok.Getter;
-import lombok.Setter;
 
 import java.io.Serializable;
 import java.util.UUID;
@@ -12,17 +12,12 @@ import java.util.UUID;
 public class HostInfo implements Serializable {
     private final UUID _uuid;
 
-    @Setter
-    private String _addr;
-    @Setter
-    private Integer _port;
-
     @JsonbCreator
-    public HostInfo(@JsonbProperty("uuid") String uuid,
-                    @JsonbProperty("addr") String addr,
-                    @JsonbProperty("port") Integer port) {
+    public HostInfo(@JsonbProperty("uuid") String uuid) {
         _uuid = UUID.fromString(uuid);
-        _addr = addr;
-        _port = port;
+    }
+
+    public PeerInfo toPeerInfo() {
+        return PeerInfo.newBuilder().setUuid(_uuid.toString()).build();
     }
 }

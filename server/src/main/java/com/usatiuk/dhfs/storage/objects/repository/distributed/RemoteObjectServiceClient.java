@@ -20,13 +20,13 @@ public class RemoteObjectServiceClient {
     PersistentRemoteHostsService persistentRemoteHostsService;
 
     @Inject
-    RemoteHostManager remoteHostManager;
+    RpcClientFactory rpcClientFactory;
 
     @Inject
     JObjectManager jObjectManager;
 
     public Pair<ObjectHeader, ByteString> getSpecificObject(UUID host, String name) {
-        return remoteHostManager.withClient(host, client -> {
+        return rpcClientFactory.withObjSyncClient(host, client -> {
             var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).setName(name).build());
             return Pair.of(reply.getObject().getHeader(), reply.getObject().getContent());
         });
@@ -40,7 +40,7 @@ public class RemoteObjectServiceClient {
             return md.getRemoteCopies().entrySet().stream().filter(entry -> entry.getValue().equals(bestVer)).map(Map.Entry::getKey).toList();
         });
 
-        return remoteHostManager.withClientAny(targets, client -> {
+        return rpcClientFactory.withObjSyncClient(targets, client -> {
             var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).setName(jObject.getName()).build());
 
             var receivedSelfVer = reply.getObject().getHeader().getChangelog()
@@ -65,7 +65,7 @@ public class RemoteObjectServiceClient {
     }
 
     public IndexUpdatePush getIndex(UUID host) {
-        return remoteHostManager.withClient(host, client -> {
+        return rpcClientFactory.withObjSyncClient(host, client -> {
             var req = GetIndexRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).build();
             return client.getIndex(req);
         });
@@ -81,6 +81,6 @@ public class RemoteObjectServiceClient {
 
         var send = builder.build();
 
-        return remoteHostManager.withClient(host, client -> client.indexUpdate(send).getErrorsList());
+        return rpcClientFactory.withObjSyncClient(host, client -> client.indexUpdate(send).getErrorsList());
     }
 }
