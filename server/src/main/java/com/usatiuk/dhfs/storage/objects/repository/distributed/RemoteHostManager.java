@@ -128,7 +128,7 @@ public class RemoteHostManager {
     }
 
     public void notifyAddr(UUID host, String addr, Integer port) {
-        if (persistentRemoteHostsService.existsHost(host)) {
+        if (!persistentRemoteHostsService.existsHost(host)) {
             Log.info("Ignoring new address from unknown host " + ": addr=" + addr + " port=" + port);
             return;
         }
