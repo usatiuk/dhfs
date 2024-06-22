@@ -158,9 +158,14 @@ public class DhfsFuse extends FuseStubFS {
 
     @Override
     public int create(String path, long mode, FuseFileInfo fi) {
-        var ret = fileService.create(path, mode);
-        if (ret.isEmpty()) return -ErrorCodes.ENOSPC();
-        else return 0;
+        try {
+            var ret = fileService.create(path, mode);
+            if (ret.isEmpty()) return -ErrorCodes.ENOSPC();
+            else return 0;
+        } catch (Exception e) {
+            Log.error("When creating " + path, e);
+            return -ErrorCodes.ENOENT();
+        }
     }
 
     @Override
