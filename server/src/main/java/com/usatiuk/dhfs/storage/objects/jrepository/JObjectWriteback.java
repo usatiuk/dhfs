@@ -77,6 +77,7 @@ public class JObjectWriteback {
                     if (entry == null) break;
                     obj = entry.getValue().getRight();
                 }
+                // FIXME: can be interrupted
                 flushOne(obj);
             }
         } catch (InterruptedException ignored) {

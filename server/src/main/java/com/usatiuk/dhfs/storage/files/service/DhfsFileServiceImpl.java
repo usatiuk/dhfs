@@ -43,21 +43,21 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         var pathFirstPart = path.getName(0).toString();
 
-        return ((JObject<Directory>) from).runReadLocked((m, d) -> {
-            var found = d.getKid(pathFirstPart);
-            if (found.isEmpty())
-                return Optional.empty();
-            Optional<JObject<? extends FsNode>> ref = jObjectManager.get(found.get().toString(), FsNode.class);
+        var found = ((JObject<Directory>) from).runReadLocked((m, d) -> d.getKid(pathFirstPart));
 
-            if (ref.isEmpty()) {
-                Log.error("File missing when traversing directory " + from.getName() + ": " + found);
-                return Optional.empty();
-            }
+        if (found.isEmpty())
+            return Optional.empty();
+        Optional<JObject<? extends FsNode>> ref = jObjectManager.get(found.get().toString(), FsNode.class);
 
-            if (path.getNameCount() == 1) return ref;
+        if (ref.isEmpty()) {
+            Log.error("File missing when traversing directory " + from.getName() + ": " + found);
+            return Optional.empty();
+        }
 
-            return traverse(ref.get(), path.subpath(1, path.getNameCount()));
-        });
+        if (path.getNameCount() == 1) return ref;
+
+        return traverse(ref.get(), path.subpath(1, path.getNameCount()));
+
     }
 
     private Optional<JObject<? extends FsNode>> getDirEntry(String name) {
