@@ -69,7 +69,7 @@ public class DhfsFileServiceSimpleTest {
 
     @Test
     void writeTest() {
-        var ret = fileService.create("/a", 777);
+        var ret = fileService.create("/writeTest", 777);
         Assertions.assertTrue(ret.isPresent());
 
         var uuid = ret.get();
@@ -84,5 +84,49 @@ public class DhfsFileServiceSimpleTest {
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 15, 16, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).get().toByteArray());
         fileService.write(uuid, 3, new byte[]{17, 18});
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 17, 18, 11, 15, 16, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).get().toByteArray());
+    }
+
+    @Test
+    void truncateTest1() {
+        var ret = fileService.create("/truncateTest1", 777);
+        Assertions.assertTrue(ret.isPresent());
+
+        var uuid = ret.get();
+
+        fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+
+        fileService.truncate(uuid, 20);
+        fileService.write(uuid, 5, new byte[]{10, 11, 12, 13, 14, 15, 16, 17});
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 15, 16, 17, 0, 0, 0, 0, 0, 0, 0}, fileService.read(uuid, 0, 20).get().toByteArray());
+    }
+
+    @Test
+    void truncateTest2() {
+        var ret = fileService.create("/truncateTest2", 777);
+        Assertions.assertTrue(ret.isPresent());
+
+        var uuid = ret.get();
+
+        fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+
+        fileService.truncate(uuid, 20);
+        fileService.write(uuid, 10, new byte[]{11, 12, 13, 14, 15, 16, 17, 18, 19, 20});
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}, fileService.read(uuid, 0, 20).get().toByteArray());
+    }
+
+    @Test
+    void truncateTest3() {
+        var ret = fileService.create("/truncateTest3", 777);
+        Assertions.assertTrue(ret.isPresent());
+
+        var uuid = ret.get();
+
+        fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+
+        fileService.truncate(uuid, 7);
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6,}, fileService.read(uuid, 0, 20).get().toByteArray());
     }
 }

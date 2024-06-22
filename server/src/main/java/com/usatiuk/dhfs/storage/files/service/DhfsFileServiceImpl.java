@@ -470,29 +470,25 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         try {
             file.runWriteLocked((m, fData, bump) -> {
                 var chunksAll = fData.getChunks();
-                var newChunks = chunksAll.subMap(0L, length - 1);
-
-                var lastChunk = newChunks.lastEntry();
+                var lastChunk = chunksAll.lastEntry();
 
                 if (lastChunk != null) {
-                    var chunkUuid = lastChunk.getValue();
-                    var chunkRead = jObjectManager.get(ChunkData.getNameFromHash(chunkUuid), ChunkData.class);
+                    var size = getChunkSize(lastChunk.getValue());
+                    var chunkEnd = size + lastChunk.getKey();
 
-                    if (chunkRead.isEmpty()) {
-                        Log.error("Chunk requested not found: " + chunkUuid);
-                        return false;
-                    }
+                    if (chunkEnd == length) return null;
 
-                    var chunkBytes = chunkRead.get().runReadLocked((m2, d) -> d.getBytes());
+                    if (chunkEnd > length) {
+                        var chunkData = readChunk(lastChunk.getValue());
 
-                    if (lastChunk.getKey() + chunkBytes.size() > 0) {
-                        int start = (int) (length - lastChunk.getKey());
-                        ChunkData newChunkData = new ChunkData(chunkBytes.substring(0, (int) (length - start)));
+                        ChunkData newChunkData = new ChunkData(chunkData.substring(0, (int) (length - lastChunk.getKey())));
                         ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
                         jObjectManager.put(newChunkData);
                         jObjectManager.put(newChunkInfo);
 
-                        newChunks.put(lastChunk.getKey(), newChunkData.getHash());
+                        chunksAll.put(lastChunk.getKey(), newChunkData.getHash());
+                    } else {
+                        write(fileUuid, chunkEnd, new byte[(int) (length - chunkEnd)]);
                     }
                 }
 
