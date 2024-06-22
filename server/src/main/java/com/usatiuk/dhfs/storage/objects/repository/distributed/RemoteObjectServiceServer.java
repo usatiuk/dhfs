@@ -12,14 +12,12 @@ import io.smallrye.common.annotation.Blocking;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import java.util.UUID;
 
 // Note: RunOnVirtualThread hangs somehow
 @GrpcService
 public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
-    @ConfigProperty(name = "dhfs.objects.distributed.selfname")
-    String selfname;
-
     @Inject
     SyncHandler syncHandler;
 
@@ -29,12 +27,15 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Inject
     RemoteHostManager remoteHostManager;
 
+    @Inject
+    PersistentRemoteHostsService persistentRemoteHostsService;
+
     @Override
     @Blocking
     public Uni<GetObjectReply> getObject(GetObjectRequest request) {
-        if (request.getSelfname().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+        if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
 
-        remoteHostManager.handleConnectionSuccess(request.getSelfname());
+        remoteHostManager.handleConnectionSuccess(UUID.fromString(request.getSelfUuid()));
 
         Log.info("<-- getObject: " + request.getName());
 
@@ -48,11 +49,11 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Override
     @Blocking
     public Uni<IndexUpdatePush> getIndex(GetIndexRequest request) {
-        if (request.getSelfname().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-        remoteHostManager.handleConnectionSuccess(request.getSelfname());
+        if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+        remoteHostManager.handleConnectionSuccess(UUID.fromString(request.getSelfUuid()));
 
         Log.info("<-- getIndex: ");
-        var builder = IndexUpdatePush.newBuilder().setSelfname(selfname);
+        var builder = IndexUpdatePush.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString());
 
         var objs = jObjectManager.find("");
 
@@ -68,8 +69,8 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Override
     @Blocking
     public Uni<IndexUpdateReply> indexUpdate(IndexUpdatePush request) {
-        if (request.getSelfname().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-        remoteHostManager.handleConnectionSuccess(request.getSelfname());
+        if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+        remoteHostManager.handleConnectionSuccess(UUID.fromString(request.getSelfUuid()));
 
 //        Log.info("<-- indexUpdate: " + request.getHeader().getName());
         return Uni.createFrom().item(syncHandler.handleRemoteUpdate(request));
@@ -78,9 +79,9 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Override
     @Blocking
     public Uni<PingReply> ping(PingRequest request) {
-        if (request.getSelfname().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-        remoteHostManager.handleConnectionSuccess(request.getSelfname());
+        if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+        remoteHostManager.handleConnectionSuccess(UUID.fromString(request.getSelfUuid()));
 
-        return Uni.createFrom().item(PingReply.newBuilder().setSelfname(selfname).build());
+        return Uni.createFrom().item(PingReply.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).build());
     }
 }

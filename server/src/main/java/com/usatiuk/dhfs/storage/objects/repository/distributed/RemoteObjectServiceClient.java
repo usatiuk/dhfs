@@ -9,15 +9,15 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.tuple.Pair;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @ApplicationScoped
 public class RemoteObjectServiceClient {
-    @ConfigProperty(name = "dhfs.objects.distributed.selfname")
-    String selfname;
+    @Inject
+    PersistentRemoteHostsService persistentRemoteHostsService;
 
     @Inject
     RemoteHostManager remoteHostManager;
@@ -25,9 +25,9 @@ public class RemoteObjectServiceClient {
     @Inject
     JObjectManager jObjectManager;
 
-    public Pair<ObjectHeader, ByteString> getSpecificObject(String host, String name) {
+    public Pair<ObjectHeader, ByteString> getSpecificObject(UUID host, String name) {
         return remoteHostManager.withClient(host, client -> {
-            var reply = client.getObject(GetObjectRequest.newBuilder().setSelfname(selfname).setName(name).build());
+            var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).setName(name).build());
             return Pair.of(reply.getObject().getHeader(), reply.getObject().getContent());
         });
     }
@@ -41,10 +41,10 @@ public class RemoteObjectServiceClient {
         });
 
         return remoteHostManager.withClientAny(targets, client -> {
-            var reply = client.getObject(GetObjectRequest.newBuilder().setSelfname(selfname).setName(jObject.getName()).build());
+            var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).setName(jObject.getName()).build());
 
             var receivedSelfVer = reply.getObject().getHeader().getChangelog()
-                    .getEntriesList().stream().filter(p -> p.getHost().equals(selfname))
+                    .getEntriesList().stream().filter(p -> p.getHost().equals(persistentRemoteHostsService.getSelfUuid().toString()))
                     .findFirst().map(ObjectChangelogEntry::getVersion).orElse(0L);
 
             var receivedTotalVer = reply.getObject().getHeader().getChangelog().getEntriesList()
@@ -53,7 +53,7 @@ public class RemoteObjectServiceClient {
             return jObject.runWriteLockedMeta((md, b, v) -> {
                 var outdated =
                         (md.getOurVersion() > receivedTotalVer)
-                                || (md.getChangelog().get(selfname) > receivedSelfVer);
+                                || (md.getChangelog().get(persistentRemoteHostsService.getSelfUuid()) > receivedSelfVer);
 
                 if (outdated) {
                     Log.error("Race when trying to fetch");
@@ -64,15 +64,15 @@ public class RemoteObjectServiceClient {
         });
     }
 
-    public IndexUpdatePush getIndex(String host) {
+    public IndexUpdatePush getIndex(UUID host) {
         return remoteHostManager.withClient(host, client -> {
-            var req = GetIndexRequest.newBuilder().setSelfname(selfname).build();
+            var req = GetIndexRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).build();
             return client.getIndex(req);
         });
     }
 
-    public List<IndexUpdateError> notifyUpdate(String host, List<String> names) {
-        var builder = IndexUpdatePush.newBuilder().setSelfname(selfname);
+    public List<IndexUpdateError> notifyUpdate(UUID host, List<String> names) {
+        var builder = IndexUpdatePush.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString());
         for (var v : names) {
             var obj = jObjectManager.get(v);
             if (obj.isEmpty()) continue;

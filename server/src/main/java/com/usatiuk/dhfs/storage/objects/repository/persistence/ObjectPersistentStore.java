@@ -13,8 +13,6 @@ public interface ObjectPersistentStore {
 
     @Nonnull
     ByteString readObject(String name);
-    @Nonnull
     void writeObject(String name, ByteString data);
-    @Nonnull
     void deleteObject(String name);
 }

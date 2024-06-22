@@ -15,7 +15,6 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
 import java.util.*;
@@ -23,9 +22,6 @@ import java.util.concurrent.TimeUnit;
 
 @ApplicationScoped
 public class RemoteHostManager {
-    @ConfigProperty(name = "dhfs.objects.distributed.selfname")
-    String selfname;
-
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
 
@@ -45,20 +41,20 @@ public class RemoteHostManager {
     public void tryConnectAll() {
         for (var host : persistentRemoteHostsService.getHosts()) {
             var shouldTry = _transientPeersState.runReadLocked(d -> {
-                var s = d.getStates().get(host.getName());
+                var s = d.getStates().get(host.getUuid());
                 if (s == null) return true;
                 return !s.getState().equals(TransientPeersStateData.TransientPeerState.ConnectionState.REACHABLE);
             });
             if (shouldTry) {
-                Log.info("Trying to connect to " + host.getName());
+                Log.info("Trying to connect to " + host.getUuid());
                 if (reachable(host)) {
-                    handleConnectionSuccess(host.getName());
+                    handleConnectionSuccess(host.getUuid());
                 }
             }
         }
     }
 
-    public void handleConnectionSuccess(String host) {
+    public void handleConnectionSuccess(UUID host) {
         if (_transientPeersState.runReadLocked(d -> d.getStates().getOrDefault(
                 host, new TransientPeersStateData.TransientPeerState(TransientPeersStateData.TransientPeerState.ConnectionState.NOT_SEEN)
         )).getState().equals(TransientPeersStateData.TransientPeerState.ConnectionState.REACHABLE)) return;
@@ -72,7 +68,7 @@ public class RemoteHostManager {
         syncHandler.doInitialResync(host);
     }
 
-    public void handleConnectionError(String host) {
+    public void handleConnectionError(UUID host) {
         Log.info("Lost connection to " + host);
         _transientPeersState.runWriteLocked(d -> {
             d.getStates().putIfAbsent(host, new TransientPeersStateData.TransientPeerState());
@@ -108,30 +104,30 @@ public class RemoteHostManager {
     private boolean reachable(HostInfo hostInfo) {
         try {
             return withClient(hostInfo.getAddr(), hostInfo.getPort(), Optional.of(5000L /*ms*/), c -> {
-                var ret = c.ping(PingRequest.newBuilder().setSelfname(selfname).build());
-                if (!ret.getSelfname().equals(hostInfo.getName())) {
-                    throw new IllegalStateException("Ping selfname returned " + ret.getSelfname() + " but expected " + hostInfo.getName());
+                var ret = c.ping(PingRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).build());
+                if (!UUID.fromString(ret.getSelfUuid()).equals(hostInfo.getUuid())) {
+                    throw new IllegalStateException("Ping selfUuid returned " + ret.getSelfUuid() + " but expected " + hostInfo.getUuid());
                 }
                 return true;
             });
         } catch (Exception ignored) {
-            Log.info("Host " + hostInfo.getName() + " is unreachable: " + ignored.getMessage() + " " + ignored.getCause());
+            Log.info("Host " + hostInfo.getUuid() + " is unreachable: " + ignored.getMessage() + " " + ignored.getCause());
             return false;
         }
     }
 
-    public boolean reachable(String host) {
+    public boolean reachable(UUID host) {
         return reachable(persistentRemoteHostsService.getInfo(host));
     }
 
-    public <R> R withClientAny(Collection<String> targets, ClientFunction<R> fn) {
+    public <R> R withClientAny(Collection<UUID> targets, ClientFunction<R> fn) {
         var shuffledList = new ArrayList<>(targets);
         Collections.shuffle(shuffledList);
-        for (String target : shuffledList) {
+        for (UUID target : shuffledList) {
             var hostinfo = persistentRemoteHostsService.getInfo(target);
 
             boolean shouldTry = _transientPeersState.runReadLocked(d -> {
-                var res = d.getStates().get(hostinfo.getName());
+                var res = d.getStates().get(hostinfo.getUuid());
                 if (res == null) return true;
                 return res.getState() == TransientPeersStateData.TransientPeerState.ConnectionState.REACHABLE;
             });
@@ -142,26 +138,26 @@ public class RemoteHostManager {
                 return withClient(hostinfo.getAddr(), hostinfo.getPort(), Optional.empty(), fn);
             } catch (StatusRuntimeException e) {
                 if (e.getStatus().equals(Status.UNAVAILABLE)) {
-                    Log.info("Host " + hostinfo.getName() + " is unreachable: " + e.getMessage());
-                    handleConnectionError(hostinfo.getName());
+                    Log.info("Host " + hostinfo.getUuid() + " is unreachable: " + e.getMessage());
+                    handleConnectionError(hostinfo.getUuid());
                 } else throw e;
             }
         }
         throw new IllegalStateException("No reachable targets!");
     }
 
-    public <R> R withClient(String target, ClientFunction<R> fn) {
+    public <R> R withClient(UUID target, ClientFunction<R> fn) {
         var hostinfo = persistentRemoteHostsService.getInfo(target);
         return withClient(hostinfo.getAddr(), hostinfo.getPort(), Optional.empty(), fn);
     }
 
-    public List<String> getAvailableHosts() {
+    public List<UUID> getAvailableHosts() {
         return _transientPeersState.runReadLocked(d -> d.getStates().entrySet().stream()
                 .filter(e -> e.getValue().getState().equals(TransientPeersStateData.TransientPeerState.ConnectionState.REACHABLE))
                 .map(Map.Entry::getKey).toList());
     }
 
-    public List<String> getSeenHosts() {
+    public List<UUID> getSeenHosts() {
         return _transientPeersState.runReadLocked(d -> d.getStates().entrySet().stream()
                 .filter(e -> !e.getValue().getState().equals(TransientPeersStateData.TransientPeerState.ConnectionState.NOT_SEEN))
                 .map(Map.Entry::getKey).toList());

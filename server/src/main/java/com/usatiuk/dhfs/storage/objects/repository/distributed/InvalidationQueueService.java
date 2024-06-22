@@ -18,7 +18,7 @@ public class InvalidationQueueService {
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
 
-    private Map<String, SequencedSet<String>> _hostToInvObj = new LinkedHashMap<>();
+    private Map<UUID, SequencedSet<String>> _hostToInvObj = new LinkedHashMap<>();
 
     private Thread _senderThread;
 
@@ -34,13 +34,13 @@ public class InvalidationQueueService {
         _senderThread.join();
     }
 
-    private SequencedSet<String> getSetForHost(String host) {
+    private SequencedSet<String> getSetForHost(UUID host) {
         synchronized (this) {
             return _hostToInvObj.computeIfAbsent(host, k -> new LinkedHashSet<>());
         }
     }
 
-    public Map<String, SequencedSet<String>> pullAll() throws InterruptedException {
+    public Map<UUID, SequencedSet<String>> pullAll() throws InterruptedException {
         synchronized (this) {
             while (_hostToInvObj.isEmpty())
                 this.wait();
@@ -103,7 +103,7 @@ public class InvalidationQueueService {
         }
     }
 
-    public void pushInvalidationToOne(String host, String name) {
+    public void pushInvalidationToOne(UUID host, String name) {
         synchronized (this) {
             getSetForHost(host).add(name);
             this.notifyAll();

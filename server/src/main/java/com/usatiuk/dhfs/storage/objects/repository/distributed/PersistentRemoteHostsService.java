@@ -14,18 +14,18 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.UUID;
 
 @ApplicationScoped
 public class PersistentRemoteHostsService {
-    @ConfigProperty(name = "dhfs.objects.distributed.selfname")
-    String selfname;
-
     @ConfigProperty(name = "dhfs.objects.distributed.root")
     String dataRoot;
 
     final String dataFileName = "hosts";
 
     private PersistentRemoteHosts _persistentData = new PersistentRemoteHosts();
+
+    private UUID _selfUuid;
 
     void init(@Observes @Priority(300) StartupEvent event) throws IOException {
         Paths.get(dataRoot).toFile().mkdirs();
@@ -34,6 +34,8 @@ public class PersistentRemoteHostsService {
             Log.info("Reading hosts");
             _persistentData = SerializationHelper.deserialize(Files.readAllBytes(Paths.get(dataRoot).resolve(dataFileName)));
         }
+        _selfUuid = _persistentData.runReadLocked(PersistentRemoteHostsData::getSelfUuid);
+        Log.info("Self uuid is: " + _selfUuid.toString());
     }
 
     void shutdown(@Observes @Priority(300) ShutdownEvent event) throws IOException {
@@ -42,7 +44,13 @@ public class PersistentRemoteHostsService {
         Log.info("Shutdown");
     }
 
-    public HostInfo getInfo(String name) {
+    public UUID getSelfUuid() {
+        if (_selfUuid == null)
+            throw new IllegalStateException();
+        else return _selfUuid;
+    }
+
+    public HostInfo getInfo(UUID name) {
         return _persistentData.runReadLocked(data -> {
             return data.getRemoteHosts().get(name);
         });
@@ -56,7 +64,7 @@ public class PersistentRemoteHostsService {
 
     public void addHost(HostInfo hostInfo) {
         _persistentData.runWriteLocked(d -> {
-            d.getRemoteHosts().put(hostInfo.getName(), hostInfo);
+            d.getRemoteHosts().put(hostInfo.getUuid(), hostInfo);
             return null;
         });
     }

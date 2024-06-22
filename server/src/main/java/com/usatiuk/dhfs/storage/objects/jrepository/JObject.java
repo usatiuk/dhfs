@@ -8,18 +8,19 @@ import org.apache.commons.lang3.NotImplementedException;
 
 import java.io.Serializable;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class JObject<T extends JObjectData> implements Serializable {
     // Create a new object
-    protected JObject(JObjectResolver resolver, String name, String conflictResolver, String selfname, T obj) {
+    protected JObject(JObjectResolver resolver, String name, String conflictResolver, UUID selfUuid, T obj) {
         _resolver = resolver;
         _metaPart = new ObjectMetadata(name, conflictResolver, obj.getClass());
         _dataPart.set(obj);
         // FIXME:?
         if (!obj.assumeUnique())
-            _metaPart.bumpVersion(selfname);
+            _metaPart.bumpVersion(selfUuid);
     }
 
     // Create an object from existing metadata

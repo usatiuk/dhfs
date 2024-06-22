@@ -4,12 +4,12 @@ import com.usatiuk.dhfs.storage.SerializationHelper;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.RemoteObjectServiceClient;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.NotImplementedException;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.LinkedHashMap;
 import java.util.Objects;
@@ -17,14 +17,14 @@ import java.util.UUID;
 
 @ApplicationScoped
 public class DirectoryConflictResolver implements ConflictResolver {
-    @ConfigProperty(name = "dhfs.objects.distributed.selfname")
-    String selfname;
+    @Inject
+    PersistentRemoteHostsService persistentRemoteHostsService;
 
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
 
     @Override
-    public ConflictResolutionResult resolve(String conflictHost, JObject<?> ours) {
+    public ConflictResolutionResult resolve(UUID conflictHost, JObject<?> ours) {
         var theirsData = remoteObjectServiceClient.getSpecificObject(conflictHost, ours.getName());
 
         if (!ours.isOf(Directory.class))
@@ -52,7 +52,7 @@ public class DirectoryConflictResolver implements ConflictResolver {
 
             Directory first;
             Directory second;
-            String otherHostname;
+            UUID otherHostname;
             if (oursDir.getMtime() >= theirsDir.getMtime()) {
                 first = oursDir;
                 second = theirsDir;
@@ -60,7 +60,7 @@ public class DirectoryConflictResolver implements ConflictResolver {
             } else {
                 second = oursDir;
                 first = theirsDir;
-                otherHostname = selfname;
+                otherHostname = persistentRemoteHostsService.getSelfUuid();
             }
 
             mergedChildren.putAll(first.getChildren());
@@ -85,15 +85,15 @@ public class DirectoryConflictResolver implements ConflictResolver {
             newMetadata = new ObjectMetadata(ours.getName(), oursHeader.getConflictResolver(), m.getType());
 
             for (var entry : oursHeader.getChangelog().getEntriesList()) {
-                newMetadata.getChangelog().put(entry.getHost(), entry.getVersion());
+                newMetadata.getChangelog().put(UUID.fromString(entry.getHost()), entry.getVersion());
             }
             for (var entry : theirsHeader.getChangelog().getEntriesList()) {
-                newMetadata.getChangelog().merge(entry.getHost(), entry.getVersion(), Long::max);
+                newMetadata.getChangelog().merge(UUID.fromString(entry.getHost()), entry.getVersion(), Long::max);
             }
 
             boolean wasChanged = mergedChildren.size() != first.getChildren().size();
             if (wasChanged) {
-                newMetadata.getChangelog().merge(selfname, 1L, Long::sum);
+                newMetadata.getChangelog().merge(persistentRemoteHostsService.getSelfUuid(), 1L, Long::sum);
             }
 
             newMtime = first.getMtime();

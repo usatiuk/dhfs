@@ -5,11 +5,11 @@ import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelogEntry;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import lombok.Getter;
-import org.eclipse.microprofile.config.ConfigProvider;
 
 import java.io.Serializable;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
 public class ObjectMetadata implements Serializable {
     public ObjectMetadata(String name, String conflictResolver, Class<? extends JObjectData> type) {
@@ -28,10 +28,10 @@ public class ObjectMetadata implements Serializable {
     private final Class<? extends JObjectData> _type;
 
     @Getter
-    private final Map<String, Long> _remoteCopies = new LinkedHashMap<>();
+    private final Map<UUID, Long> _remoteCopies = new LinkedHashMap<>();
 
     @Getter
-    private final Map<String, Long> _changelog = new LinkedHashMap<>();
+    private final Map<UUID, Long> _changelog = new LinkedHashMap<>();
 
     public Long getOurVersion() {
         return _changelog.values().stream().reduce(0L, Long::sum);
@@ -42,14 +42,15 @@ public class ObjectMetadata implements Serializable {
         return Math.max(getOurVersion(), _remoteCopies.values().stream().max(Long::compareTo).get());
     }
 
-    public void bumpVersion(String selfname) {
-        _changelog.merge(selfname, 1L, Long::sum);
+    public void bumpVersion(UUID selfUuid) {
+        _changelog.merge(selfUuid, 1L, Long::sum);
     }
 
     public ObjectChangelog toRpcChangelog() {
         var changelogBuilder = ObjectChangelog.newBuilder();
         for (var m : getChangelog().entrySet()) {
-            changelogBuilder.addEntries(ObjectChangelogEntry.newBuilder().setHost(m.getKey()).setVersion(m.getValue()).build());
+            changelogBuilder.addEntries(ObjectChangelogEntry.newBuilder()
+                    .setHost(m.getKey().toString()).setVersion(m.getValue()).build());
         }
         return changelogBuilder.build();
     }

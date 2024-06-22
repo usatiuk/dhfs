@@ -78,7 +78,6 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         }
     }
 
-    @Nonnull
     @Override
     public void writeObject(String name, ByteString data) {
         var file = Path.of(root, name);
@@ -99,7 +98,6 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         }
     }
 
-    @Nonnull
     @Override
     public void deleteObject(String name) {
         var file = Path.of(root, name);

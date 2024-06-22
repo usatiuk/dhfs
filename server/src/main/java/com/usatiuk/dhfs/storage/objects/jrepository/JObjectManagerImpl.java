@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.storage.objects.jrepository;
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.storage.SerializationHelper;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -12,7 +13,6 @@ import io.quarkus.runtime.Startup;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.Getter;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
@@ -24,14 +24,14 @@ public class JObjectManagerImpl implements JObjectManager {
     @Inject
     ObjectPersistentStore objectPersistentStore;
 
-    @ConfigProperty(name = "dhfs.objects.distributed.selfname")
-    String selfname;
-
     @Inject
     JObjectResolver jObjectResolver;
 
     @Inject
     JObjectWriteback jObjectWriteback;
+
+    @Inject
+    PersistentRemoteHostsService persistentRemoteHostsService;
 
     private static class NamedSoftReference extends SoftReference<JObject<?>> {
         public NamedSoftReference(JObject<?> target, ReferenceQueue<JObject<?>> q) {
@@ -176,7 +176,7 @@ public class JObjectManagerImpl implements JObjectManager {
                 return (JObject<D>) inMap;
             } else {
                 var created = new JObject<D>(jObjectResolver, object.getName(),
-                        object.getConflictResolver().getName(), selfname, object);
+                        object.getConflictResolver().getName(), persistentRemoteHostsService.getSelfUuid(), object);
                 _map.put(object.getName(), new NamedSoftReference(created, _refQueue));
                 created.runWriteLockedMeta((m, d, b) -> {
                     jObjectResolver.notifyWrite(created);

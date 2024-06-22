@@ -15,11 +15,11 @@ service DhfsObjectSyncGrpc {
 }
 
 message PingRequest {
-  string selfname = 1;
+  string selfUuid = 1;
 }
 
 message PingReply {
-  string selfname = 1;
+  string selfUuid = 1;
 }
 
 message ObjectChangelogEntry {
@@ -44,23 +44,23 @@ message ApiObject {
 }
 
 message GetObjectRequest {
-  string selfname = 10;
+  string selfUuid = 10;
 
   string name = 2;
 }
 
 message GetObjectReply {
-  string selfname = 10;
+  string selfUuid = 10;
 
   ApiObject object = 1;
 }
 
 message GetIndexRequest {
-  string selfname = 10;
+  string selfUuid = 10;
 }
 
 message IndexUpdatePush {
-  string selfname = 10;
+  string selfUuid = 10;
 
   repeated ObjectHeader header = 1;
 }
@@ -71,7 +71,7 @@ message IndexUpdateError {
 }
 
 message IndexUpdateReply {
-  string selfname = 10;
+  string selfUuid = 10;
 
   repeated IndexUpdateError errors = 1;
 }

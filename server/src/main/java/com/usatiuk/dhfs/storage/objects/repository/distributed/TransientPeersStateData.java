@@ -7,6 +7,7 @@ import lombok.Setter;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
 public class TransientPeersStateData {
 
@@ -25,5 +26,5 @@ public class TransientPeersStateData {
     }
 
     @Getter
-    private final Map<String, TransientPeerState> _states = new LinkedHashMap<>();
+    private final Map<UUID, TransientPeerState> _states = new LinkedHashMap<>();
 }

@@ -6,10 +6,11 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.io.Serializable;
+import java.util.UUID;
 
 @Getter
 public class HostInfo implements Serializable {
-    private final String _name;
+    private final UUID _uuid;
 
     @Setter
     private String _addr;
@@ -17,10 +18,10 @@ public class HostInfo implements Serializable {
     private Integer _port;
 
     @JsonbCreator
-    public HostInfo(@JsonbProperty("_name") String name,
-                    @JsonbProperty("_addr") String addr,
-                    @JsonbProperty("_port") Integer port) {
-        _name = name;
+    public HostInfo(@JsonbProperty("uuid") String uuid,
+                    @JsonbProperty("addr") String addr,
+                    @JsonbProperty("port") Integer port) {
+        _uuid = UUID.fromString(uuid);
         _addr = addr;
         _port = port;
     }

@@ -11,15 +11,12 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.NotImplementedException;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.Objects;
+import java.util.UUID;
 
 @ApplicationScoped
 public class SyncHandler {
-    @ConfigProperty(name = "dhfs.objects.distributed.selfname")
-    String selfname;
-
     @Inject
     JObjectManager jObjectManager;
 
@@ -35,7 +32,10 @@ public class SyncHandler {
     @Inject
     Instance<ConflictResolver> conflictResolvers;
 
-    public void doInitialResync(String host) {
+    @Inject
+    PersistentRemoteHostsService persistentRemoteHostsService;
+
+    public void doInitialResync(UUID host) {
         var got = remoteObjectServiceClient.getIndex(host);
         handleRemoteUpdate(got);
         // Push our index to the other peer too, as they might not request it if
@@ -50,7 +50,7 @@ public class SyncHandler {
         }
     }
 
-    private void handleOneUpdate(String from, ObjectHeader header) {
+    private void handleOneUpdate(UUID from, ObjectHeader header) {
         JObject<?> found;
         try {
             found = jObjectManager.getOrPut(header.getName(), new ObjectMetadata(
@@ -63,7 +63,7 @@ public class SyncHandler {
         }
 
         var receivedSelfVer = header.getChangelog()
-                .getEntriesList().stream().filter(p -> p.getHost().equals(selfname))
+                .getEntriesList().stream().filter(p -> p.getHost().equals(persistentRemoteHostsService.getSelfUuid().toString()))
                 .findFirst().map(ObjectChangelogEntry::getVersion).orElse(0L);
 
         var receivedTotalVer = header.getChangelog().getEntriesList()
@@ -76,13 +76,14 @@ public class SyncHandler {
                 return false;
             }
 
-            if (md.getChangelog().getOrDefault(selfname, 0L) > receivedSelfVer) return true;
+            if (md.getChangelog().getOrDefault(persistentRemoteHostsService.getSelfUuid(), 0L) > receivedSelfVer)
+                return true;
 
             md.getRemoteCopies().put(from, receivedTotalVer);
 
             if (Objects.equals(md.getOurVersion(), receivedTotalVer)) {
                 for (var e : header.getChangelog().getEntriesList()) {
-                    if (!Objects.equals(md.getChangelog().getOrDefault(e.getHost(), 0L),
+                    if (!Objects.equals(md.getChangelog().getOrDefault(UUID.fromString(e.getHost()), 0L),
                             e.getVersion())) return true;
                 }
             }
@@ -101,9 +102,9 @@ public class SyncHandler {
 
             md.getChangelog().clear();
             for (var entry : header.getChangelog().getEntriesList()) {
-                md.getChangelog().put(entry.getHost(), entry.getVersion());
+                md.getChangelog().put(UUID.fromString(entry.getHost()), entry.getVersion());
             }
-            md.getChangelog().putIfAbsent(selfname, 0L);
+            md.getChangelog().putIfAbsent(persistentRemoteHostsService.getSelfUuid(), 0L);
 
             return false;
         });
@@ -121,11 +122,11 @@ public class SyncHandler {
     }
 
     public IndexUpdateReply handleRemoteUpdate(IndexUpdatePush request) {
-        var builder = IndexUpdateReply.newBuilder().setSelfname(selfname);
+        var builder = IndexUpdateReply.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString());
 
         for (var u : request.getHeaderList()) {
             try {
-                handleOneUpdate(request.getSelfname(), u);
+                handleOneUpdate(UUID.fromString(request.getSelfUuid()), u);
             } catch (Exception ex) {
                 builder.addErrors(IndexUpdateError.newBuilder().setObjectName(u.getName()).setError(ex.toString()).build());
             }

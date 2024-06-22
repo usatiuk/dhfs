@@ -4,8 +4,12 @@ import lombok.Getter;
 
 import java.io.Serializable;
 import java.util.HashMap;
+import java.util.UUID;
 
 public class PersistentRemoteHostsData implements Serializable {
     @Getter
-    private final HashMap<String, HostInfo> _remoteHosts = new HashMap<>();
+    private final HashMap<UUID, HostInfo> _remoteHosts = new HashMap<>();
+
+    @Getter
+    private final UUID _selfUuid = UUID.randomUUID();
 }

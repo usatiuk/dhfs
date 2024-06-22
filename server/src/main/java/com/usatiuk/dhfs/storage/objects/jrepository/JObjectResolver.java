@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.storage.objects.jrepository;
 
 import com.usatiuk.dhfs.storage.SerializationHelper;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.InvalidationQueueService;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
@@ -9,7 +10,6 @@ import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.Optional;
 
@@ -27,8 +27,8 @@ public class JObjectResolver {
     @Inject
     JObjectWriteback jObjectWriteback;
 
-    @ConfigProperty(name = "dhfs.objects.distributed.selfname")
-    String selfname;
+    @Inject
+    PersistentRemoteHostsService persistentRemoteHostsService;
 
     public <T extends JObjectData> Optional<T> resolveDataLocal(JObject<T> jObject) {
         jObject.assertRWLock();
@@ -73,7 +73,7 @@ public class JObjectResolver {
     public void bumpVersionSelf(JObject<?> self) {
         self.assertRWLock();
         self.runWriteLockedMeta((m, bump, invalidate) -> {
-            m.bumpVersion(selfname);
+            m.bumpVersion(persistentRemoteHostsService.getSelfUuid());
             return null;
         });
     }
