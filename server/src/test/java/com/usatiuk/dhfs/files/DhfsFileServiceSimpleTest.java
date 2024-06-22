@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.files;
 
+import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.storage.files.objects.ChunkData;
 import com.usatiuk.dhfs.storage.files.objects.ChunkInfo;
 import com.usatiuk.dhfs.storage.files.objects.File;
@@ -32,16 +33,16 @@ public class DhfsFileServiceSimpleTest {
     void readTest() {
         var fuuid = UUID.randomUUID();
         {
-            ChunkData c1 = new ChunkData("12345".getBytes());
-            ChunkInfo c1i = new ChunkInfo(c1.getHash(), c1.getBytes().length);
-            ChunkData c2 = new ChunkData("678".getBytes());
-            ChunkInfo c2i = new ChunkInfo(c2.getHash(), c2.getBytes().length);
-            ChunkData c3 = new ChunkData("91011".getBytes());
-            ChunkInfo c3i = new ChunkInfo(c3.getHash(), c3.getBytes().length);
+            ChunkData c1 = new ChunkData(ByteString.copyFrom("12345".getBytes()));
+            ChunkInfo c1i = new ChunkInfo(c1.getHash(), c1.getBytes().size());
+            ChunkData c2 = new ChunkData(ByteString.copyFrom("678".getBytes()));
+            ChunkInfo c2i = new ChunkInfo(c2.getHash(), c2.getBytes().size());
+            ChunkData c3 = new ChunkData(ByteString.copyFrom("91011".getBytes()));
+            ChunkInfo c3i = new ChunkInfo(c3.getHash(), c3.getBytes().size());
             File f = new File(fuuid);
             f.getChunks().put(0L, c1.getHash());
-            f.getChunks().put((long) c1.getBytes().length, c2.getHash());
-            f.getChunks().put((long) c1.getBytes().length + c2.getBytes().length, c3.getHash());
+            f.getChunks().put((long) c1.getBytes().size(), c2.getHash());
+            f.getChunks().put((long) c1.getBytes().size() + c2.getBytes().size(), c3.getHash());
 
             // FIXME: dhfs_files
 
@@ -60,7 +61,7 @@ public class DhfsFileServiceSimpleTest {
             for (int start = 0; start < all.length(); start++) {
                 for (int end = start; end <= all.length(); end++) {
                     var read = fileService.read(fuuid.toString(), start, end - start);
-                    Assertions.assertArrayEquals(all.substring(start, end).getBytes(), read.get());
+                    Assertions.assertArrayEquals(all.substring(start, end).getBytes(), read.get().toByteArray());
                 }
             }
         }
@@ -74,14 +75,14 @@ public class DhfsFileServiceSimpleTest {
         var uuid = ret.get();
 
         fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
         fileService.write(uuid, 4, new byte[]{10, 11, 12});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 12, 7, 8, 9}, fileService.read(uuid, 0, 10).get());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 12, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
         fileService.write(uuid, 10, new byte[]{13, 14});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 12, 7, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).get());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 12, 7, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).get().toByteArray());
         fileService.write(uuid, 6, new byte[]{15, 16});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 15, 16, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).get());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 15, 16, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).get().toByteArray());
         fileService.write(uuid, 3, new byte[]{17, 18});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 17, 18, 11, 15, 16, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).get());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 17, 18, 11, 15, 16, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).get().toByteArray());
     }
 }
