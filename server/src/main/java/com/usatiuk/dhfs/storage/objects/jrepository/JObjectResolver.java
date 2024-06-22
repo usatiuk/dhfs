@@ -44,6 +44,7 @@ public class JObjectResolver {
 
         var obj = remoteObjectServiceClient.getObject(jObject);
         objectPersistentStore.writeObject(jObject.getName(), obj);
+        invalidationQueueService.pushInvalidationToAll(jObject.getName());
         return SerializationHelper.deserialize(obj);
     }
 
