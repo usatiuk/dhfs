@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.storage.files.service;
 
+import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.storage.files.objects.FsNode;
 
 import java.util.Optional;
@@ -18,7 +19,7 @@ public interface DhfsFileService {
 
     Long size(String f);
 
-    Optional<byte[]> read(String fileUuid, long offset, int length);
+    Optional<ByteString> read(String fileUuid, long offset, int length);
     Long write(String fileUuid, long offset, byte[] data);
     Boolean truncate(String fileUuid, long length);
 }

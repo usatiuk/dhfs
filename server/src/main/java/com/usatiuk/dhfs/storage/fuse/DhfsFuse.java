@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.storage.fuse;
 
+import com.google.protobuf.UnsafeByteOperations;
 import com.sun.security.auth.module.UnixSystem;
 import com.usatiuk.dhfs.storage.files.objects.Directory;
 import com.usatiuk.dhfs.storage.files.objects.File;
@@ -132,8 +133,8 @@ public class DhfsFuse extends FuseStubFS {
             var file = fileOpt.get();
             var read = fileService.read(fileOpt.get(), offset, (int) size);
             if (read.isEmpty()) return 0;
-            buf.put(0, read.get(), 0, read.get().length);
-            return read.get().length;
+            UnsafeByteOperations.unsafeWriteTo(read.get(), new JnrPtrByteOutput(buf, size));
+            return read.get().size();
         } catch (Exception e) {
             Log.error("When reading " + path, e);
             return -ErrorCodes.ENOENT();

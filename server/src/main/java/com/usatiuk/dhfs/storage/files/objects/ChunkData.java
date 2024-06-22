@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.storage.files.objects;
 
+import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import lombok.Getter;
@@ -12,12 +13,13 @@ import java.util.stream.Collectors;
 @Getter
 public class ChunkData extends JObjectData {
     final String _hash;
-    final byte[] _bytes;
+    final ByteString _bytes;
 
-    public ChunkData(byte[] bytes) {
+    public ChunkData(ByteString bytes) {
         super();
-        this._bytes = Arrays.copyOf(bytes, bytes.length);
-        this._hash = Arrays.stream(LongTupleHashFunction.xx128().hashBytes(bytes))
+        this._bytes = bytes;
+        // TODO: There might be a copy there
+        this._hash = Arrays.stream(LongTupleHashFunction.xx128().hashBytes(_bytes.asReadOnlyByteBuffer()))
                 .mapToObj(Long::toHexString).collect(Collectors.joining());
     }
 

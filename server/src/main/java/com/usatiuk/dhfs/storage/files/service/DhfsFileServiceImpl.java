@@ -1,5 +1,7 @@
 package com.usatiuk.dhfs.storage.files.service;
 
+import com.google.protobuf.ByteString;
+import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.storage.files.objects.*;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
@@ -15,7 +17,6 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -225,7 +226,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     }
 
     @Override
-    public Optional<byte[]> read(String fileUuid, long offset, int length) {
+    public Optional<ByteString> read(String fileUuid, long offset, int length) {
         var fileOpt = jObjectManager.get(fileUuid, File.class);
         if (fileOpt.isEmpty()) {
             Log.error("File not found when trying to read: " + fileUuid);
@@ -251,11 +252,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
 
         if (chunksList.get().isEmpty()) {
-            return Optional.of(new byte[0]);
+            return Optional.of(ByteString.empty());
         }
 
         var chunks = chunksList.get().iterator();
-        ByteBuffer buf = ByteBuffer.allocate(length);
+        ByteString buf = ByteString.empty();
 
         long curPos = offset;
         var chunk = chunks.next();
@@ -277,11 +278,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             var chunkBytes = chunkRead.get().runReadLocked((m, d) -> d.getBytes());
 
-            long readableLen = chunkBytes.length - offInChunk;
+            long readableLen = chunkBytes.size() - offInChunk;
 
             var toReadReally = Math.min(readableLen, toReadInChunk);
 
-            buf.put(chunkBytes, (int) offInChunk, (int) toReadReally);
+            buf = buf.concat(chunkBytes.substring((int) offInChunk, (int) (offInChunk + toReadReally)));
 
             curPos += toReadReally;
 
@@ -294,7 +295,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
 
         // FIXME:
-        return Optional.of(Arrays.copyOf(buf.array(), (int) (curPos - offset)));
+        return Optional.of(buf);
     }
 
     private Integer getChunkSize(String uuid) {
@@ -308,7 +309,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         return chunkRead.get().runReadLocked((m, d) -> d.getSize());
     }
 
-    private byte[] readChunk(String uuid) {
+    private ByteString readChunk(String uuid) {
         var chunkRead = jObjectManager.get(ChunkData.getNameFromHash(uuid), ChunkData.class);
 
         if (chunkRead.isEmpty()) {
@@ -348,26 +349,24 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             NavigableMap<Long, String> beforeFirst = first != null ? chunksAll.headMap(first.getKey(), false) : Collections.emptyNavigableMap();
             NavigableMap<Long, String> afterLast = last != null ? chunksAll.tailMap(last.getKey(), false) : Collections.emptyNavigableMap();
 
-            List<byte[]> pendingWrites = new LinkedList<>();
-            int combinedSize = 0;
+            ByteString pendingWrites = ByteString.empty();
 
             if (first != null && first.getKey() < offset) {
                 var chunkBytes = readChunk(first.getValue());
-                pendingWrites.addLast(Arrays.copyOfRange(chunkBytes, 0, (int) (offset - first.getKey())));
-                combinedSize += pendingWrites.getLast().length;
+                pendingWrites = pendingWrites.concat(chunkBytes.substring(0, (int) (offset - first.getKey())));
             }
-            pendingWrites.addLast(data);
-            combinedSize += pendingWrites.getLast().length;
+            pendingWrites = pendingWrites.concat(UnsafeByteOperations.unsafeWrap(data));
 
             if (last != null) {
                 var lchunkBytes = readChunk(last.getValue());
-                if (last.getKey() + lchunkBytes.length > offset + data.length) {
+                if (last.getKey() + lchunkBytes.size() > offset + data.length) {
                     var startInFile = offset + data.length;
                     var startInChunk = startInFile - last.getKey();
-                    pendingWrites.addLast(Arrays.copyOfRange(lchunkBytes, (int) startInChunk, lchunkBytes.length));
-                    combinedSize += pendingWrites.getLast().length;
+                    pendingWrites = pendingWrites.concat(lchunkBytes.substring((int) startInChunk, lchunkBytes.size()));
                 }
             }
+
+            int combinedSize = pendingWrites.size();
 
             if (Math.abs(combinedSize - targetChunkSize) > targetChunkSize * 0.1) {
                 if (combinedSize < targetChunkSize) {
@@ -387,7 +386,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
                             beforeFirst.pollLastEntry();
                             start = takeLeft.getKey();
-                            pendingWrites.addFirst(readChunk(cuuid));
+                            pendingWrites = pendingWrites.concat(readChunk(cuuid));
                             combinedSize += getChunkSize(cuuid);
                             chunksAll.remove(takeLeft.getKey());
                             removedChunks.add(cuuid);
@@ -404,25 +403,13 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                             }
 
                             afterLast.pollFirstEntry();
-                            pendingWrites.addLast(readChunk(cuuid));
+                            pendingWrites = readChunk(cuuid).concat(pendingWrites);
                             combinedSize += getChunkSize(cuuid);
                             chunksAll.remove(takeRight.getKey());
                             removedChunks.add(cuuid);
                         }
                     }
                 }
-            }
-
-            // FIXME:!
-
-            byte[] realbytes = new byte[combinedSize];
-            {
-                int cur = 0;
-                for (var b : pendingWrites) {
-                    System.arraycopy(b, 0, realbytes, cur, b.length);
-                    cur += b.length;
-                }
-                pendingWrites.clear();
             }
 
             {
@@ -435,16 +422,15 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                         end = combinedSize;
                     }
 
-                    byte[] thisChunk = new byte[end - cur];
-                    System.arraycopy(realbytes, cur, thisChunk, 0, thisChunk.length);
+                    var thisChunk = pendingWrites.substring(cur, end);
 
                     ChunkData newChunkData = new ChunkData(thisChunk);
-                    ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
+                    ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
                     jObjectManager.put(newChunkData);
                     jObjectManager.put(newChunkInfo);
                     chunksAll.put(start, newChunkInfo.getHash());
 
-                    start += thisChunk.length;
+                    start += thisChunk.size();
                     cur = end;
                 }
             }
@@ -508,10 +494,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
                     var chunkBytes = chunkRead.get().runReadLocked((m2, d) -> d.getBytes());
 
-                    if (lastChunk.getKey() + chunkBytes.length > 0) {
+                    if (lastChunk.getKey() + chunkBytes.size() > 0) {
                         int start = (int) (length - lastChunk.getKey());
-                        ChunkData newChunkData = new ChunkData(Arrays.copyOfRange(chunkBytes, 0, (int) (length - start)));
-                        ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().length);
+                        ChunkData newChunkData = new ChunkData(chunkBytes.substring(0, (int) (length - start)));
+                        ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
                         jObjectManager.put(newChunkData);
                         jObjectManager.put(newChunkInfo);
 
