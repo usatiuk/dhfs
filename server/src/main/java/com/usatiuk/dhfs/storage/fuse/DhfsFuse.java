@@ -6,6 +6,8 @@ import com.usatiuk.dhfs.storage.files.objects.Directory;
 import com.usatiuk.dhfs.storage.files.objects.File;
 import com.usatiuk.dhfs.storage.files.objects.FsNode;
 import com.usatiuk.dhfs.storage.files.service.DhfsFileService;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -56,14 +58,19 @@ public class DhfsFuse extends FuseStubFS {
 
     @Override
     public int statfs(String path, Statvfs stbuf) {
-        //FIXME:
-        if ("/".equals(path)) {
-            stbuf.f_blocks.set(1024 * 1024 * 1024); // total data blocks in file system
-            stbuf.f_frsize.set(1024);        // fs block size
-            stbuf.f_bfree.set(1024 * 1024 * 1024);  // free blocks in fs
-            stbuf.f_bavail.set(1024 * 1024 * 1024); // avail blocks in fs
+        try {
+            //FIXME:
+            if ("/".equals(path)) {
+                stbuf.f_blocks.set(1024 * 1024 * 1024); // total data blocks in file system
+                stbuf.f_frsize.set(1024);        // fs block size
+                stbuf.f_bfree.set(1024 * 1024 * 1024);  // free blocks in fs
+                stbuf.f_bavail.set(1024 * 1024 * 1024); // avail blocks in fs
+            }
+            return super.statfs(path, stbuf);
+        } catch (Exception e) {
+            Log.error("When statfs " + path, e);
+            return -ErrorCodes.EIO();
         }
-        return super.statfs(path, stbuf);
     }
 
     @Override
@@ -96,8 +103,8 @@ public class DhfsFuse extends FuseStubFS {
             stat.st_mtim.tv_sec.set(foundDent.getMtime() / 1000);
             stat.st_mtim.tv_nsec.set((foundDent.getMtime() % 1000) * 1000);
         } catch (Exception e) {
-            Log.error("When accessing " + path, e);
-            return -ErrorCodes.ENOENT();
+            Log.error("When getattr " + path, e);
+            return -ErrorCodes.EIO();
         }
         return 0;
     }
@@ -114,15 +121,20 @@ public class DhfsFuse extends FuseStubFS {
             if (!res) return -ErrorCodes.EINVAL();
             else return 0;
         } catch (Exception e) {
-            Log.error("When setting time " + path, e);
-            return -ErrorCodes.ENOENT();
+            Log.error("When utimens " + path, e);
+            return -ErrorCodes.EIO();
         }
     }
 
     @Override
     public int open(String path, FuseFileInfo fi) {
-        if (fileService.open(path).isEmpty()) return -ErrorCodes.ENOENT();
-        return 0;
+        try {
+            if (fileService.open(path).isEmpty()) return -ErrorCodes.ENOENT();
+            return 0;
+        } catch (Exception e) {
+            Log.error("When open " + path, e);
+            return -ErrorCodes.EIO();
+        }
     }
 
     @Override
@@ -137,7 +149,7 @@ public class DhfsFuse extends FuseStubFS {
             return read.get().size();
         } catch (Exception e) {
             Log.error("When reading " + path, e);
-            return -ErrorCodes.ENOENT();
+            return -ErrorCodes.EIO();
         }
     }
 
@@ -152,7 +164,7 @@ public class DhfsFuse extends FuseStubFS {
             return written.intValue();
         } catch (Exception e) {
             Log.error("When writing " + path, e);
-            return -ErrorCodes.ENOENT();
+            return -ErrorCodes.EIO();
         }
     }
 
@@ -164,73 +176,111 @@ public class DhfsFuse extends FuseStubFS {
             else return 0;
         } catch (Exception e) {
             Log.error("When creating " + path, e);
-            return -ErrorCodes.ENOENT();
+            return -ErrorCodes.EIO();
         }
     }
 
     @Override
     public int mkdir(String path, long mode) {
-        var ret = fileService.mkdir(path, mode);
-        if (ret.isEmpty()) return -ErrorCodes.ENOSPC();
-        else return 0;
+        try {
+            var ret = fileService.mkdir(path, mode);
+            if (ret.isEmpty()) return -ErrorCodes.ENOSPC();
+            else return 0;
+        } catch (Exception e) {
+            Log.error("When creating dir " + path, e);
+            return -ErrorCodes.EIO();
+        }
     }
 
     @Override
     public int rmdir(String path) {
-        var ret = fileService.rmdir(path);
-        if (!ret) return -ErrorCodes.ENOENT();
-        else return 0;
+        try {
+            var ret = fileService.rmdir(path);
+            if (!ret) return -ErrorCodes.ENOENT();
+            else return 0;
+        } catch (Exception e) {
+            Log.error("When removing dir " + path, e);
+            return -ErrorCodes.EIO();
+        }
     }
 
     @Override
     public int rename(String path, String newName) {
-        var ret = fileService.rename(path, newName);
-        if (!ret) return -ErrorCodes.ENOENT();
-        else return 0;
+        try {
+            var ret = fileService.rename(path, newName);
+            if (!ret) return -ErrorCodes.ENOENT();
+            else return 0;
+        } catch (Exception e) {
+            Log.error("When renaming " + path, e);
+            return -ErrorCodes.EIO();
+        }
+
     }
 
     @Override
     public int unlink(String path) {
-        var ret = fileService.unlink(path);
-        if (!ret) return -ErrorCodes.ENOENT();
-        else return 0;
+        try {
+            var ret = fileService.unlink(path);
+            if (!ret) return -ErrorCodes.ENOENT();
+            else return 0;
+        } catch (Exception e) {
+            Log.error("When unlinking " + path, e);
+            return -ErrorCodes.EIO();
+        }
     }
 
     @Override
     public int truncate(String path, long size) {
-        var fileOpt = fileService.open(path);
-        if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
-        var file = fileOpt.get();
-        var ok = fileService.truncate(file, size);
-        if (ok)
-            return 0;
-        else
-            return -ErrorCodes.ENOSPC();
+        try {
+            var fileOpt = fileService.open(path);
+            if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
+            var file = fileOpt.get();
+            var ok = fileService.truncate(file, size);
+            if (ok)
+                return 0;
+            else
+                return -ErrorCodes.ENOSPC();
+        } catch (Exception e) {
+            Log.error("When truncating " + path, e);
+            return -ErrorCodes.EIO();
+        }
     }
 
     @Override
     public int chmod(String path, long mode) {
-        var ret = fileService.chmod(path, mode);
-        if (ret) return 0;
-        else return -ErrorCodes.EINVAL();
+        try {
+            var ret = fileService.chmod(path, mode);
+            if (ret) return 0;
+            else return -ErrorCodes.EINVAL();
+        } catch (Exception e) {
+            Log.error("When chmod " + path, e);
+            return -ErrorCodes.EIO();
+        }
     }
 
     @Override
     public int readdir(String path, Pointer buf, FuseFillDir filler, long offset, FuseFileInfo fi) {
-        Iterable<String> found;
         try {
-            found = fileService.readDir(path);
+            Iterable<String> found;
+            try {
+                found = fileService.readDir(path);
+            } catch (StatusRuntimeException e) {
+                if (e.getStatus().equals(Status.NOT_FOUND))
+                    return -ErrorCodes.ENOENT();
+                else throw e;
+            }
+
+            filler.apply(buf, ".", null, 0);
+            filler.apply(buf, "..", null, 0);
+
+            for (var c : found) {
+                filler.apply(buf, c, null, 0);
+            }
+
+            return 0;
         } catch (Exception e) {
-            return -ErrorCodes.ENOENT();
+            Log.error("When readdir " + path, e);
+            return -ErrorCodes.EIO();
         }
-
-        filler.apply(buf, ".", null, 0);
-        filler.apply(buf, "..", null, 0);
-
-        for (var c : found) {
-            filler.apply(buf, c, null, 0);
-        }
-
-        return 0;
     }
 }
