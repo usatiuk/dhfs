@@ -177,9 +177,6 @@ public class JObjectManagerImpl implements JObjectManager {
                 return (JObject<D>) inMap;
             } else {
                 var created = new JObject<D>(jObjectResolver, object.getName(), object.getConflictResolver().getName(), object);
-                // FIXME:
-                if (object.assumeUnique())
-                    created.runWriteLockedMeta((m, a, b) -> m.getChangelog().put(selfname, 0L));
                 _map.put(object.getName(), new NamedSoftReference(created, _refQueue));
                 jObjectResolver.notifyWrite(created);
                 addToNursery(created.getName());

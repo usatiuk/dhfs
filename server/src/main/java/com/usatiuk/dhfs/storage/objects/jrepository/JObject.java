@@ -15,7 +15,8 @@ public class JObject<T extends JObjectData> implements Serializable {
         _metaPart = new ObjectMetadata(name, conflictResolver, obj.getClass());
         _dataPart.set(obj);
         // FIXME:?
-        _resolver.bumpVersionSelf(this);
+        if (!obj.assumeUnique())
+            _resolver.bumpVersionSelf(this);
     }
 
     protected JObject(JObjectResolver resolver, ObjectMetadata objectMetadata) {
