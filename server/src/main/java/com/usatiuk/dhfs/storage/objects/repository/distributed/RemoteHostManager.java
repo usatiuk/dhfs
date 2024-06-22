@@ -127,4 +127,14 @@ public class RemoteHostManager {
                 .map(Map.Entry::getKey).toList());
     }
 
+    public void notifyAddr(UUID host, String addr, Integer port) {
+        _transientPeersState.runWriteLocked(d -> {
+            Log.info("Updating connection info for " + host + ": addr=" + addr + " port=" + port);
+            d.getStates().putIfAbsent(host, new TransientPeerState());
+            d.getStates().get(host).setAddr(addr);
+            d.getStates().get(host).setPort(port);
+            return null;
+        });
+    }
+
 }
