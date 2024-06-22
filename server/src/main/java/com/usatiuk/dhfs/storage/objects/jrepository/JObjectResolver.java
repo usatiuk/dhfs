@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
-import com.usatiuk.dhfs.storage.DeserializationHelper;
+import com.usatiuk.dhfs.storage.SerializationHelper;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.InvalidationQueueService;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
@@ -30,11 +30,11 @@ public class JObjectResolver {
 
     public <T extends JObjectData> T resolveData(JObject<T> jObject) {
         if (objectPersistentStore.existsObject(jObject.getName()))
-            return DeserializationHelper.deserialize(objectPersistentStore.readObject(jObject.getName()));
+            return SerializationHelper.deserialize(objectPersistentStore.readObject(jObject.getName()));
 
         var obj = remoteObjectServiceClient.getObject(jObject);
         objectPersistentStore.writeObject(jObject.getName(), obj);
-        return DeserializationHelper.deserialize(obj);
+        return SerializationHelper.deserialize(obj);
     }
 
     public void removeLocal(JObject<?> jObject, String name) {

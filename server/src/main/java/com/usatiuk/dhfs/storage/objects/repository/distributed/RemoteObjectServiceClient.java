@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
+import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.repository.distributed.*;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
@@ -24,14 +25,14 @@ public class RemoteObjectServiceClient {
     @Inject
     JObjectManager jObjectManager;
 
-    public Pair<ObjectHeader, byte[]> getSpecificObject(String host, String name) {
+    public Pair<ObjectHeader, ByteString> getSpecificObject(String host, String name) {
         return remoteHostManager.withClient(host, client -> {
             var reply = client.getObject(GetObjectRequest.newBuilder().setSelfname(selfname).setName(name).build());
-            return Pair.of(reply.getObject().getHeader(), reply.getObject().getContent().toByteArray());
+            return Pair.of(reply.getObject().getHeader(), reply.getObject().getContent());
         });
     }
 
-    public byte[] getObject(JObject<?> jObject) {
+    public ByteString getObject(JObject<?> jObject) {
         // Assert lock?
         var targets = jObject.runReadLocked(d -> {
             var bestVer = d.getBestVersion();
@@ -57,7 +58,7 @@ public class RemoteObjectServiceClient {
                     Log.error("Race when trying to fetch");
                     throw new NotImplementedException();
                 }
-                return reply.getObject().getContent().toByteArray();
+                return reply.getObject().getContent();
             });
         });
     }

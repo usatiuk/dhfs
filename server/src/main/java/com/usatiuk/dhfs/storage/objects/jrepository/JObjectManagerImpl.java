@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
-import com.usatiuk.dhfs.storage.DeserializationHelper;
+import com.google.protobuf.ByteString;
+import com.usatiuk.dhfs.storage.SerializationHelper;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
@@ -127,14 +128,14 @@ public class JObjectManagerImpl implements JObjectManager {
             if (inMap != null) return Optional.of(inMap);
         }
 
-        byte[] readMd;
+        ByteString readMd;
         try {
             readMd = objectPersistentStore.readObject("meta_" + name);
         } catch (StatusRuntimeException ex) {
             if (!ex.getStatus().equals(Status.NOT_FOUND)) throw ex;
             return Optional.empty();
         }
-        var meta = DeserializationHelper.deserialize(readMd);
+        var meta = SerializationHelper.deserialize(readMd);
         if (!(meta instanceof ObjectMetadata))
             throw new NotImplementedException("Unexpected metadata type for " + name);
 

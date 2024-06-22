@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.repository.persistence;
 
-import io.smallrye.mutiny.Multi;
-import io.smallrye.mutiny.Uni;
+import com.google.protobuf.ByteString;
 
 import javax.annotation.Nonnull;
 import java.util.List;
@@ -13,9 +12,9 @@ public interface ObjectPersistentStore {
     Boolean existsObject(String name);
 
     @Nonnull
-    byte[] readObject(String name);
+    ByteString readObject(String name);
     @Nonnull
-    void writeObject(String name, byte[] data);
+    void writeObject(String name, ByteString data);
     @Nonnull
     void deleteObject(String name);
 }

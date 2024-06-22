@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
-import com.usatiuk.dhfs.storage.DeserializationHelper;
+import com.usatiuk.dhfs.storage.SerializationHelper;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -32,7 +32,7 @@ public class PersistentRemoteHostsService {
         Log.info("Initializing with root " + dataRoot);
         if (Paths.get(dataRoot).resolve(dataFileName).toFile().exists()) {
             Log.info("Reading hosts");
-            _persistentData = DeserializationHelper.deserialize(Files.readAllBytes(Paths.get(dataRoot).resolve(dataFileName)));
+            _persistentData = SerializationHelper.deserialize(Files.readAllBytes(Paths.get(dataRoot).resolve(dataFileName)));
         }
     }
 

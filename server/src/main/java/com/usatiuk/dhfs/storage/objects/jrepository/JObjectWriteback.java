@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
+import com.usatiuk.dhfs.storage.SerializationHelper;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
@@ -8,7 +9,6 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.ArrayList;
@@ -87,10 +87,10 @@ public class JObjectWriteback {
 
     private void flushOne(JObject<?> obj) {
         obj.runReadLocked((m) -> {
-            objectPersistentStore.writeObject("meta_" + m.getName(), SerializationUtils.serialize(m));
+            objectPersistentStore.writeObject("meta_" + m.getName(), SerializationHelper.serialize(m));
             if (obj.isResolved())
                 obj.runReadLocked((m2, d) -> {
-                    objectPersistentStore.writeObject(m.getName(), SerializationUtils.serialize(d));
+                    objectPersistentStore.writeObject(m.getName(), SerializationHelper.serialize(d));
                     return null;
                 });
             jObjectManager.onWriteback(m.getName());
@@ -100,10 +100,10 @@ public class JObjectWriteback {
 
     private void flushOneImmediate(JObject<?> obj) {
         obj.runWriteLockedMeta((m, a, b) -> {
-            objectPersistentStore.writeObject("meta_" + m.getName(), SerializationUtils.serialize(m));
+            objectPersistentStore.writeObject("meta_" + m.getName(), SerializationHelper.serialize(m));
             if (obj.isResolved())
                 obj.runWriteLocked((m2, d, bump) -> {
-                    objectPersistentStore.writeObject(m.getName(), SerializationUtils.serialize(d));
+                    objectPersistentStore.writeObject(m.getName(), SerializationHelper.serialize(d));
                     return null;
                 });
             jObjectManager.onWriteback(m.getName());

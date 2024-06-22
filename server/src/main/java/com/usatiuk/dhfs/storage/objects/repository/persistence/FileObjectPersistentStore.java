@@ -1,5 +1,7 @@
 package com.usatiuk.dhfs.storage.objects.repository.persistence;
 
+import com.google.protobuf.ByteString;
+import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -11,11 +13,11 @@ import jakarta.enterprise.event.Observes;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.annotation.Nonnull;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -62,14 +64,14 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     @Nonnull
     @Override
-    public byte[] readObject(String name) {
+    public ByteString readObject(String name) {
         var file = Path.of(root, name);
 
         if (!file.toFile().exists())
             throw new StatusRuntimeException(Status.NOT_FOUND);
 
         try {
-            return Files.readAllBytes(file);
+            return UnsafeByteOperations.unsafeWrap(Files.readAllBytes(file));
         } catch (IOException e) {
             Log.error("Error reading file " + file, e);
             throw new StatusRuntimeException(Status.INTERNAL);
@@ -78,7 +80,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     @Nonnull
     @Override
-    public void writeObject(String name, byte[] data) {
+    public void writeObject(String name, ByteString data) {
         var file = Path.of(root, name);
 
         if (!Paths.get(root).toFile().isDirectory()
@@ -86,7 +88,11 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
             throw new StatusRuntimeException(Status.INTERNAL);
 
         try {
-            Files.write(file, data, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
+            file.toFile().createNewFile();
+            try (var fc = new FileOutputStream(file.toFile())) {
+                if (fc.getChannel().write(data.asReadOnlyByteBuffer()) != data.size())
+                    throw new StatusRuntimeException(Status.INTERNAL.withDescription("Could not write all bytes to file"));
+            }
         } catch (IOException e) {
             Log.error("Error writing file " + file, e);
             throw new StatusRuntimeException(Status.INTERNAL);

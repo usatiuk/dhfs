@@ -1,13 +1,17 @@
 package com.usatiuk.dhfs.storage;
 
+import com.google.protobuf.ByteString;
+import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.storage.files.objects.File;
 import org.apache.commons.io.input.ClassLoaderObjectInputStream;
+import org.apache.commons.lang3.SerializationUtils;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Serializable;
 
-public abstract class DeserializationHelper {
+public abstract class SerializationHelper {
 
     // Taken from SerializationUtils
     public static <T> T deserialize(final InputStream inputStream) {
@@ -21,5 +25,13 @@ public abstract class DeserializationHelper {
 
     public static <T> T deserialize(final byte[] objectData) {
         return deserialize(new ByteArrayInputStream(objectData));
+    }
+
+    public static <T> T deserialize(final ByteString objectData) {
+        return deserialize(objectData.newInput());
+    }
+
+    public static <T extends Serializable> ByteString serialize(final T obj) {
+        return UnsafeByteOperations.unsafeWrap(SerializationUtils.serialize(obj));
     }
 }
