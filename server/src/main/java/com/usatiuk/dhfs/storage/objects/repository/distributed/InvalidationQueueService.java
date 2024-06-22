@@ -52,7 +52,7 @@ public class InvalidationQueueService {
 
     private void sender() {
         try {
-            while (true) {
+            while (!Thread.interrupted()) {
                 Thread.sleep(100);
                 var data = pullAll();
                 String stats = "Sent invalidation: ";
@@ -88,11 +88,10 @@ public class InvalidationQueueService {
                     stats += forHost.getKey() + ": " + sent + " ";
                     Log.info(stats);
                 }
-                if (Thread.interrupted()) break;
             }
-        } catch (InterruptedException e) {
-            Log.info("Invalidation sender exiting");
+        } catch (InterruptedException ignored) {
         }
+        Log.info("Invalidation sender exiting");
     }
 
     public void pushInvalidationToAll(String name) {

@@ -11,6 +11,8 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.util.Optional;
+
 @Singleton
 public class JObjectResolver {
     @Inject
@@ -28,9 +30,17 @@ public class JObjectResolver {
     @ConfigProperty(name = "dhfs.objects.distributed.selfname")
     String selfname;
 
-    public <T extends JObjectData> T resolveData(JObject<T> jObject) {
+    public <T extends JObjectData> Optional<T> resolveDataLocal(JObject<T> jObject) {
+        jObject.assertRWLock();
         if (objectPersistentStore.existsObject(jObject.getName()))
-            return SerializationHelper.deserialize(objectPersistentStore.readObject(jObject.getName()));
+            return Optional.of(SerializationHelper.deserialize(objectPersistentStore.readObject(jObject.getName())));
+        return Optional.empty();
+    }
+
+    public <T extends JObjectData> T resolveData(JObject<T> jObject) {
+        jObject.assertRWLock();
+        var local = resolveDataLocal(jObject);
+        if (local.isPresent()) return local.get();
 
         var obj = remoteObjectServiceClient.getObject(jObject);
         objectPersistentStore.writeObject(jObject.getName(), obj);
@@ -52,6 +62,7 @@ public class JObjectResolver {
     }
 
     public void notifyWrite(JObject<?> self) {
+        self.assertRWLock();
         jObjectWriteback.markDirty(self.getName(), self);
         if (self.isResolved()) {
             // FIXME:?
@@ -60,6 +71,7 @@ public class JObjectResolver {
     }
 
     public void bumpVersionSelf(JObject<?> self) {
+        self.assertRWLock();
         self.runWriteLockedMeta((m, bump, invalidate) -> {
             m.bumpVersion(selfname);
             return null;

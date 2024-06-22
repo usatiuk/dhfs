@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 
 public interface ConflictResolver {
     enum ConflictResolutionResult {
@@ -9,5 +10,5 @@ public interface ConflictResolver {
     }
 
     ConflictResolutionResult
-    resolve(String conflictHost, ObjectHeader conflictSource, String localName);
+    resolve(String conflictHost, JObject<?> conflictSource);
 }

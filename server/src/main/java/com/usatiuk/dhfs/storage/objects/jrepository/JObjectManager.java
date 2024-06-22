@@ -12,9 +12,10 @@ public interface JObjectManager {
 
     Collection<JObject<?>> find(String prefix);
 
+    // Put a new object
     <T extends JObjectData> JObject<T> put(T object);
+    // Get an object with a name if it exists, otherwise create new one based on metadata
     JObject<?> getOrPut(String name, ObjectMetadata md);
-    <T extends JObjectData> JObject<T> getOrPut(String name, T object);
 
     void onWriteback(String name);
     void unref(JObject<?> object);

@@ -1,8 +1,7 @@
 package com.usatiuk.dhfs.storage.files.objects;
 
-import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
 import com.usatiuk.dhfs.storage.SerializationHelper;
-import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.RemoteObjectServiceClient;
@@ -15,7 +14,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.util.LinkedHashMap;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
 
 @ApplicationScoped
 public class DirectoryConflictResolver implements ConflictResolver {
@@ -25,24 +23,25 @@ public class DirectoryConflictResolver implements ConflictResolver {
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
 
-    @Inject
-    JObjectManager jObjectManager;
-
     @Override
-    public ConflictResolutionResult resolve(String conflictHost,
-                                            ObjectHeader conflictSource,
-                                            String localName) {
+    public ConflictResolutionResult resolve(String conflictHost, JObject<?> ours) {
+        var theirsData = remoteObjectServiceClient.getSpecificObject(conflictHost, ours.getName());
 
-        var oursData = jObjectManager.get(localName, Directory.class).orElseThrow(() -> new NotImplementedException("Oops"));
-        var theirsData = remoteObjectServiceClient.getSpecificObject(conflictHost, conflictSource.getName());
+        if (!ours.isOf(Directory.class))
+            throw new NotImplementedException("Type conflict for " + ours.getName() + ", directory was expected");
 
-        LinkedHashMap<String, UUID> mergedChildren = new LinkedHashMap<>();
-        AtomicReference<ObjectMetadata> newMetadata = new AtomicReference<>();
-        AtomicReference<Long> newMtime = new AtomicReference<>();
-        AtomicReference<Long> newCtime = new AtomicReference<>();
+        var oursAsDir = (JObject<Directory>) ours;
 
-        boolean wasChanged = oursData.runReadLocked((m, oursDir) -> {
-            var oursHeader = oursData.runReadLocked(ObjectMetadata::toRpcHeader);
+        oursAsDir.runWriteLocked((m, oursDir, bump) -> {
+            if (!ours.tryLocalResolve())
+                throw new NotImplementedException("Conflict but we don't have local copy for " + ours.getName());
+
+            LinkedHashMap<String, UUID> mergedChildren = new LinkedHashMap<>();
+            ObjectMetadata newMetadata;
+            long newMtime;
+            long newCtime;
+
+            var oursHeader = m.toRpcHeader();
             var theirsHeader = theirsData.getLeft();
 
             var theirsDir = (Directory) SerializationHelper.deserialize(theirsData.getRight());
@@ -83,40 +82,37 @@ public class DirectoryConflictResolver implements ConflictResolver {
                 }
             }
 
-            newMetadata.set(new ObjectMetadata(oursHeader.getName(), oursHeader.getConflictResolver(), m.getType()));
+            newMetadata = new ObjectMetadata(ours.getName(), oursHeader.getConflictResolver(), m.getType());
 
             for (var entry : oursHeader.getChangelog().getEntriesList()) {
-                newMetadata.get().getChangelog().put(entry.getHost(), entry.getVersion());
+                newMetadata.getChangelog().put(entry.getHost(), entry.getVersion());
             }
             for (var entry : theirsHeader.getChangelog().getEntriesList()) {
-                newMetadata.get().getChangelog().merge(entry.getHost(), entry.getVersion(), Long::max);
+                newMetadata.getChangelog().merge(entry.getHost(), entry.getVersion(), Long::max);
             }
 
-            boolean wasChangedR = mergedChildren.size() != first.getChildren().size();
-            if (wasChangedR) {
-                newMetadata.get().getChangelog().merge(selfname, 1L, Long::sum);
+            boolean wasChanged = mergedChildren.size() != first.getChildren().size();
+            if (wasChanged) {
+                newMetadata.getChangelog().merge(selfname, 1L, Long::sum);
             }
-            newMtime.set(first.getMtime());
-            newCtime.set(first.getCtime());
 
-            return wasChangedR;
-        });
+            newMtime = first.getMtime();
+            newCtime = first.getCtime();
 
-        oursData.runWriteLocked((m, d, bump) -> {
             if (wasChanged)
-                if (m.getBestVersion() >= newMetadata.get().getOurVersion())
+                if (m.getBestVersion() >= newMetadata.getOurVersion())
                     throw new NotImplementedException("Race when conflict resolving");
 
-            if (m.getBestVersion() > newMetadata.get().getOurVersion())
+            if (m.getBestVersion() > newMetadata.getOurVersion())
                 throw new NotImplementedException("Race when conflict resolving");
 
-            d.setMtime(newMtime.get());
-            d.setCtime(newCtime.get());
-            d.getChildren().clear();
-            d.getChildren().putAll(mergedChildren);
+            oursDir.setMtime(newMtime);
+            oursDir.setCtime(newCtime);
+            oursDir.getChildren().clear();
+            oursDir.getChildren().putAll(mergedChildren);
 
             m.getChangelog().clear();
-            m.getChangelog().putAll(newMetadata.get().getChangelog());
+            m.getChangelog().putAll(newMetadata.getChangelog());
             return null;
         });
 

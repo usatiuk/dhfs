@@ -2,6 +2,8 @@ package com.usatiuk.dhfs.storage.objects.jrepository;
 
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import org.apache.commons.lang3.NotImplementedException;
 
 import java.io.Serializable;
@@ -10,22 +12,24 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class JObject<T extends JObjectData> implements Serializable {
-    protected JObject(JObjectResolver resolver, String name, String conflictResolver, T obj) {
+    // Create a new object
+    protected JObject(JObjectResolver resolver, String name, String conflictResolver, String selfname, T obj) {
         _resolver = resolver;
         _metaPart = new ObjectMetadata(name, conflictResolver, obj.getClass());
         _dataPart.set(obj);
         // FIXME:?
         if (!obj.assumeUnique())
-            _resolver.bumpVersionSelf(this);
+            _metaPart.bumpVersion(selfname);
     }
 
+    // Create an object from existing metadata
     protected JObject(JObjectResolver resolver, ObjectMetadata objectMetadata) {
         _resolver = resolver;
         _metaPart = objectMetadata;
     }
 
     public String getName() {
-        return runReadLocked(ObjectMetadata::getName);
+        return _metaPart.getName();
     }
 
     protected final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
@@ -34,13 +38,12 @@ public class JObject<T extends JObjectData> implements Serializable {
     private final AtomicReference<T> _dataPart = new AtomicReference<>();
 
     public Class<? extends ConflictResolver> getConflictResolver() {
-        return runReadLocked(m -> {
-            try {
-                return (Class<? extends ConflictResolver>) Class.forName(m.getConflictResolver(), true, JObject.class.getClassLoader());
-            } catch (ClassNotFoundException e) {
-                throw new NotImplementedException(e);
-            }
-        });
+        try {
+            return (Class<? extends ConflictResolver>) Class.forName(_metaPart.getConflictResolver(), true,
+                    JObject.class.getClassLoader());
+        } catch (ClassNotFoundException e) {
+            throw new NotImplementedException(e);
+        }
     }
 
     public boolean isResolved() {
@@ -104,17 +107,35 @@ public class JObject<T extends JObjectData> implements Serializable {
 
     private void resolveDataPart() {
         if (_dataPart.get() == null) {
-            _lock.readLock().lock();
+            _lock.writeLock().lock();
             try {
                 if (_dataPart.get() == null) {
                     _dataPart.compareAndSet(null, _resolver.resolveData(this));
                     if (!_metaPart.getType().isAssignableFrom(_dataPart.get().getClass()))
-                        throw new NotImplementedException("Type mismatch for " + getName());
+                        throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Type mismatch for " + getName()));
                 }
             } finally {
-                _lock.readLock().unlock();
+                _lock.writeLock().unlock();
             }
         }
+    }
+
+    public boolean tryLocalResolve() {
+        if (_dataPart.get() == null) {
+            _lock.writeLock().lock();
+            try {
+                if (_dataPart.get() == null) {
+                    var res = _resolver.resolveDataLocal(this);
+                    if (res.isEmpty()) return false;
+                    _dataPart.compareAndSet(null, res.get());
+                    if (!_metaPart.getType().isAssignableFrom(_dataPart.get().getClass()))
+                        throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Type mismatch for " + getName()));
+                }
+            } finally {
+                _lock.writeLock().unlock();
+            }
+        }
+        return _dataPart.get() != null;
     }
 
     public <R> R runReadLocked(ObjectDataFn<T, R> fn) {

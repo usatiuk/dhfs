@@ -12,7 +12,6 @@ import io.quarkus.runtime.Startup;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.Getter;
-import org.apache.commons.lang3.NotImplementedException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.lang.ref.ReferenceQueue;
@@ -72,22 +71,21 @@ public class JObjectManagerImpl implements JObjectManager {
 
     private void refCleanupThread() {
         try {
-            while (true) {
+            while (!Thread.interrupted()) {
                 NamedSoftReference cur = (NamedSoftReference) _refQueue.remove();
                 synchronized (this) {
                     if (_map.containsKey(cur._key) && (_map.get(cur._key).get() == null))
                         _map.remove(cur._key);
                 }
-                if (Thread.interrupted()) break;
             }
         } catch (InterruptedException ignored) {
-            Log.info("Ref cleanup thread exiting");
         }
+        Log.info("Ref cleanup thread exiting");
     }
 
     private void nurseryCleanupThread() {
         try {
-            while (true) {
+            while (!Thread.interrupted()) {
                 LinkedHashSet<String> got;
 
                 synchronized (_writebackQueue) {
@@ -102,11 +100,10 @@ public class JObjectManagerImpl implements JObjectManager {
                         _nurseryRefcounts.remove(s);
                     }
                 }
-                if (Thread.interrupted()) break;
             }
         } catch (InterruptedException ignored) {
-            Log.info("Ref cleanup thread exiting");
         }
+        Log.info("Ref cleanup thread exiting");
     }
 
     private JObject<?> getFromMap(String key) {
@@ -137,7 +134,7 @@ public class JObjectManagerImpl implements JObjectManager {
         }
         var meta = SerializationHelper.deserialize(readMd);
         if (!(meta instanceof ObjectMetadata))
-            throw new NotImplementedException("Unexpected metadata type for " + name);
+            throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Unexpected metadata type for " + name));
 
         synchronized (this) {
             var inMap = getFromMap(name);
@@ -152,7 +149,8 @@ public class JObjectManagerImpl implements JObjectManager {
     public <D extends JObjectData> Optional<JObject<? extends D>> get(String name, Class<D> klass) {
         var got = get(name);
         if (got.isEmpty()) return Optional.empty();
-        if (!got.get().isOf(klass)) throw new NotImplementedException("Class mismatch for " + name);
+        if (!got.get().isOf(klass))
+            throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Class mismatch for " + name));
         return Optional.of((JObject<? extends D>) got.get());
     }
 
@@ -177,9 +175,13 @@ public class JObjectManagerImpl implements JObjectManager {
                 addToNursery(object.getName());
                 return (JObject<D>) inMap;
             } else {
-                var created = new JObject<D>(jObjectResolver, object.getName(), object.getConflictResolver().getName(), object);
+                var created = new JObject<D>(jObjectResolver, object.getName(),
+                        object.getConflictResolver().getName(), selfname, object);
                 _map.put(object.getName(), new NamedSoftReference(created, _refQueue));
-                jObjectResolver.notifyWrite(created);
+                created.runWriteLockedMeta((m, d, b) -> {
+                    jObjectResolver.notifyWrite(created);
+                    return null;
+                });
                 addToNursery(created.getName());
                 return created;
             }
@@ -192,7 +194,7 @@ public class JObjectManagerImpl implements JObjectManager {
 
         if (got.isPresent()) {
             if (!got.get().isOf(md.getType())) {
-                throw new NotImplementedException("Type mismatch for " + name);
+                throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Type mismatch for " + name));
             }
             return got.get();
         }
@@ -204,33 +206,10 @@ public class JObjectManagerImpl implements JObjectManager {
             } else {
                 var created = new JObject<>(jObjectResolver, md);
                 _map.put(md.getName(), new NamedSoftReference(created, _refQueue));
-                jObjectResolver.notifyWrite(created);
-                return created;
-            }
-        }
-    }
-
-    @Override
-    public <D extends JObjectData> JObject<D> getOrPut(String name, D object) {
-        var got = get(name);
-        if (got.isPresent()) {
-            if (!got.get().isOf(object.getClass())) {
-                throw new NotImplementedException("Type mismatch for " + name);
-            }
-            return (JObject<D>) got.get();
-        }
-
-        synchronized (this) {
-            var inMap = getFromMap(object.getName());
-            if (inMap != null) {
-                if (inMap.isOf(object.getClass()))
-                    return (JObject<D>) inMap;
-                else
-                    throw new NotImplementedException("Type mismatch for " + name);
-            } else {
-                var created = new JObject<D>(jObjectResolver, object.getName(), object.getConflictResolver().getName(), object);
-                _map.put(object.getName(), new NamedSoftReference(created, _refQueue));
-                jObjectResolver.notifyWrite(created);
+                created.runWriteLockedMeta((m, d, b) -> {
+                    jObjectResolver.notifyWrite(created);
+                    return null;
+                });
                 return created;
             }
         }
@@ -257,6 +236,10 @@ public class JObjectManagerImpl implements JObjectManager {
             String name = m.getName();
             synchronized (this) {
                 if (!_nurseryRefcounts.containsKey(name)) return null;
+
+                if (objectPersistentStore.existsObject("meta_" + name))
+                    _nurseryRefcounts.remove(name);
+
                 _nurseryRefcounts.merge(name, -1L, Long::sum);
                 if (_nurseryRefcounts.get(name) <= 0) {
                     _nurseryRefcounts.remove(name);

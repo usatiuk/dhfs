@@ -4,6 +4,8 @@ import com.usatiuk.dhfs.objects.repository.distributed.*;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
@@ -108,15 +110,14 @@ public class SyncHandler {
 
         if (conflict) {
             var resolver = conflictResolvers.select(found.getConflictResolver());
-            var result = resolver.get().resolve(from, header, header.getName());
+            var result = resolver.get().resolve(from, found);
             if (result.equals(ConflictResolver.ConflictResolutionResult.RESOLVED)) {
                 Log.info("Resolved conflict for " + from + " " + header.getName());
             } else {
                 Log.error("Failed conflict resolution for " + from + " " + header.getName());
-                throw new NotImplementedException();
+                throw new StatusRuntimeException(Status.ALREADY_EXISTS.withDescription("Conflict resolution failed"));
             }
         }
-
     }
 
     public IndexUpdateReply handleRemoteUpdate(IndexUpdatePush request) {

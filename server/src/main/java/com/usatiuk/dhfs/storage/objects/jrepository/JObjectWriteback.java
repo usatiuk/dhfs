@@ -58,7 +58,7 @@ public class JObjectWriteback {
     private void writeback() {
         try {
             boolean wait = false;
-            while (true) {
+            while (!Thread.interrupted()) {
                 if (wait) {
                     Thread.sleep(500);
                     wait = false;
@@ -78,11 +78,10 @@ public class JObjectWriteback {
                     obj = entry.getValue().getRight();
                 }
                 flushOne(obj);
-                if (Thread.interrupted()) break;
             }
-        } catch (InterruptedException e) {
-            Log.info("Writeback thread exiting");
+        } catch (InterruptedException ignored) {
         }
+        Log.info("Writeback thread exiting");
     }
 
     private void flushOne(JObject<?> obj) {

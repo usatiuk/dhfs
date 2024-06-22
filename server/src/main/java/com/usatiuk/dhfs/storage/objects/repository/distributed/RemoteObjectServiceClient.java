@@ -33,10 +33,11 @@ public class RemoteObjectServiceClient {
     }
 
     public ByteString getObject(JObject<?> jObject) {
-        // Assert lock?
-        var targets = jObject.runReadLocked(d -> {
-            var bestVer = d.getBestVersion();
-            return d.getRemoteCopies().entrySet().stream().filter(entry -> entry.getValue().equals(bestVer)).map(Map.Entry::getKey).toList();
+        jObject.assertRWLock();
+
+        var targets = jObject.runWriteLockedMeta((md, b, v) -> {
+            var bestVer = md.getBestVersion();
+            return md.getRemoteCopies().entrySet().stream().filter(entry -> entry.getValue().equals(bestVer)).map(Map.Entry::getKey).toList();
         });
 
         return remoteHostManager.withClientAny(targets, client -> {
@@ -49,7 +50,7 @@ public class RemoteObjectServiceClient {
             var receivedTotalVer = reply.getObject().getHeader().getChangelog().getEntriesList()
                     .stream().map(ObjectChangelogEntry::getVersion).reduce(0L, Long::sum);
 
-            return jObject.runReadLocked(md -> {
+            return jObject.runWriteLockedMeta((md, b, v) -> {
                 var outdated =
                         (md.getOurVersion() > receivedTotalVer)
                                 || (md.getChangelog().get(selfname) > receivedSelfVer);
@@ -66,8 +67,7 @@ public class RemoteObjectServiceClient {
     public IndexUpdatePush getIndex(String host) {
         return remoteHostManager.withClient(host, client -> {
             var req = GetIndexRequest.newBuilder().setSelfname(selfname).build();
-            var reply = client.getIndex(req);
-            return reply;
+            return client.getIndex(req);
         });
     }
 
@@ -81,8 +81,6 @@ public class RemoteObjectServiceClient {
 
         var send = builder.build();
 
-        return remoteHostManager.withClient(host, client -> {
-            return client.indexUpdate(send).getErrorsList();
-        });
+        return remoteHostManager.withClient(host, client -> client.indexUpdate(send).getErrorsList());
     }
 }

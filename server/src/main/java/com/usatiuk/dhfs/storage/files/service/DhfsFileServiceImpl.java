@@ -8,9 +8,7 @@ import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
-import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
-import io.vertx.mutiny.core.Vertx;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -25,23 +23,16 @@ import java.util.concurrent.atomic.AtomicReference;
 @ApplicationScoped
 public class DhfsFileServiceImpl implements DhfsFileService {
     @Inject
-    Vertx vertx;
-    @Inject
     JObjectManager jObjectManager;
 
     @ConfigProperty(name = "dhfs.storage.files.target_chunk_size")
     Integer targetChunkSize;
 
-    final static String namespace = "dhfs_files";
-
     void init(@Observes @Priority(500) StartupEvent event) {
         Log.info("Initializing file service");
-        jObjectManager.getOrPut(new UUID(0, 0).toString(), new Directory(new UUID(0, 0), 0755));
+        if (jObjectManager.get(new UUID(0, 0).toString()).isEmpty())
+            jObjectManager.put(new Directory(new UUID(0, 0), 0755));
         getRoot();
-    }
-
-    void shutdown(@Observes @Priority(100) ShutdownEvent event) {
-        Log.info("Shutdown");
     }
 
     private Optional<JObject<? extends FsNode>> traverse(JObject<? extends FsNode> from, Path path) {
