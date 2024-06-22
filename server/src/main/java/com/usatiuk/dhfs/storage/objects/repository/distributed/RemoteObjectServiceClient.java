@@ -10,6 +10,7 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.util.List;
 import java.util.Map;
 
 @ApplicationScoped
@@ -61,7 +62,7 @@ public class RemoteObjectServiceClient {
         });
     }
 
-    public GetIndexReply getIndex(String host) {
+    public IndexUpdatePush getIndex(String host) {
         return remoteHostManager.withClient(host, client -> {
             var req = GetIndexRequest.newBuilder().setSelfname(selfname).build();
             var reply = client.getIndex(req);
@@ -69,18 +70,18 @@ public class RemoteObjectServiceClient {
         });
     }
 
-    public void notifyUpdate(String host, String name) {
-        var obj = jObjectManager.get(name);
+    public List<IndexUpdateError> notifyUpdate(String host, List<String> names) {
+        var builder = IndexUpdatePush.newBuilder().setSelfname(selfname);
+        for (var v : names) {
+            var obj = jObjectManager.get(v);
+            if (obj.isEmpty()) continue;
+            builder.addHeader(obj.get().runReadLocked(ObjectMetadata::toRpcHeader));
+        }
 
-        if (obj.isEmpty()) return;
+        var send = builder.build();
 
-        remoteHostManager.withClient(host, client -> {
-            var builder = IndexUpdatePush.newBuilder().setSelfname(selfname);
-
-            client.indexUpdate(builder.setHeader(
-                    obj.get().runReadLocked(ObjectMetadata::toRpcHeader)
-            ).build());
-            return null;
+        return remoteHostManager.withClient(host, client -> {
+            return client.indexUpdate(send).getErrorsList();
         });
     }
 }

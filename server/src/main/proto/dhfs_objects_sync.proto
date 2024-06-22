@@ -8,7 +8,7 @@ package dhfs.objects.sync;
 
 service DhfsObjectSyncGrpc {
   rpc GetObject (GetObjectRequest) returns (GetObjectReply) {}
-  rpc GetIndex (GetIndexRequest) returns (GetIndexReply) {}
+  rpc GetIndex (GetIndexRequest) returns (IndexUpdatePush) {}
   rpc IndexUpdate (IndexUpdatePush) returns (IndexUpdateReply) {}
 
   rpc Ping (PingRequest) returns (PingReply) {}
@@ -59,18 +59,19 @@ message GetIndexRequest {
   string selfname = 10;
 }
 
-message GetIndexReply {
-  string selfname = 10;
-
-  repeated ObjectHeader objects = 1;
-}
-
 message IndexUpdatePush {
   string selfname = 10;
 
-  ObjectHeader header = 1;
+  repeated ObjectHeader header = 1;
+}
+
+message IndexUpdateError {
+  string object_name = 1;
+  string error = 2;
 }
 
 message IndexUpdateReply {
+  string selfname = 10;
 
+  repeated IndexUpdateError errors = 1;
 }

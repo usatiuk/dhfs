@@ -8,10 +8,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 @ApplicationScoped
 public class InvalidationQueueService {
@@ -21,7 +18,7 @@ public class InvalidationQueueService {
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
 
-    private Map<String, Set<String>> _hostToInvObj = new LinkedHashMap<>();
+    private Map<String, SequencedSet<String>> _hostToInvObj = new LinkedHashMap<>();
 
     private Thread _senderThread;
 
@@ -37,13 +34,13 @@ public class InvalidationQueueService {
         _senderThread.join();
     }
 
-    private Set<String> getSetForHost(String host) {
+    private SequencedSet<String> getSetForHost(String host) {
         synchronized (this) {
             return _hostToInvObj.computeIfAbsent(host, k -> new LinkedHashSet<>());
         }
     }
 
-    public Map<String, Set<String>> pullAll() throws InterruptedException {
+    public Map<String, SequencedSet<String>> pullAll() throws InterruptedException {
         synchronized (this) {
             while (_hostToInvObj.isEmpty())
                 this.wait();
@@ -61,13 +58,27 @@ public class InvalidationQueueService {
                 String stats = "Sent invalidation: ";
                 for (var forHost : data.entrySet()) {
                     long sent = 0;
-                    for (var obj : forHost.getValue()) {
+                    while (!forHost.getValue().isEmpty()) {
+                        ArrayList<String> chunk = new ArrayList<>();
+
+                        while (chunk.size() < 1000 && !forHost.getValue().isEmpty()) {
+                            chunk.add(forHost.getValue().removeFirst());
+                        }
+
+                        sent += chunk.size();
+
                         try {
-                            remoteObjectServiceClient.notifyUpdate(forHost.getKey(), obj);
-                            sent++;
+                            var errs = remoteObjectServiceClient.notifyUpdate(forHost.getKey(), chunk);
+                            for (var v : errs) {
+                                Log.info("Failed to send invalidation to " + forHost.getKey() +
+                                        " of " + v.getObjectName() + ": " + v.getError() + ", will retry");
+                                pushInvalidationToOne(forHost.getKey(), v.getObjectName());
+                                sent--;
+                            }
                         } catch (Exception e) {
-                            Log.info("Failed to send invalidation to " + forHost.getKey() + " of " + obj + ": " + e.getMessage() + " will retry");
-                            pushInvalidationToOne(forHost.getKey(), obj);
+                            Log.info("Failed to send invalidation to " + forHost.getKey() + ": " + e.getMessage() + ", will retry");
+                            for (var c : chunk)
+                                pushInvalidationToOne(forHost.getKey(), c);
                         }
                         if (Thread.interrupted()) {
                             Log.info("Invalidation sender exiting");

@@ -106,7 +106,7 @@ public class JObject<T extends JObjectData> implements Serializable {
             _lock.readLock().lock();
             try {
                 if (_dataPart.get() == null) {
-                    _dataPart.set(_resolver.resolveData(this));
+                    _dataPart.compareAndSet(null, _resolver.resolveData(this));
                     if (!_metaPart.getType().isAssignableFrom(_dataPart.get().getClass()))
                         throw new NotImplementedException("Type mismatch for " + getName());
                 }

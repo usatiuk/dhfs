@@ -47,18 +47,18 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
     @Override
     @Blocking
-    public Uni<GetIndexReply> getIndex(GetIndexRequest request) {
+    public Uni<IndexUpdatePush> getIndex(GetIndexRequest request) {
         if (request.getSelfname().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
         remoteHostManager.handleConnectionSuccess(request.getSelfname());
 
         Log.info("<-- getIndex: ");
-        var builder = GetIndexReply.newBuilder().setSelfname(selfname);
+        var builder = IndexUpdatePush.newBuilder().setSelfname(selfname);
 
         var objs = jObjectManager.find("");
 
         for (var obj : objs) {
             obj.runReadLocked((meta) -> {
-                builder.addObjects(meta.toRpcHeader());
+                builder.addHeader(meta.toRpcHeader());
                 return null;
             });
         }
