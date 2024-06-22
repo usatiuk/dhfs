@@ -12,6 +12,7 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 import java.net.*;
+import java.nio.ByteBuffer;
 import java.util.UUID;
 
 @ApplicationScoped
@@ -47,7 +48,7 @@ public class LocalPeerDiscoveryClient {
                 _socket.receive(packet);
 
                 try {
-                    var got = PeerDiscoveryInfo.parseFrom(buf);
+                    var got = PeerDiscoveryInfo.parseFrom(ByteBuffer.wrap(buf, 0, packet.getLength()));
 
                     remoteHostManager.notifyAddr(UUID.fromString(got.getUuid()), packet.getAddress().toString(), got.getPort());
 
