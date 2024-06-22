@@ -41,6 +41,9 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
         var obj = jObjectManager.get(request.getName()).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
+        if (!obj.tryLocalResolve())
+            throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Not available locally"));
+        //FIXME:
         Pair<ObjectHeader, ByteString> read = obj.runReadLocked((meta, data) -> Pair.of(meta.toRpcHeader(), SerializationHelper.serialize(data)));
         var replyObj = ApiObject.newBuilder().setHeader(read.getLeft()).setContent(read.getRight()).build();
         return Uni.createFrom().item(GetObjectReply.newBuilder().setObject(replyObj).build());
