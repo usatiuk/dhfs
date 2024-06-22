@@ -18,8 +18,8 @@ jobs:
         run: apt-get update && apt-get install -y sudo
         if: env.ACT=='true'
 
-      - name: Install fuse
-        run: sudo apt-get update && sudo apt-get install -y fuse libfuse-dev
+      - name: Install fuse and maven
+        run: sudo apt-get update && sudo apt-get install -y fuse libfuse-dev maven
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
