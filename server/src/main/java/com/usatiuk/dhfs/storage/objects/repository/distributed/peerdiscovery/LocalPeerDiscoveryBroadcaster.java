@@ -85,7 +85,7 @@ public class LocalPeerDiscoveryBroadcaster {
                             }
 
                             try {
-                                sendPacket = new DatagramPacket(sendBytes, sendBytes.length, broadcast, 8888);
+                                sendPacket = new DatagramPacket(sendBytes, sendBytes.length, broadcast, 42069);
                                 _socket.send(sendPacket);
                             } catch (Exception ignored) {
                                 continue;
