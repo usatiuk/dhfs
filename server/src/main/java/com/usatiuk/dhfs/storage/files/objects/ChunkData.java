@@ -18,7 +18,7 @@ public class ChunkData extends JObjectData {
     public ChunkData(ByteString bytes) {
         super();
         this._bytes = bytes;
-        // TODO: There might be a copy there
+        // TODO: There might be (most definitely) a copy there
         this._hash = Arrays.stream(LongTupleHashFunction.xx128().hashBytes(_bytes.asReadOnlyByteBuffer()))
                 .mapToObj(Long::toHexString).collect(Collectors.joining());
     }
