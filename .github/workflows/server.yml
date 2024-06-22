@@ -28,8 +28,8 @@ jobs:
           distribution: "zulu"
           cache: maven
 
-      - name: Build with Gradle Wrapper
-        run: cd server && ./mvnw --batch-mode --update-snapshots verify
+      - name: Build and test with Maven
+        run: cd server && mvn --batch-mode --update-snapshots verify
 
       - run: mkdir staging && cp target/*.jar staging
       - uses: actions/upload-artifact@v4
