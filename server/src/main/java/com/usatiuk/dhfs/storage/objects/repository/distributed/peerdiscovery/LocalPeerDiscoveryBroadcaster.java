@@ -37,6 +37,7 @@ public class LocalPeerDiscoveryBroadcaster {
     }
 
     void shutdown(@Observes @Priority(10) ShutdownEvent event) {
+        _socket.close();
         _broadcasterThread.interrupt();
         while (_broadcasterThread.isAlive()) {
             try {
@@ -44,7 +45,6 @@ public class LocalPeerDiscoveryBroadcaster {
             } catch (InterruptedException ignored) {
             }
         }
-
     }
 
     private void broadcast() {

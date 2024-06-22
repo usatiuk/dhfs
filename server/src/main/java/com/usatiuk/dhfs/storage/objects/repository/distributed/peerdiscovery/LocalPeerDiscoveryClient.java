@@ -36,8 +36,15 @@ public class LocalPeerDiscoveryClient {
     }
 
     void shutdown(@Observes @Priority(10) ShutdownEvent event) throws InterruptedException {
+        _socket.close();
         _clientThread.interrupt();
-        _clientThread.join();
+        _clientThread.interrupt();
+        while (_clientThread.isAlive()) {
+            try {
+                _clientThread.join();
+            } catch (InterruptedException ignored) {
+            }
+        }
     }
 
     private void client() {
