@@ -57,7 +57,7 @@ public class LocalPeerDiscoveryClient {
                 try {
                     var got = PeerDiscoveryInfo.parseFrom(ByteBuffer.wrap(buf, 0, packet.getLength()));
 
-                    remoteHostManager.notifyAddr(UUID.fromString(got.getUuid()), packet.getAddress().toString(), got.getPort());
+                    remoteHostManager.notifyAddr(UUID.fromString(got.getUuid()), packet.getAddress().getHostAddress(), got.getPort());
 
                 } catch (InvalidProtocolBufferException e) {
                     continue;
