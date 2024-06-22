@@ -63,6 +63,7 @@ public class PersistentRemoteHostsService {
     }
 
     public void addHost(HostInfo hostInfo) {
+        if (hostInfo.getUuid().equals(_selfUuid)) return;
         _persistentData.runWriteLocked(d -> {
             d.getRemoteHosts().put(hostInfo.getUuid(), hostInfo);
             return null;
