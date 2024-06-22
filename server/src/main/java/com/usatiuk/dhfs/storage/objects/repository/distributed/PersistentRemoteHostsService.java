@@ -68,4 +68,10 @@ public class PersistentRemoteHostsService {
             return null;
         });
     }
+
+    public boolean existsHost(UUID uuid) {
+        return _persistentData.runReadLocked(d -> {
+            return d.getRemoteHosts().containsKey(uuid);
+        });
+    }
 }
