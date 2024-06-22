@@ -39,7 +39,7 @@ public class DhfsFileServiceSimpleTest {
             ChunkInfo c2i = new ChunkInfo(c2.getHash(), c2.getBytes().size());
             ChunkData c3 = new ChunkData(ByteString.copyFrom("91011".getBytes()));
             ChunkInfo c3i = new ChunkInfo(c3.getHash(), c3.getBytes().size());
-            File f = new File(fuuid);
+            File f = new File(fuuid, 777, null);
             f.getChunks().put(0L, c1.getHash());
             f.getChunks().put((long) c1.getBytes().size(), c2.getHash());
             f.getChunks().put((long) c1.getBytes().size() + c2.getBytes().size(), c3.getHash());
@@ -128,5 +128,22 @@ public class DhfsFileServiceSimpleTest {
 
         fileService.truncate(uuid, 7);
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6,}, fileService.read(uuid, 0, 20).get().toByteArray());
+    }
+
+    @Test
+    void moveTest() {
+        var ret = fileService.create("/moveTest", 777);
+        Assertions.assertTrue(ret.isPresent());
+        var uuid = ret.get();
+
+        fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+
+        Assertions.assertTrue(fileService.rename("/moveTest", "/movedTest"));
+        Assertions.assertFalse(fileService.open("/moveTest").isPresent());
+        Assertions.assertTrue(fileService.open("/movedTest").isPresent());
+
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+                fileService.read(fileService.open("/movedTest").get(), 0, 10).get().toByteArray());
     }
 }

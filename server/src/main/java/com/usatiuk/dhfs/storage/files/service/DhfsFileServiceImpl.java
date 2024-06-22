@@ -54,7 +54,15 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             return Optional.empty();
         }
 
-        if (path.getNameCount() == 1) return ref;
+        if (path.getNameCount() == 1) {
+            if (ref.get().isOf(File.class)) {
+                var f = (JObject<File>) ref.get();
+                if (!Objects.equals(f.runReadLocked((m, d) -> d.getParent()).toString(), from.getName())) {
+                    throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Parent mismatch for file " + path));
+                }
+            }
+            return ref;
+        }
 
         return traverse(ref.get(), path.subpath(1, path.getNameCount()));
 
@@ -99,8 +107,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         var dir = (JObject<Directory>) found.get();
         var fuuid = UUID.randomUUID();
-        File f = new File(fuuid);
-        f.setMode(mode);
+        File f = new File(fuuid, mode, UUID.fromString(dir.getName())); //FIXME:
 
         jObjectManager.put(f);
 
@@ -147,6 +154,12 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (!(found.get().isOf(Directory.class))) return false;
 
+        var kidId = ((JObject<Directory>) found.get()).runReadLocked((m, d) -> d.getKid(Path.of(name).getFileName().toString()));
+
+        var kid = jObjectManager.get(kidId.get().toString());
+
+        if (kid.isEmpty()) return false;
+
         var dir = (JObject<Directory>) found.get();
         return dir.runWriteLocked((m, d, bump) -> {
             bump.apply();
@@ -171,6 +184,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         if (dent.isEmpty()) return false;
         if (!rmdent(from)) return false;
 
+        var dentGot = dent.get();
+
         // FIXME:
         var root = getRoot();
         var found = traverse(root, Path.of(to).getParent());
@@ -180,10 +195,20 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         var dir = (JObject<Directory>) found.get();
 
+        var putDent = dentGot.isOf(File.class) ?
+                jObjectManager.put(((JObject<File>) dentGot).runWriteLocked((m, d, b) -> {
+                    var cpy = new File(UUID.randomUUID(), d.getMode(), UUID.fromString(dir.getName()));
+                    cpy.setMtime(d.getMtime());
+                    cpy.setCtime(d.getCtime());
+                    cpy.getChunks().putAll(d.getChunks());
+                    return cpy;
+                })) : dentGot;
+
         dir.runWriteLocked((m, d, bump) -> {
             bump.apply();
+
             d.setMtime(System.currentTimeMillis());
-            d.getChildren().put(Path.of(to).getFileName().toString(), UUID.fromString(dent.get().getName()));
+            d.getChildren().put(Path.of(to).getFileName().toString(), UUID.fromString(putDent.getName()));
             return null;
         });
 

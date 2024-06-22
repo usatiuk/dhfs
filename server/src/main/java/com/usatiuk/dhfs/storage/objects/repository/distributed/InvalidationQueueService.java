@@ -53,7 +53,7 @@ public class InvalidationQueueService {
     private void sender() {
         try {
             while (!Thread.interrupted()) {
-                Thread.sleep(100);
+                Thread.sleep(1000);
                 var data = pullAll();
                 String stats = "Sent invalidation: ";
                 for (var forHost : data.entrySet()) {
