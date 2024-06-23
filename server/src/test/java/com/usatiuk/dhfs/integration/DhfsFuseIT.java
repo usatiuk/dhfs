@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.integration;
 
+import com.github.dockerjava.api.model.Capability;
 import com.github.dockerjava.api.model.Device;
 import io.quarkus.logging.Log;
 import org.apache.commons.lang3.tuple.Pair;
@@ -46,12 +47,10 @@ public class DhfsFuseIT {
                                 .build())
                 .withFileFromPath("/app", Paths.get(buildPath, "quarkus-app"));
         container1 = new GenericContainer<>(image)
-                .withPrivilegedMode(true)
-                .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")))
+                .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")).withCapAdd(Capability.SYS_ADMIN))
                 .waitingFor(Wait.forLogMessage(".*Listening.*", 1).withStartupTimeout(Duration.ofSeconds(60))).withNetwork(network);
         container2 = new GenericContainer<>(image)
-                .withPrivilegedMode(true)
-                .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")))
+                .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")).withCapAdd(Capability.SYS_ADMIN))
                 .waitingFor(Wait.forLogMessage(".*Listening.*", 1).withStartupTimeout(Duration.ofSeconds(60))).withNetwork(network);
 
         Stream.of(container1, container2).parallel().forEach(GenericContainer::start);
