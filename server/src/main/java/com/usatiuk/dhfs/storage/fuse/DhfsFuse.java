@@ -96,9 +96,9 @@ public class DhfsFuse extends FuseStubFS {
             }
             var foundDent = (FsNode) found.get();
 
-            var ctime = System.currentTimeMillis();
-            stat.st_atim.tv_sec.set(ctime / 1000);
-            stat.st_atim.tv_nsec.set((ctime % 1000) * 1000);
+            var atime = System.currentTimeMillis();
+            stat.st_atim.tv_sec.set(atime / 1000);
+            stat.st_atim.tv_nsec.set((atime % 1000) * 1000);
 
             // FIXME: Race?
             stat.st_ctim.tv_sec.set(foundDent.getCtime() / 1000);
