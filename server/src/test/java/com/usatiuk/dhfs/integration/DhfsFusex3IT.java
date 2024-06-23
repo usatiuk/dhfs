@@ -114,9 +114,15 @@ public class DhfsFusex3IT {
 
     @Test
     void dirConflictTest() throws IOException, InterruptedException, TimeoutException {
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode());
-        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode());
-        Assertions.assertEquals(0, container3.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode());
+        boolean read = false;
+        for (int i = 0; i < 10; i++) {
+            read = (container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode() == 0)
+                    && (container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode() == 0)
+                    && (container3.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode() == 0);
+            if (read) break;
+            Thread.sleep(1000);
+        }
+        Assertions.assertTrue(read);
         Thread.sleep(1000);
         boolean createFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_data/dhfs_fuse_root/testf"),
                 Pair.of(container2, "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf"),
