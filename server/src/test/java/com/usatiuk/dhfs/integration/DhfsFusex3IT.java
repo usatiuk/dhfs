@@ -122,7 +122,63 @@ public class DhfsFusex3IT {
         Assertions.assertEquals(0, container3.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode());
         Thread.sleep(1000);
         boolean createFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_data/dhfs_fuse_root/testf"),
-                Pair.of(container2, "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf"), Pair.of(container3, "echo test3 >> /root/dhfs_data/dhfs_fuse_root/testf")).parallel().map(p -> {
+                Pair.of(container2, "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf"),
+                Pair.of(container3, "echo test3 >> /root/dhfs_data/dhfs_fuse_root/testf")).parallel().map(p -> {
+            try {
+                return p.getLeft().execInContainer("/bin/sh", "-c", p.getRight()).getExitCode();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }).anyMatch(r -> r != 0);
+        if (createFail) {
+            Log.info("Failed creating one or more files");
+            return;
+        }
+        Thread.sleep(3000);
+        var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
+        var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
+        Log.info(ls);
+        Log.info(cat);
+        Assertions.assertTrue(cat.getStdout().contains("test1"));
+        Assertions.assertTrue(cat.getStdout().contains("test2"));
+        Assertions.assertTrue(cat.getStdout().contains("test3"));
+        Assertions.assertTrue(ls.getStdout().chars().filter(c -> c == '\n').count() >= 3);
+    }
+
+    @Test
+    void dirConflictTest2() throws IOException, InterruptedException, TimeoutException {
+        boolean createFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_data/dhfs_fuse_root/testf"),
+                Pair.of(container2, "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf"),
+                Pair.of(container3, "echo test3 >> /root/dhfs_data/dhfs_fuse_root/testf")).parallel().map(p -> {
+            try {
+                return p.getLeft().execInContainer("/bin/sh", "-c", p.getRight()).getExitCode();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }).anyMatch(r -> r != 0);
+        if (createFail) {
+            Log.info("Failed creating one or more files");
+            return;
+        }
+        Thread.sleep(3000);
+        var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
+        var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
+        Log.info(ls);
+        Log.info(cat);
+        Assertions.assertTrue(cat.getStdout().contains("test1"));
+        Assertions.assertTrue(cat.getStdout().contains("test2"));
+        Assertions.assertTrue(cat.getStdout().contains("test3"));
+        Assertions.assertTrue(ls.getStdout().chars().filter(c -> c == '\n').count() >= 3);
+    }
+
+    @Test
+    void dirConflictTest3() throws IOException, InterruptedException, TimeoutException {
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode());
+        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode());
+        Assertions.assertEquals(0, container3.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode());
+        boolean createFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_data/dhfs_fuse_root/testf"),
+                Pair.of(container2, "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf"),
+                Pair.of(container3, "echo test3 >> /root/dhfs_data/dhfs_fuse_root/testf")).parallel().map(p -> {
             try {
                 return p.getLeft().execInContainer("/bin/sh", "-c", p.getRight()).getExitCode();
             } catch (Exception e) {
@@ -151,6 +207,37 @@ public class DhfsFusex3IT {
         Assertions.assertEquals("test123\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
         Assertions.assertEquals("test123\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
         Thread.sleep(200);
+
+        boolean writeFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_data/dhfs_fuse_root/testf1"),
+                Pair.of(container2, "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf1"),
+                Pair.of(container3, "echo test3 >> /root/dhfs_data/dhfs_fuse_root/testf1")).parallel().map(p -> {
+            try {
+                return p.getLeft().execInContainer("/bin/sh", "-c", p.getRight()).getExitCode();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }).anyMatch(r -> r != 0);
+        if (writeFail) {
+            Log.info("Failed writing one or more files");
+            return;
+        }
+        Thread.sleep(3000);
+        var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
+        var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
+        Log.info(ls);
+        Log.info(cat);
+        Assertions.assertTrue(cat.getStdout().contains("test1"));
+        Assertions.assertTrue(cat.getStdout().contains("test2"));
+        Assertions.assertTrue(cat.getStdout().contains("test3"));
+        Assertions.assertTrue(ls.getStdout().chars().filter(c -> c == '\n').count() >= 3);
+    }
+
+    @Test
+    void fileConflictTest2() throws IOException, InterruptedException, TimeoutException {
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo test123 > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
+        Thread.sleep(2000);
+        Assertions.assertEquals("test123\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+        Assertions.assertEquals("test123\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
 
         boolean writeFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_data/dhfs_fuse_root/testf1"),
                 Pair.of(container2, "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf1"),
