@@ -51,7 +51,7 @@ public class JObjectResolver {
     public void removeLocal(JObject<?> jObject, String name) {
         jObject.assertRWLock();
         try {
-//            Log.info("Deleting " + name);
+            Log.trace("Deleting " + name);
             jObjectWriteback.remove(name);
             objectPersistentStore.deleteObject(name);
         } catch (StatusRuntimeException sx) {

@@ -12,6 +12,7 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.NotImplementedException;
 
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -51,6 +52,7 @@ public class SyncHandler {
     }
 
     private void handleOneUpdate(UUID from, ObjectHeader header) {
+        Log.info("Handling update: " + header.getName() + " from " + from);
         JObject<?> found;
         try {
             found = jObjectManager.getOrPut(header.getName(), new ObjectMetadata(
@@ -76,15 +78,20 @@ public class SyncHandler {
                 return false;
             }
 
-            if (md.getChangelog().getOrDefault(persistentRemoteHostsService.getSelfUuid(), 0L) > receivedSelfVer)
-                return true;
-
             md.getRemoteCopies().put(from, receivedTotalVer);
+
+            if (md.getChangelog().getOrDefault(persistentRemoteHostsService.getSelfUuid(), 0L) > receivedSelfVer) {
+                Log.info("Conflict on update (self-version): " + header.getName() + " from " + from);
+                return true;
+            }
 
             if (Objects.equals(md.getOurVersion(), receivedTotalVer)) {
                 for (var e : header.getChangelog().getEntriesList()) {
                     if (!Objects.equals(md.getChangelog().getOrDefault(UUID.fromString(e.getHost()), 0L),
-                            e.getVersion())) return true;
+                            e.getVersion())) {
+                        Log.info("Conflict on update (other version): " + header.getName() + " from " + from);
+                        return true;
+                    }
                 }
             }
 
@@ -110,6 +117,7 @@ public class SyncHandler {
         });
 
         if (conflict) {
+            Log.info("Trying conflict resolution: " + header.getName() + " from " + from);
             var resolver = conflictResolvers.select(found.getConflictResolver());
             var result = resolver.get().resolve(from, found);
             if (result.equals(ConflictResolver.ConflictResolutionResult.RESOLVED)) {
@@ -128,7 +136,8 @@ public class SyncHandler {
             try {
                 handleOneUpdate(UUID.fromString(request.getSelfUuid()), u);
             } catch (Exception ex) {
-                builder.addErrors(IndexUpdateError.newBuilder().setObjectName(u.getName()).setError(ex.toString()).build());
+                Log.info("Error when handling update from " + request.getSelfUuid() + " of " + u.getName(), ex);
+                builder.addErrors(IndexUpdateError.newBuilder().setObjectName(u.getName()).setError(ex.toString() + Arrays.toString(ex.getStackTrace())).build());
             }
         }
         return builder.build();

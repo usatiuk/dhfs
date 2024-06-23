@@ -37,12 +37,14 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
         remoteHostManager.handleConnectionSuccess(UUID.fromString(request.getSelfUuid()));
 
-        Log.info("<-- getObject: " + request.getName());
+        Log.info("<-- getObject: " + request.getName() + " from " + request.getSelfUuid());
 
         var obj = jObjectManager.get(request.getName()).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
-        if (!obj.tryLocalResolve())
+        if (!obj.tryLocalResolve()) {
+            Log.info("<-- getObject FAIL: " + request.getName() + " from " + request.getSelfUuid());
             throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Not available locally"));
+        }
         //FIXME:
         Pair<ObjectHeader, ByteString> read = obj.runReadLocked((meta, data) -> Pair.of(meta.toRpcHeader(), SerializationHelper.serialize(data)));
         var replyObj = ApiObject.newBuilder().setHeader(read.getLeft()).setContent(read.getRight()).build();
@@ -55,7 +57,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
         remoteHostManager.handleConnectionSuccess(UUID.fromString(request.getSelfUuid()));
 
-        Log.info("<-- getIndex: ");
+        Log.info("<-- getIndex: from " + request.getSelfUuid());
         var builder = IndexUpdatePush.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString());
 
         var objs = jObjectManager.find("");

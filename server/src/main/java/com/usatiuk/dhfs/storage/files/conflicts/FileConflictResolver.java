@@ -45,15 +45,9 @@ public class FileConflictResolver implements ConflictResolver {
                 .orElseThrow(() -> new NotImplementedException("Could not find parent directory for file " + oursAsFile.getName()));
 
         _oursDir.runWriteLockedMeta((a, b, c) -> {
-            // FIXME:
-            if (!_oursDir.tryLocalResolve())
-                throw new NotImplementedException("Conflict but we don't have local copy for " + _oursDir.getName());
 
             _oursDir.runWriteLocked((mD, oursDir, bumpDir) -> {
                 oursAsFile.runWriteLockedMeta((a2, b2, c2) -> {
-                    // FIXME:
-                    if (!ours.tryLocalResolve())
-                        throw new NotImplementedException("Conflict but we don't have local copy for " + ours.getName());
 
                     oursAsFile.runWriteLocked((m, oursFile, bumpFile) -> {
 
