@@ -65,7 +65,8 @@ public class JObjectResolver {
     public void notifyWrite(JObject<?> self) {
         self.assertRWLock();
         jObjectWriteback.markDirty(self.getName(), self);
-        invalidationQueueService.pushInvalidationToAll(self.getName());
+        if (self.isResolved())
+            invalidationQueueService.pushInvalidationToAll(self.getName());
     }
 
     public void bumpVersionSelf(JObject<?> self) {

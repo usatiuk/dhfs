@@ -39,7 +39,6 @@ public class DirectoryConflictResolver implements ConflictResolver {
 
         var oursAsDir = (JObject<Directory>) ours;
         oursAsDir.runWriteLockedMeta((a, b, c) -> {
-            // FIXME:
             if (!ours.tryLocalResolve())
                 throw new NotImplementedException("Conflict but we don't have local copy for " + ours.getName());
 
