@@ -7,6 +7,8 @@ import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.RemoteObjectServiceClient;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -40,7 +42,7 @@ public class DirectoryConflictResolver implements ConflictResolver {
         var oursAsDir = (JObject<Directory>) ours;
         oursAsDir.runWriteLockedMeta((a, b, c) -> {
             if (!ours.tryLocalResolve())
-                throw new NotImplementedException("Conflict but we don't have local copy for " + ours.getName());
+                throw new StatusRuntimeException(Status.ABORTED.withDescription("Conflict but we don't have local copy"));
 
             oursAsDir.runWriteLocked((m, oursDir, bump) -> {
 
