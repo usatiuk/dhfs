@@ -7,6 +7,7 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.*;
 
@@ -17,6 +18,12 @@ public class InvalidationQueueService {
 
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
+
+    @ConfigProperty(name = "dhfs.objects.distributed.invalidation.batch_size")
+    Integer batchSize;
+
+    @ConfigProperty(name = "dhfs.objects.distributed.invalidation.delay")
+    Integer delay;
 
     private Map<UUID, SequencedSet<String>> _hostToInvObj = new LinkedHashMap<>();
 
@@ -53,7 +60,7 @@ public class InvalidationQueueService {
     private void sender() {
         try {
             while (!Thread.interrupted()) {
-                Thread.sleep(1000);
+                Thread.sleep(delay);
                 var data = pullAll();
                 String stats = "Sent invalidation: ";
                 for (var forHost : data.entrySet()) {
@@ -61,7 +68,7 @@ public class InvalidationQueueService {
                     while (!forHost.getValue().isEmpty()) {
                         ArrayList<String> chunk = new ArrayList<>();
 
-                        while (chunk.size() < 1000 && !forHost.getValue().isEmpty()) {
+                        while (chunk.size() < batchSize && !forHost.getValue().isEmpty()) {
                             chunk.add(forHost.getValue().removeFirst());
                         }
 

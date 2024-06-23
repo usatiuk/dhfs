@@ -22,6 +22,12 @@ public class LocalPeerDiscoveryBroadcaster {
     @ConfigProperty(name = "quarkus.http.port")
     Integer ourPort;
 
+    @ConfigProperty(name = "dhfs.objects.distributed.peerdiscovery.port")
+    Integer broadcastPort;
+
+    @ConfigProperty(name = "dhfs.objects.distributed.peerdiscovery.interval")
+    Integer broadcastInterval;
+
     private Thread _broadcasterThread;
 
     private DatagramSocket _socket;
@@ -50,7 +56,7 @@ public class LocalPeerDiscoveryBroadcaster {
     private void broadcast() {
         try {
             while (!Thread.interrupted()) {
-                Thread.sleep(10000L);
+                Thread.sleep(broadcastInterval);
 
                 try {
                     var sendData = PeerDiscoveryInfo.newBuilder()
@@ -62,7 +68,7 @@ public class LocalPeerDiscoveryBroadcaster {
 
                     DatagramPacket sendPacket
                             = new DatagramPacket(sendBytes, sendBytes.length,
-                            InetAddress.getByName("255.255.255.255"), 42069);
+                            InetAddress.getByName("255.255.255.255"), broadcastPort);
 
                     _socket.send(sendPacket);
 
@@ -85,7 +91,7 @@ public class LocalPeerDiscoveryBroadcaster {
                             }
 
                             try {
-                                sendPacket = new DatagramPacket(sendBytes, sendBytes.length, broadcast, 42069);
+                                sendPacket = new DatagramPacket(sendBytes, sendBytes.length, broadcast, broadcastPort);
                                 _socket.send(sendPacket);
                             } catch (Exception ignored) {
                                 continue;

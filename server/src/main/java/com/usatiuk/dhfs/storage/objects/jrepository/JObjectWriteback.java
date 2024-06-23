@@ -10,6 +10,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,8 +26,13 @@ public class JObjectWriteback {
     @Inject
     JObjectManager jObjectManager;
 
+    @ConfigProperty(name = "dhfs.objects.writeback.delay")
+    Integer delay;
+
+    @ConfigProperty(name = "dhfs.objects.writeback.limit")
+    Integer limit;
+
     private final LinkedHashMap<String, Pair<Long, JObject<?>>> _objects = new LinkedHashMap<>();
-    private final LinkedHashSet<String> _toIgnore = new LinkedHashSet<>();
 
     private Thread _writebackThread;
 
@@ -60,7 +66,7 @@ public class JObjectWriteback {
             boolean wait = false;
             while (!Thread.interrupted()) {
                 if (wait) {
-                    Thread.sleep(500);
+                    Thread.sleep(delay);
                     wait = false;
                 }
                 JObject<?> obj;
@@ -68,7 +74,7 @@ public class JObjectWriteback {
                     while (_objects.isEmpty())
                         _objects.wait();
 
-                    if ((System.currentTimeMillis() - _objects.firstEntry().getValue().getLeft()) < 500L) {
+                    if ((System.currentTimeMillis() - _objects.firstEntry().getValue().getLeft()) < delay) {
                         wait = true;
                         continue;
                     }
@@ -124,7 +130,7 @@ public class JObjectWriteback {
             }
 
             // FIXME: better logic
-            if (_objects.size() < 10000) {
+            if (_objects.size() < limit) {
                 _objects.put(name, Pair.of(System.currentTimeMillis(), object));
                 _objects.notifyAll();
                 return;

@@ -40,7 +40,7 @@ public class RemoteHostManager {
     void shutdown(@Observes @Priority(250) ShutdownEvent event) throws IOException {
     }
 
-    @Scheduled(every = "2s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    @Scheduled(every = "${dhfs.objects.distributed.reconnect_interval}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     @Blocking
     public void tryConnectAll() {
         for (var host : persistentRemoteHostsService.getHosts()) {
