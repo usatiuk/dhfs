@@ -6,6 +6,7 @@ import com.usatiuk.dhfs.storage.objects.repository.distributed.HostInfo;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.RemoteHostManager;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.RpcClientFactory;
+import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -40,7 +41,11 @@ public class PeerSyncClient {
 
     public void syncPeersAll() {
         for (var h : remoteHostManager.getSeenHosts()) {
-            syncPeersOne(h);
+            try {
+                syncPeersOne(h);
+            } catch (Exception e) {
+                Log.info("Failed syncing hosts with " + h, e);
+            }
         }
     }
 }

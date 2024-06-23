@@ -1,12 +1,14 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
 import com.usatiuk.dhfs.storage.SerializationHelper;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.peersync.PeerSyncClient;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
 import org.apache.commons.lang3.SerializationUtils;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -20,6 +22,9 @@ import java.util.UUID;
 public class PersistentRemoteHostsService {
     @ConfigProperty(name = "dhfs.objects.distributed.root")
     String dataRoot;
+
+    @Inject
+    PeerSyncClient peerSyncClient;
 
     final String dataFileName = "hosts";
 
@@ -65,10 +70,13 @@ public class PersistentRemoteHostsService {
 
     public void addHost(HostInfo hostInfo) {
         if (hostInfo.getUuid().equals(_selfUuid)) return;
-        _persistentData.runWriteLocked(d -> {
-            d.getRemoteHosts().put(hostInfo.getUuid(), hostInfo);
-            return null;
+        boolean added = _persistentData.runWriteLocked(d -> {
+            return d.getRemoteHosts().put(hostInfo.getUuid(), hostInfo) == null;
         });
+        if (added) {
+            // FIXME: async
+            peerSyncClient.syncPeersAll();
+        }
     }
 
     public boolean existsHost(UUID uuid) {
