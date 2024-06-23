@@ -51,8 +51,7 @@ public class SyncHandler {
         }
     }
 
-    private void handleOneUpdate(UUID from, ObjectHeader header) {
-        Log.info("Handling update: " + header.getName() + " from " + from);
+    public boolean tryHandleOneUpdate(UUID from, ObjectHeader header) {
         JObject<?> found;
         try {
             found = jObjectManager.getOrPut(header.getName(), new ObjectMetadata(
@@ -77,6 +76,17 @@ public class SyncHandler {
                         + from + " " + header.getName());
                 return false;
             }
+
+            String rcv = "";
+            for (var e : header.getChangelog().getEntriesList()) {
+                rcv += e.getHost() + ": " + e.getVersion() + "; ";
+            }
+            String ours = "";
+            for (var e : md.getChangelog().entrySet()) {
+                ours += e.getKey() + ": " + e.getValue() + "; ";
+            }
+            Log.info("Handling update: " + header.getName() + " from " + from + "\n" + "ours: " + ours + " \n" + "received: " + rcv);
+
 
             md.getRemoteCopies().put(from, receivedTotalVer);
 
@@ -116,8 +126,14 @@ public class SyncHandler {
             return false;
         });
 
-        if (conflict) {
+        return !conflict;
+    }
+
+    private void handleOneUpdate(UUID from, ObjectHeader header) {
+        if (!tryHandleOneUpdate(from, header)) {
             Log.info("Trying conflict resolution: " + header.getName() + " from " + from);
+            JObject<?> found = jObjectManager.get(header.getName())
+                    .orElseThrow(() -> new IllegalStateException("Object deleted when handling update?"));
             var resolver = conflictResolvers.select(found.getConflictResolver());
             var result = resolver.get().resolve(from, found);
             if (result.equals(ConflictResolver.ConflictResolutionResult.RESOLVED)) {

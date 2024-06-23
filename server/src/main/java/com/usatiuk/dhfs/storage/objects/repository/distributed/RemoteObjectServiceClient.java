@@ -26,6 +26,9 @@ public class RemoteObjectServiceClient {
     @Inject
     JObjectManager jObjectManager;
 
+    @Inject
+    SyncHandler syncHandler;
+
     public Pair<ObjectHeader, ByteString> getSpecificObject(UUID host, String name) {
         return rpcClientFactory.withObjSyncClient(host, client -> {
             var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).setName(name).build());
@@ -37,8 +40,12 @@ public class RemoteObjectServiceClient {
         jObject.assertRWLock();
 
         var targets = jObject.runWriteLockedMeta((md, b, v) -> {
-            var bestVer = md.getBestVersion();
-            return md.getRemoteCopies().entrySet().stream().filter(entry -> entry.getValue().equals(bestVer)).map(Map.Entry::getKey).toList();
+            // TODO: Handle case when either is empty properly
+            var ourVersion = md.getOurVersion();
+            var bestVersion = md.getBestVersion();
+            return md.getRemoteCopies().entrySet().stream()
+                    .filter(entry -> entry.getValue().equals(bestVersion) || entry.getValue().equals(ourVersion))
+                    .map(Map.Entry::getKey).toList();
         });
 
         return rpcClientFactory.withObjSyncClient(targets, client -> {
@@ -57,9 +64,20 @@ public class RemoteObjectServiceClient {
                                 || (md.getChangelog().get(persistentRemoteHostsService.getSelfUuid()) > receivedSelfVer);
 
                 if (outdated) {
-                    Log.error("Race when trying to fetch");
-                    throw new StatusRuntimeException(Status.ABORTED.withDescription("Race when trying to fetch"));
+                    Log.error("Received older object then ours from " + reply.getSelfUuid() + " for " + reply.getObject().getHeader().getName());
+                    throw new StatusRuntimeException(Status.ABORTED.withDescription("Received older object then ours"));
                 }
+
+                boolean newer = (receivedTotalVer > md.getOurVersion());
+                // FIXME:? Hidden version difference?
+                if (newer) {
+                    if (syncHandler.tryHandleOneUpdate(UUID.fromString(reply.getSelfUuid()), reply.getObject().getHeader())) {
+                        return reply.getObject().getContent();
+                    }
+                    Log.error("Received newer object then ours from " + reply.getSelfUuid() + " for " + reply.getObject().getHeader().getName());
+                    throw new StatusRuntimeException(Status.ABORTED.withDescription("Received newer object then ours"));
+                }
+
                 return reply.getObject().getContent();
             });
         });
