@@ -13,6 +13,7 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.NotImplementedException;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -90,9 +91,16 @@ public class SyncHandler {
 
             md.getRemoteCopies().put(from, receivedTotalVer);
 
-            if (md.getChangelog().getOrDefault(persistentRemoteHostsService.getSelfUuid(), 0L) > receivedSelfVer) {
-                Log.info("Conflict on update (self-version): " + header.getName() + " from " + from);
-                return true;
+            var receivedMap = new HashMap<UUID, Long>();
+            for (var e : header.getChangelog().getEntriesList()) {
+                receivedMap.put(UUID.fromString(e.getHost()), e.getVersion());
+            }
+
+            for (var e : md.getChangelog().entrySet()) {
+                if (receivedMap.getOrDefault(e.getKey(), 0L) < e.getValue()) {
+                    Log.info("Conflict on update (lower version): " + header.getName() + " from " + from);
+                    return true;
+                }
             }
 
             if (Objects.equals(md.getOurVersion(), receivedTotalVer)) {
