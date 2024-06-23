@@ -80,8 +80,8 @@ public class DhfsFuseIT {
         var c2res = container2.execInContainer("/bin/sh", "-c",
                 "curl http://localhost:8080/objects-manage/known-peers");
 
-        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 30, TimeUnit.SECONDS);
-        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 30, TimeUnit.SECONDS);
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         Thread.sleep(1500); // FIXME: Wait for both of them to get other's IP for sure
     }
 

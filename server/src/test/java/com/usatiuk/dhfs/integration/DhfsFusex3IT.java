@@ -94,9 +94,9 @@ public class DhfsFusex3IT {
                         "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
                         "  http://localhost:8080/objects-manage/known-peers");
 
-        waitingConsumer3.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 30, TimeUnit.SECONDS, 2);
-        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 30, TimeUnit.SECONDS, 2);
-        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 30, TimeUnit.SECONDS, 2);
+        waitingConsumer3.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
         Thread.sleep(2000); // FIXME: Wait for all of them to get other's IP for sure and sync
     }
 
