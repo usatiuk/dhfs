@@ -13,8 +13,6 @@ import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 
-import java.util.UUID;
-
 // Note: RunOnVirtualThread hangs somehow
 @GrpcService
 public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
@@ -34,8 +32,6 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Blocking
     public Uni<GetObjectReply> getObject(GetObjectRequest request) {
         if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-
-        remoteHostManager.handleConnectionSuccess(UUID.fromString(request.getSelfUuid()));
 
         Log.info("<-- getObject: " + request.getName() + " from " + request.getSelfUuid());
 
@@ -58,7 +54,6 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Blocking
     public Uni<IndexUpdatePush> getIndex(GetIndexRequest request) {
         if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-        remoteHostManager.handleConnectionSuccess(UUID.fromString(request.getSelfUuid()));
 
         Log.info("<-- getIndex: from " + request.getSelfUuid());
         var builder = IndexUpdatePush.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString());
@@ -78,7 +73,6 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Blocking
     public Uni<IndexUpdateReply> indexUpdate(IndexUpdatePush request) {
         if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-        remoteHostManager.handleConnectionSuccess(UUID.fromString(request.getSelfUuid()));
 
 //        Log.info("<-- indexUpdate: " + request.getHeader().getName());
         return Uni.createFrom().item(syncHandler.handleRemoteUpdate(request));
@@ -88,7 +82,6 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Blocking
     public Uni<PingReply> ping(PingRequest request) {
         if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-        remoteHostManager.handleConnectionSuccess(UUID.fromString(request.getSelfUuid()));
 
         return Uni.createFrom().item(PingReply.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).build());
     }

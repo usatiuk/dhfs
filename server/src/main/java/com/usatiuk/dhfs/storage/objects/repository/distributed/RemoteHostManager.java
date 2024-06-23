@@ -44,16 +44,21 @@ public class RemoteHostManager {
     @Blocking
     public void tryConnectAll() {
         for (var host : persistentRemoteHostsService.getHosts()) {
-            var shouldTry = _transientPeersState.runReadLocked(d -> {
-                var s = d.getStates().get(host.getUuid());
-                if (s == null) return true;
-                return !s.getState().equals(TransientPeerState.ConnectionState.REACHABLE);
-            });
-            if (shouldTry) {
-                Log.info("Trying to connect to " + host.getUuid());
-                if (pingCheck(host.getUuid())) {
-                    handleConnectionSuccess(host.getUuid());
+            try {
+                var shouldTry = _transientPeersState.runReadLocked(d -> {
+                    var s = d.getStates().get(host.getUuid());
+                    if (s == null) return true;
+                    return !s.getState().equals(TransientPeerState.ConnectionState.REACHABLE) && s.getAddr() != null;
+                });
+                if (shouldTry) {
+                    Log.info("Trying to connect to " + host.getUuid());
+                    if (pingCheck(host.getUuid())) {
+                        handleConnectionSuccess(host.getUuid());
+                    }
                 }
+            } catch (Exception e) {
+                Log.error("Failed to connect to " + host.getUuid(), e);
+                continue;
             }
         }
     }
