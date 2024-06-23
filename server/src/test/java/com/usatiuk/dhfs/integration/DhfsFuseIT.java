@@ -1,6 +1,8 @@
 package com.usatiuk.dhfs.integration;
 
 import com.github.dockerjava.api.model.Device;
+import io.quarkus.logging.Log;
+import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,18 +32,20 @@ public class DhfsFuseIT {
     WaitingConsumer waitingConsumer2;
 
     @BeforeEach
-    void setup() {
+    void setup() throws IOException, InterruptedException, TimeoutException {
         String buildPath = System.getProperty("buildDirectory");
         System.out.println("Build path: " + buildPath);
+
         Network network = Network.newNetwork();
         var image = new ImageFromDockerfile()
                 .withDockerfileFromBuilder(builder ->
                         builder
-                                .from("azul/zulu-openjdk-alpine:21-jre-latest")
-                                .run("apk add --update fuse curl strace")
+                                .from("azul/zulu-openjdk-debian:21-jre-latest")
+                                .run("apt update && apt install -y libfuse2 curl")
                                 .copy("/app", "/app")
-                                .cmd("java", "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
-                                        "-Ddhfs.objects.distributed.peerdiscovery.interval=1000", "-jar", "/app/quarkus-run.jar")
+                                .cmd("java", "-Xmx128M", "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
+                                        "-Ddhfs.objects.distributed.peerdiscovery.interval=100",
+                                        "-Ddhfs.objects.distributed.invalidation.delay=300", "-jar", "/app/quarkus-run.jar")
                                 .build())
                 .withFileFromPath("/app", Paths.get(buildPath, "quarkus-app"));
         container1 = new GenericContainer<>(image)
@@ -61,20 +65,9 @@ public class DhfsFuseIT {
         waitingConsumer2 = new WaitingConsumer();
         var loggingConsumer2 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFuseIT.class));
         container2.followOutput(loggingConsumer2.andThen(waitingConsumer2));
-    }
 
-    @AfterEach
-    void stop() {
-        Stream.of(container1, container2).parallel().forEach(GenericContainer::stop);
-    }
-
-    @Test
-    void readWriteFileTest() throws IOException, InterruptedException, TimeoutException {
         var c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_root_d/self_uuid").getStdout();
         var c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_root_d/self_uuid").getStdout();
-        System.out.println(container1.execInContainer("/bin/sh", "-c", "uname -a"));
-        System.out.println(container1.execInContainer("/bin/sh", "-c", "strace ls /root/dhfs_data/dhfs_fuse_root"));
-//        System.out.println(container2.execInContainer("/bin/sh", "-c", "strace ls /root/dhfs_data/dhfs_fuse_root"));
 
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c1uuid));
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c2uuid));
@@ -84,25 +77,119 @@ public class DhfsFuseIT {
                         "  --request PUT " +
                         "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
                         "  http://localhost:8080/objects-manage/known-peers");
-        System.out.println(c1curl);
+
         var c1res = container1.execInContainer("/bin/sh", "-c",
                 "curl http://localhost:8080/objects-manage/known-peers");
         var c2res = container2.execInContainer("/bin/sh", "-c",
                 "curl http://localhost:8080/objects-manage/known-peers");
-        System.out.println(c1res);
-        System.out.println(c2res);
 
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 30, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 30, TimeUnit.SECONDS);
-
-        Thread.sleep(10000);
-
-        var write = container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
-
-        System.out.println(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root"));
-
-        Assertions.assertEquals("test123", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
-
-        Thread.sleep(10000);
+        Thread.sleep(200); // FIXME: Wait for both of them to get other's IP for sure
     }
+
+    @AfterEach
+    void stop() {
+        Stream.of(container1, container2).parallel().forEach(GenericContainer::stop);
+    }
+
+    @Test
+    void readWriteFileTest() throws IOException, InterruptedException, TimeoutException {
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo test123 > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
+        Thread.sleep(1500);
+        Assertions.assertEquals("test123\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+    }
+
+    @Test
+    void dirConflictTest() throws IOException, InterruptedException, TimeoutException {
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode());
+        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode());
+        Thread.sleep(200);
+        boolean createFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_data/dhfs_fuse_root/testf"),
+                Pair.of(container2, "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf")).parallel().map(p -> {
+            try {
+                return p.getLeft().execInContainer("/bin/sh", "-c", p.getRight()).getExitCode();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }).anyMatch(r -> r != 0);
+        if (createFail) {
+            Log.info("Failed creating one or more files");
+            return;
+        }
+        Thread.sleep(1000);
+        var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
+        var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
+        Log.info(ls);
+        Log.info(cat);
+        Assertions.assertTrue(cat.getStdout().contains("test1"));
+        Assertions.assertTrue(cat.getStdout().contains("test2"));
+        Assertions.assertTrue(ls.getStdout().chars().filter(c -> c == '\n').count() >= 2);
+    }
+
+    @Test
+    void dirConflictTest2() throws IOException, InterruptedException, TimeoutException {
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode());
+        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode());
+        boolean createFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_data/dhfs_fuse_root/testf"),
+                Pair.of(container2, "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf")).parallel().map(p -> {
+            try {
+                return p.getLeft().execInContainer("/bin/sh", "-c", p.getRight()).getExitCode();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }).anyMatch(r -> r != 0);
+        if (createFail) {
+            Log.info("Failed creating one or more files");
+            return;
+        }
+        Thread.sleep(1000);
+        var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
+        var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
+        Log.info(ls);
+        Log.info(cat);
+        Assertions.assertTrue(cat.getStdout().contains("test1"));
+        Assertions.assertTrue(cat.getStdout().contains("test2"));
+    }
+
+    @Test
+    void dirConflictTest3() throws IOException, InterruptedException, TimeoutException {
+        boolean createFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_data/dhfs_fuse_root/testf"),
+                Pair.of(container2, "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf")).parallel().map(p -> {
+            try {
+                return p.getLeft().execInContainer("/bin/sh", "-c", p.getRight()).getExitCode();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }).anyMatch(r -> r != 0);
+        if (createFail) {
+            Log.info("Failed creating one or more files");
+            return;
+        }
+        Thread.sleep(1000);
+        var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
+        var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
+        Log.info(ls);
+        Log.info(cat);
+        Assertions.assertTrue(cat.getStdout().contains("test1"));
+        Assertions.assertTrue(cat.getStdout().contains("test2"));
+    }
+
+    @Test
+    void dirConflictTest4() throws IOException, InterruptedException, TimeoutException {
+        boolean createdOk = (container1.execInContainer("/bin/sh", "-c", "echo test1 >> /root/dhfs_data/dhfs_fuse_root/testf").getExitCode() == 0)
+                && (container2.execInContainer("/bin/sh", "-c", "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf").getExitCode() == 0);
+        if (!createdOk) {
+            Log.info("Failed creating one or more files");
+            return;
+        }
+        Thread.sleep(1000);
+        var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
+        var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
+        Log.info(ls);
+        Log.info(cat);
+        Assertions.assertTrue(cat.getStdout().contains("test1"));
+        Assertions.assertTrue(cat.getStdout().contains("test2"));
+    }
+
 }

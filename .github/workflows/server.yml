@@ -31,8 +31,7 @@ jobs:
       - name: Build and test with Maven
         run: cd server && mvn --batch-mode --update-snapshots verify
 
-      - run: mkdir staging && cp server/target/*.jar staging
       - uses: actions/upload-artifact@v4
         with:
           name: Package
-          path: staging
+          path: server/target/quarkus-app
