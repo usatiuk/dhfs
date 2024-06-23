@@ -4,10 +4,11 @@ import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.repository.distributed.*;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.List;
@@ -57,7 +58,7 @@ public class RemoteObjectServiceClient {
 
                 if (outdated) {
                     Log.error("Race when trying to fetch");
-                    throw new NotImplementedException();
+                    throw new StatusRuntimeException(Status.ABORTED.withDescription("Race when trying to fetch"));
                 }
                 return reply.getObject().getContent();
             });

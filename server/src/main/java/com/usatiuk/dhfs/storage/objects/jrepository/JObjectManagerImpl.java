@@ -129,8 +129,9 @@ public class JObjectManagerImpl implements JObjectManager {
         try {
             readMd = objectPersistentStore.readObject("meta_" + name);
         } catch (StatusRuntimeException ex) {
-            if (!ex.getStatus().equals(Status.NOT_FOUND)) throw ex;
-            return Optional.empty();
+            if (ex.getStatus().getCode().equals(Status.NOT_FOUND.getCode()))
+                return Optional.empty();
+            throw ex;
         }
         var meta = SerializationHelper.deserialize(readMd);
         if (!(meta instanceof ObjectMetadata))

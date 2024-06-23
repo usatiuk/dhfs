@@ -268,7 +268,7 @@ public class DhfsFuse extends FuseStubFS {
             try {
                 found = fileService.readDir(path);
             } catch (StatusRuntimeException e) {
-                if (e.getStatus().equals(Status.NOT_FOUND))
+                if (e.getStatus().getCode().equals(Status.NOT_FOUND.getCode()))
                     return -ErrorCodes.ENOENT();
                 else throw e;
             }
