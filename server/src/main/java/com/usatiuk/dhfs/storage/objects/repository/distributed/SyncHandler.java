@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
+import com.google.common.collect.Maps;
 import com.usatiuk.dhfs.objects.repository.distributed.*;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
@@ -52,7 +53,7 @@ public class SyncHandler {
         }
     }
 
-    public boolean tryHandleOneUpdate(UUID from, ObjectHeader header) {
+    public void handleOneUpdate(UUID from, ObjectHeader header) {
         JObject<?> found;
         try {
             found = jObjectManager.getOrPut(header.getName(), new ObjectMetadata(
@@ -64,18 +65,19 @@ public class SyncHandler {
             throw new NotImplementedException(ex);
         }
 
-        var receivedSelfVer = header.getChangelog()
-                .getEntriesList().stream().filter(p -> p.getHost().equals(persistentRemoteHostsService.getSelfUuid().toString()))
-                .findFirst().map(ObjectChangelogEntry::getVersion).orElse(0L);
-
         var receivedTotalVer = header.getChangelog().getEntriesList()
                 .stream().map(ObjectChangelogEntry::getVersion).reduce(0L, Long::sum);
+
+        var receivedMap = new HashMap<UUID, Long>();
+        for (var e : header.getChangelog().getEntriesList()) {
+            receivedMap.put(UUID.fromString(e.getHost()), e.getVersion());
+        }
 
         boolean conflict = found.runWriteLockedMeta((md, bump, invalidate) -> {
             if (md.getRemoteCopies().getOrDefault(from, 0L) > receivedTotalVer) {
                 Log.error("Received older index update than was known for host: "
                         + from + " " + header.getName());
-                return false;
+                throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Outdated!"));
             }
 
             String rcv = "";
@@ -88,13 +90,7 @@ public class SyncHandler {
             }
             Log.info("Handling update: " + header.getName() + " from " + from + "\n" + "ours: " + ours + " \n" + "received: " + rcv);
 
-
             md.getRemoteCopies().put(from, receivedTotalVer);
-
-            var receivedMap = new HashMap<UUID, Long>();
-            for (var e : header.getChangelog().getEntriesList()) {
-                receivedMap.put(UUID.fromString(e.getHost()), e.getVersion());
-            }
 
             for (var e : md.getChangelog().entrySet()) {
                 if (receivedMap.getOrDefault(e.getKey(), 0L) < e.getValue()) {
@@ -103,21 +99,21 @@ public class SyncHandler {
                 }
             }
 
-            if (Objects.equals(md.getOurVersion(), receivedTotalVer)) {
-                for (var e : header.getChangelog().getEntriesList()) {
-                    if (!Objects.equals(md.getChangelog().getOrDefault(UUID.fromString(e.getHost()), 0L),
-                            e.getVersion())) {
-                        Log.info("Conflict on update (other version): " + header.getName() + " from " + from);
-                        return true;
-                    }
-                }
-            }
-
-            // TODO: recheck this
             if (md.getOurVersion() > receivedTotalVer) {
                 Log.info("Received older index update than known: "
                         + from + " " + header.getName());
-                return false;
+                throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Outdated!"));
+            }
+
+            if (Objects.equals(md.getOurVersion(), receivedTotalVer)) {
+                for (var e : header.getChangelog().getEntriesList()) {
+                    if (!Objects.equals(
+                            Maps.filterValues(md.getChangelog(), v -> v != 0),
+                            Maps.filterValues(receivedMap, v -> v != 0))) {
+                        Log.info("Conflict on update (other mismatch): " + header.getName() + " from " + from);
+                        return true;
+                    }
+                }
             }
 
             // md.getBestVersion() > md.getTotalVersion() should also work
@@ -126,29 +122,21 @@ public class SyncHandler {
             }
 
             md.getChangelog().clear();
-            for (var entry : header.getChangelog().getEntriesList()) {
-                md.getChangelog().put(UUID.fromString(entry.getHost()), entry.getVersion());
-            }
+            md.getChangelog().putAll(receivedMap);
             md.getChangelog().putIfAbsent(persistentRemoteHostsService.getSelfUuid(), 0L);
 
             return false;
         });
 
-        return !conflict;
-    }
-
-    private void handleOneUpdate(UUID from, ObjectHeader header) {
-        if (!tryHandleOneUpdate(from, header)) {
+        if (conflict) {
             Log.info("Trying conflict resolution: " + header.getName() + " from " + from);
-            JObject<?> found = jObjectManager.get(header.getName())
-                    .orElseThrow(() -> new IllegalStateException("Object deleted when handling update?"));
             var resolver = conflictResolvers.select(found.getConflictResolver());
             var result = resolver.get().resolve(from, found);
             if (result.equals(ConflictResolver.ConflictResolutionResult.RESOLVED)) {
                 Log.info("Resolved conflict for " + from + " " + header.getName());
             } else {
                 Log.error("Failed conflict resolution for " + from + " " + header.getName());
-                throw new StatusRuntimeException(Status.ALREADY_EXISTS.withDescription("Conflict resolution failed"));
+                throw new StatusRuntimeException(Status.ABORTED.withDescription("Conflict resolution failed"));
             }
         }
     }
@@ -160,6 +148,12 @@ public class SyncHandler {
             try {
                 handleOneUpdate(UUID.fromString(request.getSelfUuid()), u);
             } catch (Exception ex) {
+                if (ex instanceof StatusRuntimeException sr) {
+                    if (sr.getStatus().equals(Status.INVALID_ARGUMENT)) {
+                        Log.info("Not reporting error when updating index of " + u.getName() + " from " + request.getSelfUuid() + ": " + sr.getMessage());
+                        continue;
+                    }
+                }
                 Log.info("Error when handling update from " + request.getSelfUuid() + " of " + u.getName(), ex);
                 builder.addErrors(IndexUpdateError.newBuilder().setObjectName(u.getName()).setError(ex.toString() + Arrays.toString(ex.getStackTrace())).build());
             }
