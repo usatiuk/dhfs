@@ -33,7 +33,8 @@ public class RpcClientFactory {
         for (UUID target : shuffledList) {
             var hostinfo = remoteHostManager.getTransientState(target);
 
-            boolean shouldTry = remoteHostManager.isReachable(target);
+            boolean shouldTry = remoteHostManager.isReachable(target)
+                    && hostinfo.getAddr() != null;
 
             if (!shouldTry) continue;
 
@@ -54,6 +55,8 @@ public class RpcClientFactory {
 
     public <R> R withObjSyncClient(UUID target, ObjectSyncClientFunction<R> fn) {
         var hostinfo = remoteHostManager.getTransientState(target);
+        if (hostinfo.getAddr() == null)
+            throw new IllegalStateException("Address for " + target + " not yet known");
         return withObjSyncClient(hostinfo.getAddr(), hostinfo.getPort(), Optional.empty(), fn);
     }
 
@@ -80,6 +83,8 @@ public class RpcClientFactory {
 
     public <R> R withPeerSyncClient(UUID target, PeerSyncClientFunction<R> fn) {
         var hostinfo = remoteHostManager.getTransientState(target);
+        if (hostinfo.getAddr() == null)
+            throw new IllegalStateException("Address for " + target + " not yet known");
         return withPeerSyncClient(hostinfo.getAddr(), hostinfo.getPort(), Optional.empty(), fn);
     }
 
