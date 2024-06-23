@@ -20,6 +20,9 @@ import java.util.UUID;
 
 @ApplicationScoped
 public class SyncHandler {
+    private static class OutdatedUpdateException extends RuntimeException {
+    }
+
     @Inject
     JObjectManager jObjectManager;
 
@@ -77,7 +80,7 @@ public class SyncHandler {
             if (md.getRemoteCopies().getOrDefault(from, 0L) > receivedTotalVer) {
                 Log.error("Received older index update than was known for host: "
                         + from + " " + header.getName());
-                throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Outdated!"));
+                throw new OutdatedUpdateException();
             }
 
             String rcv = "";
@@ -102,7 +105,7 @@ public class SyncHandler {
             if (md.getOurVersion() > receivedTotalVer) {
                 Log.info("Received older index update than known: "
                         + from + " " + header.getName());
-                throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Outdated!"));
+                throw new OutdatedUpdateException();
             }
 
             if (Objects.equals(md.getOurVersion(), receivedTotalVer)) {
@@ -147,13 +150,9 @@ public class SyncHandler {
         for (var u : request.getHeaderList()) {
             try {
                 handleOneUpdate(UUID.fromString(request.getSelfUuid()), u);
+            } catch (OutdatedUpdateException ignored) {
+                Log.info("Outdated update of " + u.getName() + " from " + request.getSelfUuid());
             } catch (Exception ex) {
-                if (ex instanceof StatusRuntimeException sr) {
-                    if (sr.getStatus().equals(Status.INVALID_ARGUMENT)) {
-                        Log.info("Not reporting error when updating index of " + u.getName() + " from " + request.getSelfUuid() + ": " + sr.getMessage());
-                        continue;
-                    }
-                }
                 Log.info("Error when handling update from " + request.getSelfUuid() + " of " + u.getName(), ex);
                 builder.addErrors(IndexUpdateError.newBuilder().setObjectName(u.getName()).setError(ex.toString() + Arrays.toString(ex.getStackTrace())).build());
             }
