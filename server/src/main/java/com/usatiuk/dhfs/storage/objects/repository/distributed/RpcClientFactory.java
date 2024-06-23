@@ -40,7 +40,9 @@ public class RpcClientFactory {
             try {
                 return withObjSyncClient(hostinfo.getAddr(), hostinfo.getPort(), Optional.empty(), fn);
             } catch (StatusRuntimeException e) {
-                if (e.getStatus().equals(Status.UNAVAILABLE)) {
+                if (e.getStatus().equals(Status.ABORTED)) {
+                    continue;
+                } else if (e.getStatus().equals(Status.UNAVAILABLE)) {
                     Log.info("Host " + target + " is unreachable: " + e.getMessage());
                     remoteHostManager.handleConnectionError(target);
                 } else throw e;

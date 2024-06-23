@@ -110,7 +110,7 @@ public class DhfsFusex3IT {
     @Test
     void readWriteFileTest() throws IOException, InterruptedException, TimeoutException {
         Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo test123 > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
-        Thread.sleep(400);
+        Thread.sleep(1000);
         Assertions.assertEquals("test123\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
         Assertions.assertEquals("test123\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
     }

@@ -43,7 +43,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
         if (!obj.tryLocalResolve()) {
             Log.info("<-- getObject FAIL: " + request.getName() + " from " + request.getSelfUuid());
-            throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Not available locally"));
+            throw new StatusRuntimeException(Status.ABORTED.withDescription("Not available locally"));
         }
         //FIXME:
         Pair<ObjectHeader, ByteString> read = obj.runReadLocked((meta, data) -> Pair.of(meta.toRpcHeader(), SerializationHelper.serialize(data)));
