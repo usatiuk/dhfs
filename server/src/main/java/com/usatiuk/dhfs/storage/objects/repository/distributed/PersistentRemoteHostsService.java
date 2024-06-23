@@ -35,6 +35,7 @@ public class PersistentRemoteHostsService {
             _persistentData = SerializationHelper.deserialize(Files.readAllBytes(Paths.get(dataRoot).resolve(dataFileName)));
         }
         _selfUuid = _persistentData.runReadLocked(PersistentRemoteHostsData::getSelfUuid);
+        Files.writeString(Paths.get(dataRoot, "self_uuid"), _selfUuid.toString());
         Log.info("Self uuid is: " + _selfUuid.toString());
     }
 
