@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.storage.objects.repository.distributed;
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.repository.distributed.*;
 import com.usatiuk.dhfs.storage.SerializationHelper;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -37,13 +38,13 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
         var obj = jObjectManager.get(request.getName()).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
-        if (!obj.tryLocalResolve()) {
-            Log.info("<-- getObject FAIL: " + request.getName() + " from " + request.getSelfUuid());
-            throw new StatusRuntimeException(Status.ABORTED.withDescription("Not available locally"));
-        }
-
-        //FIXME:
-        Pair<ObjectHeader, ByteString> read = obj.runReadLocked((meta, data) -> Pair.of(meta.toRpcHeader(), SerializationHelper.serialize(data)));
+        Pair<ObjectHeader, ByteString> read = obj.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (meta, data) -> {
+            if (data == null) {
+                Log.info("<-- getObject FAIL: " + request.getName() + " from " + request.getSelfUuid());
+                throw new StatusRuntimeException(Status.ABORTED.withDescription("Not available locally"));
+            }
+            return Pair.of(meta.toRpcHeader(), SerializationHelper.serialize(data));
+        });
         var replyObj = ApiObject.newBuilder().setHeader(read.getLeft()).setContent(read.getRight()).build();
         return Uni.createFrom().item(GetObjectReply.newBuilder()
                 .setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString())
@@ -61,10 +62,8 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         var objs = jObjectManager.find("");
 
         for (var obj : objs) {
-            obj.runReadLocked((meta) -> {
-                builder.addHeader(meta.toRpcHeader());
-                return null;
-            });
+            var header = obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (meta, data) -> meta.toRpcHeader());
+            builder.addHeader(header);
         }
         return Uni.createFrom().item(builder.build());
     }

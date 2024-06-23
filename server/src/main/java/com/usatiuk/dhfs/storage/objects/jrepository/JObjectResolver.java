@@ -71,7 +71,7 @@ public class JObjectResolver {
 
     public void bumpVersionSelf(JObject<?> self) {
         self.assertRWLock();
-        self.runWriteLockedMeta((m, bump, invalidate) -> {
+        self.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, data, bump, invalidate) -> {
             m.bumpVersion(persistentRemoteHostsService.getSelfUuid());
             return null;
         });

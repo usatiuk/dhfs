@@ -15,7 +15,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 
 @ApplicationScoped
 public class JObjectWriteback {
@@ -92,26 +91,20 @@ public class JObjectWriteback {
     }
 
     private void flushOne(JObject<?> obj) {
-        obj.runReadLocked((m) -> {
+        obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, data) -> {
             objectPersistentStore.writeObject("meta_" + m.getName(), SerializationHelper.serialize(m));
-            if (obj.isResolved())
-                obj.runReadLocked((m2, d) -> {
-                    objectPersistentStore.writeObject(m.getName(), SerializationHelper.serialize(d));
-                    return null;
-                });
+            if (data != null)
+                objectPersistentStore.writeObject(m.getName(), SerializationHelper.serialize(data));
             jObjectManager.onWriteback(m.getName());
             return null;
         });
     }
 
     private void flushOneImmediate(JObject<?> obj) {
-        obj.runWriteLockedMeta((m, a, b) -> {
+        obj.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, data, a, b) -> {
             objectPersistentStore.writeObject("meta_" + m.getName(), SerializationHelper.serialize(m));
-            if (obj.isResolved())
-                obj.runWriteLocked((m2, d, bump) -> {
-                    objectPersistentStore.writeObject(m.getName(), SerializationHelper.serialize(d));
-                    return null;
-                });
+            if (data != null)
+                objectPersistentStore.writeObject(m.getName(), SerializationHelper.serialize(data));
             jObjectManager.onWriteback(m.getName());
             return null;
         });

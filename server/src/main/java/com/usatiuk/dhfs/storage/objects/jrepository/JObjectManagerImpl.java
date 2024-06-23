@@ -179,7 +179,7 @@ public class JObjectManagerImpl implements JObjectManager {
                 var created = new JObject<D>(jObjectResolver, object.getName(),
                         object.getConflictResolver().getName(), persistentRemoteHostsService.getSelfUuid(), object);
                 _map.put(object.getName(), new NamedSoftReference(created, _refQueue));
-                created.runWriteLockedMeta((m, d, b) -> {
+                created.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                     jObjectResolver.notifyWrite(created);
                     return null;
                 });
@@ -207,7 +207,7 @@ public class JObjectManagerImpl implements JObjectManager {
             } else {
                 var created = new JObject<>(jObjectResolver, md);
                 _map.put(md.getName(), new NamedSoftReference(created, _refQueue));
-                created.runWriteLockedMeta((m, d, b) -> {
+                created.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                     jObjectResolver.notifyWrite(created);
                     return null;
                 });
@@ -233,7 +233,7 @@ public class JObjectManagerImpl implements JObjectManager {
 
     @Override
     public void unref(JObject<?> object) {
-        object.runWriteLockedMeta((m, a, b) -> {
+        object.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, a, b, i) -> {
             String name = m.getName();
             synchronized (this) {
                 if (!_nurseryRefcounts.containsKey(name)) return null;

@@ -43,7 +43,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         var pathFirstPart = path.getName(0).toString();
 
-        var found = ((JObject<Directory>) from).runReadLocked((m, d) -> d.getKid(pathFirstPart));
+        var found = ((JObject<Directory>) from).runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getKid(pathFirstPart));
 
         if (found.isEmpty())
             return Optional.empty();
@@ -57,7 +57,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         if (path.getNameCount() == 1) {
             if (ref.get().isOf(File.class)) {
                 var f = (JObject<File>) ref.get();
-                if (!Objects.equals(f.runReadLocked((m, d) -> d.getParent()).toString(), from.getName())) {
+                if (!Objects.equals(f.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getParent()).toString(), from.getName())) {
                     throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Parent mismatch for file " + path));
                 }
             }
@@ -78,7 +78,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     public Optional<FsNode> getattr(String uuid) {
         Optional<JObject<? extends FsNode>> ref = jObjectManager.get(uuid, FsNode.class);
         if (ref.isEmpty()) return Optional.empty();
-        return ref.get().runReadLocked((m, d) -> {
+        return ref.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
             //FIXME:
             return Optional.of(d);
         });
@@ -111,7 +111,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         jObjectManager.put(f);
 
-        if (!dir.runWriteLocked((m, d, bump) -> {
+        if (!dir.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, invalidate) -> {
             bump.apply();
             d.setMtime(System.currentTimeMillis());
             return d.putKid(Path.of(name).getFileName().toString(), fuuid);
@@ -136,7 +136,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var dir = (JObject<Directory>) found.get();
 
         jObjectManager.put(d);
-        if (!dir.runWriteLocked((m, dd, bump) -> {
+        if (!dir.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, dd, bump, invalidate) -> {
             bump.apply();
             d.setMtime(System.currentTimeMillis());
             return dd.putKid(Path.of(name).getFileName().toString(), duuid);
@@ -154,14 +154,14 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (!(found.get().isOf(Directory.class))) return false;
 
-        var kidId = ((JObject<Directory>) found.get()).runReadLocked((m, d) -> d.getKid(Path.of(name).getFileName().toString()));
+        var kidId = ((JObject<Directory>) found.get()).runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getKid(Path.of(name).getFileName().toString()));
 
         var kid = jObjectManager.get(kidId.get().toString());
 
         if (kid.isEmpty()) return false;
 
         var dir = (JObject<Directory>) found.get();
-        return dir.runWriteLocked((m, d, bump) -> {
+        return dir.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, i) -> {
             bump.apply();
             d.setMtime(System.currentTimeMillis());
             return d.removeKid(Path.of(name).getFileName().toString());
@@ -196,7 +196,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var dir = (JObject<Directory>) found.get();
 
         var putDent = dentGot.isOf(File.class) ?
-                jObjectManager.put(((JObject<File>) dentGot).runWriteLocked((m, d, b) -> {
+                jObjectManager.put(((JObject<File>) dentGot).runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, b, i) -> {
                     var cpy = new File(UUID.randomUUID(), d.getMode(), UUID.fromString(dir.getName()));
                     cpy.setMtime(d.getMtime());
                     cpy.setCtime(d.getCtime());
@@ -204,7 +204,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                     return cpy;
                 })) : dentGot;
 
-        dir.runWriteLocked((m, d, bump) -> {
+        dir.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, i) -> {
             bump.apply();
 
             d.setMtime(System.currentTimeMillis());
@@ -220,7 +220,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var dent = getDirEntry(name);
         if (dent.isEmpty()) return false;
 
-        dent.get().runWriteLocked((m, d, bump) -> {
+        dent.get().runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, i) -> {
             bump.apply();
             d.setMtime(System.currentTimeMillis());
             d.setMode(mode);
@@ -238,7 +238,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         if (!(found.get().isOf(Directory.class))) throw new IllegalArgumentException();
         var dir = (JObject<Directory>) found.get();
 
-        return dir.runReadLocked((m, d) -> d.getChildrenList());
+        return dir.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getChildrenList());
     }
 
     @Override
@@ -253,7 +253,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         AtomicReference<List<Map.Entry<Long, String>>> chunksList = new AtomicReference<>();
 
         try {
-            file.runReadLocked((md, fileData) -> {
+            file.runReadLocked(JObject.ResolutionStrategy.REMOTE, (md, fileData) -> {
                 var chunksAll = fileData.getChunks();
                 if (chunksAll.isEmpty()) {
                     chunksList.set(new ArrayList<>());
@@ -292,7 +292,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 return Optional.empty();
             }
 
-            var chunkBytes = chunkRead.get().runReadLocked((m, d) -> d.getBytes());
+            var chunkBytes = chunkRead.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getBytes());
 
             long readableLen = chunkBytes.size() - offInChunk;
 
@@ -322,7 +322,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             throw new StatusRuntimeException(Status.NOT_FOUND);
         }
 
-        return chunkRead.get().runReadLocked((m, d) -> d.getSize());
+        return chunkRead.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getSize());
     }
 
     private ByteString readChunk(String uuid) {
@@ -333,7 +333,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             throw new StatusRuntimeException(Status.NOT_FOUND);
         }
 
-        return chunkRead.get().runReadLocked((m, d) -> d.getBytes());
+        return chunkRead.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getBytes());
     }
 
     @Override
@@ -346,7 +346,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var file = fileOpt.get();
 
         // FIXME:
-        var removedChunksOuter = file.runWriteLocked((meta, fData, bump) -> {
+        var removedChunksOuter = file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (meta, fData, bump, i) -> {
             var chunksAll = fData.getChunks();
             var first = chunksAll.floorEntry(offset);
             var last = chunksAll.floorEntry((offset + data.length) - 1);
@@ -479,7 +479,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (length == 0) {
             try {
-                file.runWriteLocked((m, fileData, bump) -> {
+                file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, fileData, bump, i) -> {
                     bump.apply();
                     fileData.getChunks().clear();
                     fileData.setMtime(System.currentTimeMillis());
@@ -493,7 +493,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
 
         try {
-            file.runWriteLocked((m, fData, bump) -> {
+            file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, fData, bump, i) -> {
                 var chunksAll = fData.getChunks();
                 var lastChunk = chunksAll.lastEntry();
 
@@ -540,7 +540,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var file = fileOpt.get();
 
         try {
-            file.runWriteLocked((m, fileData, bump) -> {
+            file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, fileData, bump, i) -> {
                 bump.apply();
                 fileData.setMtime(mtimeMs);
                 return null;
@@ -562,7 +562,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 .orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
         try {
-            read.runReadLocked((fsNodeData, fileData) -> {
+            read.runReadLocked(JObject.ResolutionStrategy.REMOTE, (fsNodeData, fileData) -> {
                 chunksAllRef.set(new TreeMap<>(fileData.getChunks()));
                 return null;
             });
@@ -582,7 +582,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 return -1L;
             }
 
-            size += chunkRead.get().runReadLocked((m, d) -> d.getSize());
+            size += chunkRead.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getSize());
         }
         return (long) size;
     }

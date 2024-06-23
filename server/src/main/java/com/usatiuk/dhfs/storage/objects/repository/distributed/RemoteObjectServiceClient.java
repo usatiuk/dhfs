@@ -38,7 +38,7 @@ public class RemoteObjectServiceClient {
     public ByteString getObject(JObject<?> jObject) {
         jObject.assertRWLock();
 
-        var targets = jObject.runWriteLockedMeta((md, b, v) -> {
+        var targets = jObject.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (md, d) -> {
             var ourVersion = md.getOurVersion();
             return md.getRemoteCopies().entrySet().stream()
                     .filter(entry -> entry.getValue().equals(ourVersion))
@@ -53,7 +53,7 @@ public class RemoteObjectServiceClient {
                 receivedMap.put(UUID.fromString(e.getHost()), e.getVersion());
             }
 
-            return jObject.runWriteLockedMeta((md, b, v) -> {
+            return jObject.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (md, d, b, v) -> {
                 var unexpected = !Objects.equals(
                         Maps.filterValues(md.getChangelog(), val -> val != 0),
                         Maps.filterValues(receivedMap, val -> val != 0));
@@ -85,7 +85,8 @@ public class RemoteObjectServiceClient {
         for (var v : names) {
             var obj = jObjectManager.get(v);
             if (obj.isEmpty()) continue;
-            builder.addHeader(obj.get().runReadLocked(ObjectMetadata::toRpcHeader));
+            var header = obj.get().runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> m.toRpcHeader());
+            builder.addHeader(header);
         }
 
         var send = builder.build();

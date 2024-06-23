@@ -4,6 +4,7 @@ import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.NotImplementedException;
 
 import java.io.Serializable;
@@ -33,7 +34,7 @@ public class JObject<T extends JObjectData> implements Serializable {
         return _metaPart.getName();
     }
 
-    protected final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
+    private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
     private final ObjectMetadata _metaPart;
     private final JObjectResolver _resolver;
     private final AtomicReference<T> _dataPart = new AtomicReference<>();
@@ -47,7 +48,7 @@ public class JObject<T extends JObjectData> implements Serializable {
         }
     }
 
-    public boolean isResolved() {
+    protected boolean isResolved() {
         return _dataPart.get() != null;
     }
 
@@ -57,53 +58,17 @@ public class JObject<T extends JObjectData> implements Serializable {
     }
 
     @FunctionalInterface
-    public interface ObjectMetaFn<R> {
-        R apply(ObjectMetadata indexData);
+    public interface ObjectFnRead<T, R> {
+        R apply(ObjectMetadata meta, @Nullable T data);
     }
 
     @FunctionalInterface
-    public interface ObjectDataFn<T, R> {
-        R apply(ObjectMetadata meta, T data);
-    }
-
-    @FunctionalInterface
-    public interface ObjectMetaFnW<R> {
-        R apply(ObjectMetadata indexData, VoidFn bump, VoidFn invalidate);
-    }
-
-    @FunctionalInterface
-    public interface ObjectDataFnW<T, R> {
-        R apply(ObjectMetadata meta, T data, VoidFn bump);
+    public interface ObjectFnWrite<T, R> {
+        R apply(ObjectMetadata indexData, @Nullable T data, VoidFn bump, VoidFn invalidate);
     }
 
     public <X> boolean isOf(Class<X> klass) {
         return (klass.isAssignableFrom(_metaPart.getType()));
-    }
-
-    public <R> R runReadLocked(ObjectMetaFn<R> fn) {
-        _lock.readLock().lock();
-        try {
-            return fn.apply(_metaPart);
-        } finally {
-            _lock.readLock().unlock();
-        }
-    }
-
-    public <R> R runWriteLockedMeta(ObjectMetaFnW<R> fn) {
-        _lock.writeLock().lock();
-        try {
-            var ver = _metaPart.getOurVersion();
-            VoidFn invalidateFn = () -> {
-                _dataPart.set(null);
-                _resolver.removeLocal(this, _metaPart.getName());
-            };
-            var ret = fn.apply(_metaPart, () -> _resolver.bumpVersionSelf(this), invalidateFn);
-            if (!Objects.equals(ver, _metaPart.getOurVersion()))
-                _resolver.notifyWrite(this);
-            return ret;
-        } finally {
-            _lock.writeLock().unlock();
-        }
     }
 
     private void resolveDataPart() {
@@ -111,37 +76,47 @@ public class JObject<T extends JObjectData> implements Serializable {
             _lock.writeLock().lock();
             try {
                 if (_dataPart.get() == null) {
-                    _dataPart.compareAndSet(null, _resolver.resolveData(this));
+                    _dataPart.set(_resolver.resolveData(this));
+
                     if (!_metaPart.getType().isAssignableFrom(_dataPart.get().getClass()))
                         throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Type mismatch for " + getName()));
-                }
+                } // _dataPart.get() == null
             } finally {
                 _lock.writeLock().unlock();
-            }
-        }
+            } // try
+        } // _dataPart.get() == null
     }
 
-    public boolean tryLocalResolve() {
+    private void tryLocalResolve() {
         if (_dataPart.get() == null) {
             _lock.writeLock().lock();
             try {
                 if (_dataPart.get() == null) {
                     var res = _resolver.resolveDataLocal(this);
-                    if (res.isEmpty()) return false;
-                    _dataPart.compareAndSet(null, res.get());
+                    if (res.isEmpty()) return;
+                    _dataPart.set(res.get());
+
                     if (!_metaPart.getType().isAssignableFrom(_dataPart.get().getClass()))
                         throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Type mismatch for " + getName()));
-                }
+                } // _dataPart.get() == null
             } finally {
                 _lock.writeLock().unlock();
-            }
-        }
-        return _dataPart.get() != null;
+            } // try
+        } // _dataPart.get() == null
     }
 
-    public <R> R runReadLocked(ObjectDataFn<T, R> fn) {
-        resolveDataPart();
+    public enum ResolutionStrategy {
+        NO_RESOLUTION,
+        LOCAL_ONLY,
+        REMOTE
+    }
+
+    public <R> R runReadLocked(ResolutionStrategy resolutionStrategy, ObjectFnRead<T, R> fn) {
+        if (resolutionStrategy == ResolutionStrategy.LOCAL_ONLY) tryLocalResolve();
+        else if (resolutionStrategy == ResolutionStrategy.REMOTE) resolveDataPart();
+
         _lock.readLock().lock();
+
         try {
             return fn.apply(_metaPart, _dataPart.get());
         } finally {
@@ -149,12 +124,18 @@ public class JObject<T extends JObjectData> implements Serializable {
         }
     }
 
-    public <R> R runWriteLocked(ObjectDataFnW<T, R> fn) {
-        resolveDataPart();
+    public <R> R runWriteLocked(ResolutionStrategy resolutionStrategy, ObjectFnWrite<T, R> fn) {
         _lock.writeLock().lock();
         try {
+            if (resolutionStrategy == ResolutionStrategy.LOCAL_ONLY) tryLocalResolve();
+            else if (resolutionStrategy == ResolutionStrategy.REMOTE) resolveDataPart();
+
             var ver = _metaPart.getOurVersion();
-            var ret = fn.apply(_metaPart, _dataPart.get(), () -> _resolver.bumpVersionSelf(this));
+            VoidFn invalidateFn = () -> {
+                _dataPart.set(null);
+                _resolver.removeLocal(this, _metaPart.getName());
+            };
+            var ret = fn.apply(_metaPart, _dataPart.get(), () -> _resolver.bumpVersionSelf(this), invalidateFn);
             if (!Objects.equals(ver, _metaPart.getOurVersion()))
                 _resolver.notifyWrite(this);
             return ret;

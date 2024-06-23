@@ -49,7 +49,7 @@ public class SyncHandler {
         var objs = jObjectManager.find("");
 
         for (var obj : objs) {
-            obj.runReadLocked((meta) -> {
+            obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (meta, data) -> {
                 invalidationQueueService.pushInvalidationToOne(host, obj.getName());
                 return null;
             });
@@ -76,7 +76,7 @@ public class SyncHandler {
             receivedMap.put(UUID.fromString(e.getHost()), e.getVersion());
         }
 
-        boolean conflict = found.runWriteLockedMeta((md, bump, invalidate) -> {
+        boolean conflict = found.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (md, data, bump, invalidate) -> {
             if (md.getRemoteCopies().getOrDefault(from, 0L) > receivedTotalVer) {
                 Log.error("Received older index update than was known for host: "
                         + from + " " + header.getName());
