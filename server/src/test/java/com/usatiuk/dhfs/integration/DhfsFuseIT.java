@@ -3,7 +3,6 @@ package com.usatiuk.dhfs.integration;
 import com.github.dockerjava.api.model.Device;
 import io.quarkus.logging.Log;
 import org.apache.commons.lang3.tuple.Pair;
-import org.junit.AssumptionViolatedException;
 import org.junit.jupiter.api.*;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
@@ -94,7 +93,7 @@ public class DhfsFuseIT {
     @Test
     void readWriteFileTest() throws IOException, InterruptedException, TimeoutException {
         Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo test123 > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
-        Thread.sleep(2000);
+        Thread.sleep(1000);
         Assertions.assertEquals("test123\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
     }
 
@@ -112,7 +111,7 @@ public class DhfsFuseIT {
             }
         }).anyMatch(r -> r != 0);
         Assumptions.assumeTrue(!createFail, "Failed creating one or more files");
-        Thread.sleep(2000);
+        Thread.sleep(1000);
         var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
         var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
         Log.info(ls);
@@ -135,7 +134,7 @@ public class DhfsFuseIT {
             }
         }).anyMatch(r -> r != 0);
         Assumptions.assumeTrue(!createFail, "Failed creating one or more files");
-        Thread.sleep(2000);
+        Thread.sleep(1000);
         var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
         var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
         Log.info(ls);
@@ -155,7 +154,7 @@ public class DhfsFuseIT {
             }
         }).anyMatch(r -> r != 0);
         Assumptions.assumeTrue(!createFail, "Failed creating one or more files");
-        Thread.sleep(2000);
+        Thread.sleep(1000);
         var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
         var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
         Log.info(ls);
@@ -169,7 +168,7 @@ public class DhfsFuseIT {
         boolean createdOk = (container1.execInContainer("/bin/sh", "-c", "echo test1 >> /root/dhfs_data/dhfs_fuse_root/testf").getExitCode() == 0)
                 && (container2.execInContainer("/bin/sh", "-c", "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf").getExitCode() == 0);
         Assumptions.assumeTrue(createdOk, "Failed creating one or more files");
-        Thread.sleep(2000);
+        Thread.sleep(1000);
         var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
         var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
         Log.info(ls);
