@@ -39,6 +39,16 @@ public class JObject<T extends JObjectData> implements Serializable {
     private final JObjectResolver _resolver;
     private final AtomicReference<T> _dataPart = new AtomicReference<>();
 
+    public T getData() {
+        assertRWLock();
+        return _dataPart.get();
+    }
+
+    public ObjectMetadata getMeta() {
+        assertRWLock();
+        return _metaPart;
+    }
+
     public Class<? extends ConflictResolver> getConflictResolver() {
         try {
             return (Class<? extends ConflictResolver>) Class.forName(_metaPart.getConflictResolver(), true,

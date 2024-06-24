@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
 import com.usatiuk.dhfs.storage.SerializationHelper;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
@@ -82,8 +83,14 @@ public class JObjectWriteback {
                     if (entry == null) break;
                     obj = entry.getValue().getRight();
                 }
-                // FIXME: can be interrupted
-                flushOne(obj);
+                try {
+                    flushOne(obj);
+                } catch (Exception e) {
+                    Log.error("Failed writing object " + obj.getName(), e);
+                    synchronized (_objects) {
+                        _objects.put(obj.getName(), Pair.of(System.currentTimeMillis(), obj));
+                    }
+                }
             }
         } catch (InterruptedException ignored) {
         }
@@ -92,22 +99,16 @@ public class JObjectWriteback {
 
     private void flushOne(JObject<?> obj) {
         obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, data) -> {
-            objectPersistentStore.writeObject("meta_" + m.getName(), SerializationHelper.serialize(m));
-            if (data != null)
-                objectPersistentStore.writeObject(m.getName(), SerializationHelper.serialize(data));
-            jObjectManager.onWriteback(m.getName());
+            flushOneImmediate(m, data);
             return null;
         });
     }
 
-    private void flushOneImmediate(JObject<?> obj) {
-        obj.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, data, a, b) -> {
-            objectPersistentStore.writeObject("meta_" + m.getName(), SerializationHelper.serialize(m));
-            if (data != null)
-                objectPersistentStore.writeObject(m.getName(), SerializationHelper.serialize(data));
-            jObjectManager.onWriteback(m.getName());
-            return null;
-        });
+    private <T extends JObjectData> void flushOneImmediate(ObjectMetadata m, T data) {
+        objectPersistentStore.writeObject("meta_" + m.getName(), SerializationHelper.serialize(m));
+        if (data != null)
+            objectPersistentStore.writeObject(m.getName(), SerializationHelper.serialize(data));
+        jObjectManager.onWriteback(m.getName());
     }
 
     public void remove(String name) {
@@ -117,6 +118,7 @@ public class JObjectWriteback {
     }
 
     public void markDirty(String name, JObject<?> object) {
+        object.assertRWLock();
         synchronized (_objects) {
             if (_objects.containsKey(name)) {
                 return;
@@ -129,6 +131,14 @@ public class JObjectWriteback {
                 return;
             }
         }
-        flushOneImmediate(object);
+
+        try {
+            flushOneImmediate(object.getMeta(), object.getData());
+        } catch (Exception e) {
+            Log.error("Failed writing object " + object.getName(), e);
+            synchronized (_objects) {
+                _objects.put(object.getName(), Pair.of(System.currentTimeMillis(), object));
+            }
+        }
     }
 }
