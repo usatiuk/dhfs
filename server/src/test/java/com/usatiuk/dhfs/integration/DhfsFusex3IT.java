@@ -185,6 +185,11 @@ public class DhfsFusex3IT {
 
     @Test
     void fileConflictTest2() throws IOException, InterruptedException, TimeoutException {
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo test123 > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
+        Thread.sleep(1000);
+        Assertions.assertEquals("test123\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+        Assertions.assertEquals("test123\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+
         boolean writeFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_data/dhfs_fuse_root/testf1"),
                 Pair.of(container2, "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf1"),
                 Pair.of(container3, "echo test3 >> /root/dhfs_data/dhfs_fuse_root/testf1")).parallel().map(p -> {
