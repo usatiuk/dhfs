@@ -85,8 +85,22 @@ public class RemoteObjectServiceClient {
         for (var v : names) {
             var obj = jObjectManager.get(v);
             if (obj.isEmpty()) continue;
-            var header = obj.get().runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> m.toRpcHeader());
-            builder.addHeader(header);
+
+            var header = obj.get().runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
+                if (m.isInvalid()) return null;
+                return Pair.of(m.toRpcHeader(), m.isSeen());
+            });
+            if (header == null) {
+                Log.info("Not sending invalidation of invalid object: " + v);
+                continue;
+            }
+            if (!header.getRight())
+                obj.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                    m.markSeen();
+                    return null;
+                });
+
+            builder.addHeader(header.getLeft());
         }
 
         var send = builder.build();

@@ -28,7 +28,28 @@ public class JObjectResolver {
     JObjectWriteback jObjectWriteback;
 
     @Inject
+    JObjectManager jobjectManager;
+
+    @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
+
+    public void cleanupRefs(JObject<?> self) {
+        self.assertRWLock();
+        if (self.getData() != null)
+            for (var r : self.getData().extractRefs()) {
+                jobjectManager.get(r).ifPresent(ro -> ro.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                    m.removeRef(r);
+                    return null;
+                }));
+            }
+    }
+
+    public void hydrateRefs(JObject<?> self) {
+        self.assertRWLock();
+        for (var r : self.getData().extractRefs()) {
+            jobjectManager.getOrPut(r, Optional.of(self.getName()));
+        }
+    }
 
     public <T extends JObjectData> Optional<T> resolveDataLocal(JObject<T> jObject) {
         jObject.assertRWLock();

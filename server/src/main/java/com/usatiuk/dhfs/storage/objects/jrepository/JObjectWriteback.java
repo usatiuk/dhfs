@@ -105,10 +105,13 @@ public class JObjectWriteback {
     }
 
     private <T extends JObjectData> void flushOneImmediate(ObjectMetadata m, T data) {
+        if (m.isInvalid()) {
+            Log.info("Not writing invalid object " + m.getName());
+            return;
+        }
         objectPersistentStore.writeObject("meta_" + m.getName(), SerializationHelper.serialize(m));
         if (data != null)
             objectPersistentStore.writeObject(m.getName(), SerializationHelper.serialize(data));
-        jObjectManager.onWriteback(m.getName());
     }
 
     public void remove(String name) {

@@ -8,6 +8,8 @@ import lombok.Getter;
 import net.openhft.hashing.LongTupleHashFunction;
 
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -44,6 +46,11 @@ public class ChunkData extends JObjectData {
 
     public static String getNameFromHash(String hash) {
         return "data_" + hash;
+    }
+
+    @Override
+    public Collection<String> extractRefs() {
+        return List.of();
     }
 
     @Override

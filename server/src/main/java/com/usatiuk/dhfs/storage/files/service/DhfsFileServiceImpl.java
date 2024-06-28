@@ -13,9 +13,11 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.NotImplementedException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -31,90 +33,101 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     void init(@Observes @Priority(500) StartupEvent event) {
         Log.info("Initializing file service");
         if (jObjectManager.get(new UUID(0, 0).toString()).isEmpty())
-            jObjectManager.put(new Directory(new UUID(0, 0), 0755));
+            jObjectManager.put(new Directory(new UUID(0, 0), 0755), Optional.empty());
         getRoot();
     }
 
-    private Optional<JObject<? extends FsNode>> traverse(JObject<? extends FsNode> from, Path path) {
-        if (path.getNameCount() == 0) return Optional.of(from);
-
-        if (!(from.isOf(Directory.class)))
-            return Optional.empty();
+    private JObject<? extends FsNode> traverse(JObject<? extends FsNode> from, Path path) {
+        if (path.getNameCount() == 0) return from;
 
         var pathFirstPart = path.getName(0).toString();
 
-        var found = ((JObject<Directory>) from).runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getKid(pathFirstPart));
+        var notFound = new StatusRuntimeException(Status.NOT_FOUND.withDescription("Not found: " + from.getName() + "/" + path));
 
-        if (found.isEmpty())
+        var found = from.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
+            if (d instanceof Directory dir)
+                return dir.getKid(pathFirstPart);
             return Optional.empty();
-        Optional<JObject<? extends FsNode>> ref = jObjectManager.get(found.get().toString(), FsNode.class);
+        }).orElseThrow(() -> notFound);
+
+        Optional<JObject<?>> ref = jObjectManager.get(found.toString());
 
         if (ref.isEmpty()) {
             Log.error("File missing when traversing directory " + from.getName() + ": " + found);
-            return Optional.empty();
+            throw notFound;
         }
+
+        ref.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
+            if (!(d instanceof FsNode))
+                throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + m.getName()));
+            return null;
+        });
 
         if (path.getNameCount() == 1) {
-            if (ref.get().isOf(File.class)) {
-                var f = (JObject<File>) ref.get();
-                if (!Objects.equals(f.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getParent()).toString(), from.getName())) {
-                    throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Parent mismatch for file " + path));
+            ref.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
+                if (d instanceof File f) {
+                    if (!Objects.equals(f.getParent().toString(), from.getName())) {
+                        throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Parent mismatch for file " + path));
+                    }
                 }
-            }
-            return ref;
+                return null;
+            });
+            return (JObject<? extends FsNode>) ref.get();
         }
 
-        return traverse(ref.get(), path.subpath(1, path.getNameCount()));
-
+        return traverse((JObject<? extends FsNode>) ref.get(), path.subpath(1, path.getNameCount()));
     }
 
-    private Optional<JObject<? extends FsNode>> getDirEntry(String name) {
-        var root = getRoot();
-        var found = traverse(root, Path.of(name));
-        return found;
+    private JObject<? extends FsNode> getDirEntry(String name) {
+        return traverse(getRoot(), Path.of(name));
     }
 
     @Override
     public Optional<FsNode> getattr(String uuid) {
-        Optional<JObject<? extends FsNode>> ref = jObjectManager.get(uuid, FsNode.class);
+        var ref = jObjectManager.get(uuid);
         if (ref.isEmpty()) return Optional.empty();
         return ref.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
+            if (!(d instanceof FsNode))
+                throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + m.getName()));
             //FIXME:
-            return Optional.of(d);
+            return Optional.of((FsNode) d);
         });
     }
 
     @Override
     public Optional<String> open(String name) {
-        // FIXME:
-        var root = getRoot();
-        var found = traverse(root, Path.of(name));
-
-        if (found.isEmpty())
-            return Optional.empty();
-
-        return Optional.of(found.get().getName());
+        try {
+            return Optional.ofNullable(traverse(getRoot(), Path.of(name)).getName());
+        } catch (StatusRuntimeException e) {
+            if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {
+                return Optional.empty();
+            }
+            throw e;
+        }
     }
 
     @Override
     public Optional<String> create(String name, long mode) {
-        // FIXME:
-        var root = getRoot();
-        var found = traverse(root, Path.of(name).getParent());
-        if (found.isEmpty()) return Optional.empty();
+        var parent = traverse(getRoot(), Path.of(name).getParent());
 
-        if (!(found.get().isOf(Directory.class))) return Optional.empty();
+        String fname = Path.of(name).getFileName().toString();
 
-        var dir = (JObject<Directory>) found.get();
         var fuuid = UUID.randomUUID();
-        File f = new File(fuuid, mode, UUID.fromString(dir.getName())); //FIXME:
+        File f = new File(fuuid, mode, UUID.fromString(parent.getName()));
 
-        jObjectManager.put(f);
+        if (!parent.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, invalidate) -> {
+            if (!(d instanceof Directory dir))
+                return false;
 
-        if (!dir.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, invalidate) -> {
+            if (dir.getKid(fname).isPresent())
+                return false;
+
             bump.apply();
-            d.setMtime(System.currentTimeMillis());
-            return d.putKid(Path.of(name).getFileName().toString(), fuuid);
+
+            jObjectManager.put(f, Optional.of(dir.getName()));
+
+            dir.setMtime(System.currentTimeMillis());
+            return dir.putKid(fname, fuuid);
         }))
             return Optional.empty();
 
@@ -123,48 +136,66 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Override
     public Optional<String> mkdir(String name, long mode) {
-        // FIXME:
-        var root = getRoot();
-        var found = traverse(root, Path.of(name).getParent());
-        if (found.isEmpty()) return Optional.empty();
+        var found = traverse(getRoot(), Path.of(name).getParent());
 
-        if (!(found.get().isOf(Directory.class))) return Optional.empty();
+        String dname = Path.of(name).getFileName().toString();
 
         var duuid = UUID.randomUUID();
-        Directory d = new Directory(duuid);
-        d.setMode(mode);
-        var dir = (JObject<Directory>) found.get();
+        Directory ndir = new Directory(duuid, mode); //FIXME:
 
-        jObjectManager.put(d);
-        if (!dir.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, dd, bump, invalidate) -> {
+        if (!found.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, invalidate) -> {
+            if (!(d instanceof Directory dir))
+                return false;
+
+            if (dir.getKid(dname).isPresent())
+                return false;
+
             bump.apply();
-            d.setMtime(System.currentTimeMillis());
-            return dd.putKid(Path.of(name).getFileName().toString(), duuid);
+
+            jObjectManager.put(ndir, Optional.of(dir.getName()));
+
+            dir.setMtime(System.currentTimeMillis());
+            return dir.putKid(dname, duuid);
         }))
             return Optional.empty();
 
-        return Optional.of(d.getName());
+        return Optional.of(ndir.getName());
     }
 
     private Boolean rmdent(String name) {
-        // FIXME:
-        var root = getRoot();
-        var found = traverse(root, Path.of(name).getParent());
-        if (found.isEmpty()) return false;
+        var parent = getDirEntry(Path.of(name).getParent().toString());
 
-        if (!(found.get().isOf(Directory.class))) return false;
+        Optional<UUID> kidId = parent.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
+            if (!(d instanceof Directory dir))
+                return Optional.empty();
 
-        var kidId = ((JObject<Directory>) found.get()).runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getKid(Path.of(name).getFileName().toString()));
+            return dir.getKid(Path.of(name).getFileName().toString());
+        });
 
-        var kid = jObjectManager.get(kidId.get().toString());
+        if (kidId.isEmpty())
+            return false;
+
+        var kid = jObjectManager.get(kidId.toString());
 
         if (kid.isEmpty()) return false;
 
-        var dir = (JObject<Directory>) found.get();
-        return dir.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, i) -> {
+        return parent.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, i) -> {
+            if (!(d instanceof Directory dir))
+                return false;
+
+            String kname = Path.of(name).getFileName().toString();
+
+            if (dir.getKid(kname).isPresent())
+                return false;
+
+            kid.get().runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m2, d2, bump2, i2) -> {
+                m2.removeRef(m.getName());
+                return null;
+            });
+
             bump.apply();
-            d.setMtime(System.currentTimeMillis());
-            return d.removeKid(Path.of(name).getFileName().toString());
+            dir.setMtime(System.currentTimeMillis());
+            return dir.removeKid(kname);
         });
     }
 
@@ -180,37 +211,75 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Override
     public Boolean rename(String from, String to) {
-        var dent = getDirEntry(from);
-        if (dent.isEmpty()) return false;
-        if (!rmdent(from)) return false;
+        var theFile = getDirEntry(from);
+        var dentFrom = getDirEntry(Paths.get(from).getParent().toString());
+        var dentTo = getDirEntry(Paths.get(to).getParent().toString());
 
-        var dentGot = dent.get();
+        UUID cleanup = null;
 
-        // FIXME:
-        var root = getRoot();
-        var found = traverse(root, Path.of(to).getParent());
-        if (found.isEmpty()) return false;
+        try {
+            JObject.rwLockAll(List.of(dentFrom, dentTo));
+            theFile.rwLock();
 
-        if (!(found.get().isOf(Directory.class))) return false;
+            if (!dentFrom.tryResolve(JObject.ResolutionStrategy.REMOTE))
+                throw new StatusRuntimeException(Status.ABORTED.withDescription(dentFrom.getName() + " could not be resolved"));
+            if (!dentTo.tryResolve(JObject.ResolutionStrategy.REMOTE))
+                throw new StatusRuntimeException(Status.ABORTED.withDescription(dentTo.getName() + " could not be resolved"));
+            if (!theFile.tryResolve(JObject.ResolutionStrategy.REMOTE))
+                throw new StatusRuntimeException(Status.ABORTED.withDescription(theFile.getName() + " could not be resolved"));
 
-        var dir = (JObject<Directory>) found.get();
+            if (!(dentFrom.getData() instanceof Directory dentFromD))
+                throw new StatusRuntimeException(Status.ABORTED.withDescription(dentFrom.getName() + " is not a directory"));
+            if (!(dentTo.getData() instanceof Directory dentToD))
+                throw new StatusRuntimeException(Status.ABORTED.withDescription(dentTo.getName() + " is not a directory"));
 
-        var putDent = dentGot.isOf(File.class) ?
-                jObjectManager.put(((JObject<File>) dentGot).runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, b, i) -> {
-                    var cpy = new File(UUID.randomUUID(), d.getMode(), UUID.fromString(dir.getName()));
-                    cpy.setMtime(d.getMtime());
-                    cpy.setCtime(d.getCtime());
-                    cpy.getChunks().putAll(d.getChunks());
-                    return cpy;
-                })) : dentGot;
+            if (dentFromD.getKid(Paths.get(from).getFileName().toString()).isEmpty())
+                throw new NotImplementedException("Race when moving (missing)");
 
-        dir.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, i) -> {
-            bump.apply();
+            FsNode newDent;
+            if (theFile.getData() instanceof Directory d) {
+                newDent = d;
+            } else if (theFile.getData() instanceof File f) {
+                var newFile = new File(UUID.randomUUID(), f.getMode(), UUID.fromString(dentTo.getName()));
+                newFile.setMtime(f.getMtime());
+                newFile.setCtime(f.getCtime());
+                newFile.getChunks().putAll(f.getChunks());
 
-            d.setMtime(System.currentTimeMillis());
-            d.getChildren().put(Path.of(to).getFileName().toString(), UUID.fromString(putDent.getName()));
-            return null;
-        });
+                theFile.getMeta().removeRef(dentFrom.toString());
+                jObjectManager.put(newFile, Optional.of(dentTo.getName()));
+                newDent = newFile;
+            } else {
+                throw new StatusRuntimeException(Status.ABORTED.withDescription(theFile.getName() + " is of unknown type"));
+            }
+
+            if (!dentFromD.removeKid(Paths.get(from).getFileName().toString()))
+                throw new NotImplementedException("Should not reach here");
+
+            String toFn = Paths.get(to).getFileName().toString();
+
+            if (dentToD.getChildren().containsKey(toFn)) {
+                cleanup = dentToD.getChildren().get(toFn);
+            }
+
+            dentToD.getChildren().put(toFn, newDent.getUuid());
+            dentToD.setMtime(System.currentTimeMillis());
+
+            dentFrom.bumpVer();
+            dentFrom.notifyWrite();
+
+            dentTo.bumpVer();
+            dentTo.notifyWrite();
+        } finally {
+            dentFrom.rwUnlock();
+            dentTo.rwUnlock();
+            theFile.rwUnlock();
+        }
+
+        if (cleanup != null) {
+            jObjectManager.get(cleanup.toString()).ifPresent(c -> {
+                c.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> m.removeRef(dentTo.getName()));
+            });
+        }
 
         return true;
     }
@@ -218,9 +287,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Override
     public Boolean chmod(String name, long mode) {
         var dent = getDirEntry(name);
-        if (dent.isEmpty()) return false;
 
-        dent.get().runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, i) -> {
+        dent.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, i) -> {
             bump.apply();
             d.setMtime(System.currentTimeMillis());
             d.setMode(mode);
@@ -232,18 +300,19 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Override
     public Iterable<String> readDir(String name) {
-        var root = getRoot();
-        var found = traverse(root, Path.of(name));
-        if (found.isEmpty()) throw new IllegalArgumentException();
-        if (!(found.get().isOf(Directory.class))) throw new IllegalArgumentException();
-        var dir = (JObject<Directory>) found.get();
+        var found = getDirEntry(name);
 
-        return dir.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getChildrenList());
+        return found.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
+            if (!(d instanceof Directory)) {
+                throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+            }
+            return ((Directory) d).getChildrenList();
+        });
     }
 
     @Override
     public Optional<ByteString> read(String fileUuid, long offset, int length) {
-        var fileOpt = jObjectManager.get(fileUuid, File.class);
+        var fileOpt = jObjectManager.get(fileUuid);
         if (fileOpt.isEmpty()) {
             Log.error("File not found when trying to read: " + fileUuid);
             return Optional.empty();
@@ -254,7 +323,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         try {
             file.runReadLocked(JObject.ResolutionStrategy.REMOTE, (md, fileData) -> {
-                var chunksAll = fileData.getChunks();
+                if (!(fileData instanceof File)) {
+                    throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+                }
+                var chunksAll = ((File) fileData).getChunks();
                 if (chunksAll.isEmpty()) {
                     chunksList.set(new ArrayList<>());
                     return null;
@@ -284,15 +356,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             long toReadInChunk = (offset + length) - curPos;
 
-            var chunkUuid = chunk.getValue();
-            var chunkRead = jObjectManager.get(ChunkData.getNameFromHash(chunkUuid), ChunkData.class);
-
-            if (chunkRead.isEmpty()) {
-                Log.error("Chunk requested not found: " + chunkUuid);
-                return Optional.empty();
-            }
-
-            var chunkBytes = chunkRead.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getBytes());
+            var chunkBytes = readChunk(chunk.getValue());
 
             long readableLen = chunkBytes.size() - offInChunk;
 
@@ -315,30 +379,51 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     }
 
     private Integer getChunkSize(String uuid) {
-        var chunkRead = jObjectManager.get(ChunkInfo.getNameFromHash(uuid), ChunkInfo.class);
+        var chunkRead = jObjectManager.get(ChunkInfo.getNameFromHash(uuid));
 
         if (chunkRead.isEmpty()) {
             Log.error("Chunk requested not found: " + uuid);
             throw new StatusRuntimeException(Status.NOT_FOUND);
         }
 
-        return chunkRead.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getSize());
+        return chunkRead.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
+            if (!(d instanceof ChunkInfo))
+                throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+            return ((ChunkInfo) d).getSize();
+        });
     }
 
     private ByteString readChunk(String uuid) {
-        var chunkRead = jObjectManager.get(ChunkData.getNameFromHash(uuid), ChunkData.class);
+        var chunkRead = jObjectManager.get(ChunkData.getNameFromHash(uuid));
 
         if (chunkRead.isEmpty()) {
             Log.error("Chunk requested not found: " + uuid);
             throw new StatusRuntimeException(Status.NOT_FOUND);
         }
 
-        return chunkRead.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getBytes());
+        return chunkRead.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
+            if (!(d instanceof ChunkData))
+                throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+            return ((ChunkData) d).getBytes();
+        });
+    }
+
+    private void cleanupChunks(String fileUuid, Collection<String> uuids) {
+        for (var cuuid : uuids) {
+            var ci = jObjectManager.get(ChunkInfo.getNameFromHash(cuuid));
+            if (ci.isPresent()) {
+                ci.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
+                    m.removeRef(fileUuid);
+                    return null;
+                });
+                jObjectManager.tryQuickDelete(ci.get());
+            }
+        }
     }
 
     @Override
     public Long write(String fileUuid, long offset, byte[] data) {
-        var fileOpt = jObjectManager.get(fileUuid, File.class);
+        var fileOpt = jObjectManager.get(fileUuid);
         if (fileOpt.isEmpty()) {
             Log.error("File not found when trying to read: " + fileUuid);
             return -1L;
@@ -346,7 +431,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var file = fileOpt.get();
 
         // FIXME:
-        var removedChunksOuter = file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (meta, fData, bump, i) -> {
+        var removedChunksOuter = file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (meta, fDataU, bump, i) -> {
+            if (!(fDataU instanceof File))
+                throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+
+            var fData = (File) fDataU;
             var chunksAll = fData.getChunks();
             var first = chunksAll.floorEntry(offset);
             var last = chunksAll.floorEntry((offset + data.length) - 1);
@@ -442,8 +531,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
                     ChunkData newChunkData = new ChunkData(thisChunk);
                     ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
-                    jObjectManager.put(newChunkData);
-                    jObjectManager.put(newChunkInfo);
+                    jObjectManager.put(newChunkInfo, Optional.of(meta.getName()));
+                    jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
                     chunksAll.put(start, newChunkInfo.getHash());
 
                     start += thisChunk.size();
@@ -456,46 +545,49 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             return removedChunks;
         });
 
-        for (var v : removedChunksOuter) {
-            var ci = jObjectManager.get(ChunkInfo.getNameFromHash(v), ChunkInfo.class);
-            if (ci.isPresent())
-                jObjectManager.unref(ci.get());
-            var cd = jObjectManager.get(ChunkData.getNameFromHash(v), ChunkData.class);
-            if (cd.isPresent())
-                jObjectManager.unref(cd.get());
-        }
+        cleanupChunks(fileUuid, removedChunksOuter);
 
         return (long) data.length;
     }
 
     @Override
     public Boolean truncate(String fileUuid, long length) {
-        var fileOpt = jObjectManager.get(fileUuid, File.class);
+        var fileOpt = jObjectManager.get(fileUuid);
         if (fileOpt.isEmpty()) {
             Log.error("File not found when trying to read: " + fileUuid);
             return false;
         }
         var file = fileOpt.get();
 
+        TreeSet<String> removedChunks = new TreeSet<>();
+
         if (length == 0) {
             try {
                 file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, fileData, bump, i) -> {
+                    if (!(fileData instanceof File f))
+                        throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
                     bump.apply();
-                    fileData.getChunks().clear();
-                    fileData.setMtime(System.currentTimeMillis());
+                    removedChunks.addAll(f.getChunks().values());
+                    f.getChunks().clear();
+                    f.setMtime(System.currentTimeMillis());
                     return null;
                 });
             } catch (Exception e) {
                 Log.error("Error writing file chunks: " + fileUuid, e);
                 return false;
             }
+            cleanupChunks(fileUuid, removedChunks);
             return true;
         }
 
         try {
-            file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, fData, bump, i) -> {
+            file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, fDataU, bump, i) -> {
+                if (!(fDataU instanceof File fData))
+                    throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
                 var chunksAll = fData.getChunks();
                 var lastChunk = chunksAll.lastEntry();
+
+                //FIXME!
 
                 if (lastChunk != null) {
                     var size = getChunkSize(lastChunk.getValue());
@@ -508,8 +600,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
                         ChunkData newChunkData = new ChunkData(chunkData.substring(0, (int) (length - lastChunk.getKey())));
                         ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
-                        jObjectManager.put(newChunkData);
-                        jObjectManager.put(newChunkInfo);
+                        jObjectManager.put(newChunkInfo, Optional.of(m.getName()));
+                        jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
+
+                        removedChunks.add(lastChunk.getValue());
 
                         chunksAll.put(lastChunk.getKey(), newChunkData.getHash());
                     } else {
@@ -526,29 +620,25 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             Log.error("Error reading file: " + fileUuid, e);
             return false;
         }
-
+        cleanupChunks(fileUuid, removedChunks);
         return true;
     }
 
     @Override
     public Boolean setTimes(String fileUuid, long atimeMs, long mtimeMs) {
-        var fileOpt = jObjectManager.get(fileUuid, FsNode.class);
-        if (fileOpt.isEmpty()) {
-            Log.error("File not found when trying to read: " + fileUuid);
-            return false;
-        }
-        var file = fileOpt.get();
+        var file = jObjectManager.get(fileUuid).orElseThrow(
+                () -> new StatusRuntimeException(Status.NOT_FOUND.withDescription(
+                        "File not found for setTimes: " + fileUuid))
+        );
 
-        try {
-            file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, fileData, bump, i) -> {
-                bump.apply();
-                fileData.setMtime(mtimeMs);
-                return null;
-            });
-        } catch (Exception e) {
-            Log.error("Error writing file chunks: " + fileUuid, e);
-            return false;
-        }
+        file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, fileData, bump, i) -> {
+            if (!(fileData instanceof FsNode fd))
+                throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+
+            bump.apply();
+            fd.setMtime(mtimeMs);
+            return null;
+        });
 
         return true;
     }
@@ -556,39 +646,32 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Override
     public Long size(String uuid) {
         int size = 0;
-        //FIXME:
-        AtomicReference<TreeMap<Long, String>> chunksAllRef = new AtomicReference<>();
-        var read = jObjectManager.get(uuid, File.class)
+
+        NavigableMap<Long, String> chunksAll;
+
+        var read = jObjectManager.get(uuid)
                 .orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
         try {
-            read.runReadLocked(JObject.ResolutionStrategy.REMOTE, (fsNodeData, fileData) -> {
-                chunksAllRef.set(new TreeMap<>(fileData.getChunks()));
-                return null;
+            chunksAll = read.runReadLocked(JObject.ResolutionStrategy.REMOTE, (fsNodeData, fileData) -> {
+                if (!(fileData instanceof File fd))
+                    throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+                return new TreeMap<>(fd.getChunks());
             });
         } catch (Exception e) {
             Log.error("Error reading file: " + uuid, e);
             return -1L;
         }
 
-        var chunksAll = chunksAllRef.get();
-
         for (var chunk : chunksAll.entrySet()) {
-            var chunkUuid = chunk.getValue();
-            var chunkRead = jObjectManager.get(ChunkInfo.getNameFromHash(chunkUuid), ChunkInfo.class);
-
-            if (chunkRead.isEmpty()) {
-                Log.error("Chunk requested not found: " + chunkUuid);
-                return -1L;
-            }
-
-            size += chunkRead.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getSize());
+            size += getChunkSize(chunk.getValue());
         }
+
         return (long) size;
     }
 
     private JObject<Directory> getRoot() {
-        var read = jObjectManager.get(new UUID(0, 0).toString(), Directory.class);
+        var read = jObjectManager.get(new UUID(0, 0).toString());
         if (read.isEmpty()) {
             Log.error("Root directory not found");
         }

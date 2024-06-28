@@ -40,6 +40,11 @@ public class Directory extends FsNode {
         return true;
     }
 
+    @Override
+    public Collection<String> extractRefs() {
+        return _children.values().stream().map(UUID::toString).toList();
+    }
+
     public List<String> getChildrenList() {
         return _children.keySet().stream().toList();
     }

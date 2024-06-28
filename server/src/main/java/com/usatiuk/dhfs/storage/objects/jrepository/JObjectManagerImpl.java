@@ -16,8 +16,10 @@ import lombok.Getter;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Optional;
 
 @ApplicationScoped
 public class JObjectManagerImpl implements JObjectManager {
@@ -44,29 +46,21 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     private final HashMap<String, NamedSoftReference> _map = new HashMap<>();
-    private final HashMap<String, Long> _nurseryRefcounts = new HashMap<>();
     private final ReferenceQueue<JObject<?>> _refQueue = new ReferenceQueue<>();
-    private final AtomicReference<LinkedHashSet<String>> _writebackQueue = new AtomicReference<>(new LinkedHashSet<>());
 
     private Thread _refCleanupThread;
-    private Thread _nurseryCleanupThread;
 
     @Startup
     void init() {
         _refCleanupThread = new Thread(this::refCleanupThread);
         _refCleanupThread.setName("JObject ref cleanup thread");
         _refCleanupThread.start();
-        _nurseryCleanupThread = new Thread(this::nurseryCleanupThread);
-        _nurseryCleanupThread.setName("JObject nursery cleanup thread");
-        _nurseryCleanupThread.start();
     }
 
     @Shutdown
     void shutdown() throws InterruptedException {
         _refCleanupThread.interrupt();
-        _nurseryCleanupThread.interrupt();
         _refCleanupThread.join();
-        _nurseryCleanupThread.join();
     }
 
     private void refCleanupThread() {
@@ -76,29 +70,6 @@ public class JObjectManagerImpl implements JObjectManager {
                 synchronized (this) {
                     if (_map.containsKey(cur._key) && (_map.get(cur._key).get() == null))
                         _map.remove(cur._key);
-                }
-            }
-        } catch (InterruptedException ignored) {
-        }
-        Log.info("Ref cleanup thread exiting");
-    }
-
-    private void nurseryCleanupThread() {
-        try {
-            while (!Thread.interrupted()) {
-                LinkedHashSet<String> got;
-
-                synchronized (_writebackQueue) {
-                    while (_writebackQueue.get().isEmpty())
-                        _writebackQueue.wait();
-                    got = _writebackQueue.get();
-                    _writebackQueue.set(new LinkedHashSet<>());
-                }
-
-                synchronized (this) {
-                    for (var s : got) {
-                        _nurseryRefcounts.remove(s);
-                    }
                 }
             }
         } catch (InterruptedException ignored) {
@@ -147,15 +118,6 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     @Override
-    public <D extends JObjectData> Optional<JObject<? extends D>> get(String name, Class<D> klass) {
-        var got = get(name);
-        if (got.isEmpty()) return Optional.empty();
-        if (!got.get().isOf(klass))
-            throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Class mismatch for " + name));
-        return Optional.of((JObject<? extends D>) got.get());
-    }
-
-    @Override
     public Collection<JObject<?>> find(String prefix) {
         var ret = new ArrayList<JObject<?>>();
         for (var f : objectPersistentStore.findObjects("meta_")) {
@@ -167,88 +129,107 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     @Override
-    public <D extends JObjectData> JObject<D> put(D object) {
-        synchronized (this) {
-            var inMap = getFromMap(object.getName());
-            if (inMap != null) {
-                if (!object.assumeUnique())
-                    throw new IllegalArgumentException("Trying to insert different object with same key");
-                addToNursery(object.getName());
-                return (JObject<D>) inMap;
-            } else {
-                var created = new JObject<D>(jObjectResolver, object.getName(),
-                        object.getConflictResolver().getName(), persistentRemoteHostsService.getSelfUuid(), object);
-                _map.put(object.getName(), new NamedSoftReference(created, _refQueue));
-                created.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                    jObjectResolver.notifyWrite(created);
-                    return null;
-                });
-                addToNursery(created.getName());
-                return created;
-            }
-        }
-    }
-
-    @Override
-    public JObject<?> getOrPut(String name, ObjectMetadata md) {
-        var got = get(name);
-
-        if (got.isPresent()) {
-            if (!got.get().isOf(md.getType())) {
-                throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Type mismatch for " + name));
-            }
-            return got.get();
-        }
-
-        synchronized (this) {
-            var inMap = getFromMap(md.getName());
-            if (inMap != null) {
-                return inMap;
-            } else {
-                var created = new JObject<>(jObjectResolver, md);
-                _map.put(md.getName(), new NamedSoftReference(created, _refQueue));
-                created.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                    jObjectResolver.notifyWrite(created);
-                    return null;
-                });
-                return created;
-            }
-        }
-    }
-
-    private void addToNursery(String name) {
-        synchronized (this) {
-            if (!objectPersistentStore.existsObject("meta_" + name))
-                _nurseryRefcounts.merge(name, 1L, Long::sum);
-        }
-    }
-
-    @Override
-    public void onWriteback(String name) {
-        synchronized (_writebackQueue) {
-            _writebackQueue.get().add(name);
-            _writebackQueue.notifyAll();
-        }
-    }
-
-    @Override
-    public void unref(JObject<?> object) {
-        object.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, a, b, i) -> {
-            String name = m.getName();
+    public <D extends JObjectData> JObject<D> put(D object, Optional<String> parent) {
+        while (true) {
+            JObject<?> ret;
             synchronized (this) {
-                if (!_nurseryRefcounts.containsKey(name)) return null;
-
-                if (objectPersistentStore.existsObject("meta_" + name))
-                    _nurseryRefcounts.remove(name);
-
-                _nurseryRefcounts.merge(name, -1L, Long::sum);
-                if (_nurseryRefcounts.get(name) <= 0) {
-                    _nurseryRefcounts.remove(name);
-                    jObjectWriteback.remove(name);
-                    _map.remove(name);
+                ret = getFromMap(object.getName());
+                if (ret != null) {
+                    if (!object.assumeUnique())
+                        throw new IllegalArgumentException("Trying to insert different object with same key");
+                } else {
+                    ret = new JObject<D>(jObjectResolver, object.getName(), persistentRemoteHostsService.getSelfUuid(), object);
+                    _map.put(object.getName(), new NamedSoftReference(ret, _refQueue));
+                    JObject<?> finalRet = ret;
+                    ret.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                        if (parent.isPresent()) {
+                            m.addRef(parent.get());
+                        } else {
+                            m.lock();
+                        }
+                        jObjectResolver.notifyWrite(finalRet);
+                        return null;
+                    });
+                    return (JObject<D>) ret;
                 }
             }
-            return null;
+            if (!ret.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                if (m.isInvalid()) return false;
+                if (parent.isPresent()) {
+                    m.addRef(parent.get());
+                } else {
+                    m.lock();
+                }
+                return true;
+            })) continue;
+            return (JObject<D>) ret;
+        }
+    }
+
+    @Override
+    public JObject<?> getOrPut(String name, Optional<String> parent) {
+        while (true) {
+            var got = get(name);
+
+            if (got.isPresent()) {
+                if (parent.isPresent())
+                    if (!got.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                        if (m.isInvalid()) return false;
+                        m.addRef(parent.get());
+                        return true;
+                    })) continue;
+                return got.get();
+            }
+
+            synchronized (this) {
+                var inMap = getFromMap(name);
+                if (inMap != null) {
+                    continue;
+                } else {
+                    // FIXME:
+                    if (objectPersistentStore.existsObject("meta_" + name))
+                        continue;
+
+                    var created = new JObject<>(jObjectResolver, new ObjectMetadata(name));
+                    _map.put(name, new NamedSoftReference(created, _refQueue));
+                    created.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                        m.markSeen();
+                        jObjectResolver.notifyWrite(created);
+                        return null;
+                    });
+                    return created;
+                }
+            }
+        }
+    }
+
+    @Override
+    public void tryQuickDelete(JObject<?> object) {
+        object.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, b, i) -> {
+            if (m.isSeen()) return false;
+            if (m.getRefcount() > 0) return false;
+
+            m.markInvalid();
+            jObjectWriteback.remove(object.getName());
+            objectPersistentStore.deleteObject("meta_" + m.getName());
+            objectPersistentStore.deleteObject(m.getName());
+
+            synchronized (this) {
+                _map.remove(object.getName());
+            }
+
+            if (d != null) {
+                for (var c : d.extractRefs()) {
+                    get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mc, dc, bc, ic) -> {
+                        mc.removeRef(object.getName());
+                        tryQuickDelete(ref);
+                        return null;
+                    }));
+                }
+            }
+
+            return true;
         });
+
     }
 }

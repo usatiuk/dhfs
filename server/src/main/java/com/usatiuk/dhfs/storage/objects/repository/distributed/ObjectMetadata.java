@@ -3,35 +3,82 @@ package com.usatiuk.dhfs.storage.objects.repository.distributed;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelog;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelogEntry;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
-import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import lombok.Getter;
 
 import java.io.Serializable;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
 public class ObjectMetadata implements Serializable {
-    public ObjectMetadata(String name, String conflictResolver, Class<? extends JObjectData> type) {
+    public ObjectMetadata(String name) {
         _name = name;
-        _conflictResolver = conflictResolver;
-        _type = type;
     }
 
     @Getter
     private final String _name;
 
     @Getter
-    private final String _conflictResolver;
-
-    @Getter
-    private final Class<? extends JObjectData> _type;
-
-    @Getter
     private final Map<UUID, Long> _remoteCopies = new LinkedHashMap<>();
 
     @Getter
     private final Map<UUID, Long> _changelog = new LinkedHashMap<>();
+
+    @Getter
+    private final Map<UUID, Boolean> _deletionMark = new LinkedHashMap<>();
+
+    @Getter
+    private final Map<UUID, Boolean> _deletionLog = new LinkedHashMap<>();
+
+    @Getter
+    private long _refcount = 0L;
+
+    @Getter
+    private boolean _locked = false;
+
+    @Getter
+    private boolean _seen = false;
+
+    @Getter
+    private boolean _invalid = false;
+
+    public void markSeen() {
+        if (!_seen) _seen = true;
+    }
+
+    public void markInvalid() {
+        if (!_invalid) _invalid = true;
+    }
+
+    private final Map<String, Long> _referrers = new HashMap<>();
+
+    public long lock() {
+        if (_locked) throw new IllegalArgumentException("Already locked");
+        _locked = true;
+        _refcount++;
+        return _refcount;
+    }
+
+    public long unlock() {
+        if (!_locked) throw new IllegalArgumentException("Already unlocked");
+        _locked = false;
+        _refcount--;
+        return _refcount;
+    }
+
+    public long addRef(String from) {
+        _referrers.merge(from, 1L, Long::sum);
+        _refcount++;
+        return _refcount;
+    }
+
+    public long removeRef(String from) {
+        _referrers.merge(from, -1L, Long::sum);
+        if (_referrers.get(from).equals(0L)) _referrers.remove(from);
+        _refcount--;
+        return _refcount;
+    }
 
     public Long getOurVersion() {
         return _changelog.values().stream().reduce(0L, Long::sum);
@@ -57,9 +104,7 @@ public class ObjectMetadata implements Serializable {
 
     public ObjectHeader toRpcHeader() {
         var headerBuilder = ObjectHeader.newBuilder().setName(getName());
-        headerBuilder.setConflictResolver(getConflictResolver());
         headerBuilder.setChangelog(toRpcChangelog());
-        headerBuilder.setType(_type.getName());
         return headerBuilder.build();
     }
 }

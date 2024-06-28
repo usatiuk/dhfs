@@ -5,6 +5,8 @@ import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import lombok.Getter;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 
 @Getter
@@ -43,6 +45,11 @@ public class ChunkInfo extends JObjectData {
 
     public static String getNameFromHash(String hash) {
         return "info_" + hash;
+    }
+
+    @Override
+    public Collection<String> extractRefs() {
+        return List.of(ChunkData.getNameFromHash(_hash));
     }
 
     @Override

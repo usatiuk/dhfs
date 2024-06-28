@@ -4,6 +4,7 @@ import com.usatiuk.dhfs.storage.files.conflicts.FileConflictResolver;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import lombok.Getter;
 
+import java.util.Collection;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -17,6 +18,11 @@ public class File extends FsNode {
     @Override
     public Class<? extends ConflictResolver> getConflictResolver() {
         return FileConflictResolver.class;
+    }
+
+    @Override
+    public Collection<String> extractRefs() {
+        return _chunks.values().stream().map(ChunkInfo::getNameFromHash).toList();
     }
 
     @Getter

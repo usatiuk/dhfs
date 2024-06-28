@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.storage.files.conflicts;
 
 import com.usatiuk.dhfs.storage.SerializationHelper;
+import com.usatiuk.dhfs.storage.files.objects.ChunkInfo;
 import com.usatiuk.dhfs.storage.files.objects.Directory;
 import com.usatiuk.dhfs.storage.files.objects.File;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
@@ -18,6 +19,7 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 @ApplicationScoped
@@ -41,22 +43,27 @@ public class FileConflictResolver implements ConflictResolver {
             throw new NotImplementedException();
         }
 
-        var oursAsFile = (JObject<File>) ours;
 
-        var _oursDir = jObjectManager.get(oursAsFile.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
+        var _oursDir = jObjectManager.get(ours.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
                     if (d == null)
                         throw new StatusRuntimeException(Status.ABORTED.withDescription("Conflict but we don't have local copy"));
-                    return d.getParent().toString();
-                }), Directory.class)
-                .orElseThrow(() -> new NotImplementedException("Could not find parent directory for file " + oursAsFile.getName()));
+                    if (!(d instanceof File df))
+                        throw new StatusRuntimeException(Status.ABORTED.withDescription("Bad type for file"));
+                    return df.getParent().toString();
+                }))
+                .orElseThrow(() -> new NotImplementedException("Could not find parent directory for file " + ours.getName()));
 
-        _oursDir.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mD, oursDir, bumpDir, invalidateDir) -> {
-            if (oursDir == null)
+        _oursDir.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mD, oursDirU, bumpDir, invalidateDir) -> {
+            if (oursDirU == null)
                 throw new StatusRuntimeException(Status.ABORTED.withDescription("Conflict but we don't have local copy"));
+            if (!(oursDirU instanceof Directory oursDir))
+                throw new StatusRuntimeException(Status.ABORTED.withDescription("Bad type for directory"));
 
-            oursAsFile.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, oursFile, bumpFile, invalidateFile) -> {
-                if (oursFile == null)
+            ours.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, oursFileU, bumpFile, invalidateFile) -> {
+                if (oursFileU == null)
                     throw new StatusRuntimeException(Status.ABORTED.withDescription("Conflict but we don't have local copy"));
+                if (!(oursFileU instanceof File oursFile))
+                    throw new StatusRuntimeException(Status.ABORTED.withDescription("Bad type for file"));
 
                 // TODO: dedup
                 ObjectMetadata newMetadata;
@@ -77,7 +84,7 @@ public class FileConflictResolver implements ConflictResolver {
                     otherHostname = persistentRemoteHostsService.getSelfUuid();
                 }
 
-                newMetadata = new ObjectMetadata(ours.getName(), oursHeader.getConflictResolver(), m.getType());
+                newMetadata = new ObjectMetadata(ours.getName());
 
                 for (var entry : oursHeader.getChangelog().getEntriesList()) {
                     newMetadata.getChangelog().put(UUID.fromString(entry.getHost()), entry.getVersion());
@@ -96,9 +103,24 @@ public class FileConflictResolver implements ConflictResolver {
                         || chunksDiff;
 
                 if (wasChanged) {
+                    newMetadata.getChangelog().merge(persistentRemoteHostsService.getSelfUuid(), 1L, Long::sum);
+
+                    if (m.getBestVersion() >= newMetadata.getOurVersion())
+                        throw new NotImplementedException("Race when conflict resolving");
+
+                    var oldChunks = oursFile.getChunks().values().stream().toList();
                     oursFile.getChunks().clear();
+
                     for (var e : firstChunksCopy) {
                         oursFile.getChunks().put(e.getLeft(), e.getValue());
+                        jObjectManager.getOrPut(e.getValue(), Optional.of(oursFile.getName()));
+                    }
+                    for (var cuuid : oldChunks) {
+                        var ci = jObjectManager.get(ChunkInfo.getNameFromHash(cuuid));
+                        ci.ifPresent(jObject -> jObject.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, d, b, v) -> {
+                            m.removeRef(oursFile.getName());
+                            return null;
+                        }));
                     }
                     oursFile.setMtime(first.getMtime());
                     oursFile.setCtime(first.getCtime());
@@ -108,13 +130,14 @@ public class FileConflictResolver implements ConflictResolver {
                     newFile.setCtime(second.getCtime());
                     for (var e : secondChunksCopy) {
                         newFile.getChunks().put(e.getLeft(), e.getValue());
+                        jObjectManager.getOrPut(e.getValue(), Optional.ofNullable(newFile.getName()));
                     }
 
                     var theName = oursDir.getChildren().entrySet().stream().filter(p -> p.getValue().equals(oursFile.getUuid())).findAny().orElseThrow(
                             () -> new NotImplementedException("Could not find our file in directory " + oursDir.getName())
                     );
 
-                    jObjectManager.put(newFile);
+                    jObjectManager.put(newFile, Optional.of(_oursDir.getName()));
 
                     int i = 0;
                     do {
@@ -127,15 +150,8 @@ public class FileConflictResolver implements ConflictResolver {
                         break;
                     } while (true);
 
-                    newMetadata.getChangelog().merge(persistentRemoteHostsService.getSelfUuid(), 1L, Long::sum);
                     bumpDir.apply();
-                }
-
-                if (wasChanged)
-                    if (m.getBestVersion() >= newMetadata.getOurVersion())
-                        throw new NotImplementedException("Race when conflict resolving");
-
-                if (m.getBestVersion() > newMetadata.getOurVersion())
+                } else if (m.getBestVersion() > newMetadata.getOurVersion())
                     throw new NotImplementedException("Race when conflict resolving");
 
                 m.getChangelog().clear();

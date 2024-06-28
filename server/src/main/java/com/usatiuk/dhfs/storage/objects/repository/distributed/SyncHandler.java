@@ -3,7 +3,6 @@ package com.usatiuk.dhfs.storage.objects.repository.distributed;
 import com.google.common.collect.Maps;
 import com.usatiuk.dhfs.objects.repository.distributed.*;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
-import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -11,12 +10,8 @@ import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
-import org.apache.commons.lang3.NotImplementedException;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 @ApplicationScoped
 public class SyncHandler {
@@ -57,16 +52,7 @@ public class SyncHandler {
     }
 
     public void handleOneUpdate(UUID from, ObjectHeader header) {
-        JObject<?> found;
-        try {
-            found = jObjectManager.getOrPut(header.getName(), new ObjectMetadata(
-                    header.getName(), header.getConflictResolver(),
-                    (Class<? extends JObjectData>) Class.forName(header.getType(),
-                            true, JObject.class.getClassLoader())
-            ));
-        } catch (ClassNotFoundException ex) {
-            throw new NotImplementedException(ex);
-        }
+        JObject<?> found = jObjectManager.getOrPut(header.getName(), Optional.empty());
 
         var receivedTotalVer = header.getChangelog().getEntriesList()
                 .stream().map(ObjectChangelogEntry::getVersion).reduce(0L, Long::sum);

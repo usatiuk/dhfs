@@ -16,6 +16,7 @@ import javax.annotation.Nonnull;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -102,11 +103,9 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     public void deleteObject(String name) {
         var file = Path.of(root, name);
 
-        if (!file.toFile().exists())
-            throw new StatusRuntimeException(Status.NOT_FOUND);
-
         try {
             Files.delete(file);
+        } catch (NoSuchFileException ignored) {
         } catch (IOException e) {
             Log.error("Error deleting file " + file, e);
             throw new StatusRuntimeException(Status.INTERNAL);

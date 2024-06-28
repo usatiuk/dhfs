@@ -13,6 +13,7 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.Optional;
 import java.util.UUID;
 
 class Profiles {
@@ -46,13 +47,13 @@ public class DhfsFileServiceSimpleTest {
 
             // FIXME: dhfs_files
 
-            jObjectManager.put(c1);
-            jObjectManager.put(c2);
-            jObjectManager.put(c3);
-            jObjectManager.put(c1i);
-            jObjectManager.put(c2i);
-            jObjectManager.put(c3i);
-            jObjectManager.put(f);
+            jObjectManager.put(c1, Optional.of(c1i.getName()));
+            jObjectManager.put(c2, Optional.of(c2i.getName()));
+            jObjectManager.put(c3, Optional.of(c3i.getName()));
+            jObjectManager.put(c1i, Optional.of(f.getName()));
+            jObjectManager.put(c2i, Optional.of(f.getName()));
+            jObjectManager.put(c3i, Optional.of(f.getName()));
+            jObjectManager.put(f, Optional.empty());
         }
 
         String all = "1234567891011";

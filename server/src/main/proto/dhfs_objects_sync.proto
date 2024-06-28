@@ -33,8 +33,6 @@ message ObjectChangelog {
 
 message ObjectHeader {
   string name = 2;
-  string conflictResolver = 3;
-  string type = 4;
   ObjectChangelog changelog = 5;
 }
 

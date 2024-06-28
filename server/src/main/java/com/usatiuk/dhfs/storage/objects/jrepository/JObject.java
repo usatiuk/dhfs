@@ -8,6 +8,8 @@ import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.NotImplementedException;
 
 import java.io.Serializable;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -15,9 +17,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class JObject<T extends JObjectData> implements Serializable {
     // Create a new object
-    protected JObject(JObjectResolver resolver, String name, String conflictResolver, UUID selfUuid, T obj) {
+    protected JObject(JObjectResolver resolver, String name, UUID selfUuid, T obj) {
         _resolver = resolver;
-        _metaPart = new ObjectMetadata(name, conflictResolver, obj.getClass());
+        _metaPart = new ObjectMetadata(name);
         _dataPart.set(obj);
         // FIXME:?
         if (!obj.assumeUnique())
@@ -50,12 +52,8 @@ public class JObject<T extends JObjectData> implements Serializable {
     }
 
     public Class<? extends ConflictResolver> getConflictResolver() {
-        try {
-            return (Class<? extends ConflictResolver>) Class.forName(_metaPart.getConflictResolver(), true,
-                    JObject.class.getClassLoader());
-        } catch (ClassNotFoundException e) {
-            throw new NotImplementedException(e);
-        }
+        if (_dataPart.get() == null) throw new NotImplementedException("Data part not found!");
+        return _dataPart.get().getConflictResolver();
     }
 
     protected boolean isResolved() {
@@ -77,8 +75,8 @@ public class JObject<T extends JObjectData> implements Serializable {
         R apply(ObjectMetadata indexData, @Nullable T data, VoidFn bump, VoidFn invalidate);
     }
 
-    public <X> boolean isOf(Class<X> klass) {
-        return (klass.isAssignableFrom(_metaPart.getType()));
+    private void hydrateRefs() {
+        _resolver.hydrateRefs(this);
     }
 
     private void resolveDataPart() {
@@ -87,9 +85,7 @@ public class JObject<T extends JObjectData> implements Serializable {
             try {
                 if (_dataPart.get() == null) {
                     _dataPart.set(_resolver.resolveData(this));
-
-                    if (!_metaPart.getType().isAssignableFrom(_dataPart.get().getClass()))
-                        throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Type mismatch for " + getName()));
+                    hydrateRefs();
                 } // _dataPart.get() == null
             } finally {
                 _lock.writeLock().unlock();
@@ -105,9 +101,7 @@ public class JObject<T extends JObjectData> implements Serializable {
                     var res = _resolver.resolveDataLocal(this);
                     if (res.isEmpty()) return;
                     _dataPart.set(res.get());
-
-                    if (!_metaPart.getType().isAssignableFrom(_dataPart.get().getClass()))
-                        throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Type mismatch for " + getName()));
+                    hydrateRefs();
                 } // _dataPart.get() == null
             } finally {
                 _lock.writeLock().unlock();
@@ -126,8 +120,9 @@ public class JObject<T extends JObjectData> implements Serializable {
         else if (resolutionStrategy == ResolutionStrategy.REMOTE) resolveDataPart();
 
         _lock.readLock().lock();
-
         try {
+            if (_metaPart.isInvalid())
+                throw new StatusRuntimeException(Status.ABORTED.withDescription("Invalid object " + getName()));
             return fn.apply(_metaPart, _dataPart.get());
         } finally {
             _lock.readLock().unlock();
@@ -137,21 +132,59 @@ public class JObject<T extends JObjectData> implements Serializable {
     public <R> R runWriteLocked(ResolutionStrategy resolutionStrategy, ObjectFnWrite<T, R> fn) {
         _lock.writeLock().lock();
         try {
+            if (_metaPart.isInvalid())
+                throw new StatusRuntimeException(Status.ABORTED.withDescription("Invalid object " + getName()));
             if (resolutionStrategy == ResolutionStrategy.LOCAL_ONLY) tryLocalResolve();
             else if (resolutionStrategy == ResolutionStrategy.REMOTE) resolveDataPart();
 
             var ver = _metaPart.getOurVersion();
             VoidFn invalidateFn = () -> {
+                _resolver.cleanupRefs(this);
                 _dataPart.set(null);
                 _resolver.removeLocal(this, _metaPart.getName());
             };
-            var ret = fn.apply(_metaPart, _dataPart.get(), () -> _resolver.bumpVersionSelf(this), invalidateFn);
+            var ret = fn.apply(_metaPart, _dataPart.get(), this::bumpVer, invalidateFn);
             if (!Objects.equals(ver, _metaPart.getOurVersion()))
-                _resolver.notifyWrite(this);
+                notifyWrite();
             return ret;
         } finally {
             _lock.writeLock().unlock();
         }
+    }
+
+    public boolean tryResolve(ResolutionStrategy resolutionStrategy) {
+        assertRWLock();
+
+        if (resolutionStrategy == ResolutionStrategy.LOCAL_ONLY) tryLocalResolve();
+        else if (resolutionStrategy == ResolutionStrategy.REMOTE) resolveDataPart();
+
+        return _dataPart.get() != null;
+    }
+
+    public void notifyWrite() {
+        assertRWLock();
+        _resolver.notifyWrite(this);
+    }
+
+    public void bumpVer() {
+        assertRWLock();
+        _resolver.bumpVersionSelf(this);
+    }
+
+    public void rwLock() {
+        _lock.writeLock().lock();
+        if (_metaPart.isInvalid()) {
+            _lock.writeLock().unlock();
+            throw new StatusRuntimeException(Status.ABORTED.withDescription("Invalid object " + getName()));
+        }
+    }
+
+    public void rwUnlock() {
+        _lock.writeLock().unlock();
+    }
+
+    static public void rwLockAll(List<JObject<?>> objects) {
+        objects.stream().sorted(Comparator.comparingInt(System::identityHashCode)).forEach(JObject::rwLock);
     }
 
     public void assertRWLock() {

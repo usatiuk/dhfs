@@ -1,0 +1,35 @@
+version: "3.2"
+
+services:
+  dhfs1:
+    build: .
+    privileged: true
+    devices:
+      - /dev/fuse
+    volumes:
+      - $HOME/dhfs/dhfs1:/dhfs_root
+      - $HOME/dhfs/dhfs1_f:/dhfs_root/fuse:rshared
+      - ./target/quarkus-app:/app
+    command: "java --add-exports java.base/sun.nio.ch=ALL-UNNAMED
+     -Ddhfs.objects.persistence.files.root=/dhfs_root/p 
+     -Ddhfs.objects.distributed.root=/dhfs_root/d 
+     -Ddhfs.fuse.root=/dhfs_root/fuse -Dquarkus.http.host=0.0.0.0
+     -jar /app/quarkus-run.jar"
+    ports:
+      - 8080:8080
+  dhfs2:
+    build: .
+    privileged: true
+    devices:
+      - /dev/fuse
+    volumes:
+      - $HOME/dhfs/dhfs2:/dhfs_root
+      - $HOME/dhfs/dhfs2_f:/dhfs_root/fuse:rshared
+      - ./target/quarkus-app:/app
+    command: "java --add-exports java.base/sun.nio.ch=ALL-UNNAMED
+     -Ddhfs.objects.persistence.files.root=/dhfs_root/p 
+     -Ddhfs.objects.distributed.root=/dhfs_root/d 
+     -Ddhfs.fuse.root=/dhfs_root/fuse -Dquarkus.http.host=0.0.0.0
+     -jar /app/quarkus-run.jar"
+    ports:
+      - 8081:8080
