@@ -112,7 +112,9 @@ public class InvalidationQueueService {
 
     public void pushInvalidationToAll(String name, boolean shouldNotifySeen) {
         synchronized (this) {
-            for (var h : remoteHostManager.getSeenHosts()) {
+            var hosts = remoteHostManager.getSeenHosts();
+            if (hosts.isEmpty()) return;
+            for (var h : hosts) {
                 getSetForHost(h).add(Pair.of(name, shouldNotifySeen));
             }
             this.notifyAll();
