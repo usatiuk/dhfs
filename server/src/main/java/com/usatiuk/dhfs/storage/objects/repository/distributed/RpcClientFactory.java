@@ -41,12 +41,16 @@ public class RpcClientFactory {
             try {
                 return withObjSyncClient(hostinfo.getAddr(), hostinfo.getPort(), Optional.empty(), fn);
             } catch (StatusRuntimeException e) {
-                if (e.getStatus().getCode().equals(Status.ABORTED.getCode())) {
-                    continue;
-                } else if (e.getStatus().getCode().equals(Status.UNAVAILABLE.getCode())) {
+                if (e.getStatus().getCode().equals(Status.UNAVAILABLE.getCode())) {
                     Log.info("Host " + target + " is unreachable: " + e.getMessage());
                     remoteHostManager.handleConnectionError(target);
-                } else throw e;
+                } else {
+                    Log.error("When calling " + target, e);
+                    continue;
+                }
+            } catch (Exception e) {
+                Log.error("When calling " + target, e);
+                continue;
             }
         }
         throw new IllegalStateException("No reachable targets!");

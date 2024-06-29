@@ -111,16 +111,17 @@ public class FileConflictResolver implements ConflictResolver {
                     var oldChunks = oursFile.getChunks().values().stream().toList();
                     oursFile.getChunks().clear();
 
-                    for (var e : firstChunksCopy) {
-                        oursFile.getChunks().put(e.getLeft(), e.getValue());
-                        jObjectManager.getOrPut(e.getValue(), Optional.of(oursFile.getName()));
-                    }
+                    // FIXME:
                     for (var cuuid : oldChunks) {
                         var ci = jObjectManager.get(ChunkInfo.getNameFromHash(cuuid));
                         ci.ifPresent(jObject -> jObject.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, d, b, v) -> {
                             m.removeRef(oursFile.getName());
                             return null;
                         }));
+                    }
+                    for (var e : firstChunksCopy) {
+                        oursFile.getChunks().put(e.getLeft(), e.getValue());
+                        jObjectManager.getOrPut(ChunkInfo.getNameFromHash(e.getValue()), Optional.of(oursFile.getName()));
                     }
                     oursFile.setMtime(first.getMtime());
                     oursFile.setCtime(first.getCtime());
@@ -130,7 +131,7 @@ public class FileConflictResolver implements ConflictResolver {
                     newFile.setCtime(second.getCtime());
                     for (var e : secondChunksCopy) {
                         newFile.getChunks().put(e.getLeft(), e.getValue());
-                        jObjectManager.getOrPut(e.getValue(), Optional.ofNullable(newFile.getName()));
+                        jObjectManager.getOrPut(ChunkInfo.getNameFromHash(e.getValue()), Optional.ofNullable(newFile.getName()));
                     }
 
                     var theName = oursDir.getChildren().entrySet().stream().filter(p -> p.getValue().equals(oursFile.getUuid())).findAny().orElseThrow(

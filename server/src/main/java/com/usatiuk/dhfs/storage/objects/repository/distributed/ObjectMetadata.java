@@ -3,13 +3,12 @@ package com.usatiuk.dhfs.storage.objects.repository.distributed;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelog;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelogEntry;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
+import jakarta.enterprise.inject.spi.CDI;
 import lombok.Getter;
 
 import java.io.Serializable;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ObjectMetadata implements Serializable {
     public ObjectMetadata(String name) {
@@ -26,10 +25,7 @@ public class ObjectMetadata implements Serializable {
     private final Map<UUID, Long> _changelog = new LinkedHashMap<>();
 
     @Getter
-    private final Map<UUID, Boolean> _deletionMark = new LinkedHashMap<>();
-
-    @Getter
-    private final Map<UUID, Boolean> _deletionLog = new LinkedHashMap<>();
+    private final Set<String> _savedRefs = new LinkedHashSet<>();
 
     @Getter
     private long _refcount = 0L;
@@ -37,21 +33,31 @@ public class ObjectMetadata implements Serializable {
     @Getter
     private boolean _locked = false;
 
-    @Getter
-    private boolean _seen = false;
+    private AtomicBoolean _seen = new AtomicBoolean(false);
 
-    @Getter
-    private boolean _invalid = false;
+    private AtomicBoolean _deleted = new AtomicBoolean(false);
+
+    public boolean isSeen() {
+        return _seen.get();
+    }
+
+    public boolean isDeleted() {
+        return _deleted.get();
+    }
 
     public void markSeen() {
-        if (!_seen) _seen = true;
+        _seen.set(true);
     }
 
-    public void markInvalid() {
-        if (!_invalid) _invalid = true;
+    public void delete() {
+        _deleted.set(true);
     }
 
-    private final Map<String, Long> _referrers = new HashMap<>();
+    public void undelete() {
+        _deleted.set(false);
+    }
+
+    private final Set<String> _referrers = new HashSet<>();
 
     public long lock() {
         if (_locked) throw new IllegalArgumentException("Already locked");
@@ -67,15 +73,20 @@ public class ObjectMetadata implements Serializable {
         return _refcount;
     }
 
+    public boolean checkRef(String from) {
+        return _referrers.contains(from);
+    }
+
     public long addRef(String from) {
-        _referrers.merge(from, 1L, Long::sum);
+        if (_referrers.contains(from)) return _refcount;
+        _referrers.add(from);
         _refcount++;
         return _refcount;
     }
 
     public long removeRef(String from) {
-        _referrers.merge(from, -1L, Long::sum);
-        if (_referrers.get(from).equals(0L)) _referrers.remove(from);
+        if (!_referrers.contains(from)) return _refcount;
+        _referrers.remove(from);
         _refcount--;
         return _refcount;
     }
@@ -95,9 +106,17 @@ public class ObjectMetadata implements Serializable {
 
     public ObjectChangelog toRpcChangelog() {
         var changelogBuilder = ObjectChangelog.newBuilder();
-        for (var m : getChangelog().entrySet()) {
-            changelogBuilder.addEntries(ObjectChangelogEntry.newBuilder()
-                    .setHost(m.getKey().toString()).setVersion(m.getValue()).build());
+        var hosts = CDI.current().select(PersistentRemoteHostsService.class).get();
+
+        var all = new ArrayList<>(hosts.getHosts().stream().map(HostInfo::getUuid).toList());
+        all.add(hosts.getSelfUuid());
+
+        for (var h : all) {
+            var logEntry = ObjectChangelogEntry.newBuilder();
+            logEntry.setHost(h.toString());
+            if (_changelog.containsKey(h))
+                logEntry.setVersion(_changelog.get(h));
+            changelogBuilder.addEntries(logEntry.build());
         }
         return changelogBuilder.build();
     }

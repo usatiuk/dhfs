@@ -33,6 +33,9 @@ public class JObjectManagerImpl implements JObjectManager {
     JObjectWriteback jObjectWriteback;
 
     @Inject
+    JObjectRefProcessor jobjectRefProcessor;
+
+    @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
 
     private static class NamedSoftReference extends SoftReference<JObject<?>> {
@@ -108,6 +111,11 @@ public class JObjectManagerImpl implements JObjectManager {
         if (!(meta instanceof ObjectMetadata))
             throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Unexpected metadata type for " + name));
 
+        if (((ObjectMetadata) meta).isDeleted()) {
+            Log.warn("Deleted meta on disk for " + name);
+            return Optional.empty();
+        }
+
         synchronized (this) {
             var inMap = getFromMap(name);
             if (inMap != null) return Optional.of(inMap);
@@ -140,28 +148,16 @@ public class JObjectManagerImpl implements JObjectManager {
                 } else {
                     ret = new JObject<D>(jObjectResolver, object.getName(), persistentRemoteHostsService.getSelfUuid(), object);
                     _map.put(object.getName(), new NamedSoftReference(ret, _refQueue));
-                    JObject<?> finalRet = ret;
-                    ret.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                        if (parent.isPresent()) {
-                            m.addRef(parent.get());
-                        } else {
-                            m.lock();
-                        }
-                        jObjectResolver.notifyWrite(finalRet);
-                        return null;
-                    });
-                    return (JObject<D>) ret;
                 }
             }
-            if (!ret.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                if (m.isInvalid()) return false;
+            ret.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                 if (parent.isPresent()) {
                     m.addRef(parent.get());
                 } else {
                     m.lock();
                 }
                 return true;
-            })) continue;
+            });
             return (JObject<D>) ret;
         }
     }
@@ -173,11 +169,10 @@ public class JObjectManagerImpl implements JObjectManager {
 
             if (got.isPresent()) {
                 if (parent.isPresent())
-                    if (!got.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                        if (m.isInvalid()) return false;
+                    got.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                         m.addRef(parent.get());
                         return true;
-                    })) continue;
+                    });
                 return got.get();
             }
 
@@ -193,6 +188,7 @@ public class JObjectManagerImpl implements JObjectManager {
                     var created = new JObject<>(jObjectResolver, new ObjectMetadata(name));
                     _map.put(name, new NamedSoftReference(created, _refQueue));
                     created.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                        parent.ifPresent(m::addRef);
                         m.markSeen();
                         jObjectResolver.notifyWrite(created);
                         return null;
@@ -206,16 +202,23 @@ public class JObjectManagerImpl implements JObjectManager {
     @Override
     public void tryQuickDelete(JObject<?> object) {
         object.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, b, i) -> {
-            if (m.isSeen()) return false;
             if (m.getRefcount() > 0) return false;
+            if (m.isSeen()) {
+                jobjectRefProcessor.putDeletionCandidate(object.getName());
+                return false;
+            }
 
-            m.markInvalid();
-            jObjectWriteback.remove(object.getName());
-            objectPersistentStore.deleteObject("meta_" + m.getName());
-            objectPersistentStore.deleteObject(m.getName());
+            Log.info("Quick delete of " + m.getName());
+            m.delete();
 
-            synchronized (this) {
-                _map.remove(object.getName());
+            if (!m.getSavedRefs().isEmpty()) {
+                for (var c : m.getSavedRefs()) {
+                    get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mc, dc, bc, ic) -> {
+                        mc.removeRef(object.getName());
+                        tryQuickDelete(ref);
+                        return null;
+                    }));
+                }
             }
 
             if (d != null) {
@@ -230,6 +233,14 @@ public class JObjectManagerImpl implements JObjectManager {
 
             return true;
         });
+    }
 
+    @Override
+    public void notifySent(String key) {
+        //FIXME:
+        get(key).ifPresent(o -> o.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+            m.markSeen();
+            return null;
+        }));
     }
 }

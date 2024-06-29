@@ -74,8 +74,8 @@ public class RemoteHostManager {
             return null;
         });
         Log.info("Connected to " + host);
-        syncHandler.doInitialResync(host);
         peerSyncClient.syncPeersOne(host);
+        syncHandler.doInitialResync(host);
     }
 
     public void handleConnectionError(UUID host) {

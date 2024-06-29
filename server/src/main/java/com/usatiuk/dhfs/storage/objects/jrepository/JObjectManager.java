@@ -16,4 +16,7 @@ public interface JObjectManager {
     JObject<?> getOrPut(String name, Optional<String> parent);
 
     void tryQuickDelete(JObject<?> object);
+
+    void notifySent(String key);
+
 }

@@ -2,8 +2,7 @@ package com.usatiuk.dhfs.storage.objects.jrepository;
 
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
+import io.quarkus.logging.Log;
 import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.NotImplementedException;
 
@@ -16,6 +15,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class JObject<T extends JObjectData> implements Serializable {
+    public static class DeletedObjectAccessException extends RuntimeException {
+    }
+
     // Create a new object
     protected JObject(JObjectResolver resolver, String name, UUID selfUuid, T obj) {
         _resolver = resolver;
@@ -56,6 +58,10 @@ public class JObject<T extends JObjectData> implements Serializable {
         return _dataPart.get().getConflictResolver();
     }
 
+    protected boolean isDeleted() {
+        return _metaPart.isDeleted();
+    }
+
     protected boolean isResolved() {
         return _dataPart.get() != null;
     }
@@ -86,6 +92,7 @@ public class JObject<T extends JObjectData> implements Serializable {
                 if (_dataPart.get() == null) {
                     _dataPart.set(_resolver.resolveData(this));
                     hydrateRefs();
+                    verifyRefs();
                 } // _dataPart.get() == null
             } finally {
                 _lock.writeLock().unlock();
@@ -102,6 +109,7 @@ public class JObject<T extends JObjectData> implements Serializable {
                     if (res.isEmpty()) return;
                     _dataPart.set(res.get());
                     hydrateRefs();
+                    verifyRefs();
                 } // _dataPart.get() == null
             } finally {
                 _lock.writeLock().unlock();
@@ -121,31 +129,43 @@ public class JObject<T extends JObjectData> implements Serializable {
 
         _lock.readLock().lock();
         try {
-            if (_metaPart.isInvalid())
-                throw new StatusRuntimeException(Status.ABORTED.withDescription("Invalid object " + getName()));
+            if (_metaPart.isDeleted()) {
+                Log.error("Reading deleted object " + getName());
+                throw new DeletedObjectAccessException();
+            }
             return fn.apply(_metaPart, _dataPart.get());
         } finally {
             _lock.readLock().unlock();
         }
     }
 
+    private void verifyRefs() {
+        _resolver.verifyRefs(this);
+    }
+
     public <R> R runWriteLocked(ResolutionStrategy resolutionStrategy, ObjectFnWrite<T, R> fn) {
         _lock.writeLock().lock();
         try {
-            if (_metaPart.isInvalid())
-                throw new StatusRuntimeException(Status.ABORTED.withDescription("Invalid object " + getName()));
             if (resolutionStrategy == ResolutionStrategy.LOCAL_ONLY) tryLocalResolve();
             else if (resolutionStrategy == ResolutionStrategy.REMOTE) resolveDataPart();
 
             var ver = _metaPart.getOurVersion();
+            var ref = _metaPart.getRefcount();
+            boolean wasSeen = _metaPart.isSeen();
+            boolean wasDeleted = _metaPart.isDeleted();
             VoidFn invalidateFn = () -> {
-                _resolver.cleanupRefs(this);
+                _resolver.backupRefs(this);
                 _dataPart.set(null);
                 _resolver.removeLocal(this, _metaPart.getName());
             };
             var ret = fn.apply(_metaPart, _dataPart.get(), this::bumpVer, invalidateFn);
-            if (!Objects.equals(ver, _metaPart.getOurVersion()))
+            _resolver.updateDeletionState(this);
+            if (!Objects.equals(ver, _metaPart.getOurVersion())
+                    || ref != _metaPart.getRefcount()
+                    || wasDeleted != _metaPart.isDeleted()
+                    || wasSeen != _metaPart.isSeen())
                 notifyWrite();
+            verifyRefs();
             return ret;
         } finally {
             _lock.writeLock().unlock();
@@ -173,13 +193,10 @@ public class JObject<T extends JObjectData> implements Serializable {
 
     public void rwLock() {
         _lock.writeLock().lock();
-        if (_metaPart.isInvalid()) {
-            _lock.writeLock().unlock();
-            throw new StatusRuntimeException(Status.ABORTED.withDescription("Invalid object " + getName()));
-        }
     }
 
     public void rwUnlock() {
+        _resolver.updateDeletionState(this);
         _lock.writeLock().unlock();
     }
 

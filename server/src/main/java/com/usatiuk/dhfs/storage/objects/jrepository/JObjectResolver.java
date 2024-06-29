@@ -11,6 +11,7 @@ import io.quarkus.logging.Log;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
+import java.util.LinkedHashSet;
 import java.util.Optional;
 
 @Singleton
@@ -33,22 +34,48 @@ public class JObjectResolver {
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
 
-    public void cleanupRefs(JObject<?> self) {
+    @Inject
+    JObjectRefProcessor jObjectRefProcessor;
+
+    public void backupRefs(JObject<?> self) {
         self.assertRWLock();
-        if (self.getData() != null)
-            for (var r : self.getData().extractRefs()) {
-                jobjectManager.get(r).ifPresent(ro -> ro.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                    m.removeRef(r);
-                    return null;
-                }));
+        if (self.getData() != null) {
+            if (!self.getMeta().getSavedRefs().isEmpty()) {
+                Log.error("Saved refs not empty for " + self.getName() + " will clean");
+                self.getMeta().getSavedRefs().clear();
             }
+            self.getMeta().getSavedRefs().addAll(self.getData().extractRefs());
+        }
     }
 
     public void hydrateRefs(JObject<?> self) {
         self.assertRWLock();
-        for (var r : self.getData().extractRefs()) {
-            jobjectManager.getOrPut(r, Optional.of(self.getName()));
+        var extracted = new LinkedHashSet<>(self.getData().extractRefs());
+        for (var r : self.getMeta().getSavedRefs()) {
+            if (!extracted.contains(r))
+                jobjectManager.get(r).ifPresent(ro -> ro.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                    m.removeRef(r);
+                    return null;
+                }));
         }
+        for (var r : extracted) {
+            if (!self.getMeta().getSavedRefs().contains(r)) {
+                Log.info("Hydrating ref " + r + " for " + self.getName());
+                jobjectManager.getOrPut(r, Optional.of(self.getName()));
+            }
+        }
+        self.getMeta().getSavedRefs().clear();
+    }
+
+    public void updateDeletionState(JObject<?> self) {
+        self.assertRWLock();
+
+        if (self.getMeta().getRefcount() > 0) {
+            self.getMeta().undelete();
+        }
+
+        if (self.getMeta().getRefcount() <= 0)
+            jObjectRefProcessor.putDeletionCandidate(self.getName());
     }
 
     public <T extends JObjectData> Optional<T> resolveDataLocal(JObject<T> jObject) {
@@ -65,7 +92,7 @@ public class JObjectResolver {
 
         var obj = remoteObjectServiceClient.getObject(jObject);
         objectPersistentStore.writeObject(jObject.getName(), obj);
-        invalidationQueueService.pushInvalidationToAll(jObject.getName());
+        invalidationQueueService.pushInvalidationToAll(jObject.getName(), !jObject.getMeta().isSeen());
         return SerializationHelper.deserialize(obj);
     }
 
@@ -87,7 +114,7 @@ public class JObjectResolver {
         self.assertRWLock();
         jObjectWriteback.markDirty(self.getName(), self);
         if (self.isResolved())
-            invalidationQueueService.pushInvalidationToAll(self.getName());
+            invalidationQueueService.pushInvalidationToAll(self.getName(), !self.getMeta().isSeen());
     }
 
     public void bumpVersionSelf(JObject<?> self) {
@@ -96,5 +123,21 @@ public class JObjectResolver {
             m.bumpVersion(persistentRemoteHostsService.getSelfUuid());
             return null;
         });
+    }
+
+    protected void verifyRefs(JObject<?> self) {
+        self.assertRWLock();
+        if (!self.isResolved()) return;
+        if (self.isDeleted()) return;
+        for (var r : self.getData().extractRefs()) {
+            var obj = jobjectManager.get(r).orElseThrow(() -> new IllegalStateException("Object " + r + " not found but should be referenced from " + self.getName()));
+            if (obj.isDeleted())
+                throw new IllegalStateException("Object " + r + " deleted but referenced from " + self.getName());
+            obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
+                if (!m.checkRef(self.getName()))
+                    throw new IllegalStateException("Object " + r + " is not referenced by " + self.getName() + " but should be");
+                return null;
+            });
+        }
     }
 }

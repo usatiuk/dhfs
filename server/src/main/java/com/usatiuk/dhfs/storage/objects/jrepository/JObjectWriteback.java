@@ -57,7 +57,11 @@ public class JObjectWriteback {
             toWrite = new ArrayList<>(_objects.values());
         }
         for (var v : toWrite) {
-            flushOne(v.getRight());
+            try {
+                flushOne(v.getRight());
+            } catch (Exception e) {
+                Log.error("Failed writing object " + v.getRight().getName(), e);
+            }
         }
     }
 
@@ -98,15 +102,26 @@ public class JObjectWriteback {
     }
 
     private void flushOne(JObject<?> obj) {
-        obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, data) -> {
-            flushOneImmediate(m, data);
-            return null;
-        });
+        if (obj.isDeleted())
+            obj.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, data, b, i) -> {
+                flushOneImmediate(m, data);
+                return null;
+            });
+        else
+            obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, data) -> {
+                flushOneImmediate(m, data);
+                return null;
+            });
     }
 
     private <T extends JObjectData> void flushOneImmediate(ObjectMetadata m, T data) {
-        if (m.isInvalid()) {
-            Log.info("Not writing invalid object " + m.getName());
+        if (m.isDeleted()) {
+            if (m.getRefcount() > 0)
+                throw new IllegalStateException("Object deleted but has refcounts! " + m.getName());
+            // FIXME: assert Rw lock here?
+            Log.info("Deleting from persistent storage " + m.getName());
+            objectPersistentStore.deleteObject(m.getName());
+            objectPersistentStore.deleteObject("meta_" + m.getName());
             return;
         }
         objectPersistentStore.writeObject("meta_" + m.getName(), SerializationHelper.serialize(m));

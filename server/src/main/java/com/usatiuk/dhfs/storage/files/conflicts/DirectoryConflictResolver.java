@@ -15,10 +15,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.NotImplementedException;
 
-import java.util.LinkedHashMap;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @ApplicationScoped
 public class DirectoryConflictResolver implements ConflictResolver {
@@ -104,9 +101,9 @@ public class DirectoryConflictResolver implements ConflictResolver {
                 if (m.getBestVersion() >= newMetadata.getOurVersion())
                     throw new StatusRuntimeException(Status.ABORTED.withDescription("Race when conflict resolving"));
 
-                for (var child : mergedChildren.entrySet()) {
-                    if (!oursDir.getChildren().containsKey(child.getKey())) {
-                        jObjectManager.getOrPut(child.getValue().toString(), Optional.of(oursDir.getName()));
+                for (var child : mergedChildren.values()) {
+                    if (!(new HashSet<>(oursDir.getChildren().values()).contains(child))) {
+                        jObjectManager.getOrPut(child.toString(), Optional.of(oursDir.getName()));
                     }
                 }
                 oursDir.setMtime(first.getMtime());

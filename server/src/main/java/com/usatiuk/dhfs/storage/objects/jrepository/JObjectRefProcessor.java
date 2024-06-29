@@ -6,9 +6,8 @@ import io.quarkus.runtime.Shutdown;
 import io.quarkus.runtime.Startup;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.apache.commons.lang3.tuple.Pair;
 
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.LinkedHashMap;
 
 @ApplicationScoped
 public class JObjectRefProcessor {
@@ -19,9 +18,6 @@ public class JObjectRefProcessor {
 
     @Inject
     JObjectManager jObjectManager;
-
-    @Inject
-    JObjectWriteback jObjectWriteback;
 
     @Inject
     ObjectPersistentStore objectPersistentStore;
@@ -39,48 +35,70 @@ public class JObjectRefProcessor {
         _refProcessorThread.join();
     }
 
-    private LinkedBlockingQueue<Pair<Long, String>> _candidates = new LinkedBlockingQueue<>();
+    private final LinkedHashMap<String, Long> _candidates = new LinkedHashMap<>();
 
     public void putDeletionCandidate(String name) {
-        try {
-            _candidates.put(Pair.of(System.currentTimeMillis(), name));
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+        synchronized (this) {
+            _candidates.putIfAbsent(name, System.currentTimeMillis());
+            this.notify();
         }
     }
 
     private void refProcessorThread() {
         try {
-            while (true) {
-                var next = _candidates.take();
-                if ((System.currentTimeMillis() - next.getLeft()) < deletionDelay) {
+            while (!Thread.interrupted()) {
+                String next;
+                Long nextTime;
+
+                synchronized (this) {
+                    while (_candidates.isEmpty())
+                        this.wait();
+
+                    var e = _candidates.firstEntry();
+                    next = e.getKey();
+                    nextTime = e.getValue();
+                    _candidates.remove(next);
+                }
+
+                if ((System.currentTimeMillis() - nextTime) < deletionDelay) {
                     Thread.sleep(deletionDelay);
                 }
-//
-//                var got = jObjectManager.get(next.getRight());
-//                if (got.isEmpty()) continue;
-//
-//                got.get().runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, v, i) -> {
-//                    if (m.isInvalid()) return;
-//                    if (m.getRefcount() > 0) return;
-//
-//                    Log.info("Deleting " + next.getRight());
-//                    jObjectWriteback.remove(m.getName());
-//                    objectPersistentStore.deleteObject("meta_" + m.getName());
-//                    objectPersistentStore.deleteObject(m.getName());
-//
-//                    if (d != null) {
-//                        for (var c : d.extractRefs()) {
-//                            jObjectManager.get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mc, dc, bc, ic) -> {
-//                                mc.removeRef(m.getName());
-//                                if (mc.getRefcount() <= 0)
-//                                    putDeletionCandidate(mc.getName());
-//                                return null;
-//                            }));
-//                        }
-//                    }
-//
-//                });
+
+                var got = jObjectManager.get(next);
+                if (got.isEmpty()) continue;
+                try {
+                    got.get().runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, v, i) -> {
+                        if (m.isDeleted()) return null;
+                        if (m.getRefcount() > 0) return null;
+                        if (!m.isSeen()) {
+                            jObjectManager.tryQuickDelete(got.get());
+                            return null;
+                        }
+
+                        Log.info("Deleting " + m.getName());
+                        m.delete();
+                        //FIXME:
+                        if (!m.getSavedRefs().isEmpty()) {
+                            for (var c : m.getSavedRefs()) {
+                                jObjectManager.get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mc, dc, bc, ic) -> {
+                                    mc.removeRef(m.getName());
+                                    return null;
+                                }));
+                            }
+                        }
+                        if (d != null)
+                            for (var c : d.extractRefs()) {
+                                jObjectManager.get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mc, dc, bc, ic) -> {
+                                    mc.removeRef(m.getName());
+                                    return null;
+                                }));
+                            }
+
+                        return null;
+                    });
+                } catch (Exception ex) {
+                    Log.error("Error when deleting: " + next, ex);
+                }
             }
         } catch (InterruptedException ignored) {
         }

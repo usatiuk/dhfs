@@ -245,6 +245,15 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 newFile.setCtime(f.getCtime());
                 newFile.getChunks().putAll(f.getChunks());
 
+                for (var c : newFile.getChunks().values()) {
+                    var o = jObjectManager.get(ChunkInfo.getNameFromHash(c))
+                            .orElseThrow(() -> new StatusRuntimeException(Status.DATA_LOSS.withDescription("Could not find chunk " + c + " when moving " + from)));
+                    o.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                        m.addRef(newFile.getName());
+                        return null;
+                    });
+                }
+
                 theFile.getMeta().removeRef(dentFrom.toString());
                 jObjectManager.put(newFile, Optional.of(dentTo.getName()));
                 newDent = newFile;
@@ -531,6 +540,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
                     ChunkData newChunkData = new ChunkData(thisChunk);
                     ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
+                    //FIXME:
+                    jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
                     jObjectManager.put(newChunkInfo, Optional.of(meta.getName()));
                     jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
                     chunksAll.put(start, newChunkInfo.getHash());
@@ -600,6 +611,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
                         ChunkData newChunkData = new ChunkData(chunkData.substring(0, (int) (length - lastChunk.getKey())));
                         ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
+                        jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
                         jObjectManager.put(newChunkInfo, Optional.of(m.getName()));
                         jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
 

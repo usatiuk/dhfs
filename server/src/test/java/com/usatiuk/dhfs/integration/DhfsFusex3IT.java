@@ -97,7 +97,6 @@ public class DhfsFusex3IT {
         waitingConsumer3.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
-        Thread.sleep(2000); // FIXME: Wait for all of them to get other's IP for sure and sync
     }
 
     @AfterEach
@@ -108,7 +107,7 @@ public class DhfsFusex3IT {
     @Test
     void readWriteFileTest() throws IOException, InterruptedException, TimeoutException {
         Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo test123 > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
-        Thread.sleep(1000);
+        Thread.sleep(2000);
         Assertions.assertEquals("test123\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
         Assertions.assertEquals("test123\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
     }
@@ -125,7 +124,7 @@ public class DhfsFusex3IT {
             }
         }).anyMatch(r -> r != 0);
         Assumptions.assumeTrue(!createFail, "Failed creating one or more files");
-        Thread.sleep(1000);
+        Thread.sleep(2000);
         for (var c : List.of(container1, container2, container3)) {
             var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
             var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
@@ -163,7 +162,7 @@ public class DhfsFusex3IT {
             }
         }).anyMatch(r -> r != 0);
         Assumptions.assumeTrue(!createFail, "Failed creating one or more files");
-        Thread.sleep(1000);
+        Thread.sleep(2000);
         for (var c : List.of(container1, container2, container3)) {
             var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
             var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
@@ -186,7 +185,7 @@ public class DhfsFusex3IT {
     @Test
     void fileConflictTest2() throws IOException, InterruptedException, TimeoutException {
         Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo test123 > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
-        Thread.sleep(1000);
+        Thread.sleep(2000);
         Assertions.assertEquals("test123\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
         Assertions.assertEquals("test123\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
 
@@ -200,7 +199,7 @@ public class DhfsFusex3IT {
             }
         }).anyMatch(r -> r != 0);
         Assumptions.assumeTrue(!writeFail, "Failed creating one or more files");
-        Thread.sleep(1000);
+        Thread.sleep(2000);
         for (var c : List.of(container1, container2, container3)) {
             var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
             var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");

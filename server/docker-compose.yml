@@ -13,10 +13,11 @@ services:
     command: "java --add-exports java.base/sun.nio.ch=ALL-UNNAMED
      -Ddhfs.objects.persistence.files.root=/dhfs_root/p 
      -Ddhfs.objects.distributed.root=/dhfs_root/d 
-     -Ddhfs.fuse.root=/dhfs_root/fuse -Dquarkus.http.host=0.0.0.0
+     -Ddhfs.fuse.root=/dhfs_root/fuse -Dquarkus.http.host=0.0.0.0 -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
      -jar /app/quarkus-run.jar"
     ports:
       - 8080:8080
+      - 5005:5005
   dhfs2:
     build: .
     privileged: true

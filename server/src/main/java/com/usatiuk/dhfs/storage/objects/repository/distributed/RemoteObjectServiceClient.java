@@ -40,9 +40,12 @@ public class RemoteObjectServiceClient {
 
         var targets = jObject.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (md, d) -> {
             var ourVersion = md.getOurVersion();
-            return md.getRemoteCopies().entrySet().stream()
-                    .filter(entry -> entry.getValue().equals(ourVersion))
-                    .map(Map.Entry::getKey).toList();
+            if (ourVersion > 1)
+                return md.getRemoteCopies().entrySet().stream()
+                        .filter(entry -> entry.getValue().equals(ourVersion))
+                        .map(Map.Entry::getKey).toList();
+            else
+                return persistentRemoteHostsService.getHosts().stream().map(HostInfo::getUuid).toList();
         });
 
         return rpcClientFactory.withObjSyncClient(targets, client -> {
@@ -86,21 +89,17 @@ public class RemoteObjectServiceClient {
             var obj = jObjectManager.get(v);
             if (obj.isEmpty()) continue;
 
-            var header = obj.get().runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
-                if (m.isInvalid()) return null;
-                return Pair.of(m.toRpcHeader(), m.isSeen());
-            });
-            if (header == null) {
-                Log.info("Not sending invalidation of invalid object: " + v);
+            try {
+                var header = obj.get().runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> Pair.of(m.toRpcHeader(), m.isSeen()));
+                if (!header.getRight())
+                    obj.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                        m.markSeen();
+                        return null;
+                    });
+                builder.addHeader(header.getLeft());
+            } catch (JObject.DeletedObjectAccessException e) {
                 continue;
             }
-            if (!header.getRight())
-                obj.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                    m.markSeen();
-                    return null;
-                });
-
-            builder.addHeader(header.getLeft());
         }
 
         var send = builder.build();
