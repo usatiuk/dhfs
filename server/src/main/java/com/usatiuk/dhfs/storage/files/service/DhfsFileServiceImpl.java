@@ -339,6 +339,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Override
     public Optional<ByteString> read(String fileUuid, long offset, int length) {
+        if (length < 0)
+            throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Length should be more than zero: " + length));
+        if (offset < 0)
+            throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Offset should be more than zero: " + offset));
+
         var fileOpt = jObjectManager.get(fileUuid);
         if (fileOpt.isEmpty()) {
             Log.error("File not found when trying to read: " + fileUuid);
@@ -453,6 +458,9 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Override
     public Long write(String fileUuid, long offset, byte[] data) {
+        if (offset < 0)
+            throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Offset should be more than zero: " + offset));
+
         var fileOpt = jObjectManager.get(fileUuid);
         if (fileOpt.isEmpty()) {
             Log.error("File not found when trying to read: " + fileUuid);
@@ -590,6 +598,9 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Override
     public Boolean truncate(String fileUuid, long length) {
+        if (length < 0)
+            throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Length should be more than zero: " + length));
+
         var fileOpt = jObjectManager.get(fileUuid);
         if (fileOpt.isEmpty()) {
             Log.error("File not found when trying to read: " + fileUuid);
@@ -628,17 +639,17 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 var removedChunks = new LinkedHashSet<String>();
 
                 if (curSize < length) {
-                    int combinedSize = (int) (length - curSize);
+                    long combinedSize = (length - curSize);
 
                     long start = curSize;
 
                     // Hack
-                    HashMap<Integer, ByteString> zeroCache = new HashMap<>();
+                    HashMap<Long, ByteString> zeroCache = new HashMap<>();
 
                     {
-                        int cur = 0;
+                        long cur = 0;
                         while (cur < combinedSize) {
-                            int end;
+                            long end;
 
                             if (targetChunkSize <= 0)
                                 end = combinedSize;
@@ -651,7 +662,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                             }
 
                             if (!zeroCache.containsKey(end - cur))
-                                zeroCache.put(end - cur, UnsafeByteOperations.unsafeWrap(new byte[end - cur]));
+                                zeroCache.put(end - cur, UnsafeByteOperations.unsafeWrap(new byte[Math.toIntExact(end - cur)]));
 
                             ChunkData newChunkData = createChunk(zeroCache.get(end - cur));
                             ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());

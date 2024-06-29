@@ -147,6 +147,8 @@ public class DhfsFuse extends FuseStubFS {
 
     @Override
     public int read(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
+        if (size < 0) return -ErrorCodes.EINVAL();
+        if (offset < 0) return -ErrorCodes.EINVAL();
         try {
             var fileOpt = fileService.open(path);
             if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
@@ -163,6 +165,7 @@ public class DhfsFuse extends FuseStubFS {
 
     @Override
     public int write(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
+        if (offset < 0) return -ErrorCodes.EINVAL();
         try {
             var fileOpt = fileService.open(path);
             if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
@@ -239,6 +242,7 @@ public class DhfsFuse extends FuseStubFS {
 
     @Override
     public int truncate(String path, long size) {
+        if (size < 0) return -ErrorCodes.EINVAL();
         try {
             var fileOpt = fileService.open(path);
             if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();

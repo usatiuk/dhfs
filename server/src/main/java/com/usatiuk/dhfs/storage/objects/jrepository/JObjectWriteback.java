@@ -173,7 +173,7 @@ public class JObjectWriteback {
             if (_objects.size() < limit) {
                 if (overload) {
                     overload = false;
-                    Log.info("Writeback cache enabled");
+                    Log.trace("Writeback cache enabled");
                 }
                 _objects.put(name, Pair.of(System.currentTimeMillis(), object));
                 _objects.notifyAll();
@@ -184,7 +184,7 @@ public class JObjectWriteback {
         try {
             if (!overload) {
                 overload = true;
-                Log.info("Writeback cache disabled");
+                Log.trace("Writeback cache disabled");
             }
             flushOneImmediate(object.getMeta(), object.getData());
         } catch (Exception e) {
