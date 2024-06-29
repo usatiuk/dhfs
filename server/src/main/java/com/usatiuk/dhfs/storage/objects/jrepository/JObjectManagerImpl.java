@@ -218,12 +218,14 @@ public class JObjectManagerImpl implements JObjectManager {
 
             if (!m.getSavedRefs().isEmpty())
                 refs = m.getSavedRefs().stream();
-            if (d != null)
-                refs = Streams.concat(refs, d.extractRefs().stream());
+            if (object.getData() != null)
+                refs = Streams.concat(refs, object.getData().extractRefs().stream());
+
+            object.discardData();
 
             refs.forEach(c -> get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
                 mc.removeRef(object.getName());
-                tryQuickDelete(ref);
+//                tryQuickDelete(ref);
                 return null;
             })));
 

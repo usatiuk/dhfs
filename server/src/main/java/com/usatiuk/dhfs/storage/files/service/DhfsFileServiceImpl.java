@@ -437,7 +437,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     private void cleanupChunks(File f, Collection<String> uuids) {
         // FIXME:
-        var inFile = new HashSet<>(f.getChunks().values());
+        var inFile = useHashForChunks ? new HashSet<>(f.getChunks().values()) : Collections.emptySet();
         for (var cuuid : uuids) {
             if (inFile.contains(cuuid)) continue;
             var ci = jObjectManager.get(ChunkInfo.getNameFromHash(cuuid));

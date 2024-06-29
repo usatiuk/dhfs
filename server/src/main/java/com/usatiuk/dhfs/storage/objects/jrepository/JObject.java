@@ -216,6 +216,13 @@ public class JObject<T extends JObjectData> implements Serializable {
         _lock.writeLock().unlock();
     }
 
+    public void discardData() {
+        assertRWLock();
+        if (!isDeleted())
+            throw new IllegalStateException("Expected to be deleted when discarding data");
+        _dataPart.set(null);
+    }
+
     static public void rwLockAll(List<JObject<?>> objects) {
         objects.stream().sorted(Comparator.comparingInt(System::identityHashCode)).forEach(JObject::rwLock);
     }

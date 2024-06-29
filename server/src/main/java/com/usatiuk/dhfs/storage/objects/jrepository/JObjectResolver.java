@@ -130,6 +130,7 @@ public class JObjectResolver {
 
     public void notifyWriteData(JObject<?> self) {
         self.assertRWLock();
+        jObjectWriteback.markDirty(self.getName(), self);
         if (self.isResolved())
             invalidationQueueService.pushInvalidationToAll(self.getName(), !self.getMeta().isSeen());
     }
