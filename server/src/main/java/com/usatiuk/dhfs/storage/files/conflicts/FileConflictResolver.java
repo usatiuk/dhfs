@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.storage.files.conflicts;
 
 import com.usatiuk.dhfs.storage.SerializationHelper;
+import com.usatiuk.dhfs.storage.files.objects.ChunkData;
 import com.usatiuk.dhfs.storage.files.objects.ChunkInfo;
 import com.usatiuk.dhfs.storage.files.objects.Directory;
 import com.usatiuk.dhfs.storage.files.objects.File;
@@ -121,7 +122,9 @@ public class FileConflictResolver implements ConflictResolver {
                     }
                     for (var e : firstChunksCopy) {
                         oursFile.getChunks().put(e.getLeft(), e.getValue());
+                        jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
                         jObjectManager.getOrPut(ChunkInfo.getNameFromHash(e.getValue()), Optional.of(oursFile.getName()));
+                        jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
                     }
                     oursFile.setMtime(first.getMtime());
                     oursFile.setCtime(first.getCtime());
@@ -131,7 +134,9 @@ public class FileConflictResolver implements ConflictResolver {
                     newFile.setCtime(second.getCtime());
                     for (var e : secondChunksCopy) {
                         newFile.getChunks().put(e.getLeft(), e.getValue());
+                        jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
                         jObjectManager.getOrPut(ChunkInfo.getNameFromHash(e.getValue()), Optional.ofNullable(newFile.getName()));
+                        jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
                     }
 
                     var theName = oursDir.getChildren().entrySet().stream().filter(p -> p.getValue().equals(oursFile.getUuid())).findAny().orElseThrow(
