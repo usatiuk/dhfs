@@ -71,7 +71,15 @@ public class JObjectResolver {
         self.assertRWLock();
 
         if (self.getMeta().getRefcount() > 0) {
-            self.getMeta().undelete();
+            if (self.isDeleted()) {
+                self.getMeta().undelete();
+                if (self.isResolved()) {
+                    for (var r : self.getData().extractRefs()) {
+                        Log.info("Hydrating ref after undelete " + r + " for " + self.getName());
+                        jobjectManager.getOrPut(r, Optional.of(self.getName()));
+                    }
+                }
+            }
         }
 
         if (self.getMeta().getRefcount() <= 0)
