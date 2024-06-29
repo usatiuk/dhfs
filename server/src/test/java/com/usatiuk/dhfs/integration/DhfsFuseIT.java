@@ -42,7 +42,9 @@ public class DhfsFuseIT {
                                 .copy("/app", "/app")
                                 .cmd("java", "-Xmx128M", "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
                                         "-Ddhfs.objects.distributed.peerdiscovery.interval=100",
-                                        "-Ddhfs.objects.distributed.invalidation.delay=100", "-jar", "/app/quarkus-run.jar")
+                                        "-Ddhfs.objects.distributed.invalidation.delay=100",
+                                        "-Ddhfs.objects.ref_verification=true",
+                                        "-jar", "/app/quarkus-run.jar")
                                 .build())
                 .withFileFromPath("/app", Paths.get(buildPath, "quarkus-app"));
         container1 = new GenericContainer<>(image)

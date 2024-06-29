@@ -48,6 +48,7 @@ public class DhfsFusex3IT {
                                         "-Ddhfs.objects.distributed.peerdiscovery.interval=100",
                                         "-Ddhfs.objects.distributed.invalidation.delay=100",
                                         "-Djava.util.concurrent.ForkJoinPool.common.parallelism=4",
+                                        "-Ddhfs.objects.ref_verification=true",
                                         "-jar", "/app/quarkus-run.jar")
                                 .build())
                 .withFileFromPath("/app", Paths.get(buildPath, "quarkus-app"));
