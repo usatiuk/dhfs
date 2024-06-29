@@ -113,9 +113,10 @@ public class ObjectMetadata implements Serializable {
 
         for (var h : all) {
             var logEntry = ObjectChangelogEntry.newBuilder();
+            if (!_changelog.containsKey(h))
+                continue;
             logEntry.setHost(h.toString());
-            if (_changelog.containsKey(h))
-                logEntry.setVersion(_changelog.get(h));
+            logEntry.setVersion(_changelog.get(h));
             changelogBuilder.addEntries(logEntry.build());
         }
         return changelogBuilder.build();
