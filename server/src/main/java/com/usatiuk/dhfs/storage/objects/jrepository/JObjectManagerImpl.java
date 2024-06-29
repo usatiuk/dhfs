@@ -192,7 +192,6 @@ public class JObjectManagerImpl implements JObjectManager {
                     created.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                         parent.ifPresent(m::addRef);
                         m.markSeen();
-                        jObjectResolver.notifyWrite(created);
                         return null;
                     });
                     return created;

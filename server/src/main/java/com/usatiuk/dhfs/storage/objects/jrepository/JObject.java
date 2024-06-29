@@ -164,7 +164,9 @@ public class JObject<T extends JObjectData> implements Serializable {
                     || ref != _metaPart.getRefcount()
                     || wasDeleted != _metaPart.isDeleted()
                     || wasSeen != _metaPart.isSeen())
-                notifyWrite();
+                notifyWriteMeta();
+            if (!Objects.equals(ver, _metaPart.getOurVersion()))
+                notifyWriteData();
             verifyRefs();
             return ret;
         } finally {
@@ -181,9 +183,19 @@ public class JObject<T extends JObjectData> implements Serializable {
         return _dataPart.get() != null;
     }
 
-    public void notifyWrite() {
+    public void notifyWriteMeta() {
         assertRWLock();
-        _resolver.notifyWrite(this);
+        _resolver.notifyWriteMeta(this);
+    }
+
+    public void notifyWriteData() {
+        assertRWLock();
+        _resolver.notifyWriteData(this);
+    }
+
+    public void notifyWrite() {
+        notifyWriteMeta();
+        notifyWriteData();
     }
 
     public void bumpVer() {
