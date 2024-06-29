@@ -58,7 +58,7 @@ public class JObjectResolver {
         for (var r : self.getMeta().getSavedRefs()) {
             if (!extracted.contains(r))
                 jobjectManager.get(r).ifPresent(ro -> ro.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                    m.removeRef(r);
+                    m.removeRef(self.getName());
                     return null;
                 }));
         }
