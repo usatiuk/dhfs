@@ -55,7 +55,7 @@ public class LocalPeerDiscoveryBroadcaster {
 
     private void broadcast() {
         try {
-            while (!Thread.interrupted()) {
+            while (!Thread.interrupted() && !_socket.isClosed()) {
                 Thread.sleep(broadcastInterval);
 
                 try {

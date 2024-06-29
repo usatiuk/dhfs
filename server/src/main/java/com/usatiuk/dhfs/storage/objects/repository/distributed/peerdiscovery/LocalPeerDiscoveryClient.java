@@ -48,7 +48,7 @@ public class LocalPeerDiscoveryClient {
     }
 
     private void client() {
-        while (!Thread.interrupted()) {
+        while (!Thread.interrupted() && !_socket.isClosed()) {
             try {
                 byte[] buf = new byte[10000];
                 DatagramPacket packet = new DatagramPacket(buf, buf.length);
