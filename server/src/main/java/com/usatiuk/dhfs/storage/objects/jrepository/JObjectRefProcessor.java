@@ -7,6 +7,7 @@ import io.quarkus.runtime.Shutdown;
 import io.quarkus.runtime.Startup;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.LinkedHashMap;
 import java.util.stream.Stream;
@@ -16,7 +17,8 @@ public class JObjectRefProcessor {
 
     private Thread _refProcessorThread;
 
-    private Long deletionDelay = 0L;
+    @ConfigProperty(name = "dhfs.objects.deletion.delay")
+    Long deletionDelay;
 
     @Inject
     JObjectManager jObjectManager;

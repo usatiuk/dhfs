@@ -11,11 +11,11 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 @ApplicationScoped
@@ -31,6 +31,9 @@ public class RemoteHostManager {
 
     @Inject
     PeerSyncClient peerSyncClient;
+
+    @ConfigProperty(name = "dhfs.objects.distributed.sync.ping.timeout")
+    long pingTimeout;
 
     private final TransientPeersState _transientPeersState = new TransientPeersState();
 
@@ -93,7 +96,7 @@ public class RemoteHostManager {
         TransientPeerState state = _transientPeersState.runReadLocked(s -> s.getStates().get(host));
         if (state == null) return false;
         try {
-            return rpcClientFactory.withObjSyncClient(state.getAddr(), state.getPort(), Optional.of(5000L /*ms*/), c -> {
+            return rpcClientFactory.withObjSyncClient(state.getAddr(), state.getPort(), pingTimeout, c -> {
                 var ret = c.ping(PingRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).build());
                 if (!UUID.fromString(ret.getSelfUuid()).equals(host)) {
                     throw new IllegalStateException("Ping selfUuid returned " + ret.getSelfUuid() + " but expected " + host);
