@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
+import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.storage.SerializationHelper;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
@@ -20,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 @ApplicationScoped
 public class JObjectManagerImpl implements JObjectManager {
@@ -211,25 +213,20 @@ public class JObjectManagerImpl implements JObjectManager {
             Log.info("Quick delete of " + m.getName());
             m.delete();
 
-            if (!m.getSavedRefs().isEmpty()) {
-                for (var c : m.getSavedRefs()) {
-                    get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mc, dc, bc, ic) -> {
-                        mc.removeRef(object.getName());
-                        tryQuickDelete(ref);
-                        return null;
-                    }));
-                }
-            }
+            Stream<String> refs = Stream.empty();
 
-            if (d != null) {
-                for (var c : d.extractRefs()) {
-                    get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mc, dc, bc, ic) -> {
-                        mc.removeRef(object.getName());
-                        tryQuickDelete(ref);
-                        return null;
-                    }));
-                }
-            }
+            if (!m.getSavedRefs().isEmpty())
+                refs = m.getSavedRefs().stream();
+            if (d != null)
+                refs = Streams.concat(refs, d.extractRefs().stream());
+
+            refs.forEach(c -> {
+                get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mc, dc, bc, ic) -> {
+                    mc.removeRef(object.getName());
+                    tryQuickDelete(ref);
+                    return null;
+                }));
+            });
 
             return true;
         });

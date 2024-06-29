@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
+import com.google.common.collect.Streams;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.Shutdown;
@@ -8,6 +9,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.util.LinkedHashMap;
+import java.util.stream.Stream;
 
 @ApplicationScoped
 public class JObjectRefProcessor {
@@ -77,22 +79,20 @@ public class JObjectRefProcessor {
 
                         Log.info("Deleting " + m.getName());
                         m.delete();
-                        //FIXME:
-                        if (!m.getSavedRefs().isEmpty()) {
-                            for (var c : m.getSavedRefs()) {
-                                jObjectManager.get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mc, dc, bc, ic) -> {
-                                    mc.removeRef(m.getName());
-                                    return null;
-                                }));
-                            }
-                        }
+
+                        Stream<String> refs = Stream.empty();
+
+                        if (!m.getSavedRefs().isEmpty())
+                            refs = m.getSavedRefs().stream();
                         if (d != null)
-                            for (var c : d.extractRefs()) {
-                                jObjectManager.get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mc, dc, bc, ic) -> {
-                                    mc.removeRef(m.getName());
-                                    return null;
-                                }));
-                            }
+                            refs = Streams.concat(refs, d.extractRefs().stream());
+
+                        refs.forEach(c -> {
+                            jObjectManager.get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mc, dc, bc, ic) -> {
+                                mc.removeRef(m.getName());
+                                return null;
+                            }));
+                        });
 
                         return null;
                     });
