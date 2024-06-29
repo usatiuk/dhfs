@@ -77,7 +77,7 @@ public class SyncHandler {
             for (var e : md.getChangelog().entrySet()) {
                 ours += e.getKey() + ": " + e.getValue() + "; ";
             }
-            Log.info("Handling update: " + header.getName() + " from " + from + "\n" + "ours: " + ours + " \n" + "received: " + rcv);
+            Log.trace("Handling update: " + header.getName() + " from " + from + "\n" + "ours: " + ours + " \n" + "received: " + rcv);
 
             md.getRemoteCopies().put(from, receivedTotalVer);
 
