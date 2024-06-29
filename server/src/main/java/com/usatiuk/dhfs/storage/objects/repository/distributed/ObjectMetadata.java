@@ -33,9 +33,9 @@ public class ObjectMetadata implements Serializable {
     @Getter
     private boolean _locked = false;
 
-    private AtomicBoolean _seen = new AtomicBoolean(false);
+    private final AtomicBoolean _seen = new AtomicBoolean(false);
 
-    private AtomicBoolean _deleted = new AtomicBoolean(false);
+    private final AtomicBoolean _deleted = new AtomicBoolean(false);
 
     public boolean isSeen() {
         return _seen.get();

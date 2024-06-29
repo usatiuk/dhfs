@@ -140,7 +140,7 @@ public class SyncHandler {
                 Log.info("Outdated update of " + u.getName() + " from " + request.getSelfUuid());
             } catch (Exception ex) {
                 Log.info("Error when handling update from " + request.getSelfUuid() + " of " + u.getName(), ex);
-                builder.addErrors(IndexUpdateError.newBuilder().setObjectName(u.getName()).setError(ex.toString() + Arrays.toString(ex.getStackTrace())).build());
+                builder.addErrors(IndexUpdateError.newBuilder().setObjectName(u.getName()).setError(ex + Arrays.toString(ex.getStackTrace())).build());
             }
         }
         return builder.build();

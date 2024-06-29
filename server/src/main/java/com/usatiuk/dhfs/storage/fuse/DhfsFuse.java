@@ -36,6 +36,9 @@ public class DhfsFuse extends FuseStubFS {
     @ConfigProperty(name = "dhfs.fuse.root")
     String root;
 
+    @ConfigProperty(name = "dhfs.fuse.enabled")
+    boolean enabled;
+
     @ConfigProperty(name = "dhfs.fuse.debug")
     Boolean debug;
 
@@ -43,6 +46,7 @@ public class DhfsFuse extends FuseStubFS {
     DhfsFileService fileService;
 
     void init(@Observes @Priority(100000) StartupEvent event) {
+        if (!enabled) return;
         Paths.get(root).toFile().mkdirs();
         Log.info("Mounting with root " + root);
 
@@ -54,6 +58,7 @@ public class DhfsFuse extends FuseStubFS {
     }
 
     void shutdown(@Observes @Priority(1) ShutdownEvent event) {
+        if (!enabled) return;
         Log.info("Unmounting");
         umount();
         Log.info("Unmounted");

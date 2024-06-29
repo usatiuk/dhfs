@@ -417,12 +417,15 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         });
     }
 
-    private void cleanupChunks(String fileUuid, Collection<String> uuids) {
+    private void cleanupChunks(File f, Collection<String> uuids) {
+        // FIXME:
+        var inFile = new HashSet<>(f.getChunks().values());
         for (var cuuid : uuids) {
+            if (inFile.contains(cuuid)) continue;
             var ci = jObjectManager.get(ChunkInfo.getNameFromHash(cuuid));
             if (ci.isPresent()) {
                 ci.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
-                    m.removeRef(fileUuid);
+                    m.removeRef(f.getName());
                     return null;
                 });
                 jObjectManager.tryQuickDelete(ci.get());
@@ -440,14 +443,13 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var file = fileOpt.get();
 
         // FIXME:
-        var removedChunksOuter = file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (meta, fDataU, bump, i) -> {
-            if (!(fDataU instanceof File))
+        file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (meta, fDataU, bump, i) -> {
+            if (!(fDataU instanceof File fData))
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
 
-            var fData = (File) fDataU;
             var chunksAll = fData.getChunks();
             var first = chunksAll.floorEntry(offset);
-            var last = chunksAll.floorEntry((offset + data.length) - 1);
+            var last = chunksAll.lowerEntry(offset + data.length);
 
             TreeSet<String> removedChunks = new TreeSet<>();
 
@@ -482,45 +484,47 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             int combinedSize = pendingWrites.size();
 
-            if (Math.abs(combinedSize - targetChunkSize) > targetChunkSize * 0.1) {
-                if (combinedSize < targetChunkSize) {
-                    boolean leftDone = false;
-                    boolean rightDone = false;
-                    while (!leftDone && !rightDone) {
-                        if (beforeFirst.isEmpty()) leftDone = true;
-                        if (!beforeFirst.isEmpty() && !leftDone) {
-                            var takeLeft = beforeFirst.lastEntry();
+            if (targetChunkSize > 0) {
+                if (Math.abs(combinedSize - targetChunkSize) > targetChunkSize * 0.1) {
+                    if (combinedSize < targetChunkSize) {
+                        boolean leftDone = false;
+                        boolean rightDone = false;
+                        while (!leftDone && !rightDone) {
+                            if (beforeFirst.isEmpty()) leftDone = true;
+                            if (!beforeFirst.isEmpty() && !leftDone) {
+                                var takeLeft = beforeFirst.lastEntry();
 
-                            var cuuid = takeLeft.getValue();
+                                var cuuid = takeLeft.getValue();
 
-                            if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * 1.2)) {
-                                leftDone = true;
-                                continue;
+                                if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * 1.2)) {
+                                    leftDone = true;
+                                    continue;
+                                }
+
+                                beforeFirst.pollLastEntry();
+                                start = takeLeft.getKey();
+                                pendingWrites = readChunk(cuuid).concat(pendingWrites);
+                                combinedSize += getChunkSize(cuuid);
+                                chunksAll.remove(takeLeft.getKey());
+                                removedChunks.add(cuuid);
                             }
+                            if (afterLast.isEmpty()) rightDone = true;
+                            if (!afterLast.isEmpty() && !rightDone) {
+                                var takeRight = afterLast.firstEntry();
 
-                            beforeFirst.pollLastEntry();
-                            start = takeLeft.getKey();
-                            pendingWrites = pendingWrites.concat(readChunk(cuuid));
-                            combinedSize += getChunkSize(cuuid);
-                            chunksAll.remove(takeLeft.getKey());
-                            removedChunks.add(cuuid);
-                        }
-                        if (afterLast.isEmpty()) rightDone = true;
-                        if (!afterLast.isEmpty() && !rightDone) {
-                            var takeRight = afterLast.firstEntry();
+                                var cuuid = takeRight.getValue();
 
-                            var cuuid = takeRight.getValue();
+                                if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * 1.2)) {
+                                    rightDone = true;
+                                    continue;
+                                }
 
-                            if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * 1.2)) {
-                                rightDone = true;
-                                continue;
+                                afterLast.pollFirstEntry();
+                                pendingWrites = pendingWrites.concat(readChunk(cuuid));
+                                combinedSize += getChunkSize(cuuid);
+                                chunksAll.remove(takeRight.getKey());
+                                removedChunks.add(cuuid);
                             }
-
-                            afterLast.pollFirstEntry();
-                            pendingWrites = readChunk(cuuid).concat(pendingWrites);
-                            combinedSize += getChunkSize(cuuid);
-                            chunksAll.remove(takeRight.getKey());
-                            removedChunks.add(cuuid);
                         }
                     }
                 }
@@ -530,10 +534,15 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 int cur = 0;
                 while (cur < combinedSize) {
                     int end;
-                    if ((combinedSize - cur) > (targetChunkSize * 1.5)) {
-                        end = cur + targetChunkSize;
-                    } else {
+
+                    if (targetChunkSize <= 0)
                         end = combinedSize;
+                    else {
+                        if ((combinedSize - cur) > (targetChunkSize * 1.5)) {
+                            end = cur + targetChunkSize;
+                        } else {
+                            end = combinedSize;
+                        }
                     }
 
                     var thisChunk = pendingWrites.substring(cur, end);
@@ -553,10 +562,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             bump.apply();
             fData.setMtime(System.currentTimeMillis());
-            return removedChunks;
+            cleanupChunks(fData, removedChunks);
+            return null;
         });
 
-        cleanupChunks(fileUuid, removedChunksOuter);
 
         return (long) data.length;
     }
@@ -570,24 +579,21 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
         var file = fileOpt.get();
 
-        TreeSet<String> removedChunks = new TreeSet<>();
-
         if (length == 0) {
             try {
                 file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, fileData, bump, i) -> {
                     if (!(fileData instanceof File f))
                         throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
                     bump.apply();
-                    removedChunks.addAll(f.getChunks().values());
                     f.getChunks().clear();
                     f.setMtime(System.currentTimeMillis());
+                    cleanupChunks(f, new LinkedHashSet<>(f.getChunks().values()));
                     return null;
                 });
             } catch (Exception e) {
                 Log.error("Error writing file chunks: " + fileUuid, e);
                 return false;
             }
-            cleanupChunks(fileUuid, removedChunks);
             return true;
         }
 
@@ -595,36 +601,77 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, fDataU, bump, i) -> {
                 if (!(fDataU instanceof File fData))
                     throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+
+                var curSize = size(fileUuid);
+                if (curSize == length) return null;
+
                 var chunksAll = fData.getChunks();
-                var lastChunk = chunksAll.lastEntry();
 
-                //FIXME!
+                var removedChunks = new LinkedHashSet<String>();
 
-                if (lastChunk != null) {
-                    var size = getChunkSize(lastChunk.getValue());
-                    var chunkEnd = size + lastChunk.getKey();
+                if (curSize < length) {
+                    int combinedSize = (int) (length - curSize);
 
-                    if (chunkEnd == length) return null;
+                    long start = curSize;
 
-                    if (chunkEnd > length) {
-                        var chunkData = readChunk(lastChunk.getValue());
+                    // Hack
+                    HashMap<Integer, ByteString> zeroCache = new HashMap<>();
 
-                        ChunkData newChunkData = new ChunkData(chunkData.substring(0, (int) (length - lastChunk.getKey())));
-                        ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
-                        jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
-                        jObjectManager.put(newChunkInfo, Optional.of(m.getName()));
-                        jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
+                    {
+                        int cur = 0;
+                        while (cur < combinedSize) {
+                            int end;
 
-                        removedChunks.add(lastChunk.getValue());
+                            if (targetChunkSize <= 0)
+                                end = combinedSize;
+                            else {
+                                if ((combinedSize - cur) > (targetChunkSize * 1.5)) {
+                                    end = cur + targetChunkSize;
+                                } else {
+                                    end = combinedSize;
+                                }
+                            }
 
-                        chunksAll.put(lastChunk.getKey(), newChunkData.getHash());
-                    } else {
-                        write(fileUuid, chunkEnd, new byte[(int) (length - chunkEnd)]);
+                            if (!zeroCache.containsKey(end - cur))
+                                zeroCache.put(end - cur, UnsafeByteOperations.unsafeWrap(new byte[end - cur]));
+
+                            ChunkData newChunkData = new ChunkData(zeroCache.get(end - cur));
+                            ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
+                            //FIXME:
+                            jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
+                            jObjectManager.put(newChunkInfo, Optional.of(m.getName()));
+                            jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
+                            chunksAll.put(start, newChunkInfo.getHash());
+
+                            start += newChunkInfo.getSize();
+                            cur = end;
+                        }
                     }
+                } else {
+                    var tail = chunksAll.lowerEntry(length);
+                    var afterTail = chunksAll.tailMap(tail.getKey(), false);
+
+                    removedChunks.addAll(afterTail.values());
+                    afterTail.clear();
+
+                    var tailBytes = readChunk(tail.getValue());
+                    var newChunk = tailBytes.substring(0, (int) (length - tail.getKey()));
+
+                    chunksAll.remove(tail.getKey());
+                    removedChunks.add(tail.getValue());
+
+                    ChunkData newChunkData = new ChunkData(newChunk);
+                    ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
+                    //FIXME:
+                    jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
+                    jObjectManager.put(newChunkInfo, Optional.of(m.getName()));
+                    jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
+                    chunksAll.put(tail.getKey(), newChunkInfo.getHash());
                 }
 
                 bump.apply();
                 fData.setMtime(System.currentTimeMillis());
+                cleanupChunks(fData, removedChunks);
 
                 return null;
             });
@@ -632,7 +679,6 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             Log.error("Error reading file: " + fileUuid, e);
             return false;
         }
-        cleanupChunks(fileUuid, removedChunks);
         return true;
     }
 
