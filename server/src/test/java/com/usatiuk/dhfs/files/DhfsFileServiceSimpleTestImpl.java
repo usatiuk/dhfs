@@ -111,6 +111,20 @@ public class DhfsFileServiceSimpleTestImpl {
     }
 
     @Test
+    void removeTest() {
+        var ret = fileService.create("/removeTest", 777);
+        Assertions.assertTrue(ret.isPresent());
+
+        var uuid = ret.get();
+
+        fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+
+        fileService.unlink("/removeTest");
+        Assertions.assertFalse(fileService.open("/removeTest").isPresent());
+    }
+
+    @Test
     void truncateTest1() {
         var ret = fileService.create("/truncateTest1", 777);
         Assertions.assertTrue(ret.isPresent());

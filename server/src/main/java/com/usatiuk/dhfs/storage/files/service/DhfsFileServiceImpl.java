@@ -5,6 +5,7 @@ import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.storage.files.objects.*;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -29,6 +30,20 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @ConfigProperty(name = "dhfs.storage.files.target_chunk_size")
     Integer targetChunkSize;
+
+    @ConfigProperty(name = "dhfs.files.use_hash_for_chunks")
+    boolean useHashForChunks;
+
+    @Inject
+    PersistentRemoteHostsService persistentRemoteHostsService;
+
+    private ChunkData createChunk(ByteString bytes) {
+        if (useHashForChunks) {
+            return new ChunkData(bytes);
+        } else {
+            return new ChunkData(bytes, persistentRemoteHostsService.getUniqueId());
+        }
+    }
 
     void init(@Observes @Priority(500) StartupEvent event) {
         Log.info("Initializing file service");
@@ -175,7 +190,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         if (kidId.isEmpty())
             return false;
 
-        var kid = jObjectManager.get(kidId.toString());
+        var kid = jObjectManager.get(kidId.get().toString());
 
         if (kid.isEmpty()) return false;
 
@@ -185,17 +200,19 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             String kname = Path.of(name).getFileName().toString();
 
-            if (dir.getKid(kname).isPresent())
+            if (dir.getKid(kname).isEmpty())
                 return false;
 
-            kid.get().runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m2, d2, bump2, i2) -> {
+            kid.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m2, d2, bump2, i2) -> {
                 m2.removeRef(m.getName());
                 return null;
             });
 
+            boolean removed = dir.removeKid(kname);
+
             bump.apply();
             dir.setMtime(System.currentTimeMillis());
-            return dir.removeKid(kname);
+            return removed;
         });
     }
 
@@ -254,7 +271,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                     });
                 }
 
-                theFile.getMeta().removeRef(dentFrom.toString());
+                theFile.getMeta().removeRef(dentFrom.getName());
                 jObjectManager.put(newFile, Optional.of(dentTo.getName()));
                 newDent = newFile;
             } else {
@@ -281,6 +298,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         } finally {
             dentFrom.rwUnlock();
             dentTo.rwUnlock();
+            theFile.notifyWrite();
             theFile.rwUnlock();
         }
 
@@ -547,7 +565,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
                     var thisChunk = pendingWrites.substring(cur, end);
 
-                    ChunkData newChunkData = new ChunkData(thisChunk);
+                    ChunkData newChunkData = createChunk(thisChunk);
                     ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
                     //FIXME:
                     jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
@@ -635,7 +653,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                             if (!zeroCache.containsKey(end - cur))
                                 zeroCache.put(end - cur, UnsafeByteOperations.unsafeWrap(new byte[end - cur]));
 
-                            ChunkData newChunkData = new ChunkData(zeroCache.get(end - cur));
+                            ChunkData newChunkData = createChunk(zeroCache.get(end - cur));
                             ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
                             //FIXME:
                             jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
@@ -660,7 +678,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                     chunksAll.remove(tail.getKey());
                     removedChunks.add(tail.getValue());
 
-                    ChunkData newChunkData = new ChunkData(newChunk);
+                    ChunkData newChunkData = createChunk(newChunk);
                     ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
                     //FIXME:
                     jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));

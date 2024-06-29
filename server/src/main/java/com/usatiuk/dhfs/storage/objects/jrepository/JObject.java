@@ -194,6 +194,7 @@ public class JObject<T extends JObjectData> implements Serializable {
     }
 
     public void notifyWrite() {
+        _resolver.updateDeletionState(this);
         notifyWriteMeta();
         notifyWriteData();
     }
@@ -207,8 +208,11 @@ public class JObject<T extends JObjectData> implements Serializable {
         _lock.writeLock().lock();
     }
 
+    public boolean tryRwLock() {
+        return _lock.writeLock().tryLock();
+    }
+
     public void rwUnlock() {
-        _resolver.updateDeletionState(this);
         _lock.writeLock().unlock();
     }
 

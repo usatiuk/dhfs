@@ -71,13 +71,15 @@ public class JObjectRefProcessor {
                 var got = jObjectManager.get(next);
                 if (got.isEmpty()) continue;
                 try {
-                    got.get().runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, v, i) -> {
+                    got.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, v, i) -> {
                         if (m.isDeleted()) return null;
                         if (m.getRefcount() > 0) return null;
                         if (!m.isSeen()) {
                             jObjectManager.tryQuickDelete(got.get());
                             return null;
                         }
+
+                        got.get().tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
 
                         Log.info("Deleting " + m.getName());
                         m.delete();
@@ -90,7 +92,7 @@ public class JObjectRefProcessor {
                             refs = Streams.concat(refs, d.extractRefs().stream());
 
                         refs.forEach(c -> {
-                            jObjectManager.get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mc, dc, bc, ic) -> {
+                            jObjectManager.get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
                                 mc.removeRef(m.getName());
                                 return null;
                             }));

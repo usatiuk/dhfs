@@ -56,6 +56,10 @@ public class PersistentRemoteHostsService {
         else return _selfUuid;
     }
 
+    public String getUniqueId() {
+        return _selfUuid.toString() + _persistentData.runReadLocked(d -> d.getSelfCounter().addAndGet(1)).toString();
+    }
+
     public HostInfo getInfo(UUID name) {
         return _persistentData.runReadLocked(data -> {
             return data.getRemoteHosts().get(name);

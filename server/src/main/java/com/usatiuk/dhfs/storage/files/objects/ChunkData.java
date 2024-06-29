@@ -26,6 +26,12 @@ public class ChunkData extends JObjectData {
                 .mapToObj(Long::toHexString).collect(Collectors.joining());
     }
 
+    public ChunkData(ByteString bytes, String name) {
+        super();
+        this._bytes = bytes;
+        this._hash = name;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

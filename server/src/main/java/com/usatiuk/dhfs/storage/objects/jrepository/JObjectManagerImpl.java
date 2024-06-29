@@ -202,14 +202,16 @@ public class JObjectManagerImpl implements JObjectManager {
 
     @Override
     public void tryQuickDelete(JObject<?> object) {
-        object.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, b, i) -> {
+        object.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
             if (m.getRefcount() > 0) return false;
             if (m.isSeen()) {
                 jobjectRefProcessor.putDeletionCandidate(object.getName());
                 return false;
             }
 
-            Log.info("Quick delete of " + m.getName());
+            object.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
+
+            Log.trace("Quick delete of " + m.getName());
             m.delete();
 
             Stream<String> refs = Stream.empty();
@@ -219,13 +221,11 @@ public class JObjectManagerImpl implements JObjectManager {
             if (d != null)
                 refs = Streams.concat(refs, d.extractRefs().stream());
 
-            refs.forEach(c -> {
-                get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mc, dc, bc, ic) -> {
-                    mc.removeRef(object.getName());
-                    tryQuickDelete(ref);
-                    return null;
-                }));
-            });
+            refs.forEach(c -> get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
+                mc.removeRef(object.getName());
+                tryQuickDelete(ref);
+                return null;
+            })));
 
             return true;
         });

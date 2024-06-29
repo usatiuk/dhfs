@@ -10,6 +10,7 @@ import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.LinkedHashSet;
 import java.util.Optional;
@@ -37,6 +38,9 @@ public class JObjectResolver {
     @Inject
     JObjectRefProcessor jObjectRefProcessor;
 
+    @ConfigProperty(name = "dhfs.objects.ref_verification")
+    boolean refVerification;
+
     public void backupRefs(JObject<?> self) {
         self.assertRWLock();
         if (self.getData() != null) {
@@ -60,7 +64,7 @@ public class JObjectResolver {
         }
         for (var r : extracted) {
             if (!self.getMeta().getSavedRefs().contains(r)) {
-                Log.info("Hydrating ref " + r + " for " + self.getName());
+                Log.trace("Hydrating ref " + r + " for " + self.getName());
                 jobjectManager.getOrPut(r, Optional.of(self.getName()));
             }
         }
@@ -75,7 +79,7 @@ public class JObjectResolver {
                 self.getMeta().undelete();
                 if (self.isResolved()) {
                     for (var r : self.getData().extractRefs()) {
-                        Log.info("Hydrating ref after undelete " + r + " for " + self.getName());
+                        Log.trace("Hydrating ref after undelete " + r + " for " + self.getName());
                         jobjectManager.getOrPut(r, Optional.of(self.getName()));
                     }
                 }
@@ -83,7 +87,8 @@ public class JObjectResolver {
         }
 
         if (self.getMeta().getRefcount() <= 0)
-            jObjectRefProcessor.putDeletionCandidate(self.getName());
+            if (!self.isDeleted())
+                jObjectRefProcessor.putDeletionCandidate(self.getName());
     }
 
     public <T extends JObjectData> Optional<T> resolveDataLocal(JObject<T> jObject) {
@@ -138,6 +143,7 @@ public class JObjectResolver {
     }
 
     protected void verifyRefs(JObject<?> self) {
+        if (!refVerification) return;
         self.assertRWLock();
         if (!self.isResolved()) return;
         if (self.isDeleted()) return;

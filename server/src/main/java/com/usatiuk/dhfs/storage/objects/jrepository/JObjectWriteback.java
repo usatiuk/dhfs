@@ -36,6 +36,8 @@ public class JObjectWriteback {
 
     private Thread _writebackThread;
 
+    boolean overload = false;
+
     @Startup
     void init() {
         _writebackThread = new Thread(this::writeback);
@@ -119,9 +121,9 @@ public class JObjectWriteback {
             if (m.getRefcount() > 0)
                 throw new IllegalStateException("Object deleted but has refcounts! " + m.getName());
             // FIXME: assert Rw lock here?
-            Log.info("Deleting from persistent storage " + m.getName());
-            objectPersistentStore.deleteObject(m.getName());
+            Log.trace("Deleting from persistent storage " + m.getName());
             objectPersistentStore.deleteObject("meta_" + m.getName());
+            objectPersistentStore.deleteObject(m.getName());
             return;
         }
         objectPersistentStore.writeObject("meta_" + m.getName(), SerializationHelper.serialize(m));
@@ -135,6 +137,29 @@ public class JObjectWriteback {
         }
     }
 
+    private void tryClean() {
+        synchronized (_objects) {
+            if (_objects.size() >= limit) {
+                for (var obj : _objects.entrySet()) {
+                    var jobj = obj.getValue().getValue();
+                    if (jobj.isDeleted()) {
+                        if (jobj.tryRwLock()) {
+                            try {
+                                if (!jobj.isDeleted())
+                                    continue;
+                                flushOneImmediate(jobj.getMeta(), null);
+                                _objects.remove(jobj.getName());
+                                break;
+                            } finally {
+                                obj.getValue().getRight().rwUnlock();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     public void markDirty(String name, JObject<?> object) {
         object.assertRWLock();
         synchronized (_objects) {
@@ -142,8 +167,14 @@ public class JObjectWriteback {
                 return;
             }
 
+            tryClean();
+
             // FIXME: better logic
             if (_objects.size() < limit) {
+                if (overload) {
+                    overload = false;
+                    Log.info("Writeback cache enabled");
+                }
                 _objects.put(name, Pair.of(System.currentTimeMillis(), object));
                 _objects.notifyAll();
                 return;
@@ -151,6 +182,10 @@ public class JObjectWriteback {
         }
 
         try {
+            if (!overload) {
+                overload = true;
+                Log.info("Writeback cache disabled");
+            }
             flushOneImmediate(object.getMeta(), object.getData());
         } catch (Exception e) {
             Log.error("Failed writing object " + object.getName(), e);
