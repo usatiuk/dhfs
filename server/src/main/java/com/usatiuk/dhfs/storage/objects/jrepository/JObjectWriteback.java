@@ -126,6 +126,7 @@ public class JObjectWriteback {
             objectPersistentStore.deleteObject(m.getName());
             return;
         }
+        m.markWritten();
         objectPersistentStore.writeObject("meta_" + m.getName(), SerializationHelper.serialize(m));
         if (data != null)
             objectPersistentStore.writeObject(m.getName(), SerializationHelper.serialize(data));
@@ -138,37 +139,54 @@ public class JObjectWriteback {
     }
 
     private void tryClean() {
+        JObject<?> found = null;
         synchronized (_objects) {
             if (_objects.size() >= limit) {
                 for (var obj : _objects.entrySet()) {
                     var jobj = obj.getValue().getValue();
                     if (jobj.isDeleted()) {
                         if (jobj.tryRwLock()) {
-                            try {
-                                if (!jobj.isDeleted())
-                                    continue;
-                                flushOneImmediate(jobj.getMeta(), null);
-                                _objects.remove(jobj.getName());
-                                break;
-                            } finally {
-                                obj.getValue().getRight().rwUnlock();
+                            if (!jobj.isDeleted()) {
+                                jobj.rwUnlock();
+                                continue;
                             }
+                            found = jobj;
+                            _objects.remove(found.getName());
+                            break;
                         }
                     }
                 }
+            }
+        }
+        if (found != null)
+            try {
+                flushOneImmediate(found.getMeta(), null);
+            } finally {
+                found.rwUnlock();
+            }
+    }
+
+    public void hintDeletion(ObjectMetadata meta) {
+        synchronized (_objects) {
+            if (!meta.isWritten()) {
+                _objects.remove(meta.getName());
             }
         }
     }
 
     public void markDirty(String name, JObject<?> object) {
         object.assertRWLock();
+        if (object.isDeleted() && !object.getMeta().isWritten())
+            return;
+
         synchronized (_objects) {
-            if (_objects.containsKey(name)) {
+            if (_objects.containsKey(name))
                 return;
-            }
+        }
 
-            tryClean();
+        tryClean();
 
+        synchronized (_objects) {
             // FIXME: better logic
             if (_objects.size() < limit) {
                 if (overload) {

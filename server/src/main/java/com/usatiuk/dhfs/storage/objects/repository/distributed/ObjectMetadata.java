@@ -6,13 +6,17 @@ import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
 import jakarta.enterprise.inject.spi.CDI;
 import lombok.Getter;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ObjectMetadata implements Serializable {
-    public ObjectMetadata(String name) {
+    public ObjectMetadata(String name, boolean written) {
         _name = name;
+        _written.set(written);
     }
 
     @Getter
@@ -33,9 +37,17 @@ public class ObjectMetadata implements Serializable {
     @Getter
     private boolean _locked = false;
 
+    private transient AtomicBoolean _written = new AtomicBoolean(true);
+
     private final AtomicBoolean _seen = new AtomicBoolean(false);
 
     private final AtomicBoolean _deleted = new AtomicBoolean(false);
+
+    @Serial
+    private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+        in.defaultReadObject();
+        _written = new AtomicBoolean(true);
+    }
 
     public boolean isSeen() {
         return _seen.get();
@@ -55,6 +67,14 @@ public class ObjectMetadata implements Serializable {
 
     public void undelete() {
         _deleted.set(false);
+    }
+
+    public boolean isWritten() {
+        return _written.get();
+    }
+
+    public void markWritten() {
+        _written.set(true);
     }
 
     private final Set<String> _referrers = new HashSet<>();

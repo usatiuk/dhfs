@@ -24,6 +24,9 @@ public class JObjectRefProcessor {
     JObjectManager jObjectManager;
 
     @Inject
+    JObjectWriteback jObjectWriteback;
+
+    @Inject
     ObjectPersistentStore objectPersistentStore;
 
     @Startup
@@ -43,8 +46,8 @@ public class JObjectRefProcessor {
 
     public void putDeletionCandidate(String name) {
         synchronized (this) {
-            _candidates.putIfAbsent(name, System.currentTimeMillis());
-            this.notify();
+            if (_candidates.putIfAbsent(name, System.currentTimeMillis()) == null)
+                this.notify();
         }
     }
 
@@ -88,6 +91,7 @@ public class JObjectRefProcessor {
                             refs = Streams.concat(refs, got.get().getData().extractRefs().stream());
 
                         got.get().discardData();
+                        jObjectWriteback.hintDeletion(m);
 
                         refs.forEach(c -> {
                             jObjectManager.get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {

@@ -82,7 +82,7 @@ public class DirectoryConflictResolver implements ConflictResolver {
                 }
             }
 
-            newMetadata = new ObjectMetadata(ours.getName());
+            newMetadata = new ObjectMetadata(ours.getName(), true);
 
             for (var entry : oursHeader.getChangelog().getEntriesList()) {
                 newMetadata.getChangelog().put(UUID.fromString(entry.getHost()), entry.getVersion());

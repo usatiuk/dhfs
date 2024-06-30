@@ -187,7 +187,7 @@ public class JObjectManagerImpl implements JObjectManager {
                     if (objectPersistentStore.existsObject("meta_" + name))
                         continue;
 
-                    var created = new JObject<>(jObjectResolver, new ObjectMetadata(name));
+                    var created = new JObject<>(jObjectResolver, new ObjectMetadata(name, false));
                     _map.put(name, new NamedSoftReference(created, _refQueue));
                     created.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                         parent.ifPresent(m::addRef);
@@ -222,10 +222,11 @@ public class JObjectManagerImpl implements JObjectManager {
                 refs = Streams.concat(refs, object.getData().extractRefs().stream());
 
             object.discardData();
+            jObjectWriteback.hintDeletion(m);
 
             refs.forEach(c -> get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
                 mc.removeRef(object.getName());
-//                tryQuickDelete(ref);
+                tryQuickDelete(ref);
                 return null;
             })));
 

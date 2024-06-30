@@ -104,7 +104,7 @@ public class JObjectResolver {
         if (local.isPresent()) return local.get();
 
         var obj = remoteObjectServiceClient.getObject(jObject);
-        objectPersistentStore.writeObject(jObject.getName(), obj);
+        jObjectWriteback.markDirty(jObject.getName(), jObject);
         invalidationQueueService.pushInvalidationToAll(jObject.getName(), !jObject.getMeta().isSeen());
         return SerializationHelper.deserialize(obj);
     }
@@ -112,7 +112,7 @@ public class JObjectResolver {
     public void removeLocal(JObject<?> jObject, String name) {
         jObject.assertRWLock();
         try {
-            Log.trace("Deleting " + name);
+            Log.trace("Invalidating " + name);
             jObjectWriteback.remove(name);
             objectPersistentStore.deleteObject(name);
         } catch (StatusRuntimeException sx) {

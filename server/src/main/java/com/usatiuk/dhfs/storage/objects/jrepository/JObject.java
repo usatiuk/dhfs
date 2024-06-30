@@ -21,7 +21,7 @@ public class JObject<T extends JObjectData> implements Serializable {
     // Create a new object
     protected JObject(JObjectResolver resolver, String name, UUID selfUuid, T obj) {
         _resolver = resolver;
-        _metaPart = new ObjectMetadata(name);
+        _metaPart = new ObjectMetadata(name, false);
         _dataPart.set(obj);
         // FIXME:?
         if (!obj.assumeUnique())
