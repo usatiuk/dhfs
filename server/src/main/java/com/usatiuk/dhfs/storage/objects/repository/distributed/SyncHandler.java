@@ -15,7 +15,7 @@ import java.util.*;
 
 @ApplicationScoped
 public class SyncHandler {
-    private static class OutdatedUpdateException extends RuntimeException {
+    protected static class OutdatedUpdateException extends RuntimeException {
     }
 
     @Inject
@@ -141,10 +141,12 @@ public class SyncHandler {
         var builder = IndexUpdateReply.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString());
 
         for (var u : request.getHeaderList()) {
+            // TODO: Dedup
             try {
                 handleOneUpdate(UUID.fromString(request.getSelfUuid()), u);
             } catch (OutdatedUpdateException ignored) {
                 Log.info("Outdated update of " + u.getName() + " from " + request.getSelfUuid());
+                invalidationQueueService.pushInvalidationToOne(UUID.fromString(request.getSelfUuid()), u.getName(), true); // True?
             } catch (Exception ex) {
                 Log.info("Error when handling update from " + request.getSelfUuid() + " of " + u.getName(), ex);
                 builder.addErrors(IndexUpdateError.newBuilder().setObjectName(u.getName()).setError(ex + Arrays.toString(ex.getStackTrace())).build());

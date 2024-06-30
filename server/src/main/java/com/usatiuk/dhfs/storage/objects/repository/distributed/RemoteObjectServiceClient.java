@@ -27,6 +27,8 @@ public class RemoteObjectServiceClient {
 
     @Inject
     SyncHandler syncHandler;
+    @Inject
+    InvalidationQueueService invalidationQueueService;
 
     public Pair<ObjectHeader, ByteString> getSpecificObject(UUID host, String name) {
         return rpcClientFactory.withObjSyncClient(host, client -> {
@@ -64,6 +66,9 @@ public class RemoteObjectServiceClient {
                 if (unexpected) {
                     try {
                         syncHandler.handleOneUpdate(UUID.fromString(reply.getSelfUuid()), reply.getObject().getHeader());
+                    } catch (SyncHandler.OutdatedUpdateException ignored) {
+                        Log.info("Outdated update of " + md.getName() + " from " + reply.getSelfUuid());
+                        invalidationQueueService.pushInvalidationToOne(UUID.fromString(reply.getSelfUuid()), md.getName(), true); // True?
                     } catch (Exception e) {
                         Log.error("Received unexpected object version from " + reply.getSelfUuid()
                                 + " for " + reply.getObject().getHeader().getName() + " and conflict resolution failed", e);

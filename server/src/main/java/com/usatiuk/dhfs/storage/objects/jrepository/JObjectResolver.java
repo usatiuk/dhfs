@@ -44,7 +44,7 @@ public class JObjectResolver {
     public void backupRefs(JObject<?> self) {
         self.assertRWLock();
         if (self.getData() != null) {
-            if (self.getMeta().getSavedRefs() != null) {
+            if ((self.getMeta().getSavedRefs() != null) && (!self.getMeta().getSavedRefs().isEmpty())) {
                 Log.error("Saved refs not empty for " + self.getName() + " will clean");
                 self.getMeta().setSavedRefs(null);
             }
