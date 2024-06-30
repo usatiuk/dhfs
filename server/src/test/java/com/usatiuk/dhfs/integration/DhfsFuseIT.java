@@ -44,7 +44,7 @@ public class DhfsFuseIT {
                                         "-Ddhfs.objects.distributed.peerdiscovery.interval=100",
                                         "-Ddhfs.objects.distributed.invalidation.delay=100",
                                         "-Ddhfs.objects.ref_verification=true",
-                                        "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
+                                        "-Dquarkus.log.category.\\\"com.usatiuk.dhfs\\\".level=TRACE",
                                         "-jar", "/app/quarkus-run.jar")
                                 .build())
                 .withFileFromPath("/app", Paths.get(buildPath, "quarkus-app"));

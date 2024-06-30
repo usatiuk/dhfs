@@ -115,11 +115,13 @@ public class SyncHandler {
             // md.getBestVersion() > md.getTotalVersion() should also work
             if (receivedTotalVer > md.getOurVersion()) {
                 invalidate.apply();
+                md.getChangelog().clear();
+                md.getChangelog().putAll(receivedMap);
+                md.getChangelog().putIfAbsent(persistentRemoteHostsService.getSelfUuid(), 0L);
+                return false;
             }
 
-            md.getChangelog().clear();
-            md.getChangelog().putAll(receivedMap);
-            md.getChangelog().putIfAbsent(persistentRemoteHostsService.getSelfUuid(), 0L);
+            Log.warn("No action on update: " + header.getName() + " from " + from);
 
             return false;
         });

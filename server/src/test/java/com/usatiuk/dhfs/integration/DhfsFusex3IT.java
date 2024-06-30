@@ -49,7 +49,7 @@ public class DhfsFusex3IT {
                                         "-Ddhfs.objects.distributed.invalidation.delay=100",
                                         "-Djava.util.concurrent.ForkJoinPool.common.parallelism=4",
                                         "-Ddhfs.objects.ref_verification=true",
-                                        "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
+                                        "-Dquarkus.log.category.\\\"com.usatiuk.dhfs\\\".level=TRACE",
                                         "-jar", "/app/quarkus-run.jar")
                                 .build())
                 .withFileFromPath("/app", Paths.get(buildPath, "quarkus-app"));
