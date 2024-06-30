@@ -48,4 +48,9 @@ public class Directory extends FsNode {
     public List<String> getChildrenList() {
         return _children.keySet().stream().toList();
     }
+
+    @Override
+    public long estimateSize() {
+        return _children.size() * 16L;
+    }
 }

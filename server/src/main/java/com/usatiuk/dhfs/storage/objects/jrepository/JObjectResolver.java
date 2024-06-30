@@ -104,7 +104,7 @@ public class JObjectResolver {
         if (local.isPresent()) return local.get();
 
         var obj = remoteObjectServiceClient.getObject(jObject);
-        jObjectWriteback.markDirty(jObject.getName(), jObject);
+        jObjectWriteback.markDirty(jObject);
         invalidationQueueService.pushInvalidationToAll(jObject.getName(), !jObject.getMeta().isSeen());
         return SerializationHelper.deserialize(obj);
     }
@@ -113,7 +113,7 @@ public class JObjectResolver {
         jObject.assertRWLock();
         try {
             Log.trace("Invalidating " + name);
-            jObjectWriteback.remove(name);
+            jObjectWriteback.remove(jObject);
             objectPersistentStore.deleteObject(name);
         } catch (StatusRuntimeException sx) {
             if (sx.getStatus() != Status.NOT_FOUND)
@@ -125,12 +125,12 @@ public class JObjectResolver {
 
     public void notifyWriteMeta(JObject<?> self) {
         self.assertRWLock();
-        jObjectWriteback.markDirty(self.getName(), self);
+        jObjectWriteback.markDirty(self);
     }
 
     public void notifyWriteData(JObject<?> self) {
         self.assertRWLock();
-        jObjectWriteback.markDirty(self.getName(), self);
+        jObjectWriteback.markDirty(self);
         if (self.isResolved())
             invalidationQueueService.pushInvalidationToAll(self.getName(), !self.getMeta().isSeen());
     }

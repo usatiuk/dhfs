@@ -5,6 +5,7 @@ import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
 import io.quarkus.logging.Log;
 import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.NotImplementedException;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.Serializable;
 import java.util.Comparator;
@@ -14,7 +15,25 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public class JObject<T extends JObjectData> implements Serializable {
+public class JObject<T extends JObjectData> implements Serializable, Comparable<JObject<?>> {
+    @Override
+    public int compareTo(@NotNull JObject<?> o) {
+        return getName().compareTo(o.getName());
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        JObject<?> jObject = (JObject<?>) o;
+        return Objects.equals(_metaPart.getName(), jObject._metaPart.getName());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(_metaPart.getName());
+    }
+
     public static class DeletedObjectAccessException extends RuntimeException {
     }
 
@@ -153,6 +172,7 @@ public class JObject<T extends JObjectData> implements Serializable {
             var ref = _metaPart.getRefcount();
             boolean wasSeen = _metaPart.isSeen();
             boolean wasDeleted = _metaPart.isDeleted();
+            var prevData = _dataPart.get();
             VoidFn invalidateFn = () -> {
                 _resolver.backupRefs(this);
                 _dataPart.set(null);
@@ -163,7 +183,8 @@ public class JObject<T extends JObjectData> implements Serializable {
             if (!Objects.equals(ver, _metaPart.getOurVersion())
                     || ref != _metaPart.getRefcount()
                     || wasDeleted != _metaPart.isDeleted()
-                    || wasSeen != _metaPart.isSeen())
+                    || wasSeen != _metaPart.isSeen()
+                    || prevData != _dataPart.get())
                 notifyWriteMeta();
             if (!Objects.equals(ver, _metaPart.getOurVersion()))
                 notifyWriteData();

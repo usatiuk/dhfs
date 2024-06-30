@@ -222,7 +222,6 @@ public class JObjectManagerImpl implements JObjectManager {
                 refs = Streams.concat(refs, object.getData().extractRefs().stream());
 
             object.discardData();
-            jObjectWriteback.hintDeletion(m);
 
             refs.forEach(c -> get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
                 mc.removeRef(object.getName());

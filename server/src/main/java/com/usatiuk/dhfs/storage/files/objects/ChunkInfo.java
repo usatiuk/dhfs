@@ -56,4 +56,9 @@ public class ChunkInfo extends JObjectData {
     public boolean assumeUnique() {
         return true;
     }
+
+    @Override
+    public long estimateSize() {
+        return _hash.length() * 2L;
+    }
 }

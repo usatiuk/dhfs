@@ -91,7 +91,6 @@ public class JObjectRefProcessor {
                             refs = Streams.concat(refs, got.get().getData().extractRefs().stream());
 
                         got.get().discardData();
-                        jObjectWriteback.hintDeletion(m);
 
                         refs.forEach(c -> {
                             jObjectManager.get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {

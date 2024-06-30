@@ -30,4 +30,9 @@ public class File extends FsNode {
 
     @Getter
     private final UUID _parent;
+
+    @Override
+    public long estimateSize() {
+        return _chunks.size() * 16L;
+    }
 }
