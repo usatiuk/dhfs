@@ -18,6 +18,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 @ApplicationScoped
@@ -38,22 +40,27 @@ public class JObjectWriteback {
     @ConfigProperty(name = "dhfs.objects.writeback.limit")
     long sizeLimit;
 
+    @ConfigProperty(name = "dhfs.objects.writeback.threads")
+    int writebackThreads;
+
     AtomicLong _currentSize = new AtomicLong(0);
 
     private final LinkedHashMap<JObject<?>, Pair<Long, Long>> _nursery = new LinkedHashMap<>();
     // FIXME: Kind of a hack
     private final OrderedBidiMap<Pair<Long, String>, JObject<?>> _writeQueue = new TreeBidiMap<>();
 
-    private Thread _writebackThread;
     private Thread _promotionThread;
+
+    private ExecutorService _writebackExecutor;
 
     boolean overload = false;
 
     @Startup
     void init() {
-        _writebackThread = new Thread(this::writeback);
-        _writebackThread.setName("JObject writeback thread");
-        _writebackThread.start();
+        _writebackExecutor = Executors.newFixedThreadPool(writebackThreads);
+        for (int i = 0; i < writebackThreads; i++) {
+            _writebackExecutor.submit(this::writeback);
+        }
         _promotionThread = new Thread(this::promote);
         _promotionThread.setName("Writeback promotion thread");
         _promotionThread.start();
@@ -68,13 +75,7 @@ public class JObjectWriteback {
             }
         }
 
-        _writebackThread.interrupt();
-        while (_writebackThread.isAlive()) {
-            try {
-                _writebackThread.join();
-            } catch (InterruptedException ignored) {
-            }
-        }
+        _writebackExecutor.shutdownNow();
 
         HashSet<JObject<?>> toWrite = new LinkedHashSet<>();
         toWrite.addAll(_nursery.keySet());
