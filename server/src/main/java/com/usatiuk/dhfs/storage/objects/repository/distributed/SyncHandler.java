@@ -121,6 +121,9 @@ public class SyncHandler {
                 return false;
             }
 
+            if (hasLower)
+                throw new OutdatedUpdateException();
+
             Log.warn("No action on update: " + header.getName() + " from " + from);
 
             return false;
