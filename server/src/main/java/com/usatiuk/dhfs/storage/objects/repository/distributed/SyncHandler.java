@@ -12,6 +12,8 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @ApplicationScoped
 public class SyncHandler {
@@ -83,10 +85,10 @@ public class SyncHandler {
 
             boolean hasLower = false;
             boolean hasHigher = false;
-            for (var e : md.getChangelog().entrySet()) {
-                if (receivedMap.getOrDefault(e.getKey(), 0L) < e.getValue())
+            for (var e : Stream.concat(md.getChangelog().keySet().stream(), receivedMap.keySet().stream()).collect(Collectors.toSet())) {
+                if (receivedMap.getOrDefault(e, 0L) < md.getChangelog().getOrDefault(e, 0L))
                     hasLower = true;
-                if (receivedMap.getOrDefault(e.getKey(), 0L) > e.getValue())
+                if (receivedMap.getOrDefault(e, 0L) > md.getChangelog().getOrDefault(e, 0L))
                     hasHigher = true;
             }
 
@@ -121,9 +123,10 @@ public class SyncHandler {
                 return false;
             }
 
-            if (hasLower)
+            if (hasLower) {
+                Log.warn("Unhandled update with lower version: " + header.getName() + " from " + from);
                 throw new OutdatedUpdateException();
-
+            }
             Log.warn("No action on update: " + header.getName() + " from " + from);
 
             return false;
