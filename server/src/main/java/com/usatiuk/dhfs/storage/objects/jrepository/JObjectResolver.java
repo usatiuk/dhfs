@@ -12,6 +12,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Optional;
 
@@ -49,6 +50,8 @@ public class JObjectResolver {
                 self.getMeta().setSavedRefs(null);
             }
             self.getMeta().setSavedRefs(new LinkedHashSet<>(self.getData().extractRefs()));
+        } else {
+            self.getMeta().setSavedRefs(Collections.emptySet());
         }
     }
 
