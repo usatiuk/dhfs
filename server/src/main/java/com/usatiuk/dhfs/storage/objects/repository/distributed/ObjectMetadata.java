@@ -5,6 +5,7 @@ import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelogEntry;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
 import jakarta.enterprise.inject.spi.CDI;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -29,7 +30,8 @@ public class ObjectMetadata implements Serializable {
     private final Map<UUID, Long> _changelog = new LinkedHashMap<>();
 
     @Getter
-    private final Set<String> _savedRefs = new LinkedHashSet<>();
+    @Setter
+    private Set<String> _savedRefs = Collections.emptySet();
 
     @Getter
     private long _refcount = 0L;

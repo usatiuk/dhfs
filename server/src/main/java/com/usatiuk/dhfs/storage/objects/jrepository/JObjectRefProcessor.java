@@ -85,7 +85,7 @@ public class JObjectRefProcessor {
 
                         Stream<String> refs = Stream.empty();
 
-                        if (!m.getSavedRefs().isEmpty())
+                        if (m.getSavedRefs() != null)
                             refs = m.getSavedRefs().stream();
                         if (got.get().getData() != null)
                             refs = Streams.concat(refs, got.get().getData().extractRefs().stream());

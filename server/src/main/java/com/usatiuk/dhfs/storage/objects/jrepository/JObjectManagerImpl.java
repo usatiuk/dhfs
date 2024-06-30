@@ -216,7 +216,7 @@ public class JObjectManagerImpl implements JObjectManager {
 
             Stream<String> refs = Stream.empty();
 
-            if (!m.getSavedRefs().isEmpty())
+            if (m.getSavedRefs() != null)
                 refs = m.getSavedRefs().stream();
             if (object.getData() != null)
                 refs = Streams.concat(refs, object.getData().extractRefs().stream());

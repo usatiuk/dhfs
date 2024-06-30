@@ -44,31 +44,33 @@ public class JObjectResolver {
     public void backupRefs(JObject<?> self) {
         self.assertRWLock();
         if (self.getData() != null) {
-            if (!self.getMeta().getSavedRefs().isEmpty()) {
+            if (self.getMeta().getSavedRefs() != null) {
                 Log.error("Saved refs not empty for " + self.getName() + " will clean");
-                self.getMeta().getSavedRefs().clear();
+                self.getMeta().setSavedRefs(null);
             }
-            self.getMeta().getSavedRefs().addAll(self.getData().extractRefs());
+            self.getMeta().setSavedRefs(new LinkedHashSet<>(self.getData().extractRefs()));
         }
     }
 
     public void hydrateRefs(JObject<?> self) {
         self.assertRWLock();
-        var extracted = new LinkedHashSet<>(self.getData().extractRefs());
-        for (var r : self.getMeta().getSavedRefs()) {
-            if (!extracted.contains(r))
-                jobjectManager.get(r).ifPresent(ro -> ro.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                    m.removeRef(self.getName());
-                    return null;
-                }));
-        }
-        for (var r : extracted) {
-            if (!self.getMeta().getSavedRefs().contains(r)) {
-                Log.trace("Hydrating ref " + r + " for " + self.getName());
-                jobjectManager.getOrPut(r, Optional.of(self.getName()));
+        if (self.getMeta().getSavedRefs() != null) {
+            var extracted = new LinkedHashSet<>(self.getData().extractRefs());
+            for (var r : self.getMeta().getSavedRefs()) {
+                if (!extracted.contains(r))
+                    jobjectManager.get(r).ifPresent(ro -> ro.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                        m.removeRef(self.getName());
+                        return null;
+                    }));
             }
+            for (var r : extracted) {
+                if (!self.getMeta().getSavedRefs().contains(r)) {
+                    Log.trace("Hydrating ref " + r + " for " + self.getName());
+                    jobjectManager.getOrPut(r, Optional.of(self.getName()));
+                }
+            }
+            self.getMeta().setSavedRefs(null);
         }
-        self.getMeta().getSavedRefs().clear();
     }
 
     public void updateDeletionState(JObject<?> self) {
