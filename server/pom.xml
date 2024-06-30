@@ -180,6 +180,8 @@
                         <junit.jupiter.execution.parallel.mode.default>
                             concurrent
                         </junit.jupiter.execution.parallel.mode.default>
+                        <junit.platform.output.capture.stdout>true</junit.platform.output.capture.stdout>
+                        <junit.platform.output.capture.stderr>true</junit.platform.output.capture.stderr>
                         <maven.home>${maven.home}</maven.home>
                     </systemPropertyVariables>
                 </configuration>
