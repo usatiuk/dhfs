@@ -1,8 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
 import com.google.common.collect.Streams;
-import com.google.protobuf.ByteString;
-import com.usatiuk.dhfs.storage.SerializationHelper;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
@@ -101,7 +99,7 @@ public class JObjectManagerImpl implements JObjectManager {
             if (inMap != null) return Optional.of(inMap);
         }
 
-        ByteString readMd;
+        Object readMd;
         try {
             readMd = objectPersistentStore.readObject("meta_" + name);
         } catch (StatusRuntimeException ex) {
@@ -109,8 +107,7 @@ public class JObjectManagerImpl implements JObjectManager {
                 return Optional.empty();
             throw ex;
         }
-        var meta = SerializationHelper.deserialize(readMd);
-        if (!(meta instanceof ObjectMetadata))
+        if (!(readMd instanceof ObjectMetadata meta))
             throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Unexpected metadata type for " + name));
 
         if (((ObjectMetadata) meta).isDeleted()) {

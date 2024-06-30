@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.repository.persistence;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.UnsafeByteOperations;
+import com.usatiuk.dhfs.storage.SerializationHelper;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -10,11 +9,11 @@ import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import org.apache.commons.lang3.SerializationException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.annotation.Nonnull;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -65,14 +64,13 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     @Nonnull
     @Override
-    public ByteString readObject(String name) {
+    public Object readObject(String name) {
         var file = Path.of(root, name);
 
-        if (!file.toFile().exists())
-            throw new StatusRuntimeException(Status.NOT_FOUND);
-
-        try {
-            return UnsafeByteOperations.unsafeWrap(Files.readAllBytes(file));
+        try (FileInputStream in = new FileInputStream(file.toFile())) {
+            return SerializationHelper.deserialize(in);
+        } catch (FileNotFoundException f) {
+            throw new StatusRuntimeException(Status.NOT_FOUND.withDescription("Not found: " + name));
         } catch (IOException e) {
             Log.error("Error reading file " + file, e);
             throw new StatusRuntimeException(Status.INTERNAL);
@@ -80,20 +78,17 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     }
 
     @Override
-    public void writeObject(String name, ByteString data) {
+    public void writeObject(String name, Object data) {
         var file = Path.of(root, name);
 
-        if (!Paths.get(root).toFile().isDirectory()
-                && !Paths.get(root).toFile().mkdirs())
-            throw new StatusRuntimeException(Status.INTERNAL);
-
         try {
-            file.toFile().createNewFile();
-            try (var fc = new FileOutputStream(file.toFile())) {
-                if (fc.getChannel().write(data.asReadOnlyByteBuffer()) != data.size())
-                    throw new StatusRuntimeException(Status.INTERNAL.withDescription("Could not write all bytes to file"));
+            try (var fc = new FileOutputStream(file.toFile(), false);
+                 ObjectOutputStream out = new ObjectOutputStream(fc)) {
+                out.writeObject(data);
+            } catch (final IOException ex) {
+                throw new SerializationException(ex);
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             Log.error("Error writing file " + file, e);
             throw new StatusRuntimeException(Status.INTERNAL);
         }

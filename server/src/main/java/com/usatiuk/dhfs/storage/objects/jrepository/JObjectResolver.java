@@ -94,7 +94,7 @@ public class JObjectResolver {
     public <T extends JObjectData> Optional<T> resolveDataLocal(JObject<T> jObject) {
         jObject.assertRWLock();
         if (objectPersistentStore.existsObject(jObject.getName()))
-            return Optional.of(SerializationHelper.deserialize(objectPersistentStore.readObject(jObject.getName())));
+            return Optional.of((T) objectPersistentStore.readObject(jObject.getName())); //FIXME:
         return Optional.empty();
     }
 

@@ -1,7 +1,5 @@
 package com.usatiuk.dhfs.storage.objects.repository.persistence;
 
-import com.google.protobuf.ByteString;
-
 import javax.annotation.Nonnull;
 import java.util.List;
 
@@ -12,7 +10,7 @@ public interface ObjectPersistentStore {
     Boolean existsObject(String name);
 
     @Nonnull
-    ByteString readObject(String name);
-    void writeObject(String name, ByteString data);
+    Object readObject(String name);
+    void writeObject(String name, Object data);
     void deleteObject(String name);
 }

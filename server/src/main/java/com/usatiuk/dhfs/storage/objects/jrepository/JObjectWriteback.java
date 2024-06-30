@@ -181,9 +181,9 @@ public class JObjectWriteback {
             return;
         }
         m.markWritten();
-        objectPersistentStore.writeObject("meta_" + m.getName(), SerializationHelper.serialize(m));
+        objectPersistentStore.writeObject("meta_" + m.getName(), m);
         if (data != null)
-            objectPersistentStore.writeObject(m.getName(), SerializationHelper.serialize(data));
+            objectPersistentStore.writeObject(m.getName(), data);
     }
 
     public void remove(JObject<?> object) {
