@@ -31,6 +31,18 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @ConfigProperty(name = "dhfs.storage.files.target_chunk_size")
     Integer targetChunkSize;
 
+    @ConfigProperty(name = "dhfs.storage.files.write_merge_threshold")
+    float writeMergeThreshold;
+
+    @ConfigProperty(name = "dhfs.storage.files.write_merge_max_chunk_to_take")
+    float writeMergeMaxChunkToTake;
+
+    @ConfigProperty(name = "dhfs.storage.files.write_merge_limit")
+    float writeMergeLimit;
+
+    @ConfigProperty(name = "dhfs.storage.files.write_last_chunk_limit")
+    float writeLastChunkLimit;
+
     @ConfigProperty(name = "dhfs.files.use_hash_for_chunks")
     boolean useHashForChunks;
 
@@ -480,15 +492,21 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             long start = 0;
 
-            if (!chunksAll.isEmpty()) {
+            NavigableMap<Long, String> beforeFirst = first != null ? chunksAll.headMap(first.getKey(), false) : Collections.emptyNavigableMap();
+            NavigableMap<Long, String> afterLast = last != null ? chunksAll.tailMap(last.getKey(), false) : Collections.emptyNavigableMap();
+
+            if (first != null && (getChunkSize(first.getValue()) + first.getKey() <= offset)) {
+                beforeFirst = chunksAll;
+                afterLast = Collections.emptyNavigableMap();
+                first = null;
+                last = null;
+                start = offset;
+            } else if (!chunksAll.isEmpty()) {
                 var between = chunksAll.subMap(first.getKey(), true, last.getKey(), true);
                 removedChunks.addAll(between.values());
                 start = first.getKey();
                 between.clear();
             }
-
-            NavigableMap<Long, String> beforeFirst = first != null ? chunksAll.headMap(first.getKey(), false) : Collections.emptyNavigableMap();
-            NavigableMap<Long, String> afterLast = last != null ? chunksAll.tailMap(last.getKey(), false) : Collections.emptyNavigableMap();
 
             ByteString pendingWrites = ByteString.empty();
 
@@ -510,46 +528,54 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             int combinedSize = pendingWrites.size();
 
             if (targetChunkSize > 0) {
-                if (Math.abs(combinedSize - targetChunkSize) > targetChunkSize * 0.1) {
-                    if (combinedSize < targetChunkSize) {
-                        boolean leftDone = false;
-                        boolean rightDone = false;
-                        while (!leftDone && !rightDone) {
-                            if (beforeFirst.isEmpty()) leftDone = true;
-                            if (!beforeFirst.isEmpty() && !leftDone) {
-                                var takeLeft = beforeFirst.lastEntry();
+                if (combinedSize < (targetChunkSize * writeMergeThreshold)) {
+                    boolean leftDone = false;
+                    boolean rightDone = false;
+                    while (!leftDone && !rightDone) {
+                        if (beforeFirst.isEmpty()) leftDone = true;
+                        if (!beforeFirst.isEmpty() && !leftDone) {
+                            var takeLeft = beforeFirst.lastEntry();
 
-                                var cuuid = takeLeft.getValue();
+                            var cuuid = takeLeft.getValue();
 
-                                if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * 1.2)) {
-                                    leftDone = true;
-                                    continue;
-                                }
-
-                                beforeFirst.pollLastEntry();
-                                start = takeLeft.getKey();
-                                pendingWrites = readChunk(cuuid).concat(pendingWrites);
-                                combinedSize += getChunkSize(cuuid);
-                                chunksAll.remove(takeLeft.getKey());
-                                removedChunks.add(cuuid);
+                            if (getChunkSize(cuuid) >= (targetChunkSize * writeMergeMaxChunkToTake)) {
+                                leftDone = true;
+                                continue;
                             }
-                            if (afterLast.isEmpty()) rightDone = true;
-                            if (!afterLast.isEmpty() && !rightDone) {
-                                var takeRight = afterLast.firstEntry();
 
-                                var cuuid = takeRight.getValue();
-
-                                if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * 1.2)) {
-                                    rightDone = true;
-                                    continue;
-                                }
-
-                                afterLast.pollFirstEntry();
-                                pendingWrites = pendingWrites.concat(readChunk(cuuid));
-                                combinedSize += getChunkSize(cuuid);
-                                chunksAll.remove(takeRight.getKey());
-                                removedChunks.add(cuuid);
+                            if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * writeMergeLimit)) {
+                                leftDone = true;
+                                continue;
                             }
+
+                            beforeFirst.pollLastEntry();
+                            start = takeLeft.getKey();
+                            pendingWrites = readChunk(cuuid).concat(pendingWrites);
+                            combinedSize += getChunkSize(cuuid);
+                            chunksAll.remove(takeLeft.getKey());
+                            removedChunks.add(cuuid);
+                        }
+                        if (afterLast.isEmpty()) rightDone = true;
+                        if (!afterLast.isEmpty() && !rightDone) {
+                            var takeRight = afterLast.firstEntry();
+
+                            var cuuid = takeRight.getValue();
+
+                            if (getChunkSize(cuuid) >= (targetChunkSize * writeMergeMaxChunkToTake)) {
+                                rightDone = true;
+                                continue;
+                            }
+
+                            if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * writeMergeLimit)) {
+                                rightDone = true;
+                                continue;
+                            }
+
+                            afterLast.pollFirstEntry();
+                            pendingWrites = pendingWrites.concat(readChunk(cuuid));
+                            combinedSize += getChunkSize(cuuid);
+                            chunksAll.remove(takeRight.getKey());
+                            removedChunks.add(cuuid);
                         }
                     }
                 }
@@ -563,8 +589,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                     if (targetChunkSize <= 0)
                         end = combinedSize;
                     else {
-                        if ((combinedSize - cur) > (targetChunkSize * 1.5)) {
-                            end = cur + targetChunkSize;
+                        if ((combinedSize - cur) > (targetChunkSize * writeLastChunkLimit)) {
+                            end = Math.min(cur + targetChunkSize, combinedSize);
                         } else {
                             end = combinedSize;
                         }

@@ -40,6 +40,9 @@ public class JObjectWriteback {
     @ConfigProperty(name = "dhfs.objects.writeback.limit")
     long sizeLimit;
 
+    @ConfigProperty(name = "dhfs.objects.writeback.nursery_limit")
+    int nurseryLimit;
+
     @ConfigProperty(name = "dhfs.objects.writeback.threads")
     int writebackThreads;
 
@@ -223,9 +226,14 @@ public class JObjectWriteback {
                 if (oldSize == size)
                     return;
                 long oldTime = _nursery.get(object).getLeft();
-                _nursery.replace(object, Pair.of(oldTime, size));
-                _currentSize.addAndGet(size - oldSize);
-                return;
+                if (nurseryLimit > 0 && size >= nurseryLimit) {
+                    _nursery.remove(object);
+                    _currentSize.addAndGet(-oldSize);
+                } else {
+                    _nursery.replace(object, Pair.of(oldTime, size));
+                    _currentSize.addAndGet(size - oldSize);
+                    return;
+                }
             }
         }
 
@@ -241,6 +249,14 @@ public class JObjectWriteback {
         }
 
         var curTime = System.currentTimeMillis();
+
+        if (nurseryLimit > 0 && size >= nurseryLimit) {
+            synchronized (_writeQueue) {
+                _writeQueue.put(Pair.of(size, object.getName()), object);
+                _writeQueue.notifyAll();
+                return;
+            }
+        }
 
         synchronized (_nursery) {
             if (_currentSize.get() < sizeLimit) {
