@@ -31,7 +31,7 @@ public class ObjectMetadata implements Serializable {
 
     @Getter
     @Setter
-    private Set<String> _savedRefs = null;
+    private Set<String> _savedRefs = Collections.emptySet();
 
     @Getter
     private long _refcount = 0L;
