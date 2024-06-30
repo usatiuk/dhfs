@@ -1,0 +1,9 @@
+@mixin border-shadow {
+  border-radius: 7px;
+  border: 1px solid #E0E0E0;
+  box-shadow: 1px 1px 0px 0px rgba(0, 0, 0, 0.05), 2px 2px 0px 0px rgba(0, 0, 0, 0.025);
+}
+
+@mixin home-view {
+  padding: 1rem;
+}

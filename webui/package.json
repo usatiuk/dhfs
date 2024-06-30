@@ -1,0 +1,36 @@
+{
+  "name": "dhfs-webui",
+  "version": "0.0.1",
+  "private": true,
+  "source": "src/index.html",
+  "scripts": {
+    "start": "parcel --public-url /webui",
+    "build": "parcel build --public-url /webui"
+  },
+  "browserslist": "> 0.5%, last 2 versions, not dead",
+  "dependencies": {
+    "jwt-decode": "^4.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.24.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@parcel/transformer-sass": "^2.12.0",
+    "@parcel/transformer-typescript-tsc": "^2.12.0",
+    "@parcel/validator-typescript": "^2.12.0",
+    "@types/eslint": "^8.56.10",
+    "@types/eslint-config-prettier": "^6.11.3",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^7.14.1",
+    "@typescript-eslint/parser": "^7.14.1",
+    "eslint": "^8",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.34.3",
+    "parcel": "^2.12.0",
+    "prettier": "^3.3.2",
+    "process": "^0.11.10",
+    "typescript": "^5.5.2"
+  }
+}
