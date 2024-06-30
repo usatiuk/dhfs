@@ -69,6 +69,7 @@ public class RemoteObjectServiceClient {
                     } catch (SyncHandler.OutdatedUpdateException ignored) {
                         Log.info("Outdated update of " + md.getName() + " from " + reply.getSelfUuid());
                         invalidationQueueService.pushInvalidationToOne(UUID.fromString(reply.getSelfUuid()), md.getName(), true); // True?
+                        throw new StatusRuntimeException(Status.ABORTED.withDescription("Received outdated object version"));
                     } catch (Exception e) {
                         Log.error("Received unexpected object version from " + reply.getSelfUuid()
                                 + " for " + reply.getObject().getHeader().getName() + " and conflict resolution failed", e);
