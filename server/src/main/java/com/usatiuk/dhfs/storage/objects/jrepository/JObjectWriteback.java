@@ -143,13 +143,16 @@ public class JObjectWriteback {
                     flushOne(obj);
                 } catch (Exception e) {
                     Log.error("Failed writing object " + obj.getName() + ", will retry.", e);
-                    obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
-                        var size = jObjectSizeEstimator.estimateObjectSize(d);
-                        synchronized (_writeQueue) {
-                            _writeQueue.put(Pair.of(size, m.getName()), obj);
-                        }
-                        return null;
-                    });
+                    try {
+                        obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
+                            var size = jObjectSizeEstimator.estimateObjectSize(d);
+                            synchronized (_writeQueue) {
+                                _writeQueue.put(Pair.of(size, m.getName()), obj);
+                            }
+                            return null;
+                        });
+                    } catch (JObject.DeletedObjectAccessException ignored) {
+                    }
                 }
             }
         } catch (InterruptedException ignored) {

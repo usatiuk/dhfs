@@ -451,7 +451,6 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                     m.removeRef(f.getName());
                     return null;
                 });
-                jObjectManager.tryQuickDelete(ci.get());
             }
         }
     }

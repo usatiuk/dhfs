@@ -45,9 +45,9 @@ public class JObjectRefProcessor {
     private final LinkedHashMap<String, Long> _candidates = new LinkedHashMap<>();
 
     public void putDeletionCandidate(String name) {
-        synchronized (this) {
+        synchronized (_candidates) {
             if (_candidates.putIfAbsent(name, System.currentTimeMillis()) == null)
-                this.notify();
+                _candidates.notify();
         }
     }
 
@@ -57,9 +57,9 @@ public class JObjectRefProcessor {
                 String next;
                 Long nextTime;
 
-                synchronized (this) {
+                synchronized (_candidates) {
                     while (_candidates.isEmpty())
-                        this.wait();
+                        _candidates.wait();
 
                     var e = _candidates.firstEntry();
                     next = e.getKey();

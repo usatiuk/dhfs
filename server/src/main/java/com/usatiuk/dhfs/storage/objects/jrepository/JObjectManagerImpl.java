@@ -223,11 +223,11 @@ public class JObjectManagerImpl implements JObjectManager {
 
             object.discardData();
 
-            refs.forEach(c -> get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
-                mc.removeRef(object.getName());
-                tryQuickDelete(ref);
-                return null;
-            })));
+            refs.forEach(c -> get(c)
+                    .ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
+                        mc.removeRef(object.getName());
+                        return null;
+                    })));
 
             return true;
         });

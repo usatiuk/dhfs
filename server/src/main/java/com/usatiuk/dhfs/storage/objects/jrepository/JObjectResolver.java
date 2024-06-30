@@ -88,7 +88,10 @@ public class JObjectResolver {
 
         if (self.getMeta().getRefcount() <= 0)
             if (!self.isDeleted())
-                jObjectRefProcessor.putDeletionCandidate(self.getName());
+                if (self.getMeta().isSeen())
+                    jObjectRefProcessor.putDeletionCandidate(self.getName());
+                else
+                    jobjectManager.tryQuickDelete(self);
     }
 
     public <T extends JObjectData> Optional<T> resolveDataLocal(JObject<T> jObject) {
