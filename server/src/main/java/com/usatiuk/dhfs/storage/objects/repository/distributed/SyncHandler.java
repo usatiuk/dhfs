@@ -81,11 +81,18 @@ public class SyncHandler {
 
             md.getRemoteCopies().put(from, receivedTotalVer);
 
+            boolean hasLower = false;
+            boolean hasHigher = false;
             for (var e : md.getChangelog().entrySet()) {
-                if (receivedMap.getOrDefault(e.getKey(), 0L) < e.getValue()) {
-                    Log.info("Conflict on update (lower version): " + header.getName() + " from " + from);
-                    return true;
-                }
+                if (receivedMap.getOrDefault(e.getKey(), 0L) < e.getValue())
+                    hasLower = true;
+                if (receivedMap.getOrDefault(e.getKey(), 0L) > e.getValue())
+                    hasHigher = true;
+            }
+
+            if (hasLower && hasHigher) {
+                Log.info("Conflict on update (inconsistent version): " + header.getName() + " from " + from);
+                return true;
             }
 
             if (md.getOurVersion() > receivedTotalVer) {
