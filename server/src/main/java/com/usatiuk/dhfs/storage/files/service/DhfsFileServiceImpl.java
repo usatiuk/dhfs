@@ -757,7 +757,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Override
     public Long size(String uuid) {
-        int size = 0;
+        long size = 0;
 
         NavigableMap<Long, String> chunksAll;
 
@@ -779,7 +779,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             size += getChunkSize(chunk.getValue());
         }
 
-        return (long) size;
+        return size;
     }
 
     private JObject<Directory> getRoot() {
