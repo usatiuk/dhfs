@@ -8,10 +8,7 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.Serializable;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -168,7 +165,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             if (resolutionStrategy == ResolutionStrategy.LOCAL_ONLY) tryLocalResolve();
             else if (resolutionStrategy == ResolutionStrategy.REMOTE) resolveDataPart();
 
-            var ver = _metaPart.getOurVersion();
+            var ver = new LinkedHashMap<>(_metaPart.getChangelog()); // FIXME:
             var ref = _metaPart.getRefcount();
             boolean wasSeen = _metaPart.isSeen();
             boolean wasDeleted = _metaPart.isDeleted();
@@ -180,13 +177,13 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             };
             var ret = fn.apply(_metaPart, _dataPart.get(), this::bumpVer, invalidateFn);
             _resolver.updateDeletionState(this);
-            if (!Objects.equals(ver, _metaPart.getOurVersion())
+            if (!Objects.equals(ver, _metaPart.getChangelog())
                     || ref != _metaPart.getRefcount()
                     || wasDeleted != _metaPart.isDeleted()
                     || wasSeen != _metaPart.isSeen()
                     || prevData != _dataPart.get())
                 notifyWriteMeta();
-            if (!Objects.equals(ver, _metaPart.getOurVersion()))
+            if (!Objects.equals(ver, _metaPart.getChangelog()))
                 notifyWriteData();
             verifyRefs();
             return ret;
