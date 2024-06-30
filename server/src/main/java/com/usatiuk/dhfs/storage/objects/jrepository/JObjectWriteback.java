@@ -252,6 +252,7 @@ public class JObjectWriteback {
 
         if (nurseryLimit > 0 && size >= nurseryLimit) {
             synchronized (_writeQueue) {
+                _currentSize.addAndGet(size);
                 _writeQueue.put(Pair.of(size, object.getName()), object);
                 _writeQueue.notifyAll();
                 return;
