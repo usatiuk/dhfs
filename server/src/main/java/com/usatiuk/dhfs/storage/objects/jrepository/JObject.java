@@ -149,7 +149,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         _lock.readLock().lock();
         try {
             if (_metaPart.isDeleted()) {
-                Log.error("Reading deleted object " + getName());
+                Log.trace("Reading deleted object " + getName());
                 throw new DeletedObjectAccessException();
             }
             return fn.apply(_metaPart, _dataPart.get());
