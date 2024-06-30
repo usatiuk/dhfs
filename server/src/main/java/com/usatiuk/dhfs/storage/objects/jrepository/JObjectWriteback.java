@@ -106,6 +106,8 @@ public class JObjectWriteback {
                     while (_nursery.isEmpty())
                         _nursery.wait();
 
+                    curTime = System.currentTimeMillis();
+
                     if ((curTime - _nursery.firstEntry().getValue().getLeft()) <= promotionDelay) {
                         wait = promotionDelay - (curTime - _nursery.firstEntry().getValue().getLeft());
                     }
