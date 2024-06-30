@@ -68,11 +68,10 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     public ByteString readObject(String name) {
         var file = Path.of(root, name);
 
-        if (!file.toFile().exists())
-            throw new StatusRuntimeException(Status.NOT_FOUND);
-
         try {
             return UnsafeByteOperations.unsafeWrap(Files.readAllBytes(file));
+        } catch (NoSuchFileException fx) {
+            throw new StatusRuntimeException(Status.NOT_FOUND);
         } catch (IOException e) {
             Log.error("Error reading file " + file, e);
             throw new StatusRuntimeException(Status.INTERNAL);
@@ -83,14 +82,10 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     public void writeObject(String name, ByteString data) {
         var file = Path.of(root, name);
 
-        if (!Paths.get(root).toFile().isDirectory()
-                && !Paths.get(root).toFile().mkdirs())
-            throw new StatusRuntimeException(Status.INTERNAL);
-
         try {
-            file.toFile().createNewFile();
-            try (var fc = new FileOutputStream(file.toFile())) {
-                if (fc.getChannel().write(data.asReadOnlyByteBuffer()) != data.size())
+            try (var fc = new FileOutputStream(file.toFile(), false);
+                 var ch = fc.getChannel().truncate(0)) {
+                if (ch.write(data.asReadOnlyByteBuffer()) != data.size())
                     throw new StatusRuntimeException(Status.INTERNAL.withDescription("Could not write all bytes to file"));
             }
         } catch (IOException e) {
