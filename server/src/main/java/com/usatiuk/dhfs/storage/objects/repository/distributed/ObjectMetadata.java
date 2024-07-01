@@ -27,7 +27,8 @@ public class ObjectMetadata implements Serializable {
     private final Map<UUID, Long> _remoteCopies = new LinkedHashMap<>();
 
     @Getter
-    private final Map<UUID, Long> _changelog = new LinkedHashMap<>();
+    @Setter
+    private Map<UUID, Long> _changelog = new LinkedHashMap<>();
 
     @Getter
     @Setter

@@ -5,7 +5,6 @@ import com.usatiuk.dhfs.storage.files.objects.Directory;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.RemoteObjectServiceClient;
 import io.grpc.Status;
@@ -44,15 +43,12 @@ public class DirectoryConflictResolver implements ConflictResolver {
             if (!(oursDirU instanceof Directory oursDir))
                 throw new NotImplementedException("Type conflict for " + ours.getName() + ", directory was expected");
 
-            LinkedHashMap<String, UUID> mergedChildren = new LinkedHashMap<>();
-            ObjectMetadata newMetadata;
-
-            var oursHeader = m.toRpcHeader();
             var theirsHeader = theirsData.getLeft();
 
             Directory first;
             Directory second;
             UUID otherHostname;
+
             if (oursDir.getMtime() >= theirsDir.getMtime()) {
                 first = oursDir;
                 second = theirsDir;
@@ -63,7 +59,9 @@ public class DirectoryConflictResolver implements ConflictResolver {
                 otherHostname = persistentRemoteHostsService.getSelfUuid();
             }
 
-            mergedChildren.putAll(first.getChildren());
+            LinkedHashMap<String, UUID> mergedChildren = new LinkedHashMap<>(first.getChildren());
+            Map<UUID, Long> newChangelog = new LinkedHashMap<>(m.getChangelog());
+
             for (var entry : second.getChildren().entrySet()) {
                 if (mergedChildren.containsKey(entry.getKey()) &&
                         !Objects.equals(mergedChildren.get(entry.getKey()), entry.getValue())) {
@@ -82,40 +80,33 @@ public class DirectoryConflictResolver implements ConflictResolver {
                 }
             }
 
-            newMetadata = new ObjectMetadata(ours.getName(), true);
-
-            for (var entry : oursHeader.getChangelog().getEntriesList()) {
-                newMetadata.getChangelog().put(UUID.fromString(entry.getHost()), entry.getVersion());
-            }
             for (var entry : theirsHeader.getChangelog().getEntriesList()) {
-                newMetadata.getChangelog().merge(UUID.fromString(entry.getHost()), entry.getVersion(), Long::max);
+                newChangelog.merge(UUID.fromString(entry.getHost()), entry.getVersion(), Long::max);
             }
 
-            boolean wasChanged = mergedChildren.size() != first.getChildren().size()
+            boolean wasChanged = oursDir.getChildren().size() != mergedChildren.size()
                     || oursDir.getMtime() != first.getMtime()
                     || oursDir.getCtime() != first.getCtime();
 
-            if (wasChanged) {
-                newMetadata.getChangelog().merge(persistentRemoteHostsService.getSelfUuid(), 1L, Long::sum);
+            if (m.getBestVersion() > newChangelog.values().stream().reduce(0L, Long::sum))
+                throw new StatusRuntimeException(Status.ABORTED.withDescription("Race when conflict resolving"));
 
-                if (m.getBestVersion() >= newMetadata.getOurVersion())
-                    throw new StatusRuntimeException(Status.ABORTED.withDescription("Race when conflict resolving"));
+            if (wasChanged) {
+                newChangelog.merge(persistentRemoteHostsService.getSelfUuid(), 1L, Long::sum);
 
                 for (var child : mergedChildren.values()) {
                     if (!(new HashSet<>(oursDir.getChildren().values()).contains(child))) {
                         jObjectManager.getOrPut(child.toString(), Optional.of(oursDir.getName()));
                     }
                 }
+
                 oursDir.setMtime(first.getMtime());
                 oursDir.setCtime(first.getCtime());
 
-                oursDir.getChildren().clear();
-                oursDir.getChildren().putAll(mergedChildren);
-            } else if (m.getBestVersion() > newMetadata.getOurVersion())
-                throw new NotImplementedException("Race when conflict resolving");
+                oursDir.setChildren(mergedChildren);
+            }
 
-            m.getChangelog().clear();
-            m.getChangelog().putAll(newMetadata.getChangelog());
+            m.setChangelog(newChangelog);
             return null;
         });
 

@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.storage.files.objects;
 import com.usatiuk.dhfs.storage.files.conflicts.DirectoryConflictResolver;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.util.*;
 
@@ -16,7 +17,8 @@ public class Directory extends FsNode {
     }
 
     @Getter
-    private final Map<String, UUID> _children = new TreeMap<>();
+    @Setter
+    private Map<String, UUID> _children = new TreeMap<>();
 
     @Override
     public Class<? extends ConflictResolver> getConflictResolver() {

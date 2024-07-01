@@ -8,7 +8,6 @@ import com.usatiuk.dhfs.storage.files.objects.File;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.RemoteObjectServiceClient;
 import io.grpc.Status;
@@ -18,10 +17,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.tuple.Pair;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @ApplicationScoped
 public class FileConflictResolver implements ConflictResolver {
@@ -33,6 +31,9 @@ public class FileConflictResolver implements ConflictResolver {
 
     @Inject
     JObjectManager jObjectManager;
+
+    @ConfigProperty(name = "dhfs.files.use_hash_for_chunks")
+    boolean useHashForChunks;
 
     @Override
     public ConflictResolutionResult resolve(UUID conflictHost, JObject<?> ours) {
@@ -67,14 +68,13 @@ public class FileConflictResolver implements ConflictResolver {
                     throw new StatusRuntimeException(Status.ABORTED.withDescription("Bad type for file"));
 
                 // TODO: dedup
-                ObjectMetadata newMetadata;
 
-                var oursHeader = m.toRpcHeader();
                 var theirsHeader = theirsData.getLeft();
 
                 File first;
                 File second;
                 UUID otherHostname;
+
                 if (oursFile.getMtime() >= theirsFile.getMtime()) {
                     first = oursFile;
                     second = theirsFile;
@@ -85,13 +85,10 @@ public class FileConflictResolver implements ConflictResolver {
                     otherHostname = persistentRemoteHostsService.getSelfUuid();
                 }
 
-                newMetadata = new ObjectMetadata(ours.getName(), true);
+                Map<UUID, Long> newChangelog = new LinkedHashMap<>(m.getChangelog());
 
-                for (var entry : oursHeader.getChangelog().getEntriesList()) {
-                    newMetadata.getChangelog().put(UUID.fromString(entry.getHost()), entry.getVersion());
-                }
                 for (var entry : theirsHeader.getChangelog().getEntriesList()) {
-                    newMetadata.getChangelog().merge(UUID.fromString(entry.getHost()), entry.getVersion(), Long::max);
+                    newChangelog.merge(UUID.fromString(entry.getHost()), entry.getVersion(), Long::max);
                 }
 
                 boolean chunksDiff = !Objects.equals(first.getChunks(), second.getChunks());
@@ -103,35 +100,42 @@ public class FileConflictResolver implements ConflictResolver {
                         || oursFile.getCtime() != first.getCtime()
                         || chunksDiff;
 
+                if (m.getBestVersion() > newChangelog.values().stream().reduce(0L, Long::sum))
+                    throw new StatusRuntimeException(Status.ABORTED.withDescription("Race when conflict resolving"));
+
                 if (wasChanged) {
-                    newMetadata.getChangelog().merge(persistentRemoteHostsService.getSelfUuid(), 1L, Long::sum);
+                    newChangelog.merge(persistentRemoteHostsService.getSelfUuid(), 1L, Long::sum);
 
-                    if (m.getBestVersion() >= newMetadata.getOurVersion())
-                        throw new NotImplementedException("Race when conflict resolving");
-
-                    var oldChunks = oursFile.getChunks().values().stream().toList();
-                    oursFile.getChunks().clear();
+                    if (useHashForChunks)
+                        throw new NotImplementedException();
 
                     // FIXME:
-                    for (var cuuid : oldChunks) {
-                        var ci = jObjectManager.get(ChunkInfo.getNameFromHash(cuuid));
-                        ci.ifPresent(jObject -> jObject.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, d, b, v) -> {
-                            m.removeRef(oursFile.getName());
-                            return null;
-                        }));
+                    for (var cuuid : oursFile.getChunks().values()) {
+                        jObjectManager
+                                .get(ChunkInfo.getNameFromHash(cuuid))
+                                .ifPresent(jObject -> jObject.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, d, b, v) -> {
+                                    m.removeRef(oursFile.getName());
+                                    return null;
+                                }));
                     }
+
+                    oursFile.getChunks().clear();
+
                     for (var e : firstChunksCopy) {
                         oursFile.getChunks().put(e.getLeft(), e.getValue());
                         jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
                         jObjectManager.getOrPut(ChunkInfo.getNameFromHash(e.getValue()), Optional.of(oursFile.getName()));
                         jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
                     }
+
                     oursFile.setMtime(first.getMtime());
                     oursFile.setCtime(first.getCtime());
 
                     var newFile = new File(UUID.randomUUID(), second.getMode(), oursDir.getUuid());
+
                     newFile.setMtime(second.getMtime());
                     newFile.setCtime(second.getCtime());
+
                     for (var e : secondChunksCopy) {
                         newFile.getChunks().put(e.getLeft(), e.getValue());
                         jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
@@ -139,9 +143,9 @@ public class FileConflictResolver implements ConflictResolver {
                         jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
                     }
 
-                    var theName = oursDir.getChildren().entrySet().stream().filter(p -> p.getValue().equals(oursFile.getUuid())).findAny().orElseThrow(
-                            () -> new NotImplementedException("Could not find our file in directory " + oursDir.getName())
-                    );
+                    var theName = oursDir.getChildren().entrySet().stream()
+                            .filter(p -> p.getValue().equals(oursFile.getUuid())).findAny()
+                            .orElseThrow(() -> new NotImplementedException("Could not find our file in directory " + oursDir.getName()));
 
                     jObjectManager.put(newFile, Optional.of(_oursDir.getName()));
 
@@ -157,11 +161,9 @@ public class FileConflictResolver implements ConflictResolver {
                     } while (true);
 
                     bumpDir.apply();
-                } else if (m.getBestVersion() > newMetadata.getOurVersion())
-                    throw new NotImplementedException("Race when conflict resolving");
+                }
 
-                m.getChangelog().clear();
-                m.getChangelog().putAll(newMetadata.getChangelog());
+                m.setChangelog(newChangelog);
                 return null;
             });
             return null;
