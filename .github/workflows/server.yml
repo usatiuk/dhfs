@@ -31,12 +31,12 @@ jobs:
       - name: Build and test with Maven
         run: cd server && mvn --batch-mode --update-snapshots verify -Djunit.jupiter.execution.parallel.config.fixed.parallelism=1
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v3
         with:
           name: Package
           path: server/target/quarkus-app
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v3
         if: ${{ always() }}
         with:
           name: Test logs
