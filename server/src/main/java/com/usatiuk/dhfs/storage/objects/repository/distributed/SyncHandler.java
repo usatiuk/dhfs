@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
-import com.google.common.collect.Maps;
 import com.usatiuk.dhfs.objects.repository.distributed.*;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
@@ -97,25 +96,13 @@ public class SyncHandler {
                 return true;
             }
 
-            if (md.getOurVersion() > receivedTotalVer) {
+            if (hasLower) {
                 Log.info("Received older index update than known: "
                         + from + " " + header.getName());
                 throw new OutdatedUpdateException();
             }
 
-            if (Objects.equals(md.getOurVersion(), receivedTotalVer)) {
-                for (var e : header.getChangelog().getEntriesList()) {
-                    if (!Objects.equals(
-                            Maps.filterValues(md.getChangelog(), v -> v != 0),
-                            Maps.filterValues(receivedMap, v -> v != 0))) {
-                        Log.info("Conflict on update (other mismatch): " + header.getName() + " from " + from);
-                        return true;
-                    }
-                }
-            }
-
-            // md.getBestVersion() > md.getTotalVersion() should also work
-            if (receivedTotalVer > md.getOurVersion()) {
+            if (hasHigher) {
                 invalidate.apply();
                 md.getChangelog().clear();
                 md.getChangelog().putAll(receivedMap);
@@ -123,11 +110,9 @@ public class SyncHandler {
                 return false;
             }
 
-            if (hasLower) {
-                Log.warn("Unhandled update with lower version: " + header.getName() + " from " + from);
-                throw new OutdatedUpdateException();
-            }
-            Log.warn("No action on update: " + header.getName() + " from " + from);
+            assert Objects.equals(receivedTotalVer, md.getOurVersion());
+
+            Log.info("No action on update: " + header.getName() + " from " + from);
 
             return false;
         });

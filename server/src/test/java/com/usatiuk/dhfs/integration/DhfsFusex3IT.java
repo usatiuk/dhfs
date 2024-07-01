@@ -44,7 +44,7 @@ public class DhfsFusex3IT {
                                 .from("azul/zulu-openjdk-debian:21-jre-latest")
                                 .run("apt update && apt install -y libfuse2 curl")
                                 .copy("/app", "/app")
-                                .cmd("java", "-Xmx128M", "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
+                                .cmd("java", "-ea", "-Xmx128M", "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
                                         "-Ddhfs.objects.distributed.peerdiscovery.interval=500",
                                         "-Ddhfs.objects.distributed.invalidation.delay=200",
                                         "-Djava.util.concurrent.ForkJoinPool.common.parallelism=4",
