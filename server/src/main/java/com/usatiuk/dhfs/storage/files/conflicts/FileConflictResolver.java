@@ -125,7 +125,6 @@ public class FileConflictResolver implements ConflictResolver {
                         oursFile.getChunks().put(e.getLeft(), e.getValue());
                         jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
                         jObjectManager.getOrPut(ChunkInfo.getNameFromHash(e.getValue()), Optional.of(oursFile.getName()));
-                        jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
                     }
 
                     oursFile.setMtime(first.getMtime());
@@ -140,7 +139,6 @@ public class FileConflictResolver implements ConflictResolver {
                         newFile.getChunks().put(e.getLeft(), e.getValue());
                         jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
                         jObjectManager.getOrPut(ChunkInfo.getNameFromHash(e.getValue()), Optional.ofNullable(newFile.getName()));
-                        jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
                     }
 
                     var theName = oursDir.getChildren().entrySet().stream()

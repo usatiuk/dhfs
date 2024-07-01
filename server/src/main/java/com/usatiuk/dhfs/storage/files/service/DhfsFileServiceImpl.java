@@ -603,7 +603,6 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                     //FIXME:
                     jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
                     jObjectManager.put(newChunkInfo, Optional.of(meta.getName()));
-                    jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
                     chunksAll.put(start, newChunkInfo.getHash());
 
                     start += thisChunk.size();
@@ -694,7 +693,6 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                             //FIXME:
                             jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
                             jObjectManager.put(newChunkInfo, Optional.of(m.getName()));
-                            jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
                             chunksAll.put(start, newChunkInfo.getHash());
 
                             start += newChunkInfo.getSize();
@@ -719,7 +717,6 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                     //FIXME:
                     jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
                     jObjectManager.put(newChunkInfo, Optional.of(m.getName()));
-                    jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
                     chunksAll.put(tail.getKey(), newChunkInfo.getHash());
                 }
 
