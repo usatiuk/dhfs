@@ -22,7 +22,6 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
-// Note: this is not actually reactive
 @ApplicationScoped
 public class DhfsFileServiceImpl implements DhfsFileService {
     @Inject
