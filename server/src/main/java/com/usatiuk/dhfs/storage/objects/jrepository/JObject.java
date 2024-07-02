@@ -239,7 +239,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         if (!isDeleted())
             throw new IllegalStateException("Expected to be deleted when discarding data");
         _dataPart.set(null);
-        _metaPart.setSavedRefs(null);
+        _metaPart.setSavedRefs(Collections.emptySet());
     }
 
     static public void rwLockAll(List<JObject<?>> objects) {
