@@ -113,7 +113,9 @@ public class SyncHandler {
                     found.externalResolution(SerializationHelper.deserialize(header.getPushedData()));
                 return false;
             } else if (data == null && header.hasPushedData()) {
-                found.externalResolution(SerializationHelper.deserialize(header.getPushedData()));
+                found.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
+                if (found.getData() == null)
+                    found.externalResolution(SerializationHelper.deserialize(header.getPushedData()));
             }
 
             assert Objects.equals(receivedTotalVer, md.getOurVersion());

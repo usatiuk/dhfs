@@ -219,7 +219,8 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
                     || wasSeen != _metaPart.isSeen()
                     || prevData != _dataPart.get())
                 notifyWriteMeta();
-            if (!Objects.equals(ver, _metaPart.getChangelog()))
+            if (!Objects.equals(ver, _metaPart.getChangelog())
+                    || prevData != _dataPart.get())
                 notifyWriteData();
             verifyRefs();
             return ret;
