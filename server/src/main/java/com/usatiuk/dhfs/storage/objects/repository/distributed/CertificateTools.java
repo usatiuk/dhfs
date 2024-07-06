@@ -42,7 +42,6 @@ public class CertificateTools {
 
         Date startDate = new Date();
 
-        X500Name dnName = new X500Name("DN=" + subject);
         X500Name cnName = new X500Name("CN=" + subject);
         BigInteger certSerialNumber = new BigInteger(DigestUtils.sha256(subject));
 
@@ -54,7 +53,7 @@ public class CertificateTools {
 
         ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSA").build(keyPair.getPrivate());
 
-        JcaX509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(dnName, certSerialNumber, startDate, endDate, cnName, keyPair.getPublic());
+        JcaX509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(cnName, certSerialNumber, startDate, endDate, cnName, keyPair.getPublic());
 
         BasicConstraints basicConstraints = new BasicConstraints(false);
         certBuilder.addExtension(new ASN1ObjectIdentifier("2.5.29.19"), true, basicConstraints);
