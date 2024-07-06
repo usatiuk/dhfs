@@ -50,6 +50,9 @@ public class RemoteObjectServiceClient {
                 return persistentRemoteHostsService.getHosts().stream().map(HostInfo::getUuid).toList();
         });
 
+        if (targets.isEmpty())
+            throw new IllegalStateException("No targets for object " + jObject.getName());
+
         return rpcClientFactory.withObjSyncClient(targets, client -> {
             var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).setName(jObject.getName()).build());
 

@@ -158,9 +158,13 @@ public class RemoteHostManager {
             Log.trace("Ignoring new address from unknown host " + ": addr=" + addr + " port=" + port);
             return;
         }
+
         _transientPeersState.runWriteLocked(d -> {
             Log.trace("Updating connection info for " + host + ": addr=" + addr + " port=" + port);
-            d.getStates().put(host, state);
+            d.getStates().putIfAbsent(host, new TransientPeerState()); // FIXME:? set reachable here?
+            d.getStates().get(host).setAddr(addr);
+            d.getStates().get(host).setPort(port);
+            d.getStates().get(host).setSecurePort(securePort);
             return null;
         });
     }

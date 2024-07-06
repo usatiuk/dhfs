@@ -73,16 +73,20 @@ public class DhfsFuseIT {
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c1uuid));
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c2uuid));
 
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Ignoring new address"), 60, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Ignoring new address"), 60, TimeUnit.SECONDS);
+
         var c1curl = container1.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
-                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
+                        "  --data " + c2uuid +
                         "  http://localhost:8080/objects-manage/known-peers");
 
-        var c1res = container1.execInContainer("/bin/sh", "-c",
-                "curl http://localhost:8080/objects-manage/known-peers");
-        var c2res = container2.execInContainer("/bin/sh", "-c",
-                "curl http://localhost:8080/objects-manage/known-peers");
+        var c2curl = container2.execInContainer("/bin/sh", "-c",
+                "curl --header \"Content-Type: application/json\" " +
+                        "  --request PUT " +
+                        "  --data " + c1uuid +
+                        "  http://localhost:8080/objects-manage/known-peers");
 
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);

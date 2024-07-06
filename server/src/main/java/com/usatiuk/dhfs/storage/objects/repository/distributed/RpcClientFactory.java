@@ -17,10 +17,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import javax.net.ssl.KeyManagerFactory;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 // TODO: Dedup this
@@ -52,10 +49,14 @@ public class RpcClientFactory {
         for (UUID target : shuffledList) {
             var hostinfo = remoteHostManager.getTransientState(target);
 
-            boolean shouldTry = remoteHostManager.isReachable(target)
-                    && hostinfo.getAddr() != null;
+            boolean reachable = remoteHostManager.isReachable(target);
+            var addr = hostinfo.getAddr();
+            boolean shouldTry = reachable && addr != null;
 
-            if (!shouldTry) continue;
+            if (!shouldTry) {
+                Log.trace("Not trying " + target + ": " + "addr=" + Objects.toString(addr) + " reachable=" + reachable);
+                continue;
+            }
 
             try {
                 return withObjSyncClient(target.toString(), hostinfo.getAddr(), hostinfo.getSecurePort(), syncTimeout, fn);
@@ -78,8 +79,7 @@ public class RpcClientFactory {
 
     public <R> R withObjSyncClient(UUID target, ObjectSyncClientFunction<R> fn) {
         var hostinfo = remoteHostManager.getTransientState(target);
-        if (hostinfo.getAddr() == null)
-            throw new IllegalStateException("Address for " + target + " not yet known");
+        if (hostinfo.getAddr() == null) throw new IllegalStateException("Address for " + target + " not yet known");
         return withObjSyncClient(target.toString(), hostinfo.getAddr(), hostinfo.getSecurePort(), syncTimeout, fn);
     }
 
@@ -88,17 +88,12 @@ public class RpcClientFactory {
             KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
             ks.load(null, null);
 
-            ks.setKeyEntry("clientkey",
-                    persistentRemoteHostsService.getSelfKeypair().getPrivate(), null,
-                    new Certificate[]{persistentRemoteHostsService.getSelfCertificate()});
+            ks.setKeyEntry("clientkey", persistentRemoteHostsService.getSelfKeypair().getPrivate(), null, new Certificate[]{persistentRemoteHostsService.getSelfCertificate()});
 
             KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
             keyManagerFactory.init(ks, null);
 
-            ChannelCredentials creds = TlsChannelCredentials.newBuilder()
-                    .trustManager(peerTrustManager)
-                    .keyManager(keyManagerFactory.getKeyManagers())
-                    .build();
+            ChannelCredentials creds = TlsChannelCredentials.newBuilder().trustManager(peerTrustManager).keyManager(keyManagerFactory.getKeyManagers()).build();
             return creds;
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -107,12 +102,8 @@ public class RpcClientFactory {
 
     public <R> R withObjSyncClient(String host, String addr, int port, long timeout, ObjectSyncClientFunction<R> fn) {
         var creds = getChannelCredentials();
-        var channel = NettyChannelBuilder.forAddress(addr, port, creds)
-                .overrideAuthority(host).build();
-        var client = DhfsObjectSyncGrpcGrpc.newBlockingStub(channel)
-                .withMaxOutboundMessageSize(Integer.MAX_VALUE)
-                .withMaxInboundMessageSize(Integer.MAX_VALUE)
-                .withDeadlineAfter(timeout, TimeUnit.SECONDS);
+        var channel = NettyChannelBuilder.forAddress(addr, port, creds).overrideAuthority(host).build();
+        var client = DhfsObjectSyncGrpcGrpc.newBlockingStub(channel).withMaxOutboundMessageSize(Integer.MAX_VALUE).withMaxInboundMessageSize(Integer.MAX_VALUE).withDeadlineAfter(timeout, TimeUnit.SECONDS);
         try {
             return fn.apply(client);
         } finally {
@@ -127,18 +118,13 @@ public class RpcClientFactory {
 
     public <R> R withPeerSyncClient(UUID target, PeerSyncClientFunction<R> fn) {
         var hostinfo = remoteHostManager.getTransientState(target);
-        if (hostinfo.getAddr() == null)
-            throw new IllegalStateException("Address for " + target + " not yet known");
+        if (hostinfo.getAddr() == null) throw new IllegalStateException("Address for " + target + " not yet known");
         return withPeerSyncClient(hostinfo.getAddr(), hostinfo.getPort(), peerSyncTimeout, fn);
     }
 
     public <R> R withPeerSyncClient(String addr, int port, long timeout, PeerSyncClientFunction<R> fn) {
-        var channel = NettyChannelBuilder.forAddress(addr, port).negotiationType(NegotiationType.PLAINTEXT)
-                .usePlaintext().build();
-        var client = DhfsObjectPeerSyncGrpcGrpc.newBlockingStub(channel)
-                .withMaxOutboundMessageSize(Integer.MAX_VALUE)
-                .withMaxInboundMessageSize(Integer.MAX_VALUE)
-                .withDeadlineAfter(timeout, TimeUnit.SECONDS);
+        var channel = NettyChannelBuilder.forAddress(addr, port).negotiationType(NegotiationType.PLAINTEXT).usePlaintext().build();
+        var client = DhfsObjectPeerSyncGrpcGrpc.newBlockingStub(channel).withMaxOutboundMessageSize(Integer.MAX_VALUE).withMaxInboundMessageSize(Integer.MAX_VALUE).withDeadlineAfter(timeout, TimeUnit.SECONDS);
         try {
             return fn.apply(client);
         } finally {

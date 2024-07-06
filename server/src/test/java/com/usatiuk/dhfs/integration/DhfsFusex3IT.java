@@ -88,15 +88,32 @@ public class DhfsFusex3IT {
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c2uuid));
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c3uuid));
 
+        waitingConsumer3.waitUntil(frame -> frame.getUtf8String().contains("Ignoring new address"), 60, TimeUnit.SECONDS, 4);
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Ignoring new address"), 60, TimeUnit.SECONDS, 4);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Ignoring new address"), 60, TimeUnit.SECONDS, 4);
+
         var c1curl = container1.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
-                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
+                        "  --data " + c2uuid +
                         "  http://localhost:8080/objects-manage/known-peers");
+
+        var c2curl1 = container2.execInContainer("/bin/sh", "-c",
+                "curl --header \"Content-Type: application/json\" " +
+                        "  --request PUT " +
+                        "  --data " + c1uuid +
+                        "  http://localhost:8080/objects-manage/known-peers");
+
+        var c2curl3 = container2.execInContainer("/bin/sh", "-c",
+                "curl --header \"Content-Type: application/json\" " +
+                        "  --request PUT " +
+                        "  --data " + c3uuid +
+                        "  http://localhost:8080/objects-manage/known-peers");
+
         var c3curl = container3.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
-                        "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
+                        "  --data " + c2uuid +
                         "  http://localhost:8080/objects-manage/known-peers");
 
         waitingConsumer3.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
