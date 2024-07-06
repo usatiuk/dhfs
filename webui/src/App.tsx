@@ -8,6 +8,8 @@ import {
 import "./App.scss";
 import { Home } from "./Home";
 import { PeerState } from "./PeerState";
+import { peerStateLoader } from "./PeerStatePlumbing";
+import { ErrorGate } from "./ErrorGate";
 
 const router = createBrowserRouter(
     [
@@ -21,11 +23,19 @@ const router = createBrowserRouter(
                 //     return redirect("/home");
                 // }
             },
+            errorElement: <ErrorGate />,
         },
         {
             path: "/home",
             element: <Home />,
-            children: [{ path: "peers", element: <PeerState /> }],
+            children: [
+                {
+                    path: "peers",
+                    element: <PeerState />,
+                    loader: peerStateLoader,
+                },
+            ],
+            errorElement: <ErrorGate />,
         },
     ],
     { basename: "/webui" },

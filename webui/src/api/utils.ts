@@ -1,5 +1,5 @@
 import { jwtDecode } from "jwt-decode";
-import { isError } from "./dto";
+import { isError, TErrorTo } from "./dto";
 
 declare const process: {
     env: {
@@ -8,7 +8,9 @@ declare const process: {
 };
 
 const apiRoot: string =
-    process.env.NODE_ENV == "production" ? "" : "http://localhost:8080";
+    process.env.NODE_ENV == "production"
+        ? ""
+        : "http://localhost:1234/apiproxy";
 
 let token: string | null;
 
@@ -88,3 +90,21 @@ export async function fetchJSONAuth<T, P extends { parse: (arg: string) => T }>(
         throw new Error("Not logged in");
     }
 }
+
+function errorCheck<A extends unknown[], R>(
+    fn: (...args: A) => R,
+): (...args: A) => Promise<Exclude<Awaited<R>, TErrorTo>> {
+    return async (...args: A): Promise<Exclude<Awaited<R>, TErrorTo>> => {
+        const ret = await fn(...args);
+        if (isError(ret)) {
+            throw ret;
+        } else {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-expect-error
+            return ret;
+        }
+    };
+}
+
+export const fetchJSON_throws = errorCheck(fetchJSON);
+export const fetchJSONAuth_throws = errorCheck(fetchJSONAuth);

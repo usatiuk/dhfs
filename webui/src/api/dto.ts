@@ -33,3 +33,18 @@ export type TTokenTo = z.infer<typeof TokenTo>;
 
 export const TokenToResp = CreateAPIResponse(TokenTo);
 export type TTokenToResp = z.infer<typeof TokenToResp>;
+
+export const AvailablePeerInfoTo = z.object({
+    uuid: z.string(),
+    addr: z.string(),
+    port: z.number(),
+});
+export type TAvailablePeerInfoTo = z.infer<typeof AvailablePeerInfoTo>;
+
+export const AvailablePeerInfoArrTo = z.array(AvailablePeerInfoTo);
+export type TAvailablePeerInfoArrTo = z.infer<typeof AvailablePeerInfoArrTo>;
+
+export const AvailablePeerInfoToResp = CreateAPIResponse(
+    AvailablePeerInfoArrTo,
+);
+export type TAvailablePeerInfoToResp = z.infer<typeof AvailablePeerInfoToResp>;
