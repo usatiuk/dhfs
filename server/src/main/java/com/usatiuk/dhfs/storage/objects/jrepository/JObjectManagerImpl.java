@@ -201,39 +201,6 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     @Override
-    public void tryQuickDelete(JObject<?> object) {
-        object.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-            if (m.getRefcount() > 0) return false;
-            if (m.isSeen()) {
-                jobjectRefProcessor.putDeletionCandidate(object.getName());
-                return false;
-            }
-
-            object.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
-
-            Log.trace("Quick delete of " + m.getName());
-            m.delete();
-
-            Stream<String> refs = Stream.empty();
-
-            if (m.getSavedRefs() != null)
-                refs = m.getSavedRefs().stream();
-            if (object.getData() != null)
-                refs = Streams.concat(refs, object.getData().extractRefs().stream());
-
-            object.discardData();
-
-            refs.forEach(c -> get(c)
-                    .ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
-                        mc.removeRef(object.getName());
-                        return null;
-                    })));
-
-            return true;
-        });
-    }
-
-    @Override
     public void notifySent(String key) {
         //FIXME:
         get(key).ifPresent(o -> o.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {

@@ -15,8 +15,5 @@ public interface JObjectManager {
     // Get an object with a name if it exists, otherwise create new one based on metadata
     JObject<?> getOrPut(String name, Optional<String> parent);
 
-    void tryQuickDelete(JObject<?> object);
-
     void notifySent(String key);
-
 }
