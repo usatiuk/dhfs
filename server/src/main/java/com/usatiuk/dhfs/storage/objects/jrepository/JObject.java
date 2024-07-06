@@ -4,7 +4,6 @@ import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import io.quarkus.logging.Log;
 import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.NotImplementedException;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.Serializable;
 import java.util.*;
@@ -13,7 +12,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class JObject<T extends JObjectData> implements Serializable, Comparable<JObject<?>> {
     @Override
-    public int compareTo(@NotNull JObject<?> o) {
+    public int compareTo(JObject<?> o) {
         return getName().compareTo(o.getName());
     }
 
