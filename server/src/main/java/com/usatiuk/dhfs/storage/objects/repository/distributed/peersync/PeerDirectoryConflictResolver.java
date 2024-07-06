@@ -58,8 +58,8 @@ public class PeerDirectoryConflictResolver implements ConflictResolver {
                 newChangelog.merge(persistentRemoteHostsService.getSelfUuid(), 1L, Long::sum);
 
                 for (var child : mergedChildren) {
-                    if (!(new HashSet<>(oursPD.getPeers()).contains(child))) {
-                        jObjectManager.getOrPut(child.toString(), PersistentPeerInfo.class, Optional.of(oursPD.getName()));
+                    if (!oursPD.getPeers().contains(child)) {
+                        jObjectManager.getOrPut(PersistentPeerInfo.getNameFromUuid(child), PersistentPeerInfo.class, Optional.of(oursPD.getName()));
                     }
                 }
 

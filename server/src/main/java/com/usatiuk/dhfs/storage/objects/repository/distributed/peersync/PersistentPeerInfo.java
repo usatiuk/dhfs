@@ -1,14 +1,11 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed.peersync;
 
-import com.google.protobuf.ByteString;
-import com.usatiuk.dhfs.objects.repository.distributed.peersync.PeerInfo;
 import com.usatiuk.dhfs.storage.files.conflicts.NotImplementedConflictResolver;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
-import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
 import java.util.List;
@@ -20,18 +17,13 @@ public class PersistentPeerInfo extends JObjectData {
     private final UUID _uuid;
     private final X509Certificate _certificate;
 
-    public PeerInfo toPeerInfo() {
-        try {
-            return PeerInfo.newBuilder().setUuid(_uuid.toString())
-                    .setCert(ByteString.copyFrom(_certificate.getEncoded())).build();
-        } catch (CertificateEncodingException e) {
-            throw new RuntimeException(e);
-        }
+    public static String getNameFromUuid(UUID uuid) {
+        return "peer_" + uuid;
     }
 
     @Override
     public String getName() {
-        return _uuid.toString();
+        return getNameFromUuid(_uuid);
     }
 
     @Override

@@ -111,7 +111,7 @@ public class PersistentRemoteHostsService {
     }
 
     private JObject<PersistentPeerInfo> getPeer(UUID uuid) {
-        var got = jObjectManager.get(uuid.toString()).orElseThrow(() -> new IllegalStateException("Peer " + uuid + " not found"));
+        var got = jObjectManager.get(PersistentPeerInfo.getNameFromUuid(uuid)).orElseThrow(() -> new IllegalStateException("Peer " + uuid + " not found"));
         got.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
             if (d == null) throw new IllegalStateException("Could not resolve peer " + uuid);
             if (!(d instanceof PersistentPeerInfo))

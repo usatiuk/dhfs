@@ -37,7 +37,7 @@ public class PeerDirectory extends JObjectData {
 
     @Override
     public Collection<String> extractRefs() {
-        return _peers.stream().map(UUID::toString).toList();
+        return _peers.stream().map(PersistentPeerInfo::getNameFromUuid).toList();
     }
 
     @Override
