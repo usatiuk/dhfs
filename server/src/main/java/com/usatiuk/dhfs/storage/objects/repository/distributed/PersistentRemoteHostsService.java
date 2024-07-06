@@ -122,6 +122,19 @@ public class PersistentRemoteHostsService {
         return (JObject<PersistentPeerInfo>) got;
     }
 
+    private List<PersistentPeerInfo> getPeersSnapshot() {
+        return getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
+            return d.getPeers().stream().map(u -> {
+                try {
+                    return getPeer(u).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m2, d2) -> d2);
+                } catch (Exception e) {
+                    Log.warn("Error making snapshot of peer " + u, e);
+                    return null;
+                }
+            }).filter(Objects::nonNull).toList();
+        });
+    }
+
     public UUID getSelfUuid() {
         if (_selfUuid == null)
             throw new IllegalStateException();
@@ -139,6 +152,10 @@ public class PersistentRemoteHostsService {
     }
 
     public List<PersistentPeerInfo> getHosts() {
+        return getPeersSnapshot().stream().filter(i -> !i.getUuid().equals(_selfUuid)).toList();
+    }
+
+    public List<PersistentPeerInfo> getHostsNoNulls() {
         for (int i = 0; i < 5; i++) {
             try {
                 return getPeerDirectory()
@@ -175,7 +192,7 @@ public class PersistentRemoteHostsService {
 
     private void updateCerts() {
         getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
-            peerTrustManager.reloadTrustManagerHosts(getHosts());
+            peerTrustManager.reloadTrustManagerHosts(getHostsNoNulls());
             return null;
         });
     }

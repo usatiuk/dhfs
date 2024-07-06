@@ -4,11 +4,8 @@ import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelog;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelogEntry;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
 import com.usatiuk.dhfs.storage.SerializationHelper;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.peersync.PersistentPeerInfo;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import jakarta.enterprise.inject.spi.CDI;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -153,17 +150,11 @@ public class ObjectMetadata implements Serializable {
 
     public ObjectChangelog toRpcChangelog() {
         var changelogBuilder = ObjectChangelog.newBuilder();
-        var hosts = CDI.current().select(PersistentRemoteHostsService.class).get();
 
-        var all = new ArrayList<>(hosts.getHosts().stream().map(PersistentPeerInfo::getUuid).toList());
-        all.add(hosts.getSelfUuid());
-
-        for (var h : all) {
+        for (var h : _changelog.entrySet()) {
             var logEntry = ObjectChangelogEntry.newBuilder();
-            if (!_changelog.containsKey(h))
-                continue;
-            logEntry.setHost(h.toString());
-            logEntry.setVersion(_changelog.get(h));
+            logEntry.setHost(h.getKey().toString());
+            logEntry.setVersion(h.getValue());
             changelogBuilder.addEntries(logEntry.build());
         }
         return changelogBuilder.build();

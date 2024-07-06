@@ -22,7 +22,7 @@ public class ManagementApi {
     @Path("known-peers")
     @GET
     public List<KnownPeerInfo> knownPeers() {
-        return persistentRemoteHostsService.getHosts().stream().map(h -> new KnownPeerInfo(h.getUuid().toString())).toList();
+        return persistentRemoteHostsService.getHostsNoNulls().stream().map(h -> new KnownPeerInfo(h.getUuid().toString())).toList();
     }
 
     @Path("known-peers")
