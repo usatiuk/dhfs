@@ -131,11 +131,11 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             _lock.readLock().lock();
             try {
                 if (_dataPart.get() == null) {
-                    if (_metaPart.getSavedRefs() != null && !_metaPart.getSavedRefs().isEmpty())
-                        throw new IllegalStateException("Object " + getName() + " has non-hydrated refs when written locally");
-
                     var res = _resolver.resolveDataLocal(this);
                     if (res.isEmpty()) return;
+
+                    if (_metaPart.getSavedRefs() != null && !_metaPart.getSavedRefs().isEmpty())
+                        throw new IllegalStateException("Object " + getName() + " has non-hydrated refs when written locally");
 
                     _metaPart.narrowClass(res.get().getClass());
                     _dataPart.compareAndSet(null, res.get());
