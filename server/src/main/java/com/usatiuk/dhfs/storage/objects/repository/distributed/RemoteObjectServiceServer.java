@@ -11,6 +11,7 @@ import io.quarkus.grpc.GrpcService;
 import io.quarkus.logging.Log;
 import io.smallrye.common.annotation.Blocking;
 import io.smallrye.mutiny.Uni;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -18,6 +19,7 @@ import java.util.UUID;
 
 // Note: RunOnVirtualThread hangs somehow
 @GrpcService
+@RolesAllowed("cluster-member")
 public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Inject
     SyncHandler syncHandler;

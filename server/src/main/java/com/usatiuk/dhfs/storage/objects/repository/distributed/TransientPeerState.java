@@ -29,4 +29,8 @@ public class TransientPeerState {
     @Getter
     @Setter
     private int _port;
+
+    @Getter
+    @Setter
+    private int _securePort;
 }

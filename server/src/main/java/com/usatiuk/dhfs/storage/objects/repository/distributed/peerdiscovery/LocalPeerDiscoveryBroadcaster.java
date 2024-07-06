@@ -22,6 +22,9 @@ public class LocalPeerDiscoveryBroadcaster {
     @ConfigProperty(name = "quarkus.http.port")
     Integer ourPort;
 
+    @ConfigProperty(name = "quarkus.http.ssl-port")
+    Integer ourSecurePort;
+
     @ConfigProperty(name = "dhfs.objects.distributed.peerdiscovery.port")
     Integer broadcastPort;
 
@@ -62,6 +65,7 @@ public class LocalPeerDiscoveryBroadcaster {
                     var sendData = PeerDiscoveryInfo.newBuilder()
                             .setUuid(persistentRemoteHostsService.getSelfUuid().toString())
                             .setPort(ourPort)
+                            .setSecurePort(ourSecurePort)
                             .build();
 
                     var sendBytes = sendData.toByteArray();

@@ -1,15 +1,15 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed.peersync;
 
+import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.repository.distributed.peersync.PeerInfo;
 import com.usatiuk.dhfs.objects.repository.distributed.peersync.SyncPeersData;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.HostInfo;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.RemoteHostManager;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.RpcClientFactory;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.*;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.CertificateException;
 import java.util.UUID;
 
 @ApplicationScoped
@@ -30,12 +30,24 @@ public class PeerSyncClient {
             for (var h : persistentRemoteHostsService.getHosts()) {
                 builder.addMyPeers(h.toPeerInfo());
             }
-            builder.addMyPeers(PeerInfo.newBuilder().setUuid(persistentRemoteHostsService.getSelfUuid().toString()).build());
+            try {
+                builder.addMyPeers(PeerInfo.newBuilder().setUuid(persistentRemoteHostsService.getSelfUuid().toString())
+                        .setCert(ByteString.copyFrom(persistentRemoteHostsService.getSelfCertificate().getEncoded()))
+                        .build());
+            } catch (CertificateEncodingException e) {
+                throw new RuntimeException(e);
+            }
             return client.syncPeers(builder.build());
         });
 
         for (var np : ret.getMyPeersList()) {
-            persistentRemoteHostsService.addHost(new HostInfo(np.getUuid()));
+            try {
+                persistentRemoteHostsService.addHost(
+                        new HostInfo(UUID.fromString(np.getUuid()),
+                                CertificateTools.certFromBytes(np.getCert().toByteArray())));
+            } catch (CertificateException e) {
+                Log.error("Error adding peer " + np.getUuid(), e);
+            }
         }
     }
 

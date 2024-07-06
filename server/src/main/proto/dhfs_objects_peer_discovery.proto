@@ -9,4 +9,5 @@ package dhfs.objects.peerdiscovery;
 message PeerDiscoveryInfo {
   string uuid = 1;
   uint32 port = 2;
+  uint32 securePort = 3;
 }

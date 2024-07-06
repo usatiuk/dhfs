@@ -1,7 +1,9 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
 import com.usatiuk.dhfs.objects.repository.distributed.PingRequest;
+import com.usatiuk.dhfs.objects.repository.distributed.peersync.GetSelfInfoRequest;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.peersync.PeerSyncClient;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.webapi.AvailablePeerInfo;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -14,9 +16,13 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
+import java.security.cert.CertificateException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 @ApplicationScoped
 public class RemoteHostManager {
@@ -36,6 +42,8 @@ public class RemoteHostManager {
     long pingTimeout;
 
     private final TransientPeersState _transientPeersState = new TransientPeersState();
+
+    private final ConcurrentMap<UUID, TransientPeerState> _seenHostsButNotAdded = new ConcurrentHashMap<>();
 
     void init(@Observes @Priority(350) StartupEvent event) throws IOException {
     }
@@ -96,7 +104,7 @@ public class RemoteHostManager {
         TransientPeerState state = _transientPeersState.runReadLocked(s -> s.getStates().get(host));
         if (state == null) return false;
         try {
-            return rpcClientFactory.withObjSyncClient(state.getAddr(), state.getPort(), pingTimeout, c -> {
+            return rpcClientFactory.withObjSyncClient(host.toString(), state.getAddr(), state.getSecurePort(), pingTimeout, c -> {
                 var ret = c.ping(PingRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).build());
                 if (!UUID.fromString(ret.getSelfUuid()).equals(host)) {
                     throw new IllegalStateException("Ping selfUuid returned " + ret.getSelfUuid() + " but expected " + host);
@@ -135,21 +143,57 @@ public class RemoteHostManager {
                 .map(Map.Entry::getKey).toList());
     }
 
-    public void notifyAddr(UUID host, String addr, Integer port) {
+    public void notifyAddr(UUID host, String addr, Integer port, Integer securePort) {
         if (host.equals(persistentRemoteHostsService.getSelfUuid())) {
             return;
         }
+
+        var state = new TransientPeerState();
+        state.setAddr(addr);
+        state.setPort(port);
+        state.setSecurePort(securePort);
+
         if (!persistentRemoteHostsService.existsHost(host)) {
+            _seenHostsButNotAdded.put(host, state);
             Log.trace("Ignoring new address from unknown host " + ": addr=" + addr + " port=" + port);
             return;
         }
         _transientPeersState.runWriteLocked(d -> {
             Log.trace("Updating connection info for " + host + ": addr=" + addr + " port=" + port);
-            d.getStates().putIfAbsent(host, new TransientPeerState());
-            d.getStates().get(host).setAddr(addr);
-            d.getStates().get(host).setPort(port);
+            d.getStates().put(host, state);
             return null;
         });
+    }
+
+    public void addRemoteHost(UUID host) {
+        if (!_seenHostsButNotAdded.containsKey(host)) {
+            throw new IllegalStateException("Host " + host + " is not seen");
+        }
+        if (persistentRemoteHostsService.existsHost(host)) {
+            throw new IllegalStateException("Host " + host + " is already added");
+        }
+
+        var state = _seenHostsButNotAdded.get(host);
+
+        // FIXME: race?
+
+        var info = rpcClientFactory.withPeerSyncClient(state.getAddr(), state.getPort(), 10000L, c -> {
+            return c.getSelfInfo(GetSelfInfoRequest.getDefaultInstance());
+        });
+
+        try {
+            persistentRemoteHostsService.addHost(
+                    new HostInfo(UUID.fromString(info.getUuid()), CertificateTools.certFromBytes(info.getCert().toByteArray())));
+            Log.info("Added host: " + host.toString());
+        } catch (CertificateException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Collection<AvailablePeerInfo> getSeenButNotAddedHosts() {
+        return _seenHostsButNotAdded.entrySet().stream()
+                .map(e -> new AvailablePeerInfo(e.getKey().toString(), e.getValue().getAddr(), e.getValue().getPort()))
+                .toList();
     }
 
 }

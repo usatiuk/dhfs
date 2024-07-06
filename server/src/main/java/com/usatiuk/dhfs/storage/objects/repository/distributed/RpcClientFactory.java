@@ -2,8 +2,11 @@ package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
 import com.usatiuk.dhfs.objects.repository.distributed.DhfsObjectSyncGrpcGrpc;
 import com.usatiuk.dhfs.objects.repository.distributed.peersync.DhfsObjectPeerSyncGrpcGrpc;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.peertrust.PeerTrustManager;
+import io.grpc.ChannelCredentials;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.TlsChannelCredentials;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.quarkus.logging.Log;
@@ -11,6 +14,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import javax.net.ssl.KeyManagerFactory;
+import java.security.KeyStore;
+import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -22,6 +28,9 @@ import java.util.concurrent.TimeUnit;
 public class RpcClientFactory {
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
+
+    @Inject
+    PeerTrustManager peerTrustManager;
 
     @ConfigProperty(name = "dhfs.objects.distributed.sync.timeout")
     long syncTimeout;
@@ -49,7 +58,7 @@ public class RpcClientFactory {
             if (!shouldTry) continue;
 
             try {
-                return withObjSyncClient(hostinfo.getAddr(), hostinfo.getPort(), syncTimeout, fn);
+                return withObjSyncClient(target.toString(), hostinfo.getAddr(), hostinfo.getSecurePort(), syncTimeout, fn);
             } catch (StatusRuntimeException e) {
                 if (e.getStatus().getCode().equals(Status.UNAVAILABLE.getCode())) {
                     Log.info("Host " + target + " is unreachable: " + e.getMessage());
@@ -71,12 +80,35 @@ public class RpcClientFactory {
         var hostinfo = remoteHostManager.getTransientState(target);
         if (hostinfo.getAddr() == null)
             throw new IllegalStateException("Address for " + target + " not yet known");
-        return withObjSyncClient(hostinfo.getAddr(), hostinfo.getPort(), syncTimeout, fn);
+        return withObjSyncClient(target.toString(), hostinfo.getAddr(), hostinfo.getSecurePort(), syncTimeout, fn);
     }
 
-    public <R> R withObjSyncClient(String addr, int port, long timeout, ObjectSyncClientFunction<R> fn) {
-        var channel = NettyChannelBuilder.forAddress(addr, port).negotiationType(NegotiationType.PLAINTEXT)
-                .usePlaintext().build();
+    private ChannelCredentials getChannelCredentials() {
+        try {
+            KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
+            ks.load(null, null);
+
+            ks.setKeyEntry("clientkey",
+                    persistentRemoteHostsService.getSelfKeypair().getPrivate(), null,
+                    new Certificate[]{persistentRemoteHostsService.getSelfCertificate()});
+
+            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            keyManagerFactory.init(ks, null);
+
+            ChannelCredentials creds = TlsChannelCredentials.newBuilder()
+                    .trustManager(peerTrustManager)
+                    .keyManager(keyManagerFactory.getKeyManagers())
+                    .build();
+            return creds;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public <R> R withObjSyncClient(String host, String addr, int port, long timeout, ObjectSyncClientFunction<R> fn) {
+        var creds = getChannelCredentials();
+        var channel = NettyChannelBuilder.forAddress(addr, port, creds)
+                .overrideAuthority(host).build();
         var client = DhfsObjectSyncGrpcGrpc.newBlockingStub(channel)
                 .withMaxOutboundMessageSize(Integer.MAX_VALUE)
                 .withMaxInboundMessageSize(Integer.MAX_VALUE)

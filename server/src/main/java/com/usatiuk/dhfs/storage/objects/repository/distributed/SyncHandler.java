@@ -119,7 +119,8 @@ public class SyncHandler {
 
         if (conflict) {
             Log.info("Trying conflict resolution: " + header.getName() + " from " + from);
-            var resolver = conflictResolvers.select(found.getConflictResolver());
+            var resolverClass = found.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> found.getConflictResolver());
+            var resolver = conflictResolvers.select(resolverClass);
             var result = resolver.get().resolve(from, found);
             if (result.equals(ConflictResolver.ConflictResolutionResult.RESOLVED)) {
                 Log.info("Resolved conflict for " + from + " " + header.getName());

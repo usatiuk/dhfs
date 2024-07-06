@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
 import com.usatiuk.dhfs.storage.SerializationHelper;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.peersync.PeerSyncClient;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.peertrust.PeerTrustManager;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -15,6 +16,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.KeyPair;
+import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,6 +28,9 @@ public class PersistentRemoteHostsService {
 
     @Inject
     PeerSyncClient peerSyncClient;
+
+    @Inject
+    PeerTrustManager peerTrustManager;
 
     final String dataFileName = "hosts";
 
@@ -40,6 +46,24 @@ public class PersistentRemoteHostsService {
             _persistentData = SerializationHelper.deserialize(Files.readAllBytes(Paths.get(dataRoot).resolve(dataFileName)));
         }
         _selfUuid = _persistentData.runReadLocked(PersistentRemoteHostsData::getSelfUuid);
+
+        if (_persistentData.runReadLocked(d -> d.getSelfCertificate() == null))
+            _persistentData.runWriteLocked(d -> {
+                try {
+                    Log.info("Generating a key pair, please wait");
+                    d.setSelfKeyPair(CertificateTools.generateKeyPair());
+                    d.setSelfCertificate(CertificateTools.generateCertificate(d.getSelfKeyPair(), _selfUuid.toString()));
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed generating cert", e);
+                }
+                return null;
+            });
+
+        _persistentData.runReadLocked(d -> {
+            peerTrustManager.reloadTrustManagerHosts(d.getRemoteHosts().values());
+            return null;
+        });
+
         Files.writeString(Paths.get(dataRoot, "self_uuid"), _selfUuid.toString());
         Log.info("Self uuid is: " + _selfUuid.toString());
     }
@@ -72,15 +96,20 @@ public class PersistentRemoteHostsService {
         });
     }
 
-    public void addHost(HostInfo hostInfo) {
-        if (hostInfo.getUuid().equals(_selfUuid)) return;
+    public boolean addHost(HostInfo hostInfo) {
+        if (hostInfo.getUuid().equals(_selfUuid)) return false;
         boolean added = _persistentData.runWriteLocked(d -> {
             return d.getRemoteHosts().put(hostInfo.getUuid(), hostInfo) == null;
         });
         if (added) {
+            _persistentData.runReadLocked(d -> {
+                peerTrustManager.reloadTrustManagerHosts(d.getRemoteHosts().values());
+                return null;
+            });
             // FIXME: async
             peerSyncClient.syncPeersAll();
         }
+        return added;
     }
 
     public boolean existsHost(UUID uuid) {
@@ -88,4 +117,13 @@ public class PersistentRemoteHostsService {
             return d.getRemoteHosts().containsKey(uuid);
         });
     }
+
+    public KeyPair getSelfKeypair() {
+        return _persistentData.runReadLocked(PersistentRemoteHostsData::getSelfKeyPair);
+    }
+
+    public X509Certificate getSelfCertificate() {
+        return _persistentData.runReadLocked(PersistentRemoteHostsData::getSelfCertificate);
+    }
+
 }
