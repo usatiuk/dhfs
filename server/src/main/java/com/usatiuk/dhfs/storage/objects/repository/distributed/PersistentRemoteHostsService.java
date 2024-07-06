@@ -7,6 +7,8 @@ import com.usatiuk.dhfs.storage.objects.jrepository.JObjectResolver;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.peersync.PeerDirectory;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.peersync.PersistentPeerInfo;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.peertrust.PeerTrustManager;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -23,7 +25,6 @@ import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -121,19 +122,6 @@ public class PersistentRemoteHostsService {
         return (JObject<PersistentPeerInfo>) got;
     }
 
-    private List<PersistentPeerInfo> getPeersSnapshot() {
-        return getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
-            return d.getPeers().stream().map(u -> {
-                try {
-                    return getPeer(u).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m2, d2) -> d2);
-                } catch (Exception e) {
-                    Log.warn("Error making snapshot of peer " + u, e);
-                    return null;
-                }
-            }).filter(Objects::nonNull).toList();
-        });
-    }
-
     public UUID getSelfUuid() {
         if (_selfUuid == null)
             throw new IllegalStateException();
@@ -151,7 +139,22 @@ public class PersistentRemoteHostsService {
     }
 
     public List<PersistentPeerInfo> getHosts() {
-        return getPeersSnapshot().stream().filter(i -> !i.getUuid().equals(_selfUuid)).toList();
+        for (int i = 0; i < 5; i++) {
+            try {
+                return getPeerDirectory()
+                        .runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY,
+                                (m, d) -> d.getPeers().stream()
+                                        .map(u -> getPeer(u).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m2, d2) -> d2))
+                                        .filter(e -> !e.getUuid().equals(_selfUuid)).toList());
+            } catch (Exception e) {
+                Log.warn("Error when making snapshot of hosts ", e);
+                try {
+                    Thread.sleep(i * 2);
+                } catch (InterruptedException ignored) {
+                }
+            }
+        }
+        throw new StatusRuntimeException(Status.ABORTED.withDescription("Could not make a snapshot of peers in 5 tries!"));
     }
 
     public boolean addHost(PersistentPeerInfo persistentPeerInfo) {
