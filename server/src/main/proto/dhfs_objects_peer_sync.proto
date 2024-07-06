@@ -7,8 +7,6 @@ option java_outer_classname = "DhfsObjectPeerSyncApi";
 package dhfs.objects.peersync;
 
 service DhfsObjectPeerSyncGrpc {
-  rpc SyncPeers (SyncPeersData) returns (SyncPeersData) {}
-
   rpc GetSelfInfo (GetSelfInfoRequest) returns (PeerInfo) {}
 }
 
@@ -19,10 +17,4 @@ message GetSelfInfoRequest {
 message PeerInfo {
   string uuid = 1;
   bytes cert = 2;
-}
-
-message SyncPeersData {
-  string selfUuid = 1;
-
-  repeated PeerInfo my_peers = 2;
 }

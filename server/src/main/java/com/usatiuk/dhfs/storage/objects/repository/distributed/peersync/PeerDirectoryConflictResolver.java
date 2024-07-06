@@ -1,8 +1,6 @@
-package com.usatiuk.dhfs.storage.files.conflicts;
+package com.usatiuk.dhfs.storage.objects.repository.distributed.peersync;
 
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
-import com.usatiuk.dhfs.storage.files.objects.Directory;
-import com.usatiuk.dhfs.storage.files.objects.FsNode;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
@@ -19,7 +17,7 @@ import org.apache.commons.lang3.NotImplementedException;
 import java.util.*;
 
 @ApplicationScoped
-public class DirectoryConflictResolver implements ConflictResolver {
+public class PeerDirectoryConflictResolver implements ConflictResolver {
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
 
@@ -31,8 +29,8 @@ public class DirectoryConflictResolver implements ConflictResolver {
 
     @Override
     public ConflictResolutionResult resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
-        var theirsDir = (Directory) theirsData;
-        if (!theirsDir.getClass().equals(Directory.class)) {
+        var theirsDir = (PeerDirectory) theirsData;
+        if (!theirsDir.getClass().equals(PeerDirectory.class)) {
             Log.error("Object type mismatch!");
             throw new NotImplementedException();
         }
@@ -40,51 +38,18 @@ public class DirectoryConflictResolver implements ConflictResolver {
         ours.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, oursDirU, bump, invalidate) -> {
             if (oursDirU == null)
                 throw new StatusRuntimeException(Status.ABORTED.withDescription("Conflict but we don't have local copy"));
-            if (!(oursDirU instanceof Directory oursDir))
+            if (!(oursDirU instanceof PeerDirectory oursPD))
                 throw new NotImplementedException("Type conflict for " + ours.getName() + ", directory was expected");
 
-            Directory first;
-            Directory second;
-            UUID otherHostname;
-
-            if (oursDir.getMtime() >= theirsDir.getMtime()) {
-                first = oursDir;
-                second = theirsDir;
-                otherHostname = conflictHost;
-            } else {
-                second = oursDir;
-                first = theirsDir;
-                otherHostname = persistentRemoteHostsService.getSelfUuid();
-            }
-
-            LinkedHashMap<String, UUID> mergedChildren = new LinkedHashMap<>(first.getChildren());
+            LinkedHashSet<UUID> mergedChildren = new LinkedHashSet<>(oursPD.getPeers());
+            mergedChildren.addAll(theirsDir.getPeers());
             Map<UUID, Long> newChangelog = new LinkedHashMap<>(m.getChangelog());
-
-            for (var entry : second.getChildren().entrySet()) {
-                if (mergedChildren.containsKey(entry.getKey()) &&
-                        !Objects.equals(mergedChildren.get(entry.getKey()), entry.getValue())) {
-                    int i = 0;
-                    do {
-                        String name = entry.getKey() + ".conflict." + i + "." + otherHostname;
-                        if (mergedChildren.containsKey(name)) {
-                            i++;
-                            continue;
-                        }
-                        mergedChildren.put(name, entry.getValue());
-                        break;
-                    } while (true);
-                } else {
-                    mergedChildren.put(entry.getKey(), entry.getValue());
-                }
-            }
 
             for (var entry : theirsHeader.getChangelog().getEntriesList()) {
                 newChangelog.merge(UUID.fromString(entry.getHost()), entry.getVersion(), Long::max);
             }
 
-            boolean wasChanged = oursDir.getChildren().size() != mergedChildren.size()
-                    || oursDir.getMtime() != first.getMtime()
-                    || oursDir.getCtime() != first.getCtime();
+            boolean wasChanged = oursPD.getPeers().size() != mergedChildren.size();
 
             if (m.getBestVersion() > newChangelog.values().stream().reduce(0L, Long::sum))
                 throw new StatusRuntimeException(Status.ABORTED.withDescription("Race when conflict resolving"));
@@ -92,16 +57,13 @@ public class DirectoryConflictResolver implements ConflictResolver {
             if (wasChanged) {
                 newChangelog.merge(persistentRemoteHostsService.getSelfUuid(), 1L, Long::sum);
 
-                for (var child : mergedChildren.values()) {
-                    if (!(new HashSet<>(oursDir.getChildren().values()).contains(child))) {
-                        jObjectManager.getOrPut(child.toString(), FsNode.class, Optional.of(oursDir.getName()));
+                for (var child : mergedChildren) {
+                    if (!(new HashSet<>(oursPD.getPeers()).contains(child))) {
+                        jObjectManager.getOrPut(child.toString(), PersistentPeerInfo.class, Optional.of(oursPD.getName()));
                     }
                 }
 
-                oursDir.setMtime(first.getMtime());
-                oursDir.setCtime(first.getCtime());
-
-                oursDir.setChildren(mergedChildren);
+                oursPD.getPeers().addAll(mergedChildren);
             }
 
             m.setChangelog(newChangelog);

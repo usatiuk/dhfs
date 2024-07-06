@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.storage.files.objects;
 
 import com.usatiuk.dhfs.storage.files.conflicts.FileConflictResolver;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import lombok.Getter;
 
@@ -18,6 +19,11 @@ public class File extends FsNode {
     @Override
     public Class<? extends ConflictResolver> getConflictResolver() {
         return FileConflictResolver.class;
+    }
+
+    @Override
+    public Class<? extends JObjectData> getRefType() {
+        return ChunkInfo.class;
     }
 
     @Override

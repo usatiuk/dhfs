@@ -54,7 +54,7 @@ public class RpcClientFactory {
             boolean shouldTry = reachable && addr != null;
 
             if (!shouldTry) {
-                Log.trace("Not trying " + target + ": " + "addr=" + Objects.toString(addr) + " reachable=" + reachable);
+                Log.trace("Not trying " + target + ": " + "addr=" + addr + " reachable=" + reachable);
                 continue;
             }
 

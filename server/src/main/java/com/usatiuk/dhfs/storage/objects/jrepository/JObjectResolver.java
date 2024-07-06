@@ -10,6 +10,8 @@ import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import org.apache.commons.collections4.MultiValuedMap;
+import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.Collections;
@@ -39,8 +41,18 @@ public class JObjectResolver {
     @Inject
     JObjectRefProcessor jObjectRefProcessor;
 
+    private final MultiValuedMap<Class<? extends JObjectData>, JObject.ObjectFnWrite<?, Void>> _writeListeners
+            = new ArrayListValuedHashMap<>();
+
     @ConfigProperty(name = "dhfs.objects.ref_verification")
     boolean refVerification;
+
+    @ConfigProperty(name = "dhfs.objects.bump_verification")
+    boolean _bumpVerification;
+
+    public <T extends JObjectData> void registerWriteListener(Class<T> klass, JObject.ObjectFnWrite<T, Void> fn) {
+        _writeListeners.put(klass, fn);
+    }
 
     public void backupRefs(JObject<?> self) {
         self.assertRWLock();
@@ -69,7 +81,7 @@ public class JObjectResolver {
             for (var r : extracted) {
                 if (!self.getMeta().getSavedRefs().contains(r)) {
                     Log.trace("Hydrating ref " + r + " for " + self.getName());
-                    jobjectManager.getOrPut(r, Optional.of(self.getName()));
+                    jobjectManager.getOrPut(r, self.getData().getRefType(), Optional.of(self.getName()));
                 }
             }
             self.getMeta().setSavedRefs(null);
@@ -85,7 +97,7 @@ public class JObjectResolver {
                 if (self.isResolved()) {
                     for (var r : self.getData().extractRefs()) {
                         Log.trace("Hydrating ref after undelete " + r + " for " + self.getName());
-                        jobjectManager.getOrPut(r, Optional.of(self.getName()));
+                        jobjectManager.getOrPut(r, self.getData().getRefType(), Optional.of(self.getName()));
                     }
                 }
             }
@@ -97,7 +109,8 @@ public class JObjectResolver {
     }
 
     public <T extends JObjectData> Optional<T> resolveDataLocal(JObject<T> jObject) {
-        jObject.assertRWLock();
+        // jObject.assertRWLock();
+        // FIXME: No way to assert read lock?
         if (objectPersistentStore.existsObject(jObject.getName()))
             return Optional.of(SerializationHelper.deserialize(objectPersistentStore.readObject(jObject.getName())));
         return Optional.empty();
@@ -133,11 +146,16 @@ public class JObjectResolver {
         jObjectWriteback.markDirty(self);
     }
 
-    public void notifyWriteData(JObject<?> self) {
+    public <T extends JObjectData> void notifyWriteData(JObject<T> self) {
         self.assertRWLock();
         jObjectWriteback.markDirty(self);
-        if (self.isResolved())
+        if (self.isResolved()) {
             invalidationQueueService.pushInvalidationToAll(self.getName(), !self.getMeta().isSeen());
+            for (var l : _writeListeners.get(self.getData().getClass())) {
+                // TODO: Assert types?
+                self.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (JObject.ObjectFnWrite<T, ?>) l);
+            }
+        }
     }
 
     public void bumpVersionSelf(JObject<?> self) {

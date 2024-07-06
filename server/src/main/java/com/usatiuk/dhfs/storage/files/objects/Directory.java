@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.storage.files.objects;
 
 import com.usatiuk.dhfs.storage.files.conflicts.DirectoryConflictResolver;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import lombok.Getter;
 import lombok.Setter;
@@ -40,6 +41,10 @@ public class Directory extends FsNode {
 
         _children.put(name, uuid);
         return true;
+    }
+    @Override
+    public Class<? extends JObjectData> getRefType() {
+        return FsNode.class;
     }
 
     @Override

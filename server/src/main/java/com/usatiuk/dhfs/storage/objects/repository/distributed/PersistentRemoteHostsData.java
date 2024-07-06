@@ -6,14 +6,10 @@ import lombok.Setter;
 import java.io.Serializable;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
-import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class PersistentRemoteHostsData implements Serializable {
-    @Getter
-    private final HashMap<UUID, HostInfo> _remoteHosts = new HashMap<>();
-
     @Getter
     private final UUID _selfUuid = UUID.randomUUID();
 

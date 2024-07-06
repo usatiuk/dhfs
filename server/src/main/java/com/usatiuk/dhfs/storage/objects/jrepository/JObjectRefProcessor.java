@@ -75,6 +75,7 @@ public class JObjectRefProcessor {
                 if (got.isEmpty()) continue;
                 try {
                     got.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, v, i) -> {
+                        if (m.isLocked()) return null;
                         if (m.isDeleted()) return null;
                         if (m.getRefcount() > 0) return null;
 

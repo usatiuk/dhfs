@@ -5,6 +5,8 @@ import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.repository.distributed.*;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.peersync.PeerDirectory;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.peersync.PersistentPeerInfo;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -47,7 +49,7 @@ public class RemoteObjectServiceClient {
                         .filter(entry -> entry.getValue().equals(ourVersion))
                         .map(Map.Entry::getKey).toList();
             else
-                return persistentRemoteHostsService.getHosts().stream().map(HostInfo::getUuid).toList();
+                return persistentRemoteHostsService.getHosts().stream().map(PersistentPeerInfo::getUuid).toList();
         });
 
         if (targets.isEmpty())
@@ -99,7 +101,7 @@ public class RemoteObjectServiceClient {
             if (obj.isEmpty()) continue;
 
             try {
-                var header = obj.get().runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> Pair.of(m.toRpcHeader(), m.isSeen()));
+                var header = obj.get().runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> Pair.of(m.toRpcHeader(d), m.isSeen()));
                 if (!header.getRight())
                     obj.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                         m.markSeen();

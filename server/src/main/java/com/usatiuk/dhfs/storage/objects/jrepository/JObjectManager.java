@@ -13,7 +13,7 @@ public interface JObjectManager {
     <T extends JObjectData> JObject<T> put(T object, Optional<String> parent);
 
     // Get an object with a name if it exists, otherwise create new one based on metadata
-    JObject<?> getOrPut(String name, Optional<String> parent);
+    JObject<?> getOrPut(String name, Class<? extends JObjectData> klass, Optional<String> parent);
 
     void notifySent(String key);
 }

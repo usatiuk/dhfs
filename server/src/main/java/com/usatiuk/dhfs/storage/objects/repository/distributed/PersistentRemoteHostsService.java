@@ -1,7 +1,11 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
 import com.usatiuk.dhfs.storage.SerializationHelper;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.peersync.PeerSyncClient;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObjectResolver;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.peersync.PeerDirectory;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.peersync.PersistentPeerInfo;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.peertrust.PeerTrustManager;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
@@ -19,7 +23,10 @@ import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 
 @ApplicationScoped
 public class PersistentRemoteHostsService {
@@ -27,10 +34,16 @@ public class PersistentRemoteHostsService {
     String dataRoot;
 
     @Inject
-    PeerSyncClient peerSyncClient;
+    PeerTrustManager peerTrustManager;
 
     @Inject
-    PeerTrustManager peerTrustManager;
+    JObjectManager jObjectManager;
+
+    @Inject
+    JObjectResolver jObjectResolver;
+
+    @Inject
+    ExecutorService executorService;
 
     final String dataFileName = "hosts";
 
@@ -47,7 +60,7 @@ public class PersistentRemoteHostsService {
         }
         _selfUuid = _persistentData.runReadLocked(PersistentRemoteHostsData::getSelfUuid);
 
-        if (_persistentData.runReadLocked(d -> d.getSelfCertificate() == null))
+        if (_persistentData.runReadLocked(d -> d.getSelfCertificate() == null)) {
             _persistentData.runWriteLocked(d -> {
                 try {
                     Log.info("Generating a key pair, please wait");
@@ -58,11 +71,22 @@ public class PersistentRemoteHostsService {
                 }
                 return null;
             });
+            jObjectManager.put(new PeerDirectory(), Optional.empty());
+        }
 
-        _persistentData.runReadLocked(d -> {
-            peerTrustManager.reloadTrustManagerHosts(d.getRemoteHosts().values());
+        jObjectResolver.registerWriteListener(PersistentPeerInfo.class, (m, d, i, v) -> {
+            Log.info("Scheduling certificate update after " + m.getName() + " was updated");
+            executorService.submit(this::updateCerts);
             return null;
         });
+
+        jObjectResolver.registerWriteListener(PeerDirectory.class, (m, d, i, v) -> {
+            Log.info("Scheduling certificate update after " + m.getName() + " was updated");
+            executorService.submit(this::updateCerts);
+            return null;
+        });
+
+        updateCerts();
 
         Files.writeString(Paths.get(dataRoot, "self_uuid"), _selfUuid.toString());
         Log.info("Self uuid is: " + _selfUuid.toString());
@@ -72,6 +96,41 @@ public class PersistentRemoteHostsService {
         Log.info("Saving hosts");
         Files.write(Paths.get(dataRoot).resolve(dataFileName), SerializationUtils.serialize(_persistentData));
         Log.info("Shutdown");
+    }
+
+    private JObject<PeerDirectory> getPeerDirectory() {
+        var got = jObjectManager.get(PeerDirectory.PeerDirectoryObjName).orElseThrow(() -> new IllegalStateException("Peer directory not found"));
+        got.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
+            if (d == null) throw new IllegalStateException("Could not resolve peer directory!");
+            if (!(d instanceof PeerDirectory))
+                throw new IllegalStateException("Peer directory is of wrong type!");
+            return null;
+        });
+        return (JObject<PeerDirectory>) got;
+    }
+
+    private JObject<PersistentPeerInfo> getPeer(UUID uuid) {
+        var got = jObjectManager.get(uuid.toString()).orElseThrow(() -> new IllegalStateException("Peer " + uuid + " not found"));
+        got.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
+            if (d == null) throw new IllegalStateException("Could not resolve peer " + uuid);
+            if (!(d instanceof PersistentPeerInfo))
+                throw new IllegalStateException("Peer " + uuid + " is of wrong type!");
+            return null;
+        });
+        return (JObject<PersistentPeerInfo>) got;
+    }
+
+    private List<PersistentPeerInfo> getPeersSnapshot() {
+        return getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
+            return d.getPeers().stream().map(u -> {
+                try {
+                    return getPeer(u).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m2, d2) -> d2);
+                } catch (Exception e) {
+                    Log.warn("Error making snapshot of peer " + u, e);
+                    return null;
+                }
+            }).filter(Objects::nonNull).toList();
+        });
     }
 
     public UUID getSelfUuid() {
@@ -84,38 +143,41 @@ public class PersistentRemoteHostsService {
         return _selfUuid.toString() + _persistentData.runReadLocked(d -> d.getSelfCounter().addAndGet(1)).toString();
     }
 
-    public HostInfo getInfo(UUID name) {
-        return _persistentData.runReadLocked(data -> {
-            return data.getRemoteHosts().get(name);
+    public PersistentPeerInfo getInfo(UUID name) {
+        return getPeer(name).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
+            return d;
         });
     }
 
-    public List<HostInfo> getHosts() {
-        return _persistentData.runReadLocked(data -> {
-            return data.getRemoteHosts().values().stream().toList();
-        });
+    public List<PersistentPeerInfo> getHosts() {
+        return getPeersSnapshot().stream().filter(i -> !i.getUuid().equals(_selfUuid)).toList();
     }
 
-    public boolean addHost(HostInfo hostInfo) {
-        if (hostInfo.getUuid().equals(_selfUuid)) return false;
-        boolean added = _persistentData.runWriteLocked(d -> {
-            return d.getRemoteHosts().put(hostInfo.getUuid(), hostInfo) == null;
+    public boolean addHost(PersistentPeerInfo persistentPeerInfo) {
+        if (persistentPeerInfo.getUuid().equals(_selfUuid)) return false;
+
+        boolean added = getPeerDirectory().runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
+            boolean addedInner = d.getPeers().add(persistentPeerInfo.getUuid());
+            if (addedInner) {
+                jObjectManager.put(persistentPeerInfo, Optional.of(m.getName()));
+                b.apply();
+            }
+            return addedInner;
         });
-        if (added) {
-            _persistentData.runReadLocked(d -> {
-                peerTrustManager.reloadTrustManagerHosts(d.getRemoteHosts().values());
-                return null;
-            });
-            // FIXME: async
-            peerSyncClient.syncPeersAll();
-        }
+        if (added)
+            updateCerts();
         return added;
     }
 
-    public boolean existsHost(UUID uuid) {
-        return _persistentData.runReadLocked(d -> {
-            return d.getRemoteHosts().containsKey(uuid);
+    private void updateCerts() {
+        getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
+            peerTrustManager.reloadTrustManagerHosts(getHosts());
+            return null;
         });
+    }
+
+    public boolean existsHost(UUID uuid) {
+        return getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.getPeers().contains(uuid));
     }
 
     public KeyPair getSelfKeypair() {

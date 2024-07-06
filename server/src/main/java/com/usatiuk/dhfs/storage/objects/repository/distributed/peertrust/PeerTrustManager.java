@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed.peertrust;
 
-import com.usatiuk.dhfs.storage.objects.repository.distributed.HostInfo;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.peersync.PersistentPeerInfo;
+import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -34,8 +35,9 @@ public class PeerTrustManager implements X509TrustManager {
         return trustManager.getAcceptedIssuers();
     }
 
-    public void reloadTrustManagerHosts(Collection<HostInfo> hosts) {
+    public void reloadTrustManagerHosts(Collection<PersistentPeerInfo> hosts) {
         try {
+            Log.info("Trying to reload trust manager: " + hosts.size() + " known hosts");
             reloadTrustManager(hosts.stream().map(hostInfo ->
                     Pair.of(hostInfo.getUuid().toString(), hostInfo.getCertificate())).toList());
         } catch (Exception e) {
@@ -54,7 +56,7 @@ public class PeerTrustManager implements X509TrustManager {
         TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         tmf.init(ts);
 
-        TrustManager tms[] = tmf.getTrustManagers();
+        TrustManager[] tms = tmf.getTrustManagers();
         for (var tm : tms) {
             if (tm instanceof X509TrustManager) {
                 trustManager = (X509TrustManager) tm;

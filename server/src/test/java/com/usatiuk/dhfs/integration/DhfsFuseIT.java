@@ -79,13 +79,13 @@ public class DhfsFuseIT {
         var c1curl = container1.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
-                        "  --data " + c2uuid +
+                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
                         "  http://localhost:8080/objects-manage/known-peers");
 
         var c2curl = container2.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
-                        "  --data " + c1uuid +
+                        "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
                         "  http://localhost:8080/objects-manage/known-peers");
 
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);

@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
 import com.usatiuk.dhfs.storage.SerializationHelper;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;

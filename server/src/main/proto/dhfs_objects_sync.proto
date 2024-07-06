@@ -34,6 +34,7 @@ message ObjectChangelog {
 message ObjectHeader {
   string name = 2;
   ObjectChangelog changelog = 5;
+  optional bytes pushedData = 6;
 }
 
 message ApiObject {

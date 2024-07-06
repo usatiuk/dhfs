@@ -1,11 +1,12 @@
 package com.usatiuk.dhfs.storage.files.conflicts;
 
-import com.usatiuk.dhfs.storage.SerializationHelper;
+import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
 import com.usatiuk.dhfs.storage.files.objects.ChunkData;
 import com.usatiuk.dhfs.storage.files.objects.ChunkInfo;
 import com.usatiuk.dhfs.storage.files.objects.Directory;
 import com.usatiuk.dhfs.storage.files.objects.File;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
@@ -36,10 +37,9 @@ public class FileConflictResolver implements ConflictResolver {
     boolean useHashForChunks;
 
     @Override
-    public ConflictResolutionResult resolve(UUID conflictHost, JObject<?> ours) {
-        var theirsData = remoteObjectServiceClient.getSpecificObject(conflictHost, ours.getName());
+    public ConflictResolutionResult resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
 
-        var theirsFile = (File) SerializationHelper.deserialize(theirsData.getRight());
+        var theirsFile = (File) theirsData;
         if (!theirsFile.getClass().equals(File.class)) {
             Log.error("Object type mismatch!");
             throw new NotImplementedException();
@@ -68,8 +68,6 @@ public class FileConflictResolver implements ConflictResolver {
                     throw new StatusRuntimeException(Status.ABORTED.withDescription("Bad type for file"));
 
                 // TODO: dedup
-
-                var theirsHeader = theirsData.getLeft();
 
                 File first;
                 File second;
@@ -123,8 +121,8 @@ public class FileConflictResolver implements ConflictResolver {
 
                     for (var e : firstChunksCopy) {
                         oursFile.getChunks().put(e.getLeft(), e.getValue());
-                        jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
-                        jObjectManager.getOrPut(ChunkInfo.getNameFromHash(e.getValue()), Optional.of(oursFile.getName()));
+                        jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), ChunkData.class, Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
+                        jObjectManager.getOrPut(ChunkInfo.getNameFromHash(e.getValue()), ChunkInfo.class, Optional.of(oursFile.getName()));
                     }
 
                     oursFile.setMtime(first.getMtime());
@@ -137,8 +135,8 @@ public class FileConflictResolver implements ConflictResolver {
 
                     for (var e : secondChunksCopy) {
                         newFile.getChunks().put(e.getLeft(), e.getValue());
-                        jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
-                        jObjectManager.getOrPut(ChunkInfo.getNameFromHash(e.getValue()), Optional.ofNullable(newFile.getName()));
+                        jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), ChunkData.class, Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
+                        jObjectManager.getOrPut(ChunkInfo.getNameFromHash(e.getValue()), ChunkInfo.class, Optional.ofNullable(newFile.getName()));
                     }
 
                     var theName = oursDir.getChildren().entrySet().stream()

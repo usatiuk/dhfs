@@ -1,8 +1,13 @@
-package com.usatiuk.dhfs.storage.objects.repository.distributed;
+package com.usatiuk.dhfs.storage.objects.jrepository;
 
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelog;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelogEntry;
 import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
+import com.usatiuk.dhfs.storage.SerializationHelper;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.peersync.PersistentPeerInfo;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import jakarta.enterprise.inject.spi.CDI;
 import lombok.Getter;
 import lombok.Setter;
@@ -13,11 +18,13 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class ObjectMetadata implements Serializable {
-    public ObjectMetadata(String name, boolean written) {
+    public ObjectMetadata(String name, boolean written, Class<? extends JObjectData> knownClass) {
         _name = name;
         _written.set(written);
+        _knownClass.set(knownClass);
     }
 
     @Getter
@@ -34,6 +41,8 @@ public class ObjectMetadata implements Serializable {
     @Setter
     private Set<String> _savedRefs = Collections.emptySet();
 
+    private final AtomicReference<Class<? extends JObjectData>> _knownClass = new AtomicReference<>();
+
     @Getter
     private long _refcount = 0L;
 
@@ -45,6 +54,21 @@ public class ObjectMetadata implements Serializable {
     private final AtomicBoolean _seen = new AtomicBoolean(false);
 
     private final AtomicBoolean _deleted = new AtomicBoolean(false);
+
+    public Class<? extends JObjectData> getKnownClass() {
+        return _knownClass.get();
+    }
+
+    protected void narrowClass(Class<? extends JObjectData> klass) {
+        Class<? extends JObjectData> got = null;
+        do {
+            got = _knownClass.get();
+            if (got.equals(klass)) return;
+            if (klass.isAssignableFrom(got)) return;
+            if (!got.isAssignableFrom(klass))
+                throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Could not narrow class of object " + getName() + " from " + got + " to " + klass));
+        } while (!_knownClass.compareAndSet(got, klass));
+    }
 
     @Serial
     private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
@@ -131,7 +155,7 @@ public class ObjectMetadata implements Serializable {
         var changelogBuilder = ObjectChangelog.newBuilder();
         var hosts = CDI.current().select(PersistentRemoteHostsService.class).get();
 
-        var all = new ArrayList<>(hosts.getHosts().stream().map(HostInfo::getUuid).toList());
+        var all = new ArrayList<>(hosts.getHosts().stream().map(PersistentPeerInfo::getUuid).toList());
         all.add(hosts.getSelfUuid());
 
         for (var h : all) {
@@ -148,6 +172,17 @@ public class ObjectMetadata implements Serializable {
     public ObjectHeader toRpcHeader() {
         var headerBuilder = ObjectHeader.newBuilder().setName(getName());
         headerBuilder.setChangelog(toRpcChangelog());
+
+        return headerBuilder.build();
+    }
+
+    public ObjectHeader toRpcHeader(JObjectData data) {
+        var headerBuilder = ObjectHeader.newBuilder().setName(getName());
+        headerBuilder.setChangelog(toRpcChangelog());
+
+        if (data != null && data.pushResolution())
+            headerBuilder.setPushedData(SerializationHelper.serialize(data));
+
         return headerBuilder.build();
     }
 }

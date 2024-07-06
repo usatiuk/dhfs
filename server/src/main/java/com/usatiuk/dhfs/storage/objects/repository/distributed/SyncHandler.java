@@ -1,7 +1,9 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
 import com.usatiuk.dhfs.objects.repository.distributed.*;
+import com.usatiuk.dhfs.storage.SerializationHelper;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -53,7 +55,7 @@ public class SyncHandler {
     }
 
     public void handleOneUpdate(UUID from, ObjectHeader header) {
-        JObject<?> found = jObjectManager.getOrPut(header.getName(), Optional.empty());
+        JObject<?> found = jObjectManager.getOrPut(header.getName(), JObjectData.class, Optional.empty());
 
         var receivedTotalVer = header.getChangelog().getEntriesList()
                 .stream().map(ObjectChangelogEntry::getVersion).reduce(0L, Long::sum);
@@ -107,7 +109,11 @@ public class SyncHandler {
                 md.getChangelog().clear();
                 md.getChangelog().putAll(receivedMap);
                 md.getChangelog().putIfAbsent(persistentRemoteHostsService.getSelfUuid(), 0L);
+                if (header.hasPushedData())
+                    found.externalResolution(SerializationHelper.deserialize(header.getPushedData()));
                 return false;
+            } else if (data == null && header.hasPushedData()) {
+                found.externalResolution(SerializationHelper.deserialize(header.getPushedData()));
             }
 
             assert Objects.equals(receivedTotalVer, md.getOurVersion());
@@ -119,9 +125,21 @@ public class SyncHandler {
 
         if (conflict) {
             Log.info("Trying conflict resolution: " + header.getName() + " from " + from);
+
+            JObjectData theirsData;
+            ObjectHeader theirsHeader;
+            if (header.hasPushedData()) {
+                theirsHeader = header;
+                theirsData = SerializationHelper.deserialize(header.getPushedData());
+            } else {
+                var got = remoteObjectServiceClient.getSpecificObject(from, header.getName());
+                theirsData = SerializationHelper.deserialize(got.getRight());
+                theirsHeader = got.getLeft();
+            }
+
             var resolverClass = found.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> found.getConflictResolver());
             var resolver = conflictResolvers.select(resolverClass);
-            var result = resolver.get().resolve(from, found);
+            var result = resolver.get().resolve(from, theirsHeader, theirsData, found);
             if (result.equals(ConflictResolver.ConflictResolutionResult.RESOLVED)) {
                 Log.info("Resolved conflict for " + from + " " + header.getName());
             } else {

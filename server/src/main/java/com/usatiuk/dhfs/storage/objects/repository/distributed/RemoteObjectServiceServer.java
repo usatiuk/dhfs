@@ -70,7 +70,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         var objs = jObjectManager.find("");
 
         for (var obj : objs) {
-            var header = obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (meta, data) -> meta.toRpcHeader());
+            var header = obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (meta, data) -> meta.toRpcHeader(data));
             builder.addHeader(header);
         }
         return Uni.createFrom().item(builder.build());

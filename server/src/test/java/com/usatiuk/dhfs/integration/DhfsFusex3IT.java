@@ -95,25 +95,25 @@ public class DhfsFusex3IT {
         var c1curl = container1.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
-                        "  --data " + c2uuid +
+                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
                         "  http://localhost:8080/objects-manage/known-peers");
 
         var c2curl1 = container2.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
-                        "  --data " + c1uuid +
+                        "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
                         "  http://localhost:8080/objects-manage/known-peers");
 
         var c2curl3 = container2.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
-                        "  --data " + c3uuid +
+                        "  --data '{\"uuid\":\"" + c3uuid + "\"}' " +
                         "  http://localhost:8080/objects-manage/known-peers");
 
         var c3curl = container3.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
-                        "  --data " + c2uuid +
+                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
                         "  http://localhost:8080/objects-manage/known-peers");
 
         waitingConsumer3.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);

@@ -2,7 +2,7 @@ package com.usatiuk.dhfs.storage.objects.repository.distributed;
 
 import com.usatiuk.dhfs.objects.repository.distributed.PingRequest;
 import com.usatiuk.dhfs.objects.repository.distributed.peersync.GetSelfInfoRequest;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.peersync.PeerSyncClient;
+import com.usatiuk.dhfs.storage.objects.repository.distributed.peersync.PersistentPeerInfo;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.webapi.AvailablePeerInfo;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
@@ -35,9 +35,6 @@ public class RemoteHostManager {
     @Inject
     RpcClientFactory rpcClientFactory;
 
-    @Inject
-    PeerSyncClient peerSyncClient;
-
     @ConfigProperty(name = "dhfs.objects.distributed.sync.ping.timeout")
     long pingTimeout;
 
@@ -45,7 +42,10 @@ public class RemoteHostManager {
 
     private final ConcurrentMap<UUID, TransientPeerState> _seenHostsButNotAdded = new ConcurrentHashMap<>();
 
+    boolean _initialized = false;
+
     void init(@Observes @Priority(350) StartupEvent event) throws IOException {
+        _initialized = true;
     }
 
     void shutdown(@Observes @Priority(250) ShutdownEvent event) throws IOException {
@@ -54,6 +54,7 @@ public class RemoteHostManager {
     @Scheduled(every = "${dhfs.objects.distributed.reconnect_interval}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     @Blocking
     public void tryConnectAll() {
+        if (!_initialized) return;
         for (var host : persistentRemoteHostsService.getHosts()) {
             try {
                 var shouldTry = _transientPeersState.runReadLocked(d -> {
@@ -85,7 +86,6 @@ public class RemoteHostManager {
             return null;
         });
         Log.info("Connected to " + host);
-        peerSyncClient.syncPeersOne(host);
         syncHandler.doInitialResync(host);
     }
 
@@ -155,12 +155,12 @@ public class RemoteHostManager {
 
         if (!persistentRemoteHostsService.existsHost(host)) {
             _seenHostsButNotAdded.put(host, state);
-            Log.trace("Ignoring new address from unknown host " + ": addr=" + addr + " port=" + port);
+//            Log.trace("Ignoring new address from unknown host " + ": addr=" + addr + " port=" + port);
             return;
         }
 
         _transientPeersState.runWriteLocked(d -> {
-            Log.trace("Updating connection info for " + host + ": addr=" + addr + " port=" + port);
+//            Log.trace("Updating connection info for " + host + ": addr=" + addr + " port=" + port);
             d.getStates().putIfAbsent(host, new TransientPeerState()); // FIXME:? set reachable here?
             d.getStates().get(host).setAddr(addr);
             d.getStates().get(host).setPort(port);
@@ -187,7 +187,7 @@ public class RemoteHostManager {
 
         try {
             persistentRemoteHostsService.addHost(
-                    new HostInfo(UUID.fromString(info.getUuid()), CertificateTools.certFromBytes(info.getCert().toByteArray())));
+                    new PersistentPeerInfo(UUID.fromString(info.getUuid()), CertificateTools.certFromBytes(info.getCert().toByteArray())));
             Log.info("Added host: " + host.toString());
         } catch (CertificateException e) {
             throw new RuntimeException(e);

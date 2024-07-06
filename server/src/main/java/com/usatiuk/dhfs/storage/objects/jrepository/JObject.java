@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
 import io.quarkus.logging.Log;
 import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.NotImplementedException;
@@ -37,7 +36,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     // Create a new object
     protected JObject(JObjectResolver resolver, String name, UUID selfUuid, T obj) {
         _resolver = resolver;
-        _metaPart = new ObjectMetadata(name, false);
+        _metaPart = new ObjectMetadata(name, false, obj.getClass());
         _dataPart.set(obj);
         // FIXME:?
         if (!obj.assumeUnique())
@@ -49,6 +48,15 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         _resolver = resolver;
         _metaPart = objectMetadata;
     }
+
+    public Class<? extends JObjectData> getKnownClass() {
+        return _metaPart.getKnownClass();
+    }
+
+    public void narrowClass(Class<? extends JObjectData> klass) {
+        _metaPart.narrowClass(klass);
+    }
+
 
     public String getName() {
         return _metaPart.getName();
@@ -106,7 +114,9 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             _lock.writeLock().lock();
             try {
                 if (_dataPart.get() == null) {
-                    _dataPart.set(_resolver.resolveData(this));
+                    var res = _resolver.resolveData(this);
+                    _metaPart.narrowClass(res.getClass());
+                    _dataPart.set(res);
                     hydrateRefs();
                     verifyRefs();
                 } // _dataPart.get() == null
@@ -118,19 +128,34 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
 
     private void tryLocalResolve() {
         if (_dataPart.get() == null) {
-            _lock.writeLock().lock();
+            _lock.readLock().lock();
             try {
                 if (_dataPart.get() == null) {
+                    if (_metaPart.getSavedRefs() != null && !_metaPart.getSavedRefs().isEmpty())
+                        throw new IllegalStateException("Object " + getName() + " has non-hydrated refs when written locally");
+
                     var res = _resolver.resolveDataLocal(this);
                     if (res.isEmpty()) return;
-                    _dataPart.set(res.get());
-                    hydrateRefs();
-                    verifyRefs();
+
+                    _metaPart.narrowClass(res.get().getClass());
+                    _dataPart.compareAndSet(null, res.get());
                 } // _dataPart.get() == null
             } finally {
-                _lock.writeLock().unlock();
+                _lock.readLock().unlock();
             } // try
         } // _dataPart.get() == null
+    }
+
+    public void externalResolution(T data) {
+        assertRWLock();
+        if (_dataPart.get() != null)
+            throw new IllegalStateException("Data is not null when recording external resolution of " + getName());
+        _metaPart.narrowClass(data.getClass());
+        _dataPart.set(data);
+        if (!_metaPart.isLocked())
+            _metaPart.lock();
+        hydrateRefs();
+        verifyRefs();
     }
 
     public enum ResolutionStrategy {
@@ -177,6 +202,17 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             };
             var ret = fn.apply(_metaPart, _dataPart.get(), this::bumpVer, invalidateFn);
             _resolver.updateDeletionState(this);
+
+            if (_resolver._bumpVerification) {
+                if (_dataPart.get() != null && _dataPart.get().assumeUnique())
+                    if (!Objects.equals(ver, _metaPart.getChangelog()))
+                        throw new IllegalStateException("Object changed but is assumed immutable: " + getName());
+                // Todo: data check?
+            }
+
+            if (_dataPart.get() != null)
+                _metaPart.narrowClass(_dataPart.get().getClass());
+
             if (!Objects.equals(ver, _metaPart.getChangelog())
                     || ref != _metaPart.getRefcount()
                     || wasDeleted != _metaPart.isDeleted()

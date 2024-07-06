@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.storage.files.objects;
 
 import com.usatiuk.dhfs.storage.files.conflicts.NoOpConflictResolver;
+import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import lombok.Getter;
@@ -45,6 +46,11 @@ public class ChunkInfo extends JObjectData {
 
     public static String getNameFromHash(String hash) {
         return "info_" + hash;
+    }
+
+    @Override
+    public Class<? extends JObjectData> getRefType() {
+        return ChunkData.class;
     }
 
     @Override

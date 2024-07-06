@@ -1,9 +1,7 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
-import com.google.common.collect.Streams;
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.storage.SerializationHelper;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.ObjectMetadata;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
@@ -21,7 +19,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 @ApplicationScoped
 public class JObjectManagerImpl implements JObjectManager {
@@ -165,13 +162,16 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     @Override
-    public JObject<?> getOrPut(String name, Optional<String> parent) {
+    public JObject<?> getOrPut(String name, Class<? extends JObjectData> klass, Optional<String> parent) {
         while (true) {
             var got = get(name);
 
             if (got.isPresent()) {
+                got.get().narrowClass(klass);
                 if (parent.isPresent())
                     got.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                        if (m.isLocked())
+                            m.unlock();
                         m.addRef(parent.get());
                         return true;
                     });
@@ -187,7 +187,7 @@ public class JObjectManagerImpl implements JObjectManager {
                     if (objectPersistentStore.existsObject("meta_" + name))
                         continue;
 
-                    var created = new JObject<>(jObjectResolver, new ObjectMetadata(name, false));
+                    var created = new JObject<>(jObjectResolver, new ObjectMetadata(name, false, klass));
                     _map.put(name, new NamedSoftReference(created, _refQueue));
                     created.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                         parent.ifPresent(m::addRef);
