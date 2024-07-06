@@ -155,7 +155,8 @@ public class RemoteHostManager {
 
         if (!persistentRemoteHostsService.existsHost(host)) {
             _seenHostsButNotAdded.put(host, state);
-//            Log.trace("Ignoring new address from unknown host " + ": addr=" + addr + " port=" + port);
+            // Needed for tests
+            Log.trace("Ignoring new address from unknown host " + ": addr=" + addr + " port=" + port);
             return;
         }
 
