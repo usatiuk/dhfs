@@ -20,12 +20,14 @@ export type TNoContentTo = z.infer<typeof NoContentTo>;
 export const NoContentToResp = CreateAPIResponse(NoContentTo);
 export type TNoContentToResp = z.infer<typeof NoContentToResp>;
 
+// TokenRequest
 export const TokenRequestTo = z.object({
     username: z.string(),
     password: z.string(),
 });
 export type TTokenRequestTo = z.infer<typeof TokenRequestTo>;
 
+// Token
 export const TokenTo = z.object({
     token: z.string(),
 });
@@ -34,6 +36,7 @@ export type TTokenTo = z.infer<typeof TokenTo>;
 export const TokenToResp = CreateAPIResponse(TokenTo);
 export type TTokenToResp = z.infer<typeof TokenToResp>;
 
+//  AvailablePeerInfo
 export const AvailablePeerInfoTo = z.object({
     uuid: z.string(),
     addr: z.string(),
@@ -48,3 +51,19 @@ export const AvailablePeerInfoToResp = CreateAPIResponse(
     AvailablePeerInfoArrTo,
 );
 export type TAvailablePeerInfoToResp = z.infer<typeof AvailablePeerInfoToResp>;
+
+// KnownPeerInfo
+export const KnownPeerInfoTo = z.object({
+    uuid: z.string(),
+});
+export type TKnownPeerInfoTo = z.infer<typeof KnownPeerInfoTo>;
+
+export const KnownPeerInfoArrTo = z.array(KnownPeerInfoTo);
+export type TKnownPeerInfoArrTo = z.infer<typeof KnownPeerInfoArrTo>;
+
+export const KnownPeerInfoToResp = CreateAPIResponse(KnownPeerInfoArrTo);
+export type TKnownPeerInfoToResp = z.infer<typeof KnownPeerInfoToResp>;
+
+// KnownPeerPut
+export const KnownPeerPutTo = z.object({ uuid: z.string() });
+export type TKnownPeerPutTo = z.infer<typeof KnownPeerPutTo>;

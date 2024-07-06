@@ -1,0 +1,7 @@
+@import "./common";
+
+.peerCard {
+  @include border-shadow;
+
+  padding: 0.25rem;
+}

@@ -8,7 +8,7 @@ import {
 import "./App.scss";
 import { Home } from "./Home";
 import { PeerState } from "./PeerState";
-import { peerStateLoader } from "./PeerStatePlumbing";
+import { peerStateAction, peerStateLoader } from "./PeerStatePlumbing";
 import { ErrorGate } from "./ErrorGate";
 
 const router = createBrowserRouter(
@@ -33,6 +33,7 @@ const router = createBrowserRouter(
                     path: "peers",
                     element: <PeerState />,
                     loader: peerStateLoader,
+                    action: peerStateAction,
                 },
             ],
             errorElement: <ErrorGate />,

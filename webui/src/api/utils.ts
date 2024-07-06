@@ -7,7 +7,7 @@ declare const process: {
     };
 };
 
-const apiRoot: string =
+export const apiRoot: string =
     process.env.NODE_ENV == "production"
         ? ""
         : "http://localhost:1234/apiproxy";
@@ -91,9 +91,7 @@ export async function fetchJSONAuth<T, P extends { parse: (arg: string) => T }>(
     }
 }
 
-function errorCheck<A extends unknown[], R>(
-    fn: (...args: A) => R,
-): (...args: A) => Promise<Exclude<Awaited<R>, TErrorTo>> {
+function errorCheck<A extends unknown[], R>(fn: (...args: A) => R) {
     return async (...args: A): Promise<Exclude<Awaited<R>, TErrorTo>> => {
         const ret = await fn(...args);
         if (isError(ret)) {

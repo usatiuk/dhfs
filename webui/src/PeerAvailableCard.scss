@@ -1,0 +1,13 @@
+@import "./PeerCardCommon";
+
+.peerAvailableCard {
+  @extend .peerCard;
+
+  display: flex;
+  flex-direction: row;
+
+  .peerInfo {
+    flex-grow: 1;
+  }
+
+}

@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.storage.objects.repository.distributed.webapi;
 
-import com.usatiuk.dhfs.storage.objects.repository.distributed.HostInfo;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.RemoteHostManager;
 import jakarta.inject.Inject;
@@ -22,14 +21,14 @@ public class ManagementApi {
 
     @Path("known-peers")
     @GET
-    public List<HostInfo> knownPeers() {
-        return persistentRemoteHostsService.getHosts();
+    public List<KnownPeerInfo> knownPeers() {
+        return persistentRemoteHostsService.getHosts().stream().map(h -> new KnownPeerInfo(h.getUuid().toString())).toList();
     }
 
     @Path("known-peers")
     @PUT
-    public void addPeer(String hostname) {
-        remoteHostManager.addRemoteHost(UUID.fromString(hostname));
+    public void addPeer(KnownPeerPut knownPeerPut) {
+        remoteHostManager.addRemoteHost(UUID.fromString(knownPeerPut.uuid()));
     }
 
     @Path("available-peers")

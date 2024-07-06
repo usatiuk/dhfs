@@ -196,6 +196,7 @@ public class RemoteHostManager {
 
     public Collection<AvailablePeerInfo> getSeenButNotAddedHosts() {
         return _seenHostsButNotAdded.entrySet().stream()
+                .filter(e -> !persistentRemoteHostsService.existsHost(e.getKey()))
                 .map(e -> new AvailablePeerInfo(e.getKey().toString(), e.getValue().getAddr(), e.getValue().getPort()))
                 .toList();
     }
