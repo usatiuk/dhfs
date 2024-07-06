@@ -90,6 +90,8 @@ public class DhfsFuseIT {
 
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+
+        Thread.sleep(2000);
     }
 
     @AfterEach
