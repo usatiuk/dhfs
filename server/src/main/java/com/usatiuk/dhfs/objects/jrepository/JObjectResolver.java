@@ -108,9 +108,10 @@ public class JObjectResolver {
     public void updateDeletionState(JObject<?> self) {
         self.assertRWLock();
 
-        if (self.getMeta().getRefcount() > 0) {
+        if (self.getMeta().getRefcount() > 0 || self.getMeta().isLocked()) {
             if (self.isDeleted()) {
                 self.getMeta().undelete();
+                Log.debug("Undelete: " + self.getName());
                 if (self.isResolved()) {
                     for (var r : self.getData().extractRefs()) {
                         Log.trace("Hydrating ref after undelete " + r + " for " + self.getName());
@@ -120,9 +121,11 @@ public class JObjectResolver {
             }
         }
 
-        if (self.getMeta().getRefcount() <= 0)
-            if (!self.isDeleted())
+        if (self.getMeta().getRefcount() <= 0 && !self.getMeta().isLocked())
+            if (!self.isDeleted()) {
+                Log.debug("Deletion candidate: " + self.getName());
                 jObjectRefProcessor.putDeletionCandidate(self.getName());
+            }
     }
 
     public <T extends JObjectData> Optional<T> resolveDataLocal(JObject<T> jObject) {

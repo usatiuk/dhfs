@@ -203,6 +203,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             boolean wasLocked = _metaPart.isLocked();
             var prevData = _dataPart.get();
             VoidFn invalidateFn = () -> {
+                tryLocalResolve();
                 _resolver.backupRefs(this);
                 _dataPart.set(null);
                 _resolver.removeLocal(this, _metaPart.getName());

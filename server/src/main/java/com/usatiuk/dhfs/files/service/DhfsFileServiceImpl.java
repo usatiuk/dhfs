@@ -3,10 +3,9 @@ package com.usatiuk.dhfs.files.service;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.files.objects.*;
-import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
-import com.usatiuk.dhfs.files.objects.*;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -140,6 +139,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         String fname = Path.of(name).getFileName().toString();
 
         var fuuid = UUID.randomUUID();
+        Log.trace("Creating file " + fuuid);
         File f = new File(fuuid, mode, UUID.fromString(parent.getName()));
 
         if (!parent.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, invalidate) -> {
@@ -168,6 +168,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         String dname = Path.of(name).getFileName().toString();
 
         var duuid = UUID.randomUUID();
+        Log.trace("Creating dir " + duuid);
         Directory ndir = new Directory(duuid, mode); //FIXME:
 
         if (!found.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, invalidate) -> {

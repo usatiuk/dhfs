@@ -14,7 +14,7 @@ import java.util.concurrent.Executors;
 
 @ApplicationScoped
 public class DeadlockDetector {
-    private ExecutorService _executor = Executors.newSingleThreadExecutor();
+    private final ExecutorService _executor = Executors.newSingleThreadExecutor();
 
     void init(@Observes @Priority(1) StartupEvent event) {
         _executor.submit(this::run);

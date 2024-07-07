@@ -45,9 +45,7 @@ public class InvalidationQueueService {
     }
 
     private SequencedSet<String> getSetForHost(UUID host) {
-        synchronized (this) {
-            return _hostToInvObj.computeIfAbsent(host, k -> new LinkedHashSet<>());
-        }
+        return _hostToInvObj.computeIfAbsent(host, k -> new LinkedHashSet<>());
     }
 
     public Map<UUID, SequencedSet<String>> pullAll() throws InterruptedException {
