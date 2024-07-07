@@ -6,6 +6,7 @@ import com.usatiuk.dhfs.objects.repository.ObjectChangelogEntry;
 import com.usatiuk.dhfs.objects.repository.ObjectHeader;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.quarkus.logging.Log;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -122,6 +123,10 @@ public class ObjectMetadata implements Serializable {
     }
 
     public long removeRef(String from) {
+        if (isLocked()) {
+            unlock();
+            Log.error("Object " + getName() + " is locked, but we removed a reference to it, unlocking!");
+        }
         if (!_referrers.contains(from)) return _refcount;
         _referrers.remove(from);
         _refcount--;
