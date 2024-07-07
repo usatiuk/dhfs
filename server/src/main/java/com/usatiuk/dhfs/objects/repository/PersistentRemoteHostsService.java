@@ -132,16 +132,15 @@ public class PersistentRemoteHostsService {
     }
 
     private List<PersistentPeerInfo> getPeersSnapshot() {
-        return getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
-            return d.getPeers().stream().map(u -> {
-                try {
-                    return getPeer(u).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m2, d2) -> d2);
-                } catch (Exception e) {
-                    Log.warn("Error making snapshot of peer " + u, e);
-                    return null;
-                }
-            }).filter(Objects::nonNull).toList();
-        });
+        return getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY,
+                (m, d) -> d.getPeers().stream().map(u -> {
+                    try {
+                        return getPeer(u).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m2, d2) -> d2);
+                    } catch (Exception e) {
+                        Log.warn("Error making snapshot of peer " + u, e);
+                        return null;
+                    }
+                }).filter(Objects::nonNull).toList());
     }
 
     public UUID getSelfUuid() {
@@ -155,9 +154,7 @@ public class PersistentRemoteHostsService {
     }
 
     public PersistentPeerInfo getInfo(UUID name) {
-        return getPeer(name).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
-            return d;
-        });
+        return getPeer(name).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d);
     }
 
     public List<PersistentPeerInfo> getHosts() {
