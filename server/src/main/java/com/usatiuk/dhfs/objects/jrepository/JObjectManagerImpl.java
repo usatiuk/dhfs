@@ -161,6 +161,7 @@ public class JObjectManagerImpl implements JObjectManager {
                 }
 
                 if (finalCreated) finalRet.notifyWrite();// Kind of a hack?
+                return null;
             });
             return (JObject<D>) ret;
         }
