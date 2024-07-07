@@ -1,11 +1,11 @@
 package com.usatiuk.dhfs.files;
 
 import com.google.protobuf.ByteString;
-import com.usatiuk.dhfs.storage.files.objects.ChunkData;
-import com.usatiuk.dhfs.storage.files.objects.ChunkInfo;
-import com.usatiuk.dhfs.storage.files.objects.File;
-import com.usatiuk.dhfs.storage.files.service.DhfsFileService;
-import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.files.objects.ChunkData;
+import com.usatiuk.dhfs.files.objects.ChunkInfo;
+import com.usatiuk.dhfs.files.objects.File;
+import com.usatiuk.dhfs.files.service.DhfsFileService;
+import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
@@ -31,7 +31,7 @@ class Profiles {
         public Map<String, String> getConfigOverrides() {
             var ret = new HashMap<String, String>();
             ret.put("dhfs.fuse.enabled", "false");
-            ret.put("dhfs.storage.files.target_chunk_size", "-1");
+            ret.put("dhfs.files.target_chunk_size", "-1");
             return ret;
         }
     }
@@ -41,7 +41,7 @@ class Profiles {
         public Map<String, String> getConfigOverrides() {
             var ret = new HashMap<String, String>();
             ret.put("dhfs.fuse.enabled", "false");
-            ret.put("dhfs.storage.files.target_chunk_size", "3");
+            ret.put("dhfs.files.target_chunk_size", "3");
             return ret;
         }
     }
