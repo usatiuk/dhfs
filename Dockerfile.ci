@@ -3,9 +3,9 @@ FROM azul/zulu-openjdk-alpine:21
 RUN apk update && apk add fuse && rm -rf /var/cache/apk/*
 
 WORKDIR /usr/src/app
-COPY ./dhfs-package .
+COPY ./server/target/quarkus-app .
 RUN mkdir -p webui
-COPY ./webui-dist ./webui
+COPY ./webui/dist ./webui
 
 ENV dhfs_webui_root=/usr/src/app/webui
 
