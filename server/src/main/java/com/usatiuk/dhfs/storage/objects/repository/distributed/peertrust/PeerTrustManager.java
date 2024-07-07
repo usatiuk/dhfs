@@ -35,7 +35,7 @@ public class PeerTrustManager implements X509TrustManager {
         return trustManager.getAcceptedIssuers();
     }
 
-    public void reloadTrustManagerHosts(Collection<PersistentPeerInfo> hosts) {
+    public synchronized void reloadTrustManagerHosts(Collection<PersistentPeerInfo> hosts) {
         try {
             Log.info("Trying to reload trust manager: " + hosts.size() + " known hosts");
             reloadTrustManager(hosts.stream().map(hostInfo ->
@@ -45,7 +45,7 @@ public class PeerTrustManager implements X509TrustManager {
         }
     }
 
-    private void reloadTrustManager(Collection<Pair<String, X509Certificate>> certs) throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException {
+    private synchronized void reloadTrustManager(Collection<Pair<String, X509Certificate>> certs) throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException {
         KeyStore ts = KeyStore.getInstance(KeyStore.getDefaultType());
         ts.load(null, null);
 
