@@ -149,9 +149,11 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         assertRWLock();
         if (_dataPart.get() != null)
             throw new IllegalStateException("Data is not null when recording external resolution of " + getName());
+        if (!data.pushResolution())
+            throw new IllegalStateException("Expected external resolution only for classes with pushResolution " + getName());
         _metaPart.narrowClass(data.getClass());
         _dataPart.set(data);
-        if (!_metaPart.isLocked() && _metaPart.getRefcount() == 0)
+        if (!_metaPart.isLocked())
             _metaPart.lock();
         hydrateRefs();
         verifyRefs();

@@ -145,14 +145,16 @@ public class JObjectManagerImpl implements JObjectManager {
             }
             JObject<D> finalRet = (JObject<D>) ret;
             ret.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                if (parent.isPresent()) {
-                    m.addRef(parent.get());
-                } else {
-                    m.lock();
-                }
-
                 if (object.pushResolution() && object.assumeUnique() && finalRet.getData() == null) {
                     finalRet.externalResolution(object);
+                }
+
+                if (parent.isPresent()) {
+                    m.addRef(parent.get());
+                    if (m.isLocked())
+                        m.unlock();
+                } else {
+                    m.lock();
                 }
 
                 return true;
