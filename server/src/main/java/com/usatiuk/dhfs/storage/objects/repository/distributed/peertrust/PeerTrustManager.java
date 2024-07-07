@@ -15,24 +15,25 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
+import java.util.concurrent.atomic.AtomicReference;
 
 @ApplicationScoped
 public class PeerTrustManager implements X509TrustManager {
-    private X509TrustManager trustManager;
+    private AtomicReference<X509TrustManager> trustManager = new AtomicReference<>();
 
     @Override
     public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-        trustManager.checkClientTrusted(chain, authType);
+        trustManager.get().checkClientTrusted(chain, authType);
     }
 
     @Override
     public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-        trustManager.checkServerTrusted(chain, authType);
+        trustManager.get().checkServerTrusted(chain, authType);
     }
 
     @Override
     public X509Certificate[] getAcceptedIssuers() {
-        return trustManager.getAcceptedIssuers();
+        return trustManager.get().getAcceptedIssuers();
     }
 
     public synchronized void reloadTrustManagerHosts(Collection<PersistentPeerInfo> hosts) {
@@ -59,7 +60,7 @@ public class PeerTrustManager implements X509TrustManager {
         TrustManager[] tms = tmf.getTrustManagers();
         for (var tm : tms) {
             if (tm instanceof X509TrustManager) {
-                trustManager = (X509TrustManager) tm;
+                trustManager.set((X509TrustManager) tm);
                 return;
             }
         }
