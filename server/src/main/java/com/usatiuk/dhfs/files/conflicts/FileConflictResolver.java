@@ -1,8 +1,5 @@
 package com.usatiuk.dhfs.files.conflicts;
 
-import com.usatiuk.dhfs.objects.repository.ConflictResolver;
-import com.usatiuk.dhfs.objects.repository.ObjectHeader;
-import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.files.objects.ChunkData;
 import com.usatiuk.dhfs.files.objects.ChunkInfo;
 import com.usatiuk.dhfs.files.objects.Directory;
@@ -10,6 +7,9 @@ import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.objects.repository.ConflictResolver;
+import com.usatiuk.dhfs.objects.repository.ObjectHeader;
+import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -103,22 +103,25 @@ public class FileConflictResolver implements ConflictResolver {
                     if (useHashForChunks)
                         throw new NotImplementedException();
 
-                    // FIXME:
-                    for (var cuuid : oursFile.getChunks().values()) {
-                        jObjectManager
-                                .get(ChunkInfo.getNameFromHash(cuuid))
-                                .ifPresent(jObject -> jObject.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, d, b, v) -> {
-                                    m.removeRef(oursFile.getName());
-                                    return null;
-                                }));
-                    }
 
+                    HashSet<String> oursBackup = new HashSet<>(oursFile.getChunks().values());
                     oursFile.getChunks().clear();
 
                     for (var e : firstChunksCopy) {
                         oursFile.getChunks().put(e.getLeft(), e.getValue());
                         jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), ChunkData.class, Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
                         jObjectManager.getOrPut(ChunkInfo.getNameFromHash(e.getValue()), ChunkInfo.class, Optional.of(oursFile.getName()));
+                    }
+                    HashSet<String> oursNew = new HashSet<>(oursFile.getChunks().values());
+
+                    for (var cuuid : oursBackup) {
+                        if (!oursNew.contains(cuuid))
+                            jObjectManager
+                                    .get(ChunkInfo.getNameFromHash(cuuid))
+                                    .ifPresent(jObject -> jObject.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, d, b, v) -> {
+                                        m.removeRef(oursFile.getName());
+                                        return null;
+                                    }));
                     }
 
                     oursFile.setMtime(first.getMtime());
