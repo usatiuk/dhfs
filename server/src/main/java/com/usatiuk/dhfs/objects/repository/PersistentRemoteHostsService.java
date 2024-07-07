@@ -77,16 +77,14 @@ public class PersistentRemoteHostsService {
             jObjectManager.put(new PersistentPeerInfo(_selfUuid, getSelfCertificate()), Optional.of(dir.getName()));
         }
 
-        jObjectResolver.registerWriteListener(PersistentPeerInfo.class, (m, d, i, v) -> {
-            Log.info("Scheduling certificate update after " + m.getName() + " was updated");
+        jObjectResolver.registerWriteListener(PersistentPeerInfo.class, obj -> {
+            Log.info("Scheduling certificate update after " + obj.getName() + " was updated");
             executorService.submit(this::updateCerts);
-            return null;
         });
 
-        jObjectResolver.registerWriteListener(PeerDirectory.class, (m, d, i, v) -> {
-            Log.info("Scheduling certificate update after " + m.getName() + " was updated");
+        jObjectResolver.registerWriteListener(PeerDirectory.class, obj -> {
+            Log.info("Scheduling certificate update after " + obj.getName() + " was updated");
             executorService.submit(this::updateCerts);
-            return null;
         });
 
         updateCerts();

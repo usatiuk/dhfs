@@ -170,13 +170,12 @@ public class JObjectManagerImpl implements JObjectManager {
 
             if (got.isPresent()) {
                 got.get().narrowClass(klass);
-                if (parent.isPresent())
-                    got.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                        if (m.isLocked())
-                            m.unlock();
-                        m.addRef(parent.get());
-                        return true;
-                    });
+                parent.ifPresent(s -> got.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                    if (m.isLocked())
+                        m.unlock();
+                    m.addRef(s);
+                    return true;
+                }));
                 return got.get();
             }
 

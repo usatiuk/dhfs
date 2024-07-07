@@ -120,7 +120,7 @@ public class JObjectWriteback {
                         var got = _nursery.pollFirstEntry();
                         synchronized (_writeQueue) {
                             _writeQueue.put(Pair.of(got.getValue().getRight(), got.getKey().getName()), got.getKey());
-                            _writeQueue.notifyAll();
+                            _writeQueue.notify();
                         }
                     }
                 }
@@ -255,7 +255,7 @@ public class JObjectWriteback {
             synchronized (_writeQueue) {
                 _currentSize.addAndGet(size);
                 _writeQueue.put(Pair.of(size, object.getName()), object);
-                _writeQueue.notifyAll();
+                _writeQueue.notify();
                 return;
             }
         }
@@ -268,7 +268,7 @@ public class JObjectWriteback {
                 }
                 _nursery.put(object, Pair.of(curTime, size));
                 _currentSize.addAndGet(size);
-                _nursery.notifyAll();
+                _nursery.notify();
                 return;
             }
         }

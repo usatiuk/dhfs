@@ -145,6 +145,11 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         } // _dataPart.get() == null
     }
 
+    public boolean hasLocalCopy() {
+        // FIXME: Read/write lock assert?
+        return _resolver.hasLocalCopy(this);
+    }
+
     public void externalResolution(T data) {
         assertRWLock();
         if (_dataPart.get() != null)
@@ -193,6 +198,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
 
             var ver = new LinkedHashMap<>(_metaPart.getChangelog()); // FIXME:
             var ref = _metaPart.getRefcount();
+            var prevClass = _metaPart.getKnownClass();
             boolean wasDeleted = _metaPart.isDeleted();
             var prevData = _dataPart.get();
             VoidFn invalidateFn = () -> {
@@ -216,7 +222,8 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             if (!Objects.equals(ver, _metaPart.getChangelog())
                     || ref != _metaPart.getRefcount()
                     || wasDeleted != _metaPart.isDeleted()
-                    || prevData != _dataPart.get())
+                    || prevData != _dataPart.get()
+                    || !prevClass.equals(_metaPart.getKnownClass()))
                 notifyWriteMeta();
             if (!Objects.equals(ver, _metaPart.getChangelog())
                     || prevData != _dataPart.get())

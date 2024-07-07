@@ -41,7 +41,9 @@ public class JObjectResolver {
     @Inject
     JObjectRefProcessor jObjectRefProcessor;
 
-    private final MultiValuedMap<Class<? extends JObjectData>, JObject.ObjectFnWrite<?, Void>> _writeListeners
+    private final MultiValuedMap<Class<? extends JObjectData>, WriteListenerFn<?>> _writeListeners
+            = new ArrayListValuedHashMap<>();
+    private final MultiValuedMap<Class<? extends JObjectData>, WriteListenerFn<?>> _metaWriteListeners
             = new ArrayListValuedHashMap<>();
 
     @ConfigProperty(name = "dhfs.objects.ref_verification")
@@ -50,8 +52,23 @@ public class JObjectResolver {
     @ConfigProperty(name = "dhfs.objects.bump_verification")
     boolean bumpVerification;
 
-    public <T extends JObjectData> void registerWriteListener(Class<T> klass, JObject.ObjectFnWrite<T, Void> fn) {
+
+    @FunctionalInterface
+    public interface WriteListenerFn<T extends JObjectData> {
+        void apply(JObject<T> obj);
+    }
+
+    public <T extends JObjectData> void registerWriteListener(Class<T> klass, WriteListenerFn<T> fn) {
         _writeListeners.put(klass, fn);
+    }
+
+    public <T extends JObjectData> void registerMetaWriteListener(Class<T> klass, WriteListenerFn<T> fn) {
+        _metaWriteListeners.put(klass, fn);
+    }
+
+    public boolean hasLocalCopy(JObject<?> self) {
+        // FIXME: Read/write lock assert?
+        return objectPersistentStore.existsObject(self.getName());
     }
 
     public void backupRefs(JObject<?> self) {
@@ -141,9 +158,14 @@ public class JObjectResolver {
         }
     }
 
-    public void notifyWriteMeta(JObject<?> self) {
+    public <T extends JObjectData> void notifyWriteMeta(JObject<T> self) {
         self.assertRWLock();
         jObjectWriteback.markDirty(self);
+        for (var t : _metaWriteListeners.keySet()) { // FIXME:?
+            if (t.isAssignableFrom(self.getKnownClass()))
+                for (var cb : _metaWriteListeners.get(t))
+                    cb.apply((JObject) self);
+        }
     }
 
     public <T extends JObjectData> void notifyWriteData(JObject<T> self) {
@@ -151,10 +173,10 @@ public class JObjectResolver {
         jObjectWriteback.markDirty(self);
         if (self.isResolved()) {
             invalidationQueueService.pushInvalidationToAll(self.getName());
-            for (var e : _writeListeners.keySet()) { // FIXME:?
-                if (e.isAssignableFrom((self.getData().getClass())))
-                    for (var cb : _writeListeners.get(e))
-                        self.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (JObject.ObjectFnWrite<T, ?>) cb);
+            for (var t : _writeListeners.keySet()) { // FIXME:?
+                if (t.isAssignableFrom(self.getKnownClass()))
+                    for (var cb : _writeListeners.get(t))
+                        cb.apply((JObject) self);
             }
         }
     }
