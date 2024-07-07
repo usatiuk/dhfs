@@ -59,16 +59,16 @@ jobs:
 
       - run:
           name: Install node modules
-          command: cd backend && npm i
+          command: cd webui && npm i
 
       - save_cache:
           paths:
             - webui/node_modules
-          key: webui-dependencies-{{ checksum "backend/package.json" }}
+          key: webui-dependencies-{{ checksum "webui/package.json" }}
 
       - run:
           name: Build
-          command: cd backend && npm run build
+          command: cd webui && npm run build
 
       - store_artifacts:
           path: webui/dist
