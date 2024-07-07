@@ -161,6 +161,6 @@ workflows:
           requires:
             - build-dhfs
             - build-webui
-          filters:
-            branches:
-              only: main
+          # filters:
+          #   branches:
+          #     only: main
