@@ -10,6 +10,7 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.util.UUID;
 import java.util.function.Supplier;
 
 @ApplicationScoped
@@ -28,17 +29,19 @@ public class PeerRolesAugmentor implements SecurityIdentityAugmentor {
         } else {
             QuarkusSecurityIdentity.Builder builder = QuarkusSecurityIdentity.builder(identity);
 
-            var entry = persistentRemoteHostsService.getHosts().stream()
-                    .filter(i -> i.getUuid().toString()
-                            .equals(identity.getPrincipal().getName().substring(3)))
-                    .findFirst();
-            if (entry.isEmpty()) return () -> identity;
+            var uuid = identity.getPrincipal().getName().substring(3);
 
-            if (!entry.get().getCertificate().equals(identity.getCredential(CertificateCredential.class).getCertificate()))
+            try {
+                var entry = persistentRemoteHostsService.getHost(UUID.fromString(uuid));
+
+                if (!entry.getCertificate().equals(identity.getCredential(CertificateCredential.class).getCertificate()))
+                    return () -> identity;
+
+                builder.addRole("cluster-member");
+                return builder::build;
+            } catch (Exception e) {
                 return () -> identity;
-
-            builder.addRole("cluster-member");
-            return builder::build;
+            }
         }
     }
 }

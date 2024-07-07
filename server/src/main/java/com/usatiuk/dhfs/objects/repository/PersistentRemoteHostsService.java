@@ -219,6 +219,10 @@ public class PersistentRemoteHostsService {
         return getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.getPeers().contains(uuid));
     }
 
+    public PersistentPeerInfo getHost(UUID uuid) {
+        return getPeer(uuid).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d);
+    }
+
     public KeyPair getSelfKeypair() {
         return _persistentData.runReadLocked(PersistentRemoteHostsData::getSelfKeyPair);
     }
