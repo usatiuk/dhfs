@@ -55,12 +55,13 @@ public class AutoSyncProcessor {
             jObjectResolver.registerMetaWriteListener(PeerDirectory.class, this::alwaysSaveCallback);
         }
 
-        executorService.submit(() -> {
-            for (var obj : jObjectManager.find("")) {
-                if (!obj.hasLocalCopy())
-                    add(obj.getName());
-            }
-        });
+        if (downloadAll)
+            executorService.submit(() -> {
+                for (var obj : jObjectManager.find("")) {
+                    if (!obj.hasLocalCopy())
+                        add(obj.getName());
+                }
+            });
     }
 
     private void alwaysSaveCallback(JObject<?> obj) {
