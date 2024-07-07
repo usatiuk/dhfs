@@ -51,6 +51,8 @@ public class DeadlockDetector {
                         }
                         sb.append("===");
                     }
+
+                    Log.error(sb);
                 }
             }
         } catch (InterruptedException e) {
