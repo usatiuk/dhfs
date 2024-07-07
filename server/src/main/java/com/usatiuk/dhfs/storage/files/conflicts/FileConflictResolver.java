@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.storage.files.conflicts;
 
-import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
+import com.usatiuk.dhfs.objects.repository.ObjectHeader;
 import com.usatiuk.dhfs.storage.files.objects.ChunkData;
 import com.usatiuk.dhfs.storage.files.objects.ChunkInfo;
 import com.usatiuk.dhfs.storage.files.objects.Directory;
@@ -8,8 +8,8 @@ import com.usatiuk.dhfs.storage.files.objects.File;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
+import com.usatiuk.dhfs.storage.objects.repository.ConflictResolver;
+import com.usatiuk.dhfs.storage.objects.repository.PersistentRemoteHostsService;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;

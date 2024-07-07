@@ -2,7 +2,7 @@ package com.usatiuk.dhfs.storage.objects.jrepository;
 
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.storage.SerializationHelper;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
+import com.usatiuk.dhfs.storage.objects.repository.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;

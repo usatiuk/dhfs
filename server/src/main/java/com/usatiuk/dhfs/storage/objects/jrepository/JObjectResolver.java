@@ -1,9 +1,9 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
 import com.usatiuk.dhfs.storage.SerializationHelper;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.InvalidationQueueService;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.RemoteObjectServiceClient;
+import com.usatiuk.dhfs.storage.objects.repository.InvalidationQueueService;
+import com.usatiuk.dhfs.storage.objects.repository.PersistentRemoteHostsService;
+import com.usatiuk.dhfs.storage.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;

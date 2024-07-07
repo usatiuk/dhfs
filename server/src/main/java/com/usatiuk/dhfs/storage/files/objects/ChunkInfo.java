@@ -3,7 +3,7 @@ package com.usatiuk.dhfs.storage.files.objects;
 import com.usatiuk.dhfs.storage.files.conflicts.NoOpConflictResolver;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
+import com.usatiuk.dhfs.storage.objects.repository.ConflictResolver;
 import lombok.Getter;
 
 import java.util.Collection;

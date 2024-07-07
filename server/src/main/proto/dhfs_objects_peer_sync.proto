@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 option java_multiple_files = true;
-option java_package = "com.usatiuk.dhfs.objects.repository.distributed.peersync";
+option java_package = "com.usatiuk.dhfs.objects.repository.peersync";
 option java_outer_classname = "DhfsObjectPeerSyncApi";
 
 package dhfs.objects.peersync;

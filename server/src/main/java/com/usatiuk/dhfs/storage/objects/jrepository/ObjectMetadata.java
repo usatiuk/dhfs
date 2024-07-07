@@ -1,8 +1,8 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
-import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelog;
-import com.usatiuk.dhfs.objects.repository.distributed.ObjectChangelogEntry;
-import com.usatiuk.dhfs.objects.repository.distributed.ObjectHeader;
+import com.usatiuk.dhfs.objects.repository.ObjectChangelog;
+import com.usatiuk.dhfs.objects.repository.ObjectChangelogEntry;
+import com.usatiuk.dhfs.objects.repository.ObjectHeader;
 import com.usatiuk.dhfs.storage.SerializationHelper;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;

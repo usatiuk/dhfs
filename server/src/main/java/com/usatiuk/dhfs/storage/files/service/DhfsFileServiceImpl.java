@@ -5,7 +5,7 @@ import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.storage.files.objects.*;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
+import com.usatiuk.dhfs.storage.objects.repository.PersistentRemoteHostsService;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;

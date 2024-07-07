@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
-import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
+import com.usatiuk.dhfs.storage.objects.repository.ConflictResolver;
 import io.quarkus.logging.Log;
 import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.NotImplementedException;

@@ -41,8 +41,8 @@ public class DhfsFuseIT {
                                 .run("apt update && apt install -y libfuse2 curl")
                                 .copy("/app", "/app")
                                 .cmd("java", "-ea", "-Xmx128M", "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
-                                        "-Ddhfs.objects.distributed.peerdiscovery.interval=500",
-                                        "-Ddhfs.objects.distributed.invalidation.delay=200",
+                                        "-Ddhfs.objects.peerdiscovery.interval=500",
+                                        "-Ddhfs.objects.invalidation.delay=200",
                                         "-Ddhfs.objects.ref_verification=true",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".min-level=TRACE",

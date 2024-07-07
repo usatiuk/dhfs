@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 option java_multiple_files = true;
-option java_package = "com.usatiuk.dhfs.objects.repository.distributed.peerdiscovery";
+option java_package = "com.usatiuk.dhfs.objects.repository.peerdiscovery";
 option java_outer_classname = "DhfsObjectPeerDiscoveryApi";
 
 package dhfs.objects.peerdiscovery;
