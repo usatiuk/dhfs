@@ -36,7 +36,7 @@ jobs:
           cache: maven
 
       - name: Build and test with Maven
-        run: cd server && mvn --batch-mode --update-snapshots package verify -Dskip.unit=true  -Dmaven.test.skip=true
+        run: cd server && mvn --batch-mode --update-snapshots package verify
 
       - uses: actions/upload-artifact@v3
         with:
