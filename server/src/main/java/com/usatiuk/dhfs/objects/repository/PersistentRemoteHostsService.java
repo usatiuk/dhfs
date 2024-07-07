@@ -47,6 +47,9 @@ public class PersistentRemoteHostsService {
     @Inject
     ExecutorService executorService;
 
+    @Inject
+    InvalidationQueueService invalidationQueueService;
+
     final String dataFileName = "hosts";
 
     private PersistentRemoteHosts _persistentData = new PersistentRemoteHosts();
@@ -77,15 +80,8 @@ public class PersistentRemoteHostsService {
             jObjectManager.put(new PersistentPeerInfo(_selfUuid, getSelfCertificate()), Optional.of(dir.getName()));
         }
 
-        jObjectResolver.registerWriteListener(PersistentPeerInfo.class, obj -> {
-            Log.info("Scheduling certificate update after " + obj.getName() + " was updated");
-            executorService.submit(this::updateCerts);
-        });
-
-        jObjectResolver.registerWriteListener(PeerDirectory.class, obj -> {
-            Log.info("Scheduling certificate update after " + obj.getName() + " was updated");
-            executorService.submit(this::updateCerts);
-        });
+        jObjectResolver.registerWriteListener(PersistentPeerInfo.class, this::pushPeerUpdates);
+        jObjectResolver.registerWriteListener(PeerDirectory.class, this::pushPeerUpdates);
 
         // FIXME: Warn on failed resolves?
         getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
@@ -112,6 +108,16 @@ public class PersistentRemoteHostsService {
             return null;
         });
         return (JObject<PeerDirectory>) got;
+    }
+
+    private void pushPeerUpdates(JObject<?> obj) {
+        Log.info("Scheduling certificate update after " + obj.getName() + " was updated");
+        executorService.submit(() -> {
+            updateCerts();
+            invalidationQueueService.pushInvalidationToAll(PeerDirectory.PeerDirectoryObjName);
+            for (var p : getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.getPeers().stream().toList()))
+                invalidationQueueService.pushInvalidationToAll(PersistentPeerInfo.getNameFromUuid(p));
+        });
     }
 
     private JObject<PersistentPeerInfo> getPeer(UUID uuid) {
