@@ -1,10 +1,10 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
+import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.repository.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
-import com.usatiuk.dhfs.SerializationHelper;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -151,9 +151,10 @@ public class JObjectResolver {
         jObjectWriteback.markDirty(self);
         if (self.isResolved()) {
             invalidationQueueService.pushInvalidationToAll(self.getName());
-            for (var l : _writeListeners.get(self.getData().getClass())) {
-                // TODO: Assert types?
-                self.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (JObject.ObjectFnWrite<T, ?>) l);
+            for (var e : _writeListeners.keySet()) { // FIXME:?
+                if (e.isAssignableFrom((self.getData().getClass())))
+                    for (var cb : _writeListeners.get(e))
+                        self.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (JObject.ObjectFnWrite<T, ?>) cb);
             }
         }
     }
