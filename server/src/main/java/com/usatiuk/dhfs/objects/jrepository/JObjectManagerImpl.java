@@ -133,6 +133,7 @@ public class JObjectManagerImpl implements JObjectManager {
     public <D extends JObjectData> JObject<D> put(D object, Optional<String> parent) {
         while (true) {
             JObject<?> ret;
+            boolean created = false;
             synchronized (this) {
                 ret = getFromMap(object.getName());
                 if (ret != null) {
@@ -141,9 +142,11 @@ public class JObjectManagerImpl implements JObjectManager {
                 } else {
                     ret = new JObject<D>(jObjectResolver, object.getName(), persistentRemoteHostsService.getSelfUuid(), object);
                     _map.put(object.getName(), new NamedSoftReference(ret, _refQueue));
+                    created = true;
                 }
             }
             JObject<D> finalRet = (JObject<D>) ret;
+            boolean finalCreated = created;
             ret.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                 if (object.pushResolution() && object.assumeUnique() && finalRet.getData() == null) {
                     finalRet.externalResolution(object);
@@ -157,7 +160,7 @@ public class JObjectManagerImpl implements JObjectManager {
                     m.lock();
                 }
 
-                return true;
+                if (finalCreated) finalRet.notifyWrite();// Kind of a hack?
             });
             return (JObject<D>) ret;
         }
@@ -192,6 +195,8 @@ public class JObjectManagerImpl implements JObjectManager {
                     _map.put(name, new NamedSoftReference(created, _refQueue));
                     created.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                         parent.ifPresent(m::addRef);
+                        if (parent.isEmpty())
+                            created.notifyWrite();
                         return null;
                     });
                     return created;

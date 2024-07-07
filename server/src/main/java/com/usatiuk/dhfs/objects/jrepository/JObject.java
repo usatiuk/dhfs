@@ -200,6 +200,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             var ref = _metaPart.getRefcount();
             var prevClass = _metaPart.getKnownClass();
             boolean wasDeleted = _metaPart.isDeleted();
+            boolean wasLocked = _metaPart.isLocked();
             var prevData = _dataPart.get();
             VoidFn invalidateFn = () -> {
                 _resolver.backupRefs(this);
@@ -223,7 +224,8 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
                     || ref != _metaPart.getRefcount()
                     || wasDeleted != _metaPart.isDeleted()
                     || prevData != _dataPart.get()
-                    || !prevClass.equals(_metaPart.getKnownClass()))
+                    || !prevClass.equals(_metaPart.getKnownClass())
+                    || wasLocked != _metaPart.isLocked())
                 notifyWriteMeta();
             if (!Objects.equals(ver, _metaPart.getChangelog())
                     || prevData != _dataPart.get())

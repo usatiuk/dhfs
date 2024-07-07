@@ -4,6 +4,8 @@ import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.jrepository.JObjectResolver;
+import com.usatiuk.dhfs.objects.repository.peersync.PeerDirectory;
+import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.Startup;
@@ -47,13 +49,10 @@ public class AutoSyncProcessor {
         }
 
         if (downloadAll) {
-            jObjectResolver.registerMetaWriteListener(JObjectData.class, obj -> {
-                obj.assertRWLock();
-                if (obj.getData() != null) return;
-                if (obj.hasLocalCopy()) return;
-
-                add(obj.getName());
-            });
+            jObjectResolver.registerMetaWriteListener(JObjectData.class, this::alwaysSaveCallback);
+        } else {
+            jObjectResolver.registerMetaWriteListener(PersistentPeerInfo.class, this::alwaysSaveCallback);
+            jObjectResolver.registerMetaWriteListener(PeerDirectory.class, this::alwaysSaveCallback);
         }
 
         executorService.submit(() -> {
@@ -62,6 +61,14 @@ public class AutoSyncProcessor {
                     add(obj.getName());
             }
         });
+    }
+
+    private void alwaysSaveCallback(JObject<?> obj) {
+        obj.assertRWLock();
+        if (obj.getData() != null) return;
+        if (obj.hasLocalCopy()) return;
+
+        add(obj.getName());
     }
 
     void shutdown(@Observes @Priority(10) ShutdownEvent event) {
