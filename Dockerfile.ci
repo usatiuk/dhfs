@@ -1,0 +1,16 @@
+FROM azul/zulu-openjdk-alpine:21
+
+RUN apk update && apk add fuse && rm -rf /var/cache/apk/*
+
+WORKDIR /usr/src/app
+COPY ./dhfs-package-downloaded/. .
+RUN mkdir -p webui
+COPY ./webui-dist-downloaded/. ./webui
+
+ENV dhfs_webui_root=/usr/src/app/webui
+
+COPY ./dockerentry.sh .
+
+RUN ["chmod", "+x", "./dockerentry.sh"]
+
+CMD [ "./dockerentry.sh" ]
