@@ -73,7 +73,7 @@ jobs:
           name: Webui
           path: webui/dist
 
-  docker-publish:
+  publish-docker:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -163,3 +163,48 @@ jobs:
         # This step uses the identity token to provision an ephemeral certificate
         # against the sigstore community Fulcio instance.
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+
+  publish-run-wrapper:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      # This is used to complete the identity challenge
+      # with sigstore/fulcio when running outside of PRs.
+      id-token: write
+
+    needs: [build-webui, build-dhfs]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: DHFS Package
+          path: dhfs-package-downloaded
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: Webui
+          path: webui-dist-downloaded
+
+      - name: Show all the files
+        run: find .
+
+      - name: Make run wrapper dirs
+        run: mkdir -p run-wrapper-out/data && mkdir -p run-wrapper-out/fuse && mkdir -p run-wrapper-out/app
+
+      - name: Copy DHFS
+        run: cp -r ./dhfs-package-downloaded "run-wrapper-out/app/DHFS Package"
+
+      - name: Copy Webui
+        run: cp -r ./webui-dist-downloaded "run-wrapper-out/app/Webui"
+
+      - name: Copy run wrapper
+        run: cp -r ./run-wrapper/run.sh "run-wrapper-out/app/"
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: Run wrapper
+          path: run-wrapper-out
