@@ -68,6 +68,7 @@ public class InvalidationQueueService {
                 data.entrySet().stream().filter(e -> persistentRemoteHostsService.existsHost(e.getKey())).forEach(forHost -> {
                     String stats = "Sent invalidation: ";
                     long sent = 0;
+                    long success = 0;
 
                     while (!forHost.getValue().isEmpty()) {
                         ArrayList<String> chunk = new ArrayList<>();
@@ -78,26 +79,27 @@ public class InvalidationQueueService {
                         }
 
                         sent += chunk.size();
-
+                        success = sent;
                         try {
                             var errs = remoteObjectServiceClient.notifyUpdate(forHost.getKey(), chunk);
                             for (var v : errs) {
                                 Log.info("Failed to send invalidation to " + forHost.getKey() +
                                         " of " + v.getObjectName() + ": " + v.getError() + ", will retry");
                                 pushInvalidationToOne(forHost.getKey(), v.getObjectName());
-                                sent--;
+                                success--;
                             }
                         } catch (Exception e) {
                             Log.info("Failed to send invalidation to " + forHost.getKey() + ": " + e.getMessage() + ", will retry");
                             for (var c : chunk)
                                 pushInvalidationToOne(forHost.getKey(), c);
+                            success = 0;
                         }
                         if (Thread.interrupted()) {
                             Log.info("Invalidation sender exiting");
                             return;
                         }
                     }
-                    stats += forHost.getKey() + ": " + sent + " ";
+                    stats += forHost.getKey() + ": " + success + "/" + sent + " ";
                     Log.info(stats);
                 });
             }
