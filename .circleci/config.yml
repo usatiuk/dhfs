@@ -40,8 +40,12 @@ jobs:
           destination: package
 
       - store_artifacts:
-          path: server/target/*-reports
-          destination: mvn-logs
+          path: server/target/surefire-reports
+          destination: surefire-reports
+
+      - store_artifacts:
+          path: server/target/failsafe-reports
+          destination: failsafe-reports
 
       - save_cache:
           paths:
