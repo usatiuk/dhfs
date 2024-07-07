@@ -32,7 +32,7 @@ public class CertificateTools {
 
     public static KeyPair generateKeyPair() throws NoSuchAlgorithmException {
         KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
-        keyGen.initialize(1024); //FIXME:
+        keyGen.initialize(2048); //FIXME:
         return keyGen.generateKeyPair();
     }
 
