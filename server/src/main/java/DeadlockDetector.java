@@ -1,3 +1,4 @@
+import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
@@ -25,27 +26,35 @@ public class DeadlockDetector {
 
     private void run() {
         ThreadMXBean bean = ManagementFactory.getThreadMXBean();
-        long[] threadIds = bean.findDeadlockedThreads(); // Returns null if no threads are deadlocked.
+        try {
+            while (!Thread.interrupted()) {
+                Thread.sleep(4000);
 
-        if (threadIds != null) {
-            ThreadInfo[] infos = bean.getThreadInfo(threadIds);
+                long[] threadIds = bean.findDeadlockedThreads(); // Returns null if no threads are deadlocked.
 
-            StringBuilder sb = new StringBuilder();
+                if (threadIds != null) {
+                    ThreadInfo[] infos = bean.getThreadInfo(threadIds);
 
-            sb.append("Deadlock detected!\n");
+                    StringBuilder sb = new StringBuilder();
 
-            for (ThreadInfo info : infos) {
-                StackTraceElement[] stack = info.getStackTrace();
-                sb.append(info.getThreadName()).append("\n");
-                sb.append("getLockedMonitors:").append(Arrays.toString(info.getLockedMonitors())).append("\n");
-                sb.append("getLockedSynchronizers:").append(Arrays.toString(info.getLockedSynchronizers())).append("\n");
-                sb.append("waiting on:").append(info.getLockInfo()).append("\n");
-                sb.append("Stack trace:\n");
-                for (var e : stack) {
-                    sb.append(e.toString()).append("\n");
+                    sb.append("Deadlock detected!\n");
+
+                    for (ThreadInfo info : infos) {
+                        StackTraceElement[] stack = info.getStackTrace();
+                        sb.append(info.getThreadName()).append("\n");
+                        sb.append("getLockedMonitors:").append(Arrays.toString(info.getLockedMonitors())).append("\n");
+                        sb.append("getLockedSynchronizers:").append(Arrays.toString(info.getLockedSynchronizers())).append("\n");
+                        sb.append("waiting on:").append(info.getLockInfo()).append("\n");
+                        sb.append("Stack trace:\n");
+                        for (var e : stack) {
+                            sb.append(e.toString()).append("\n");
+                        }
+                        sb.append("===");
+                    }
                 }
-                sb.append("===");
             }
+        } catch (InterruptedException e) {
         }
+        Log.info("Deadlock detector thread exiting");
     }
 }
