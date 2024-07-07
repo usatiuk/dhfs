@@ -16,10 +16,14 @@ export function PeerAvailableCard({ peerInfo }: TPeerAvailableCardProps) {
                 <span>UUID: </span>
                 <span>{peerInfo.uuid}</span>
             </div>
-            <fetcher.Form method="put" action={"/home/peers"}>
+            <fetcher.Form
+                className="actions"
+                method="put"
+                action={"/home/peers"}
+            >
+                <button type="submit">connect</button>
                 <input name="intent" hidden={true} value={"add_peer"} />
                 <input name="uuid" hidden={true} value={peerInfo.uuid} />
-                <button type="submit">connect</button>
             </fetcher.Form>
         </div>
     );

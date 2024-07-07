@@ -3,8 +3,7 @@
 .peerAvailableCard {
   @extend .peerCard;
 
-  display: flex;
-  flex-direction: row;
+  @include card-with-actions;
 
   .peerInfo {
     flex-grow: 1;
