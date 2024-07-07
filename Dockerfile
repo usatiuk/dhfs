@@ -17,7 +17,7 @@ RUN ./mvnw -Dmaven.test.skip=true -Dskip.unit=true package --fail-never
 COPY ./server/. .
 RUN ./mvnw -Dmaven.test.skip=true -Dskip.unit=true clean package
 
-FROM azul/zulu-openjdk-alpine:21
+FROM azul/zulu-openjdk-alpine:21-jre-headless
 
 RUN apk update && apk add fuse && rm -rf /var/cache/apk/*
 
