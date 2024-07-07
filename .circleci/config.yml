@@ -9,7 +9,7 @@ jobs:
     # Specify the execution environment. You can specify an image from Docker Hub or use one of our convenience images from CircleCI's Developer Hub.
     # See: https://circleci.com/docs/executor-intro/ & https://circleci.com/docs/configuration-reference/#executor-job
     machine: # executor type
-      image: ubuntu-2004:202010-01 # # recommended linux image - includes Ubuntu 20.04, docker 19.03.13, docker-compose 1.27.4
+      image: ubuntu-2004:current # # recommended linux image - includes Ubuntu 20.04, docker 19.03.13, docker-compose 1.27.4
 
     environment:
       # Customize the JVM maximum heap limit
