@@ -8,19 +8,12 @@ jobs:
   build:
     # Specify the execution environment. You can specify an image from Docker Hub or use one of our convenience images from CircleCI's Developer Hub.
     # See: https://circleci.com/docs/executor-intro/ & https://circleci.com/docs/configuration-reference/#executor-job
-    docker:
-      # Specify the version you desire here
-      # See: https://circleci.com/developer/images/image/cimg/openjdk
-      - image: cimg/openjdk:21.0
-
-      # Specify service dependencies here if necessary
-      # CircleCI maintains a library of pre-built images
-      # documented at https://circleci.com/docs/circleci-images/
-      # - image: circleci/postgres:9.4
+    machine: # executor type
+      image: ubuntu-2004:202010-01 # # recommended linux image - includes Ubuntu 20.04, docker 19.03.13, docker-compose 1.27.4
 
     environment:
       # Customize the JVM maximum heap limit
-      JVM_OPTS: -Xmx3200m
+      JVM_OPTS: -Xmx1G
       TERM: dumb
 
     # Add steps to the job
@@ -29,7 +22,7 @@ jobs:
       # Checkout the code as the first step.
       - checkout
 
-      - run: sudo apt-get update && sudo apt-get install -y fuse # FIXME
+      - run: sudo apt-get update && sudo apt-get install -y fuse openjdk-21-jdk maven # FIXME
 
       # Download and cache dependencies
       - restore_cache:
@@ -43,6 +36,7 @@ jobs:
       - store_artifacts:
           path: server/target/quarkus-app
           destination: package
+
       - store_artifacts:
           path: server/target/*-reports
           destination: mvn-logs
