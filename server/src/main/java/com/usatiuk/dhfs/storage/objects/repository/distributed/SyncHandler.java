@@ -160,7 +160,6 @@ public class SyncHandler {
                 handleOneUpdate(UUID.fromString(request.getSelfUuid()), u);
             } catch (OutdatedUpdateException ignored) {
                 Log.info("Outdated update of " + u.getName() + " from " + request.getSelfUuid());
-                invalidationQueueService.pushInvalidationToOne(UUID.fromString(request.getSelfUuid()), u.getName(), true); // True?
             } catch (Exception ex) {
                 Log.info("Error when handling update from " + request.getSelfUuid() + " of " + u.getName(), ex);
                 builder.addErrors(IndexUpdateError.newBuilder().setObjectName(u.getName()).setError(ex + Arrays.toString(ex.getStackTrace())).build());
