@@ -87,7 +87,11 @@ public class PersistentRemoteHostsService {
             executorService.submit(this::updateCerts);
         });
 
-        updateCerts();
+        // FIXME: Warn on failed resolves?
+        getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
+            peerTrustManager.reloadTrustManagerHosts(getHosts());
+            return null;
+        });
 
         Files.writeString(Paths.get(dataRoot, "self_uuid"), _selfUuid.toString());
         Log.info("Self uuid is: " + _selfUuid.toString());
