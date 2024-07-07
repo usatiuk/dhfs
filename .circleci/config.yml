@@ -81,8 +81,6 @@ jobs:
           name: Archive everything
           command: |
             zip -r webui-dist.zip webui/dist
-            zip -r surefire-reports.zip server/target/surefire-reports
-            zip -r failsafe-reports.zip server/target/failsafe-reports
 
       - store_artifacts:
           path: webui-dist.zip
