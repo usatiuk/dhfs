@@ -52,26 +52,28 @@ public class AutoSyncProcessor {
                 if (obj.getData() != null) return;
                 if (obj.hasLocalCopy()) return;
 
-                synchronized (_pending) {
-                    _pending.add(obj.getName());
-                    _pending.notify();
-                }
+                add(obj.getName());
             });
         }
 
         executorService.submit(() -> {
             for (var obj : jObjectManager.find("")) {
                 if (!obj.hasLocalCopy())
-                    synchronized (_pending) {
-                        _pending.add(obj.getName());
-                        _pending.notify();
-                    }
+                    add(obj.getName());
             }
         });
     }
 
     void shutdown(@Observes @Priority(10) ShutdownEvent event) {
         _autosyncExcecutor.shutdownNow();
+    }
+
+    private void add(String name) {
+        synchronized (_pending) {
+            _pending.add(name);
+            _pending.notify(); // FIXME: Delay?
+        }
+
     }
 
     private void autosync() {
@@ -90,19 +92,20 @@ public class AutoSyncProcessor {
                         // FIXME: does this double lock make sense?
                         if (obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> obj.hasLocalCopy()))
                             return;
-                        obj.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, i, v) -> {
-                            if (obj.hasLocalCopy()) return null;
-                            obj.tryResolve(JObject.ResolutionStrategy.REMOTE);
-                            return null;
+                        boolean ok = obj.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, i, v) -> {
+                            if (obj.hasLocalCopy()) return true;
+                            return obj.tryResolve(JObject.ResolutionStrategy.REMOTE);
                         });
+                        if (!ok) {
+                            Log.warn("Failed downloading object " + name + ", will retry.");
+                            add(name);
+                        }
                     });
                 } catch (JObject.DeletedObjectAccessException ignored) {
                 } catch (Exception e) {
                     Log.error("Failed downloading object " + name + ", will retry.", e);
-                    synchronized (_pending) {
-                        _pending.add(name);
-                        _pending.notify(); // FIXME: Delay?
-                    }
+                    add(name);
+                    // Delay?
                 }
             }
         } catch (InterruptedException ignored) {
