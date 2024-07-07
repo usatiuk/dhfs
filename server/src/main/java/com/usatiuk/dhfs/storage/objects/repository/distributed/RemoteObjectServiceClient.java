@@ -5,7 +5,6 @@ import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.repository.distributed.*;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObject;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.peersync.PeerDirectory;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.peersync.PersistentPeerInfo;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -73,7 +72,7 @@ public class RemoteObjectServiceClient {
                         syncHandler.handleOneUpdate(UUID.fromString(reply.getSelfUuid()), reply.getObject().getHeader());
                     } catch (SyncHandler.OutdatedUpdateException ignored) {
                         Log.info("Outdated update of " + md.getName() + " from " + reply.getSelfUuid());
-                        invalidationQueueService.pushInvalidationToOne(UUID.fromString(reply.getSelfUuid()), md.getName(), true); // True?
+                        invalidationQueueService.pushInvalidationToOne(UUID.fromString(reply.getSelfUuid()), md.getName());
                         throw new StatusRuntimeException(Status.ABORTED.withDescription("Received outdated object version"));
                     } catch (Exception e) {
                         Log.error("Received unexpected object version from " + reply.getSelfUuid()
@@ -101,13 +100,8 @@ public class RemoteObjectServiceClient {
             if (obj.isEmpty()) continue;
 
             try {
-                var header = obj.get().runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> Pair.of(m.toRpcHeader(d), m.isSeen()));
-                if (!header.getRight())
-                    obj.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                        m.markSeen();
-                        return null;
-                    });
-                builder.addHeader(header.getLeft());
+                var header = obj.get().runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> m.toRpcHeader(d));
+                builder.addHeader(header);
             } catch (JObject.DeletedObjectAccessException e) {
                 continue;
             }

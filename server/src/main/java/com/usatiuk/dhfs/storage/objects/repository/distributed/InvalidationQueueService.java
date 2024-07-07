@@ -8,7 +8,6 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.*;
@@ -30,7 +29,7 @@ public class InvalidationQueueService {
     @ConfigProperty(name = "dhfs.objects.distributed.invalidation.delay")
     Integer delay;
 
-    private Map<UUID, SequencedSet<Pair<String, Boolean>>> _hostToInvObj = new LinkedHashMap<>();
+    private Map<UUID, SequencedSet<String>> _hostToInvObj = new LinkedHashMap<>();
 
     private Thread _senderThread;
 
@@ -46,13 +45,13 @@ public class InvalidationQueueService {
         _senderThread.join();
     }
 
-    private SequencedSet<Pair<String, Boolean>> getSetForHost(UUID host) {
+    private SequencedSet<String> getSetForHost(UUID host) {
         synchronized (this) {
             return _hostToInvObj.computeIfAbsent(host, k -> new LinkedHashSet<>());
         }
     }
 
-    public Map<UUID, SequencedSet<Pair<String, Boolean>>> pullAll() throws InterruptedException {
+    public Map<UUID, SequencedSet<String>> pullAll() throws InterruptedException {
         synchronized (this) {
             while (_hostToInvObj.isEmpty())
                 this.wait();
@@ -75,10 +74,7 @@ public class InvalidationQueueService {
 
                         while (chunk.size() < batchSize && !forHost.getValue().isEmpty()) {
                             var got = forHost.getValue().removeFirst();
-                            chunk.add(got.getKey());
-                            if (got.getRight()) {
-                                jObjectManager.notifySent(got.getKey());
-                            }
+                            chunk.add(got);
                         }
 
                         sent += chunk.size();
@@ -88,13 +84,13 @@ public class InvalidationQueueService {
                             for (var v : errs) {
                                 Log.info("Failed to send invalidation to " + forHost.getKey() +
                                         " of " + v.getObjectName() + ": " + v.getError() + ", will retry");
-                                pushInvalidationToOne(forHost.getKey(), v.getObjectName(), false);
+                                pushInvalidationToOne(forHost.getKey(), v.getObjectName());
                                 sent--;
                             }
                         } catch (Exception e) {
                             Log.info("Failed to send invalidation to " + forHost.getKey() + ": " + e.getMessage() + ", will retry");
                             for (var c : chunk)
-                                pushInvalidationToOne(forHost.getKey(), c, false);
+                                pushInvalidationToOne(forHost.getKey(), c);
                         }
                         if (Thread.interrupted()) {
                             Log.info("Invalidation sender exiting");
@@ -110,20 +106,20 @@ public class InvalidationQueueService {
         Log.info("Invalidation sender exiting");
     }
 
-    public void pushInvalidationToAll(String name, boolean shouldNotifySeen) {
+    public void pushInvalidationToAll(String name) {
         synchronized (this) {
             var hosts = remoteHostManager.getSeenHosts();
             if (hosts.isEmpty()) return;
             for (var h : hosts) {
-                getSetForHost(h).add(Pair.of(name, shouldNotifySeen));
+                getSetForHost(h).add(name);
             }
             this.notifyAll();
         }
     }
 
-    public void pushInvalidationToOne(UUID host, String name, boolean shouldNotifySeen) {
+    public void pushInvalidationToOne(UUID host, String name) {
         synchronized (this) {
-            getSetForHost(host).add(Pair.of(name, shouldNotifySeen));
+            getSetForHost(host).add(name);
             this.notifyAll();
         }
     }

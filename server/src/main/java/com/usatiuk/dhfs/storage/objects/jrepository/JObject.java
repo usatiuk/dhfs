@@ -191,7 +191,6 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
 
             var ver = new LinkedHashMap<>(_metaPart.getChangelog()); // FIXME:
             var ref = _metaPart.getRefcount();
-            boolean wasSeen = _metaPart.isSeen();
             boolean wasDeleted = _metaPart.isDeleted();
             var prevData = _dataPart.get();
             VoidFn invalidateFn = () -> {
@@ -215,7 +214,6 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             if (!Objects.equals(ver, _metaPart.getChangelog())
                     || ref != _metaPart.getRefcount()
                     || wasDeleted != _metaPart.isDeleted()
-                    || wasSeen != _metaPart.isSeen()
                     || prevData != _dataPart.get())
                 notifyWriteMeta();
             if (!Objects.equals(ver, _metaPart.getChangelog())
