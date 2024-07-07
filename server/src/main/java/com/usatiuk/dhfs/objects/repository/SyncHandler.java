@@ -119,7 +119,7 @@ public class SyncHandler {
 
             assert Objects.equals(receivedTotalVer, md.getOurVersion());
 
-            Log.info("No action on update: " + header.getName() + " from " + from);
+            Log.debug("No action on update: " + header.getName() + " from " + from);
 
             return false;
         });
