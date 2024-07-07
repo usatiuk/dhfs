@@ -30,3 +30,9 @@ export async function putKnownPeer(uuid: string): Promise<TNoContentToResp> {
         uuid,
     });
 }
+
+export async function removeKnownPeer(uuid: string): Promise<TNoContentToResp> {
+    return fetchJSON("/objects-manage/known-peers", "DELETE", NoContentToResp, {
+        uuid,
+    });
+}

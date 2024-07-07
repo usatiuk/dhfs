@@ -169,6 +169,15 @@ public class RemoteHostManager {
         });
     }
 
+    public void removeRemoteHost(UUID host) {
+        persistentRemoteHostsService.removeHost(host);
+        // Race?
+        _transientPeersState.runWriteLocked(d -> {
+            d.getStates().remove(host);
+            return null;
+        });
+    }
+
     public void addRemoteHost(UUID host) {
         if (!_seenHostsButNotAdded.containsKey(host)) {
             throw new IllegalStateException("Host " + host + " is not seen");

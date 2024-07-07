@@ -67,3 +67,7 @@ export type TKnownPeerInfoToResp = z.infer<typeof KnownPeerInfoToResp>;
 // KnownPeerPut
 export const KnownPeerPutTo = z.object({ uuid: z.string() });
 export type TKnownPeerPutTo = z.infer<typeof KnownPeerPutTo>;
+
+// KnownPeerDelete
+export const KnownPeerDeleteTo = z.object({ uuid: z.string() });
+export type TKnownPeerDeleteTo = z.infer<typeof KnownPeerDeleteTo>;

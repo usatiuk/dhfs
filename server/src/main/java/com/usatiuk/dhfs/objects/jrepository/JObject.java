@@ -151,7 +151,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             throw new IllegalStateException("Data is not null when recording external resolution of " + getName());
         _metaPart.narrowClass(data.getClass());
         _dataPart.set(data);
-        if (!_metaPart.isLocked())
+        if (!_metaPart.isLocked() && _metaPart.getRefcount() == 0)
             _metaPart.lock();
         hydrateRefs();
         verifyRefs();

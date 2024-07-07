@@ -31,6 +31,10 @@ public class DhfsFusex3IT {
     WaitingConsumer waitingConsumer2;
     WaitingConsumer waitingConsumer3;
 
+    String c1uuid;
+    String c2uuid;
+    String c3uuid;
+
     @BeforeEach
     void setup() throws IOException, InterruptedException, TimeoutException {
         String buildPath = System.getProperty("buildDirectory");
@@ -70,9 +74,9 @@ public class DhfsFusex3IT {
 
         Stream.of(container1, container2, container3).parallel().forEach(GenericContainer::start);
 
-        var c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_root_d/self_uuid").getStdout();
-        var c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_root_d/self_uuid").getStdout();
-        var c3uuid = container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_root_d/self_uuid").getStdout();
+        c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_root_d/self_uuid").getStdout();
+        c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_root_d/self_uuid").getStdout();
+        c3uuid = container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_root_d/self_uuid").getStdout();
 
         waitingConsumer1 = new WaitingConsumer();
         var loggingConsumer1 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFusex3IT.class)).withPrefix(c1uuid);
@@ -137,6 +141,27 @@ public class DhfsFusex3IT {
     }
 
     @Test
+    void removeHostTest() throws IOException, InterruptedException, TimeoutException {
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
+        Thread.sleep(1000);
+        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+        Assertions.assertEquals("tesempty\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+
+        var c3curl = container3.execInContainer("/bin/sh", "-c",
+                "curl --header \"Content-Type: application/json\" " +
+                        "  --request DELETE " +
+                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
+                        "  http://localhost:8080/objects-manage/known-peers");
+
+        Thread.sleep(1000);
+        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "echo rewritten > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
+        Thread.sleep(1000);
+        Assertions.assertEquals("rewritten\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+        Assertions.assertEquals("tesempty\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+        Assertions.assertEquals("tesempty\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+    }
+
+    @Test
     void dirConflictTest() throws IOException, InterruptedException, TimeoutException {
         boolean createFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_data/dhfs_fuse_root/testf"),
                 Pair.of(container2, "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf"),
@@ -148,7 +173,7 @@ public class DhfsFusex3IT {
             }
         }).anyMatch(r -> r != 0);
         Assumptions.assumeTrue(!createFail, "Failed creating one or more files");
-        Thread.sleep(5000);
+        Thread.sleep(2000);
         for (var c : List.of(container1, container2, container3)) {
             var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
             var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
@@ -186,7 +211,7 @@ public class DhfsFusex3IT {
             }
         }).anyMatch(r -> r != 0);
         Assumptions.assumeTrue(!createFail, "Failed creating one or more files");
-        Thread.sleep(5000);
+        Thread.sleep(2000);
         for (var c : List.of(container1, container2, container3)) {
             var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
             var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
@@ -223,7 +248,7 @@ public class DhfsFusex3IT {
             }
         }).anyMatch(r -> r != 0);
         Assumptions.assumeTrue(!writeFail, "Failed creating one or more files");
-        Thread.sleep(5000);
+        Thread.sleep(2000);
         for (var c : List.of(container1, container2, container3)) {
             var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
             var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");

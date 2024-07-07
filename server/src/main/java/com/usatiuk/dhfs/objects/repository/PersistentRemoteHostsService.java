@@ -191,6 +191,23 @@ public class PersistentRemoteHostsService {
         return added;
     }
 
+    public boolean removeHost(UUID host) {
+        boolean removed = getPeerDirectory().runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
+            boolean removedInner = d.getPeers().remove(host);
+            if (removedInner) {
+                getPeer(host).runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mp, dp, bp, vp) -> {
+                    mp.removeRef(m.getName());
+                    return null;
+                });
+                b.apply();
+            }
+            return removedInner;
+        });
+        if (removed)
+            updateCerts();
+        return removed;
+    }
+
     private void updateCerts() {
         getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
             peerTrustManager.reloadTrustManagerHosts(getHostsNoNulls());

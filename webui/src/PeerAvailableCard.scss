@@ -2,11 +2,4 @@
 
 .peerAvailableCard {
   @extend .peerCard;
-
-  @include card-with-actions;
-
-  .peerInfo {
-    flex-grow: 1;
-  }
-
 }

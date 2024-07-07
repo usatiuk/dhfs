@@ -28,6 +28,9 @@ public class DhfsFuseIT {
     WaitingConsumer waitingConsumer1;
     WaitingConsumer waitingConsumer2;
 
+    String c1uuid;
+    String c2uuid;
+
     @BeforeEach
     void setup() throws IOException, InterruptedException, TimeoutException {
         String buildPath = System.getProperty("buildDirectory");
@@ -67,8 +70,8 @@ public class DhfsFuseIT {
         var loggingConsumer2 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFuseIT.class)).withPrefix("2");
         container2.followOutput(loggingConsumer2.andThen(waitingConsumer2));
 
-        var c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_root_d/self_uuid").getStdout();
-        var c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_root_d/self_uuid").getStdout();
+        c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_root_d/self_uuid").getStdout();
+        c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_root_d/self_uuid").getStdout();
 
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c1uuid));
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c2uuid));
@@ -107,6 +110,33 @@ public class DhfsFuseIT {
     }
 
     @Test
+    void removeAddHostTest() throws IOException, InterruptedException, TimeoutException {
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
+        Thread.sleep(2000);
+        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+
+        var c2curl = container2.execInContainer("/bin/sh", "-c",
+                "curl --header \"Content-Type: application/json\" " +
+                        "  --request DELETE " +
+                        "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
+                        "  http://localhost:8080/objects-manage/known-peers");
+
+        Thread.sleep(1000);
+        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "echo rewritten > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
+        Assertions.assertEquals("tesempty\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+
+        container2.execInContainer("/bin/sh", "-c",
+                "curl --header \"Content-Type: application/json\" " +
+                        "  --request PUT " +
+                        "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
+                        "  http://localhost:8080/objects-manage/known-peers");
+
+        Thread.sleep(1000);
+        Assertions.assertEquals("rewritten\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+        Assertions.assertEquals("rewritten\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+    }
+
+    @Test
     void dirConflictTest() throws IOException, InterruptedException, TimeoutException {
         Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode());
         Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode());
@@ -120,7 +150,7 @@ public class DhfsFuseIT {
             }
         }).anyMatch(r -> r != 0);
         Assumptions.assumeTrue(!createFail, "Failed creating one or more files");
-        Thread.sleep(5000);
+        Thread.sleep(2000);
         var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
         var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
         Log.info(ls);
@@ -143,7 +173,7 @@ public class DhfsFuseIT {
             }
         }).anyMatch(r -> r != 0);
         Assumptions.assumeTrue(!createFail, "Failed creating one or more files");
-        Thread.sleep(5000);
+        Thread.sleep(2000);
         var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
         var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
         Log.info(ls);
@@ -163,7 +193,7 @@ public class DhfsFuseIT {
             }
         }).anyMatch(r -> r != 0);
         Assumptions.assumeTrue(!createFail, "Failed creating one or more files");
-        Thread.sleep(5000);
+        Thread.sleep(2000);
         var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
         var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
         Log.info(ls);
@@ -177,7 +207,7 @@ public class DhfsFuseIT {
         boolean createdOk = (container1.execInContainer("/bin/sh", "-c", "echo test1 >> /root/dhfs_data/dhfs_fuse_root/testf").getExitCode() == 0)
                 && (container2.execInContainer("/bin/sh", "-c", "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf").getExitCode() == 0);
         Assumptions.assumeTrue(createdOk, "Failed creating one or more files");
-        Thread.sleep(5000);
+        Thread.sleep(2000);
         var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
         var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
         Log.info(ls);

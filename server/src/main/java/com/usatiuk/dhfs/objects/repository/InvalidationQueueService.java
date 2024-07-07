@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.objects.repository;
 
-import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.Startup;
@@ -21,7 +20,7 @@ public class InvalidationQueueService {
     RemoteObjectServiceClient remoteObjectServiceClient;
 
     @Inject
-    JObjectManager jObjectManager;
+    PersistentRemoteHostsService persistentRemoteHostsService;
 
     @ConfigProperty(name = "dhfs.objects.invalidation.batch_size")
     Integer batchSize;
@@ -66,9 +65,10 @@ public class InvalidationQueueService {
             while (!Thread.interrupted()) {
                 var data = pullAll();
                 Thread.sleep(delay);
-                String stats = "Sent invalidation: ";
-                for (var forHost : data.entrySet()) {
+                data.entrySet().stream().filter(e -> persistentRemoteHostsService.existsHost(e.getKey())).forEach(forHost -> {
+                    String stats = "Sent invalidation: ";
                     long sent = 0;
+
                     while (!forHost.getValue().isEmpty()) {
                         ArrayList<String> chunk = new ArrayList<>();
 
@@ -99,7 +99,7 @@ public class InvalidationQueueService {
                     }
                     stats += forHost.getKey() + ": " + sent + " ";
                     Log.info(stats);
-                }
+                });
             }
         } catch (InterruptedException ignored) {
         }

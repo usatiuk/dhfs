@@ -1,9 +1,9 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
 import com.google.protobuf.ByteString;
+import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
-import com.usatiuk.dhfs.SerializationHelper;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -143,12 +143,18 @@ public class JObjectManagerImpl implements JObjectManager {
                     _map.put(object.getName(), new NamedSoftReference(ret, _refQueue));
                 }
             }
+            JObject<D> finalRet = (JObject<D>) ret;
             ret.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                 if (parent.isPresent()) {
                     m.addRef(parent.get());
                 } else {
                     m.lock();
                 }
+
+                if (object.pushResolution() && finalRet.getData() == null) {
+                    finalRet.externalResolution(object);
+                }
+
                 return true;
             });
             return (JObject<D>) ret;

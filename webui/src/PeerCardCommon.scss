@@ -6,4 +6,10 @@
   > * {
     padding: 0.5rem;
   }
+
+  @include card-with-actions;
+
+  .peerInfo {
+    flex-grow: 1;
+  }
 }
