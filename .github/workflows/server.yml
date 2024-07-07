@@ -60,7 +60,7 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-
+          cache-dependency-path: "webui/package.json"
       - name: NPM Install
         run: cd webui && npm i
 
@@ -80,9 +80,9 @@ jobs:
       # This is used to complete the identity challenge
       # with sigstore/fulcio when running outside of PRs.
       id-token: write
-   
+
     needs: [build-webui, build-dhfs]
-   
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -94,7 +94,6 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: Webui
-
 
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer
