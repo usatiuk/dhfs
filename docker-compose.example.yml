@@ -1,0 +1,23 @@
+version: "3.2"
+
+services:
+  dhfs1:
+    build: .
+    privileged: true
+    devices:
+      - /dev/fuse
+    command: "./dockerentry.sh -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5010"
+    ports:
+      - 8080:8080
+      - 8081:8443
+      - 5005:5005
+  dhfs2:
+    build: .
+    privileged: true
+    devices:
+      - /dev/fuse
+    command: "./dockerentry.sh -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5010"
+    ports:
+      - 8090:8080
+      - 8091:8443
+      - 5010:5010

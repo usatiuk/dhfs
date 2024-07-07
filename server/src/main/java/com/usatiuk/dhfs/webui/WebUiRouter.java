@@ -20,6 +20,7 @@ public class WebUiRouter {
 
     void installRoute(@Observes StartupEvent startupEvent, Router router) {
         root.ifPresent(r -> {
+            router.route().path("/").handler(ctx -> ctx.redirect("/webui"));
             router.route()
                     .path("/webui/*")
                     .handler(this::handle);
