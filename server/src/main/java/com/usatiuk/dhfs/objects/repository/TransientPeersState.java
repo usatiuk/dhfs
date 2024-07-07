@@ -5,7 +5,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class TransientPeersState {
     private final TransientPeersStateData _data = new TransientPeersStateData();
-    private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
+    private final ReadWriteLock _lock = new ReentrantReadWriteLock();
 
     @FunctionalInterface
     public interface TransientPeersStaten<R> {
@@ -13,7 +13,6 @@ public class TransientPeersState {
     }
 
     public <R> R runReadLocked(TransientPeersStaten<R> fn) {
-        if (_lock.isWriteLockedByCurrentThread()) throw new IllegalStateException("Deadlock avoided!");
         _lock.readLock().lock();
         try {
             return fn.apply(_data);

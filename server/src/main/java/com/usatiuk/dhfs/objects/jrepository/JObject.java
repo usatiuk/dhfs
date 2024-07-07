@@ -127,7 +127,6 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
 
     private void tryLocalResolve() {
         if (_dataPart.get() == null) {
-            if (_lock.isWriteLockedByCurrentThread()) throw new IllegalStateException("Deadlock avoided!");
             _lock.readLock().lock();
             try {
                 if (_dataPart.get() == null) {
@@ -175,7 +174,6 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         if (resolutionStrategy == ResolutionStrategy.LOCAL_ONLY) tryLocalResolve();
         else if (resolutionStrategy == ResolutionStrategy.REMOTE) resolveDataPart();
 
-        if (_lock.isWriteLockedByCurrentThread()) throw new IllegalStateException("Deadlock avoided!");
         _lock.readLock().lock();
         try {
             if (_metaPart.isDeleted()) {

@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects.repository;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class PersistentRemoteHosts implements Serializable {
@@ -9,7 +10,7 @@ public class PersistentRemoteHosts implements Serializable {
     private static final long serialVersionUID = 1;
 
     private final PersistentRemoteHostsData _data = new PersistentRemoteHostsData();
-    private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
+    private final ReadWriteLock _lock = new ReentrantReadWriteLock();
 
     @FunctionalInterface
     public interface PersistentRemoteHostsFn<R> {
@@ -17,7 +18,6 @@ public class PersistentRemoteHosts implements Serializable {
     }
 
     public <R> R runReadLocked(PersistentRemoteHostsFn<R> fn) {
-        if (_lock.isWriteLockedByCurrentThread()) throw new IllegalStateException("Deadlock avoided!");
         _lock.readLock().lock();
         try {
             return fn.apply(_data);
