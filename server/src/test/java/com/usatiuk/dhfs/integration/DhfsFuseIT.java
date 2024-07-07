@@ -121,8 +121,8 @@ public class DhfsFuseIT {
                         "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
                         "  http://localhost:8080/objects-manage/known-peers");
 
-        Thread.sleep(1000);
         Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "echo rewritten > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
+        Thread.sleep(1000);
         Assertions.assertEquals("tesempty\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
 
         container2.execInContainer("/bin/sh", "-c",
@@ -130,6 +130,7 @@ public class DhfsFuseIT {
                         "  --request PUT " +
                         "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
                         "  http://localhost:8080/objects-manage/known-peers");
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
 
         Thread.sleep(1000);
         Assertions.assertEquals("rewritten\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
