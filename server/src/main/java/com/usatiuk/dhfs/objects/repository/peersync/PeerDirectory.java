@@ -4,12 +4,16 @@ import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import lombok.Getter;
 
+import java.io.Serial;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
 
 public class PeerDirectory extends JObjectData {
+    @Serial
+    private static final long serialVersionUID = 1;
+
     @Getter
     private final Set<UUID> _peers = new LinkedHashSet<>();
 

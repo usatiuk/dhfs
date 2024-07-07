@@ -6,6 +6,7 @@ import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
+import java.io.Serial;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
 import java.util.List;
@@ -14,6 +15,9 @@ import java.util.UUID;
 @Getter
 @AllArgsConstructor
 public class PersistentPeerInfo extends JObjectData {
+    @Serial
+    private static final long serialVersionUID = 1;
+
     private final UUID _uuid;
     private final X509Certificate _certificate;
 

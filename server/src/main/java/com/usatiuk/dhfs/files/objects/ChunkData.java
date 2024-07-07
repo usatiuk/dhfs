@@ -7,6 +7,7 @@ import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import lombok.Getter;
 import net.openhft.hashing.LongTupleHashFunction;
 
+import java.io.Serial;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -15,6 +16,9 @@ import java.util.stream.Collectors;
 
 @Getter
 public class ChunkData extends JObjectData {
+    @Serial
+    private static final long serialVersionUID = 1;
+
     final String _hash;
     final ByteString _bytes;
 

@@ -6,9 +6,13 @@ import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serial;
 import java.util.UUID;
 
 public abstract class FsNode extends JObjectData {
+    @Serial
+    private static final long serialVersionUID = 1;
+
     @Getter
     final UUID _uuid;
 

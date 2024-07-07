@@ -6,9 +6,13 @@ import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serial;
 import java.util.*;
 
 public class Directory extends FsNode {
+    @Serial
+    private static final long serialVersionUID = 1;
+
     public Directory(UUID uuid) {
         super(uuid);
     }
