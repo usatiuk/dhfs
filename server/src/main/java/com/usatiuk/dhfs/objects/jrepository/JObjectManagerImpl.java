@@ -151,7 +151,7 @@ public class JObjectManagerImpl implements JObjectManager {
                     m.lock();
                 }
 
-                if (object.pushResolution() && finalRet.getData() == null) {
+                if (object.pushResolution() && object.assumeUnique() && finalRet.getData() == null) {
                     finalRet.externalResolution(object);
                 }
 
