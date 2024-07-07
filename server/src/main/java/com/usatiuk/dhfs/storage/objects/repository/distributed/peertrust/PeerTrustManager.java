@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @ApplicationScoped
 public class PeerTrustManager implements X509TrustManager {
-    private AtomicReference<X509TrustManager> trustManager = new AtomicReference<>();
+    private final AtomicReference<X509TrustManager> trustManager = new AtomicReference<>();
 
     @Override
     public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {

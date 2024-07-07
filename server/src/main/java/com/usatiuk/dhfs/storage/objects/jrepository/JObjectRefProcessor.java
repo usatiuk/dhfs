@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.storage.objects.jrepository;
 
 import com.google.common.collect.Streams;
-import com.usatiuk.dhfs.storage.objects.repository.persistence.ObjectPersistentStore;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.Shutdown;
 import io.quarkus.runtime.Startup;
@@ -23,11 +22,6 @@ public class JObjectRefProcessor {
     @Inject
     JObjectManager jObjectManager;
 
-    @Inject
-    JObjectWriteback jObjectWriteback;
-
-    @Inject
-    ObjectPersistentStore objectPersistentStore;
 
     @Startup
     void init() {

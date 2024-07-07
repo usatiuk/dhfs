@@ -201,7 +201,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             var ret = fn.apply(_metaPart, _dataPart.get(), this::bumpVer, invalidateFn);
             _resolver.updateDeletionState(this);
 
-            if (_resolver._bumpVerification) {
+            if (_resolver.bumpVerification) {
                 if (_dataPart.get() != null && _dataPart.get().assumeUnique())
                     if (!Objects.equals(ver, _metaPart.getChangelog()))
                         throw new IllegalStateException("Object changed but is assumed immutable: " + getName());

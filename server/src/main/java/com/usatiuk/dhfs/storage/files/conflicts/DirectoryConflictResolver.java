@@ -8,7 +8,6 @@ import com.usatiuk.dhfs.storage.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.storage.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.ConflictResolver;
 import com.usatiuk.dhfs.storage.objects.repository.distributed.PersistentRemoteHostsService;
-import com.usatiuk.dhfs.storage.objects.repository.distributed.RemoteObjectServiceClient;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -22,9 +21,6 @@ import java.util.*;
 public class DirectoryConflictResolver implements ConflictResolver {
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
-
-    @Inject
-    RemoteObjectServiceClient remoteObjectServiceClient;
 
     @Inject
     JObjectManager jObjectManager;

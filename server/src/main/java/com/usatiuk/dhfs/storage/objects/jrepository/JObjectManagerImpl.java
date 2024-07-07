@@ -29,12 +29,6 @@ public class JObjectManagerImpl implements JObjectManager {
     JObjectResolver jObjectResolver;
 
     @Inject
-    JObjectWriteback jObjectWriteback;
-
-    @Inject
-    JObjectRefProcessor jobjectRefProcessor;
-
-    @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
 
     private static class NamedSoftReference extends SoftReference<JObject<?>> {
