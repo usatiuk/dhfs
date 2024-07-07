@@ -1,9 +1,9 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
+import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.repository.ObjectChangelog;
 import com.usatiuk.dhfs.objects.repository.ObjectChangelogEntry;
 import com.usatiuk.dhfs.objects.repository.ObjectHeader;
-import com.usatiuk.dhfs.SerializationHelper;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import lombok.Getter;
@@ -18,6 +18,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class ObjectMetadata implements Serializable {
+    @Serial
+    private static final long serialVersionUID = 1;
+
     public ObjectMetadata(String name, boolean written, Class<? extends JObjectData> knownClass) {
         _name = name;
         _written.set(written);
