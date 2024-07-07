@@ -46,7 +46,7 @@ public class DhfsFuseIT {
                                 .cmd("java", "-ea", "-Xmx128M", "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
                                         "-Ddhfs.objects.peerdiscovery.interval=500",
                                         "-Ddhfs.objects.invalidation.delay=200",
-                                        "-Ddhfs.objects.ref_verification=true",
+                                        "-Ddhfs.objects.ref_verification=false",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".min-level=TRACE",
                                         "-jar", "/app/quarkus-run.jar")

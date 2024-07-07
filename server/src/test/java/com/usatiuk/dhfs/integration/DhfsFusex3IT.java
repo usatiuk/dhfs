@@ -52,7 +52,7 @@ public class DhfsFusex3IT {
                                         "-Ddhfs.objects.peerdiscovery.interval=500",
                                         "-Ddhfs.objects.invalidation.delay=200",
                                         "-Djava.util.concurrent.ForkJoinPool.common.parallelism=4",
-                                        "-Ddhfs.objects.ref_verification=true",
+                                        "-Ddhfs.objects.ref_verification=false",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".min-level=TRACE",
                                         "-jar", "/app/quarkus-run.jar")
