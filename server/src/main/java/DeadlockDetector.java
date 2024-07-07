@@ -1,0 +1,51 @@
+import io.quarkus.runtime.ShutdownEvent;
+import io.quarkus.runtime.StartupEvent;
+import jakarta.annotation.Priority;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
+
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
+import java.util.Arrays;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+@ApplicationScoped
+public class DeadlockDetector {
+    private ExecutorService _executor = Executors.newSingleThreadExecutor();
+
+    void init(@Observes @Priority(1) StartupEvent event) {
+        _executor.submit(this::run);
+    }
+
+    void shutdown(@Observes @Priority(100000) ShutdownEvent event) {
+        _executor.shutdownNow();
+    }
+
+    private void run() {
+        ThreadMXBean bean = ManagementFactory.getThreadMXBean();
+        long[] threadIds = bean.findDeadlockedThreads(); // Returns null if no threads are deadlocked.
+
+        if (threadIds != null) {
+            ThreadInfo[] infos = bean.getThreadInfo(threadIds);
+
+            StringBuilder sb = new StringBuilder();
+
+            sb.append("Deadlock detected!\n");
+
+            for (ThreadInfo info : infos) {
+                StackTraceElement[] stack = info.getStackTrace();
+                sb.append(info.getThreadName()).append("\n");
+                sb.append("getLockedMonitors:").append(Arrays.toString(info.getLockedMonitors())).append("\n");
+                sb.append("getLockedSynchronizers:").append(Arrays.toString(info.getLockedSynchronizers())).append("\n");
+                sb.append("waiting on:").append(info.getLockInfo()).append("\n");
+                sb.append("Stack trace:\n");
+                for (var e : stack) {
+                    sb.append(e.toString()).append("\n");
+                }
+                sb.append("===");
+            }
+        }
+    }
+}
