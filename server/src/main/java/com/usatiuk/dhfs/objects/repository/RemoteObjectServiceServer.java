@@ -49,6 +49,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
                 Log.info("<-- getObject FAIL: " + request.getName() + " from " + request.getSelfUuid());
                 throw new StatusRuntimeException(Status.ABORTED.withDescription("Not available locally"));
             }
+            data.extractRefs().parallelStream().forEach(ref -> jObjectManager.get(ref).ifPresent(JObject::markSeen));
             return Pair.of(meta.toRpcHeader(), SerializationHelper.serialize(data));
         });
         var replyObj = ApiObject.newBuilder().setHeader(read.getLeft()).setContent(read.getRight()).build();

@@ -178,6 +178,7 @@ public class JObjectManagerImpl implements JObjectManager {
                     if (m.isLocked())
                         m.unlock();
                     m.addRef(s);
+                    m.markSeen();
                     return true;
                 }));
                 return got.get();

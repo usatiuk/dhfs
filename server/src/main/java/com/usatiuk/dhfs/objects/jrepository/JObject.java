@@ -91,6 +91,10 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         return _dataPart.get() != null;
     }
 
+    public void markSeen() {
+        _metaPart.markSeen();
+    }
+
     @FunctionalInterface
     public interface VoidFn {
         void apply();
