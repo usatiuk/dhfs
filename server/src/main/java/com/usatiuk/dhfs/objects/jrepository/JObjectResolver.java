@@ -15,7 +15,6 @@ import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -81,8 +80,6 @@ public class JObjectResolver {
                 self.getMeta().setSavedRefs(null);
             }
             self.getMeta().setSavedRefs(new LinkedHashSet<>(self.getData().extractRefs()));
-        } else {
-            self.getMeta().setSavedRefs(Collections.emptySet());
         }
     }
 
