@@ -111,6 +111,25 @@ public class DhfsFuseIT {
     }
 
     @Test
+    void moveFileTest() throws IOException, InterruptedException, TimeoutException {
+        Log.info("Creating");
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
+        Assertions.assertEquals("tesempty\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+        Thread.sleep(500);
+        Log.info("Listing");
+        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root/").getExitCode());
+        Thread.sleep(500);
+        Log.info("Moving");
+        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "mv /root/dhfs_data/dhfs_fuse_root/testf1 /root/dhfs_data/dhfs_fuse_root/testf2").getExitCode());
+        Thread.sleep(500);
+        Log.info("Listing");
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root/").getExitCode());
+        Thread.sleep(500);
+        Log.info("Reading");
+        Assertions.assertEquals("tesempty\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf2").getStdout());
+    }
+
+    @Test
     void removeAddHostTest() throws IOException, InterruptedException, TimeoutException {
         Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
         Thread.sleep(2000);
