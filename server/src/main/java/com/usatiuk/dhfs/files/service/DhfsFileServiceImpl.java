@@ -284,6 +284,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                     });
                 }
 
+                ((File) theFile.getData()).getChunks().clear();
                 theFile.getMeta().removeRef(dentFrom.getName());
                 jObjectManager.put(newFile, Optional.of(dentTo.getName()));
                 newDent = newFile;
@@ -317,7 +318,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         if (cleanup != null) {
             jObjectManager.get(cleanup.toString()).ifPresent(c -> {
-                c.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> m.removeRef(dentTo.getName()));
+                c.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                    m.removeRef(dentTo.getName());
+                    return null;
+                });
             });
         }
 

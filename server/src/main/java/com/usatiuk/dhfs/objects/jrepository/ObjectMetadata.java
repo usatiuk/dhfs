@@ -45,9 +45,6 @@ public class ObjectMetadata implements Serializable {
     private final AtomicReference<Class<? extends JObjectData>> _knownClass = new AtomicReference<>();
 
     @Getter
-    private long _refcount = 0L;
-
-    @Getter
     private boolean _locked = false;
 
     private transient AtomicBoolean _written = new AtomicBoolean(true);
@@ -55,6 +52,9 @@ public class ObjectMetadata implements Serializable {
     private final AtomicBoolean _seen = new AtomicBoolean(false);
 
     private final AtomicBoolean _deleted = new AtomicBoolean(false);
+
+    @Getter
+    private final HashSet<UUID> _confirmedDeletes = new HashSet<>();
 
     public Class<? extends JObjectData> getKnownClass() {
         return _knownClass.get();
@@ -94,6 +94,7 @@ public class ObjectMetadata implements Serializable {
     }
 
     public void undelete() {
+        _confirmedDeletes.clear();
         _deleted.set(false);
     }
 
@@ -105,42 +106,72 @@ public class ObjectMetadata implements Serializable {
         _written.set(true);
     }
 
-    private final Set<String> _referrers = new HashSet<>();
+    private String _referrer = null;
 
-    public long lock() {
+    @Getter
+    private boolean _isReferred = false;
+
+    public void lock() {
         if (_locked) throw new IllegalArgumentException("Already locked");
+        _confirmedDeletes.clear();
         _locked = true;
-        _refcount++;
-        return _refcount;
     }
 
-    public long unlock() {
+    public void unlock() {
         if (!_locked) throw new IllegalArgumentException("Already unlocked");
         _locked = false;
-        _refcount--;
-        return _refcount;
     }
 
     public boolean checkRef(String from) {
-        return _referrers.contains(from);
+        return Objects.equals(_referrer, from);
     }
 
-    public long addRef(String from) {
-        if (_referrers.contains(from)) return _refcount;
-        _referrers.add(from);
-        _refcount++;
-        return _refcount;
+    public void addRef(String from) {
+        _confirmedDeletes.clear();
+
+        if (_referrer == null) {
+            _referrer = from;
+            _isReferred = true;
+            return;
+        }
+
+        if (Objects.equals(_referrer, from)) {
+//            if (_isReferred)
+//                throw new IllegalStateException("Adding a ref to an already referenced object: " + getName());
+            _isReferred = true;
+            return;
+        }
+
+        if (_knownClass.get().isAnnotationPresent(Movable.class)) {
+            Log.info("Object " + getName() + " changing ownership from " + _referrer + " to " + from);
+            _referrer = from;
+            _isReferred = true;
+            return;
+        }
+
+        throw new IllegalStateException("Trying to move an immovable object " + getName());
     }
 
-    public long removeRef(String from) {
+    public void removeRef(String from) {
         if (isLocked()) {
             unlock();
             Log.error("Object " + getName() + " is locked, but we removed a reference to it, unlocking!");
         }
-        if (!_referrers.contains(from)) return _refcount;
-        _referrers.remove(from);
-        _refcount--;
-        return _refcount;
+        if (!_isReferred)
+            throw new IllegalStateException("Removing a ref from an unreferenced object!: " + getName());
+        if (!Objects.equals(_referrer, from))
+            throw new IllegalStateException("Removing a wrong ref from an object " + getName() + " expected: " + _referrer + " have: " + from);
+
+        _isReferred = false;
+    }
+
+    public String getRef() {
+        if (_isReferred && _referrer != null) return _referrer;
+        return null;
+    }
+
+    public boolean isDeletionCandidate() {
+        return !isLocked() && !isReferred();
     }
 
     public Long getOurVersion() {
@@ -183,5 +214,14 @@ public class ObjectMetadata implements Serializable {
             headerBuilder.setPushedData(SerializationHelper.serialize(data));
 
         return headerBuilder.build();
+    }
+
+    public int metaHash() {
+        return Objects.hash(isSeen(), getKnownClass(), isDeleted(), _referrer, _isReferred, _locked, _remoteCopies, _savedRefs);
+    }
+
+    // Not really a hash
+    public int dataHash() {
+        return Objects.hash(_changelog);
     }
 }

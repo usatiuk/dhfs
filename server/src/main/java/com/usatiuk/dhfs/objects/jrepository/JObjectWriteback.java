@@ -156,7 +156,7 @@ public class JObjectWriteback {
                             }
                             return null;
                         });
-                    } catch (JObject.DeletedObjectAccessException ignored) {
+                    } catch (DeletedObjectAccessException ignored) {
                     }
                 }
             }
@@ -180,8 +180,8 @@ public class JObjectWriteback {
 
     private <T extends JObjectData> void flushOneImmediate(ObjectMetadata m, T data) {
         if (m.isDeleted()) {
-            if (m.getRefcount() > 0)
-                throw new IllegalStateException("Object deleted but has refcounts! " + m.getName());
+            if (!m.isDeletionCandidate())
+                throw new IllegalStateException("Object deleted but not deletable! " + m.getName());
             // FIXME: assert Rw lock here?
             Log.trace("Deleting from persistent storage " + m.getName());
             objectPersistentStore.deleteObject("meta_" + m.getName());

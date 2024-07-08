@@ -10,6 +10,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+
 public class JObject<T extends JObjectData> implements Serializable, Comparable<JObject<?>> {
     @Override
     public int compareTo(JObject<?> o) {
@@ -27,9 +28,6 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     @Override
     public int hashCode() {
         return Objects.hashCode(_metaPart.getName());
-    }
-
-    public static class DeletedObjectAccessException extends RuntimeException {
     }
 
     // Create a new object
@@ -83,6 +81,10 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
 
     protected boolean isDeleted() {
         return _metaPart.isDeleted();
+    }
+
+    protected boolean isDeletable() {
+        return _metaPart.isDeletionCandidate();
     }
 
     protected boolean isResolved() {
@@ -196,13 +198,10 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             if (resolutionStrategy == ResolutionStrategy.LOCAL_ONLY) tryLocalResolve();
             else if (resolutionStrategy == ResolutionStrategy.REMOTE) resolveDataPart();
 
-            var ver = new LinkedHashMap<>(_metaPart.getChangelog()); // FIXME:
-            var ref = _metaPart.getRefcount();
-            boolean wasSeen = _metaPart.isSeen();
-            var prevClass = _metaPart.getKnownClass();
-            boolean wasDeleted = _metaPart.isDeleted();
-            boolean wasLocked = _metaPart.isLocked();
+            var dataHash = _metaPart.dataHash();
+            var metaHash = Objects.hash(_metaPart.metaHash(), dataHash);
             var prevData = _dataPart.get();
+
             VoidFn invalidateFn = () -> {
                 tryLocalResolve();
                 _resolver.backupRefs(this);
@@ -212,9 +211,13 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             var ret = fn.apply(_metaPart, _dataPart.get(), this::bumpVer, invalidateFn);
             _resolver.updateDeletionState(this);
 
+            var newDataHash = _metaPart.dataHash();
+            var newMetaHash = Objects.hash(_metaPart.metaHash(), newDataHash);
+            var newData = _dataPart.get();
+
             if (_resolver.bumpVerification) {
                 if (_dataPart.get() != null && _dataPart.get().assumeUnique())
-                    if (!Objects.equals(ver, _metaPart.getChangelog()))
+                    if (!Objects.equals(newDataHash, dataHash))
                         throw new IllegalStateException("Object changed but is assumed immutable: " + getName());
                 // Todo: data check?
             }
@@ -222,16 +225,11 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             if (_dataPart.get() != null)
                 _metaPart.narrowClass(_dataPart.get().getClass());
 
-            if (!Objects.equals(ver, _metaPart.getChangelog())
-                    || ref != _metaPart.getRefcount()
-                    || wasDeleted != _metaPart.isDeleted()
-                    || wasSeen != _metaPart.isSeen()
-                    || prevData != _dataPart.get()
-                    || !prevClass.equals(_metaPart.getKnownClass())
-                    || wasLocked != _metaPart.isLocked())
+            if (!Objects.equals(newMetaHash, metaHash)
+                    || newData != prevData)
                 notifyWriteMeta();
-            if (!Objects.equals(ver, _metaPart.getChangelog())
-                    || prevData != _dataPart.get())
+            if (!Objects.equals(newDataHash, dataHash)
+                    || newData != prevData)
                 notifyWriteData();
             verifyRefs();
             return ret;

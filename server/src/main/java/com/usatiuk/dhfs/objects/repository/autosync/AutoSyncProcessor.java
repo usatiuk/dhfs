@@ -1,9 +1,6 @@
 package com.usatiuk.dhfs.objects.repository.autosync;
 
-import com.usatiuk.dhfs.objects.jrepository.JObject;
-import com.usatiuk.dhfs.objects.jrepository.JObjectData;
-import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
-import com.usatiuk.dhfs.objects.jrepository.JObjectResolver;
+import com.usatiuk.dhfs.objects.jrepository.*;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerDirectory;
 import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
 import io.quarkus.logging.Log;
@@ -76,7 +73,7 @@ public class AutoSyncProcessor {
         _autosyncExcecutor.shutdownNow();
     }
 
-    private void add(String name) {
+    public void add(String name) {
         synchronized (_pending) {
             _pending.add(name);
             _pending.notify(); // FIXME: Delay?
@@ -109,7 +106,7 @@ public class AutoSyncProcessor {
                             add(name);
                         }
                     });
-                } catch (JObject.DeletedObjectAccessException ignored) {
+                } catch (DeletedObjectAccessException ignored) {
                 } catch (Exception e) {
                     Log.error("Failed downloading object " + name + ", will retry.", e);
                     add(name);

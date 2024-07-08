@@ -119,7 +119,7 @@ public class FileConflictResolver implements ConflictResolver {
                             jObjectManager
                                     .get(ChunkInfo.getNameFromHash(cuuid))
                                     .ifPresent(jObject -> jObject.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, d, b, v) -> {
-                                        m.removeRef(oursFile.getName());
+                                        mc.removeRef(oursFile.getName());
                                         return null;
                                     }));
                     }

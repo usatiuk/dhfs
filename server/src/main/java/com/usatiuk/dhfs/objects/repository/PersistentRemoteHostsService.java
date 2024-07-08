@@ -161,6 +161,10 @@ public class PersistentRemoteHostsService {
         return getPeersSnapshot().stream().filter(i -> !i.getUuid().equals(_selfUuid)).toList();
     }
 
+    public List<UUID> getHostsUuid() {
+        return getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.getPeers().stream().filter(i -> !i.equals(_selfUuid)).toList());
+    }
+
     public List<PersistentPeerInfo> getHostsNoNulls() {
         for (int i = 0; i < 5; i++) {
             try {

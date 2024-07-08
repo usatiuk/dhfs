@@ -16,7 +16,10 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import javax.net.ssl.KeyManagerFactory;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 // TODO: Dedup this

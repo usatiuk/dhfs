@@ -2,9 +2,9 @@ package com.usatiuk.dhfs.objects.repository;
 
 import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
+import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
-import com.usatiuk.dhfs.objects.repository.peersync.PeerDirectory;
 import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -107,7 +107,7 @@ public class RemoteObjectServiceClient {
                         return null;
                     });
                 builder.addHeader(header.getLeft());
-            } catch (JObject.DeletedObjectAccessException e) {
+            } catch (DeletedObjectAccessException e) {
                 continue;
             }
         }
@@ -115,5 +115,19 @@ public class RemoteObjectServiceClient {
         var send = builder.build();
 
         return rpcClientFactory.withObjSyncClient(host, client -> client.indexUpdate(send).getErrorsList());
+    }
+
+    public Collection<CanDeleteReply> canDelete(String object) {
+        return persistentRemoteHostsService.getHostsUuid().parallelStream()
+                .map(h -> {
+                    try {
+                        return rpcClientFactory.withObjSyncClient(h, client -> client.canDelete(CanDeleteRequest.newBuilder()
+                                .setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString())
+                                .setName(object).build()));
+                    } catch (Exception e) {
+                        Log.debug("Error when asking canDelete for object " + object, e);
+                        return null;
+                    }
+                }).filter(Objects::nonNull).toList();
     }
 }

@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects.repository;
 
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.SerializationHelper;
+import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import io.grpc.Status;
@@ -54,6 +55,41 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         return Uni.createFrom().item(GetObjectReply.newBuilder()
                 .setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString())
                 .setObject(replyObj).build());
+    }
+
+    @Override
+    @Blocking
+    public Uni<CanDeleteReply> canDelete(CanDeleteRequest request) {
+        if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+        if (!persistentRemoteHostsService.existsHost(UUID.fromString(request.getSelfUuid())))
+            throw new StatusRuntimeException(Status.UNAUTHENTICATED);
+
+        Log.info("<-- canDelete: " + request.getName() + " from " + request.getSelfUuid());
+
+        var builder = CanDeleteReply.newBuilder();
+
+        var obj = jObjectManager.get(request.getName());
+
+        builder.setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString());
+        builder.setObjName(request.getName());
+
+        if (obj.isPresent()) try {
+            obj.get().runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
+                if (m.isDeleted() && !m.isDeletionCandidate())
+                    throw new IllegalStateException("Object " + m.getName() + " is deleted but not a deletion candidate");
+                builder.setDeletionCandidate(m.isDeletionCandidate());
+                if (m.getRef() != null)
+                    builder.setReferent(m.getRef());
+                return null;
+            });
+        } catch (DeletedObjectAccessException dox) {
+            builder.setDeletionCandidate(true);
+        }
+        else {
+            builder.setDeletionCandidate(true);
+        }
+
+        return Uni.createFrom().item(builder.build());
     }
 
     @Override

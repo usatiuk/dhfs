@@ -1,6 +1,9 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
 import com.google.common.collect.Streams;
+import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
+import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
+import com.usatiuk.dhfs.objects.repository.autosync.AutoSyncProcessor;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.Shutdown;
 import io.quarkus.runtime.Startup;
@@ -8,12 +11,12 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.util.LinkedHashMap;
+import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Stream;
 
 @ApplicationScoped
 public class JObjectRefProcessor {
-
     private Thread _refProcessorThread;
 
     @ConfigProperty(name = "dhfs.objects.deletion.delay")
@@ -22,6 +25,17 @@ public class JObjectRefProcessor {
     @Inject
     JObjectManager jObjectManager;
 
+    @Inject
+    PersistentRemoteHostsService persistentRemoteHostsService;
+
+    @Inject
+    ExecutorService executorService;
+
+    @Inject
+    RemoteObjectServiceClient remoteObjectServiceClient;
+
+    @Inject
+    AutoSyncProcessor autoSyncProcessor;
 
     @Startup
     void init() {
@@ -39,10 +53,62 @@ public class JObjectRefProcessor {
     private final LinkedHashMap<String, Long> _candidates = new LinkedHashMap<>();
 
     public void putDeletionCandidate(String name) {
-        synchronized (_candidates) {
-            if (_candidates.putIfAbsent(name, System.currentTimeMillis()) == null)
-                _candidates.notify();
+        synchronized (_movablesInProcessing) {
+            if (_movablesInProcessing.contains(name)) return;
+            synchronized (_candidates) {
+                if (_candidates.putIfAbsent(name, System.currentTimeMillis()) == null) {
+                    Log.debug("Deletion candidate: " + name);
+                    _candidates.notify();
+                }
+            }
         }
+    }
+
+    private final HashSet<String> _movablesInProcessing = new HashSet<>();
+
+    private void asyncProcessMovable(JObject<?> obj) {
+        synchronized (_movablesInProcessing) {
+            if (_movablesInProcessing.contains(obj.getName())) return;
+            _movablesInProcessing.add(obj.getName());
+        }
+
+        executorService.submit(() -> {
+            try {
+                var ret = remoteObjectServiceClient.canDelete(obj.getName());
+
+                for (var r : ret) {
+                    if (!r.getDeletionCandidate() && r.hasReferent())
+                        autoSyncProcessor.add(r.getReferent());
+                }
+
+                obj.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                    for (var r : ret)
+                        if (r.getDeletionCandidate())
+                            m.getConfirmedDeletes().add(UUID.fromString(r.getSelfUuid()));
+                    return null;
+                });
+            } finally {
+                synchronized (_movablesInProcessing) {
+                    _movablesInProcessing.remove(obj.getName());
+                    putDeletionCandidate(obj.getName());
+                }
+            }
+        });
+    }
+
+    private boolean processMovable(JObject<?> obj) {
+        obj.assertRWLock();
+        var knownHosts = persistentRemoteHostsService.getHostsUuid();
+        List<UUID> missing = new ArrayList<>();
+        int current = 0;
+        for (var x : knownHosts) {
+            if (obj.getMeta().getConfirmedDeletes().contains(x)) current++;
+            else missing.add(x);
+        }
+
+        if (missing.isEmpty()) return true;
+        asyncProcessMovable(obj);
+        return false;
     }
 
     private void refProcessorThread() {
@@ -71,7 +137,11 @@ public class JObjectRefProcessor {
                     got.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, v, i) -> {
                         if (m.isLocked()) return null;
                         if (m.isDeleted()) return null;
-                        if (m.getRefcount() > 0) return null;
+                        if (!m.isDeletionCandidate()) return null;
+                        if (m.isSeen() && m.getKnownClass().isAnnotationPresent(Movable.class)) {
+                            if (!processMovable(got.get()))
+                                return null;
+                        }
 
                         got.get().tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
 

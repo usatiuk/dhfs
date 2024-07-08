@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.files.objects;
 
 import com.usatiuk.dhfs.files.conflicts.NoOpConflictResolver;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
+import com.usatiuk.dhfs.objects.jrepository.Movable;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import lombok.Getter;
 
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Objects;
 
 @Getter
+@Movable
 public class ChunkInfo extends JObjectData {
     @Serial
     private static final long serialVersionUID = 1;

@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
+import com.google.common.collect.Streams;
 import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.repository.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
@@ -17,6 +18,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 @Singleton
 public class JObjectResolver {
@@ -108,24 +110,27 @@ public class JObjectResolver {
     public void updateDeletionState(JObject<?> self) {
         self.assertRWLock();
 
-        if (self.getMeta().getRefcount() > 0 || self.getMeta().isLocked()) {
-            if (self.isDeleted()) {
-                self.getMeta().undelete();
-                Log.debug("Undelete: " + self.getName());
-                if (self.isResolved()) {
-                    for (var r : self.getData().extractRefs()) {
-                        Log.trace("Hydrating ref after undelete " + r + " for " + self.getName());
-                        jobjectManager.getOrPut(r, self.getData().getRefType(), Optional.of(self.getName()));
-                    }
-                }
-            }
+        if (!self.isDeletable() && self.isDeleted()) {
+            self.getMeta().undelete();
+            Log.debug("Undelete: " + self.getName());
+
+            Stream<String> refs = Stream.empty();
+
+            if (self.getMeta().getSavedRefs() != null)
+                refs = self.getMeta().getSavedRefs().stream();
+            if (self.getData() != null)
+                refs = Streams.concat(refs, self.getData().extractRefs().stream());
+
+            refs.forEach(r -> {
+                Log.trace("Hydrating ref after undelete " + r + " for " + self.getName());
+                jobjectManager.getOrPut(r, self.getData().getRefType(), Optional.of(self.getName()));
+            });
+
         }
 
-        if (self.getMeta().getRefcount() <= 0 && !self.getMeta().isLocked())
-            if (!self.isDeleted()) {
-                Log.debug("Deletion candidate: " + self.getName());
-                jObjectRefProcessor.putDeletionCandidate(self.getName());
-            }
+        if (self.isDeletable() && !self.isDeleted()) {
+            jObjectRefProcessor.putDeletionCandidate(self.getName());
+        }
     }
 
     public <T extends JObjectData> Optional<T> resolveDataLocal(JObject<T> jObject) {
