@@ -5,6 +5,7 @@ import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.objects.repository.autosync.AutoSyncProcessor;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.grpc.GrpcService;
@@ -29,6 +30,9 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
     @Inject
     RemoteHostManager remoteHostManager;
+
+    @Inject
+    AutoSyncProcessor autoSyncProcessor;
 
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
@@ -80,7 +84,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
                     throw new IllegalStateException("Object " + m.getName() + " is deleted but not a deletion candidate");
                 builder.setDeletionCandidate(m.isDeletionCandidate());
                 if (m.getRef() != null)
-                    builder.setReferent(m.getRef());
+                    builder.setReferrer(m.getRef());
                 return null;
             });
         } catch (DeletedObjectAccessException dox) {
@@ -90,7 +94,13 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
             builder.setDeletionCandidate(true);
         }
 
-        return Uni.createFrom().item(builder.build());
+        var ret = builder.build();
+
+        if (!ret.getDeletionCandidate() && request.hasOurReferrer()) {
+            autoSyncProcessor.add(request.getOurReferrer());
+        }
+
+        return Uni.createFrom().item(ret);
     }
 
     @Override
