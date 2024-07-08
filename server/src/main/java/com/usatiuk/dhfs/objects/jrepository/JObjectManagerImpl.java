@@ -197,11 +197,21 @@ public class JObjectManagerImpl implements JObjectManager {
                     created.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                         parent.ifPresent(m::addRef);
                         created.notifyWrite();
+                        m.markSeen();
                         return null;
                     });
                     return created;
                 }
             }
         }
+    }
+
+    @Override
+    public void notifySent(String key) {
+        //FIXME:
+        get(key).ifPresent(o -> o.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+            m.markSeen();
+            return null;
+        }));
     }
 }

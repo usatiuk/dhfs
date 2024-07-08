@@ -47,7 +47,7 @@ public class SyncHandler {
 
         for (var obj : objs) {
             obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (meta, data) -> {
-                invalidationQueueService.pushInvalidationToOne(host, obj.getName());
+                invalidationQueueService.pushInvalidationToOne(host, obj.getName(), !meta.isSeen());
                 return null;
             });
         }

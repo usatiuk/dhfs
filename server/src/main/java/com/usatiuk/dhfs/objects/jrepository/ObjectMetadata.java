@@ -52,6 +52,8 @@ public class ObjectMetadata implements Serializable {
 
     private transient AtomicBoolean _written = new AtomicBoolean(true);
 
+    private final AtomicBoolean _seen = new AtomicBoolean(false);
+
     private final AtomicBoolean _deleted = new AtomicBoolean(false);
 
     public Class<? extends JObjectData> getKnownClass() {
@@ -75,8 +77,16 @@ public class ObjectMetadata implements Serializable {
         _written = new AtomicBoolean(true);
     }
 
+    public boolean isSeen() {
+        return _seen.get();
+    }
+
     public boolean isDeleted() {
         return _deleted.get();
+    }
+
+    public void markSeen() {
+        _seen.set(true);
     }
 
     public void delete() {

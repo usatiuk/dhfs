@@ -198,6 +198,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
 
             var ver = new LinkedHashMap<>(_metaPart.getChangelog()); // FIXME:
             var ref = _metaPart.getRefcount();
+            boolean wasSeen = _metaPart.isSeen();
             var prevClass = _metaPart.getKnownClass();
             boolean wasDeleted = _metaPart.isDeleted();
             boolean wasLocked = _metaPart.isLocked();
@@ -224,6 +225,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             if (!Objects.equals(ver, _metaPart.getChangelog())
                     || ref != _metaPart.getRefcount()
                     || wasDeleted != _metaPart.isDeleted()
+                    || wasSeen != _metaPart.isSeen()
                     || prevData != _dataPart.get()
                     || !prevClass.equals(_metaPart.getKnownClass())
                     || wasLocked != _metaPart.isLocked())
