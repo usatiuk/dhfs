@@ -143,7 +143,7 @@ public class ObjectMetadata implements Serializable {
         }
 
         if (_knownClass.get().isAnnotationPresent(Movable.class)) {
-            Log.info("Object " + getName() + " changing ownership from " + _referrer + " to " + from);
+            Log.debug("Object " + getName() + " changing ownership from " + _referrer + " to " + from);
             _referrer = from;
             _isReferred = true;
             return;
