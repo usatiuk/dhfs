@@ -643,9 +643,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                     if (!(fileData instanceof File f))
                         throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
                     bump.apply();
+                    var oldChunks = new LinkedHashSet<>(f.getChunks().values());
                     f.getChunks().clear();
                     f.setMtime(System.currentTimeMillis());
-                    cleanupChunks(f, new LinkedHashSet<>(f.getChunks().values()));
+                    cleanupChunks(f, oldChunks);
                     return null;
                 });
             } catch (Exception e) {

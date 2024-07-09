@@ -111,6 +111,16 @@ public class DhfsFuseIT {
     }
 
     @Test
+    void readWriteRewriteFileTest() throws IOException, InterruptedException, TimeoutException {
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
+        Thread.sleep(500);
+        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo rewritten > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
+        Thread.sleep(500);
+        Assertions.assertEquals("rewritten\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+    }
+
+    @Test
     void moveFileTest() throws IOException, InterruptedException, TimeoutException {
         Log.info("Creating");
         Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());

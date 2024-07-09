@@ -81,7 +81,10 @@ public class SyncHandler {
             }
             Log.trace("Handling update: " + header.getName() + " from " + from + "\n" + "ours: " + ours + " \n" + "received: " + rcv);
 
-            md.getRemoteCopies().put(from, receivedTotalVer);
+            boolean updatedRemoteVersion = false;
+
+            var oldRemoteVer = md.getRemoteCopies().put(from, receivedTotalVer);
+            if (oldRemoteVer != null && !oldRemoteVer.equals(receivedTotalVer)) updatedRemoteVersion = true;
 
             boolean hasLower = false;
             boolean hasHigher = false;
@@ -119,7 +122,8 @@ public class SyncHandler {
 
             assert Objects.equals(receivedTotalVer, md.getOurVersion());
 
-            Log.debug("No action on update: " + header.getName() + " from " + from);
+            if (!updatedRemoteVersion)
+                Log.debug("No action on update: " + header.getName() + " from " + from);
 
             return false;
         });
