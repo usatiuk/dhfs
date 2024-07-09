@@ -83,7 +83,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         return _metaPart.isDeleted();
     }
 
-    protected boolean isDeletable() {
+    protected boolean isDeletionCandidate() {
         return _metaPart.isDeletionCandidate();
     }
 

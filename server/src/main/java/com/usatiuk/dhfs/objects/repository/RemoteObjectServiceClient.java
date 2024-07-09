@@ -15,6 +15,9 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @ApplicationScoped
 public class RemoteObjectServiceClient {
@@ -127,19 +130,31 @@ public class RemoteObjectServiceClient {
         return rpcClientFactory.withObjSyncClient(host, client -> client.indexUpdate(send).getErrorsList());
     }
 
-    public Collection<CanDeleteReply> canDelete(String object, Collection<String> ourReferrers) {
-        return persistentRemoteHostsService.getHostsUuid().parallelStream()
-                .map(h -> {
-                    try {
-                        var req = CanDeleteRequest.newBuilder()
-                                .setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString())
-                                .setName(object);
-                        req.addAllOurReferrers(ourReferrers);
-                        return rpcClientFactory.withObjSyncClient(h, client -> client.canDelete(req.build()));
-                    } catch (Exception e) {
-                        Log.debug("Error when asking canDelete for object " + object, e);
-                        return null;
-                    }
-                }).filter(Objects::nonNull).toList();
+    public Collection<CanDeleteReply> canDelete(Collection<UUID> targets, String object, Collection<String> ourReferrers) {
+        ConcurrentLinkedDeque<CanDeleteReply> results = new ConcurrentLinkedDeque<>();
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            targets.forEach(h -> executor.submit(() -> {
+                try {
+                    var req = CanDeleteRequest.newBuilder()
+                            .setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString())
+                            .setName(object);
+                    req.addAllOurReferrers(ourReferrers);
+                    var res = rpcClientFactory.withObjSyncClient(h, client -> client.canDelete(req.build()));
+                    if (res != null)
+                        results.add(res);
+                } catch (Exception e) {
+                    Log.debug("Error when asking canDelete for object " + object, e);
+                }
+            }));
+            try {
+                if (!executor.awaitTermination(10, TimeUnit.SECONDS)) //FIXME:
+                    Log.warn("Timed out waiting for canDelete for object " + object);
+            } catch (InterruptedException e) {
+                Log.warn("Interrupted waiting for canDelete for object " + object);
+            }
+            if (!executor.shutdownNow().isEmpty())
+                Log.warn("Didn't ask all targets when asking canDelete for " + object);
+        }
+        return results;
     }
 }

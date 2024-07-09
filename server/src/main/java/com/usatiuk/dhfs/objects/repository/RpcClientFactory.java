@@ -1,36 +1,24 @@
 package com.usatiuk.dhfs.objects.repository;
 
 import com.usatiuk.dhfs.objects.repository.peersync.DhfsObjectPeerSyncGrpcGrpc;
-import com.usatiuk.dhfs.objects.repository.peertrust.PeerTrustManager;
-import io.grpc.ChannelCredentials;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import io.grpc.TlsChannelCredentials;
-import io.grpc.netty.NegotiationType;
-import io.grpc.netty.NettyChannelBuilder;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import javax.net.ssl.KeyManagerFactory;
-import java.security.KeyStore;
-import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
 // TODO: Dedup this
 @ApplicationScoped
 public class RpcClientFactory {
-    @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
-
-    @Inject
-    PeerTrustManager peerTrustManager;
-
     @ConfigProperty(name = "dhfs.objects.sync.timeout")
     long syncTimeout;
 
@@ -39,6 +27,20 @@ public class RpcClientFactory {
 
     @Inject
     RemoteHostManager remoteHostManager;
+
+    @Inject
+    RpcChannelFactory rpcChannelFactory;
+
+    private record ObjSyncStubKey(String host, String address, int port) {
+    }
+
+    private record PeerSyncStubKey(String address, int port) {
+    }
+
+    // FIXME: Leaks!
+    private final ConcurrentMap<ObjSyncStubKey, DhfsObjectSyncGrpcGrpc.DhfsObjectSyncGrpcBlockingStub> _objSyncCache = new ConcurrentHashMap<>();
+    private final ConcurrentMap<PeerSyncStubKey, DhfsObjectPeerSyncGrpcGrpc.DhfsObjectPeerSyncGrpcBlockingStub> _peerSyncCache = new ConcurrentHashMap<>();
+
 
     @FunctionalInterface
     public interface ObjectSyncClientFunction<R> {
@@ -85,32 +87,17 @@ public class RpcClientFactory {
         return withObjSyncClient(target.toString(), hostinfo.getAddr(), hostinfo.getSecurePort(), syncTimeout, fn);
     }
 
-    private ChannelCredentials getChannelCredentials() {
-        try {
-            KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
-            ks.load(null, null);
-
-            ks.setKeyEntry("clientkey", persistentRemoteHostsService.getSelfKeypair().getPrivate(), null, new Certificate[]{persistentRemoteHostsService.getSelfCertificate()});
-
-            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-            keyManagerFactory.init(ks, null);
-
-            ChannelCredentials creds = TlsChannelCredentials.newBuilder().trustManager(peerTrustManager).keyManager(keyManagerFactory.getKeyManagers()).build();
-            return creds;
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     public <R> R withObjSyncClient(String host, String addr, int port, long timeout, ObjectSyncClientFunction<R> fn) {
-        var creds = getChannelCredentials();
-        var channel = NettyChannelBuilder.forAddress(addr, port, creds).overrideAuthority(host).build();
-        var client = DhfsObjectSyncGrpcGrpc.newBlockingStub(channel).withMaxOutboundMessageSize(Integer.MAX_VALUE).withMaxInboundMessageSize(Integer.MAX_VALUE).withDeadlineAfter(timeout, TimeUnit.SECONDS);
-        try {
-            return fn.apply(client);
-        } finally {
-            channel.shutdownNow();
-        }
+        var key = new ObjSyncStubKey(host, addr, port);
+        var stub = _objSyncCache.computeIfAbsent(key, (k) -> {
+            var channel = rpcChannelFactory.getSecureChannel(host, addr, port);
+            return DhfsObjectSyncGrpcGrpc.newBlockingStub(channel)
+                    .withMaxOutboundMessageSize(Integer.MAX_VALUE)
+                    .withMaxInboundMessageSize(Integer.MAX_VALUE);
+
+        });
+        return fn.apply(stub.withDeadlineAfter(timeout, TimeUnit.SECONDS));
     }
 
     @FunctionalInterface
@@ -125,14 +112,13 @@ public class RpcClientFactory {
     }
 
     public <R> R withPeerSyncClient(String addr, int port, long timeout, PeerSyncClientFunction<R> fn) {
-        var channel = NettyChannelBuilder.forAddress(addr, port).negotiationType(NegotiationType.PLAINTEXT).usePlaintext().build();
-        var client = DhfsObjectPeerSyncGrpcGrpc.newBlockingStub(channel).withMaxOutboundMessageSize(Integer.MAX_VALUE).withMaxInboundMessageSize(Integer.MAX_VALUE).withDeadlineAfter(timeout, TimeUnit.SECONDS);
-        try {
-            return fn.apply(client);
-        } finally {
-            channel.shutdownNow();
-        }
+        var key = new PeerSyncStubKey(addr, port);
+        var stub = _peerSyncCache.computeIfAbsent(key, (k) -> {
+            var channel = rpcChannelFactory.getInsecureChannel(addr, port);
+            return DhfsObjectPeerSyncGrpcGrpc.newBlockingStub(channel)
+                    .withMaxOutboundMessageSize(Integer.MAX_VALUE)
+                    .withMaxInboundMessageSize(Integer.MAX_VALUE);
+        });
+        return fn.apply(stub.withDeadlineAfter(timeout, TimeUnit.SECONDS));
     }
-
-
 }

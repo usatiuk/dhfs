@@ -109,7 +109,7 @@ public class JObjectResolver {
     public void updateDeletionState(JObject<?> self) {
         self.assertRWLock();
 
-        if (!self.isDeletable() && self.isDeleted()) {
+        if (!self.isDeletionCandidate() && self.isDeleted()) {
             self.getMeta().undelete();
             Log.debug("Undelete: " + self.getName());
 
@@ -127,7 +127,7 @@ public class JObjectResolver {
 
         }
 
-        if (self.isDeletable() && !self.isDeleted()) {
+        if (self.isDeletionCandidate() && !self.isDeleted()) {
             jObjectRefProcessor.putDeletionCandidate(self.getName());
         }
     }

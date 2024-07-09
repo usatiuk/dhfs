@@ -79,8 +79,15 @@ public class JObjectRefProcessor {
 
         _movableProcessorExecutorService.submit(() -> {
             try {
-                var ourReferrers = obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> m.getReferrers());
-                var ret = remoteObjectServiceClient.canDelete(obj.getName(), ourReferrers);
+                var knownHosts = persistentRemoteHostsService.getHostsUuid();
+                List<UUID> missing = new ArrayList<>();
+
+                var ourReferrers = obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
+                    for (var x : knownHosts)
+                        if (!m.getConfirmedDeletes().contains(x)) missing.add(x);
+                    return m.getReferrers();
+                });
+                var ret = remoteObjectServiceClient.canDelete(missing, obj.getName(), ourReferrers);
 
                 for (var r : ret) {
                     if (!r.getDeletionCandidate())
@@ -94,6 +101,8 @@ public class JObjectRefProcessor {
                             m.getConfirmedDeletes().add(UUID.fromString(r.getSelfUuid()));
                     return null;
                 });
+            } catch (Exception e) {
+                Log.error("When processing deletion of movable object " + obj.getName(), e);
             } finally {
                 synchronized (_movablesInProcessing) {
                     _movablesInProcessing.remove(obj.getName());
@@ -106,14 +115,14 @@ public class JObjectRefProcessor {
     private boolean processMovable(JObject<?> obj) {
         obj.assertRWLock();
         var knownHosts = persistentRemoteHostsService.getHostsUuid();
-        List<UUID> missing = new ArrayList<>();
-        int current = 0;
-        for (var x : knownHosts) {
-            if (obj.getMeta().getConfirmedDeletes().contains(x)) current++;
-            else missing.add(x);
-        }
+        boolean missing = false;
+        for (var x : knownHosts)
+            if (!obj.getMeta().getConfirmedDeletes().contains(x)) {
+                missing = true;
+                break;
+            }
 
-        if (missing.isEmpty()) return true;
+        if (!missing) return true;
         asyncProcessMovable(obj);
         return false;
     }
