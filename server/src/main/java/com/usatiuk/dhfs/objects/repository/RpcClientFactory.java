@@ -38,8 +38,8 @@ public class RpcClientFactory {
     }
 
     // FIXME: Leaks!
-    private final ConcurrentMap<ObjSyncStubKey, DhfsObjectSyncGrpcGrpc.DhfsObjectSyncGrpcBlockingStub> _objSyncCache = new ConcurrentHashMap<>();
-    private final ConcurrentMap<PeerSyncStubKey, DhfsObjectPeerSyncGrpcGrpc.DhfsObjectPeerSyncGrpcBlockingStub> _peerSyncCache = new ConcurrentHashMap<>();
+    private ConcurrentMap<ObjSyncStubKey, DhfsObjectSyncGrpcGrpc.DhfsObjectSyncGrpcBlockingStub> _objSyncCache = new ConcurrentHashMap<>();
+    private ConcurrentMap<PeerSyncStubKey, DhfsObjectPeerSyncGrpcGrpc.DhfsObjectPeerSyncGrpcBlockingStub> _peerSyncCache = new ConcurrentHashMap<>();
 
 
     @FunctionalInterface
@@ -121,4 +121,11 @@ public class RpcClientFactory {
         });
         return fn.apply(stub.withDeadlineAfter(timeout, TimeUnit.SECONDS));
     }
+
+    public void dropCache() {
+        rpcChannelFactory.dropCache();
+        _objSyncCache = new ConcurrentHashMap<>();
+        _peerSyncCache = new ConcurrentHashMap<>();
+    }
+
 }

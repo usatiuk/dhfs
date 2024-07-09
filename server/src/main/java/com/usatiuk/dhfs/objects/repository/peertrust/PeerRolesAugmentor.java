@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects.repository.peertrust;
 
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
+import io.quarkus.logging.Log;
 import io.quarkus.security.credential.CertificateCredential;
 import io.quarkus.security.identity.AuthenticationRequestContext;
 import io.quarkus.security.identity.SecurityIdentity;
@@ -34,12 +35,15 @@ public class PeerRolesAugmentor implements SecurityIdentityAugmentor {
             try {
                 var entry = persistentRemoteHostsService.getHost(UUID.fromString(uuid));
 
-                if (!entry.getCertificate().equals(identity.getCredential(CertificateCredential.class).getCertificate()))
+                if (!entry.getCertificate().equals(identity.getCredential(CertificateCredential.class).getCertificate())) {
+                    Log.error("Certificate mismatch for " + uuid);
                     return () -> identity;
+                }
 
                 builder.addRole("cluster-member");
                 return builder::build;
             } catch (Exception e) {
+                Log.error("Error when checking certificate for " + uuid, e);
                 return () -> identity;
             }
         }

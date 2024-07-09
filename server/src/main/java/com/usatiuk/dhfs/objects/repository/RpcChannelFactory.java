@@ -38,8 +38,8 @@ public class RpcChannelFactory {
     private record InsecureChannelKey(String address, int port) {
     }
 
-    private final ConcurrentMap<SecureChannelKey, ManagedChannel> _secureChannelCache = new ConcurrentHashMap<>();
-    private final ConcurrentMap<InsecureChannelKey, ManagedChannel> _insecureChannelCache = new ConcurrentHashMap<>();
+    private ConcurrentMap<SecureChannelKey, ManagedChannel> _secureChannelCache = new ConcurrentHashMap<>();
+    private ConcurrentMap<InsecureChannelKey, ManagedChannel> _insecureChannelCache = new ConcurrentHashMap<>();
 
     private ChannelCredentials getChannelCredentials() {
         try {
@@ -70,5 +70,14 @@ public class RpcChannelFactory {
         return _insecureChannelCache.computeIfAbsent(key, (k) -> {
             return NettyChannelBuilder.forAddress(address, port).negotiationType(NegotiationType.PLAINTEXT).idleTimeout(10, TimeUnit.SECONDS).usePlaintext().build();
         });
+    }
+
+    public void dropCache() {
+        var oldS = _secureChannelCache;
+        var oldI = _insecureChannelCache;
+        _secureChannelCache = new ConcurrentHashMap<>();
+        _insecureChannelCache = new ConcurrentHashMap<>();
+        oldS.values().forEach(ManagedChannel::shutdown);
+        oldI.values().forEach(ManagedChannel::shutdown);
     }
 }

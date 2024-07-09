@@ -50,6 +50,9 @@ public class PersistentRemoteHostsService {
     @Inject
     InvalidationQueueService invalidationQueueService;
 
+    @Inject
+    RpcClientFactory rpcClientFactory;
+
     final String dataFileName = "hosts";
 
     private PersistentRemoteHosts _persistentData = new PersistentRemoteHosts();
@@ -220,6 +223,9 @@ public class PersistentRemoteHostsService {
     private void updateCerts() {
         getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
             peerTrustManager.reloadTrustManagerHosts(getHostsNoNulls());
+            // Fixme:? I don't think it should be needed with custom trust store
+            // but it doesn't work?
+            rpcClientFactory.dropCache();
             return null;
         });
     }
