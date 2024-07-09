@@ -760,29 +760,24 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Override
     public Long size(String uuid) {
-        long size = 0;
-
-        NavigableMap<Long, String> chunksAll;
 
         var read = jObjectManager.get(uuid)
                 .orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
         try {
-            chunksAll = read.runReadLocked(JObject.ResolutionStrategy.REMOTE, (fsNodeData, fileData) -> {
+            return read.runReadLocked(JObject.ResolutionStrategy.REMOTE, (fsNodeData, fileData) -> {
+                long size = 0;
                 if (!(fileData instanceof File fd))
                     throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-                return new TreeMap<>(fd.getChunks());
+                for (var chunk : fd.getChunks().entrySet()) {
+                    size += getChunkSize(chunk.getValue());
+                }
+                return size;
             });
         } catch (Exception e) {
             Log.error("Error reading file: " + uuid, e);
             return -1L;
         }
-
-        for (var chunk : chunksAll.entrySet()) {
-            size += getChunkSize(chunk.getValue());
-        }
-
-        return size;
     }
 
     private JObject<Directory> getRoot() {
