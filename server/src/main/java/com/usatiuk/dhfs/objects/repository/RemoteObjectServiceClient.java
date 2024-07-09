@@ -15,9 +15,9 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 @ApplicationScoped
 public class RemoteObjectServiceClient {
@@ -133,22 +133,21 @@ public class RemoteObjectServiceClient {
     public Collection<CanDeleteReply> canDelete(Collection<UUID> targets, String object, Collection<String> ourReferrers) {
         ConcurrentLinkedDeque<CanDeleteReply> results = new ConcurrentLinkedDeque<>();
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            targets.forEach(h -> executor.submit(() -> {
-                try {
-                    var req = CanDeleteRequest.newBuilder()
-                            .setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString())
-                            .setName(object);
-                    req.addAllOurReferrers(ourReferrers);
-                    var res = rpcClientFactory.withObjSyncClient(h, client -> client.canDelete(req.build()));
-                    if (res != null)
-                        results.add(res);
-                } catch (Exception e) {
-                    Log.debug("Error when asking canDelete for object " + object, e);
-                }
-            }));
             try {
-                if (!executor.awaitTermination(10, TimeUnit.SECONDS)) //FIXME:
-                    Log.warn("Timed out waiting for canDelete for object " + object);
+                executor.invokeAll(targets.stream().<Callable<Void>>map(h -> () -> {
+                    try {
+                        var req = CanDeleteRequest.newBuilder()
+                                .setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString())
+                                .setName(object);
+                        req.addAllOurReferrers(ourReferrers);
+                        var res = rpcClientFactory.withObjSyncClient(h, client -> client.canDelete(req.build()));
+                        if (res != null)
+                            results.add(res);
+                    } catch (Exception e) {
+                        Log.debug("Error when asking canDelete for object " + object, e);
+                    }
+                    return null;
+                }).toList());
             } catch (InterruptedException e) {
                 Log.warn("Interrupted waiting for canDelete for object " + object);
             }
