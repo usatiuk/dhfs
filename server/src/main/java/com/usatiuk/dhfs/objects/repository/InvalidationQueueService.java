@@ -66,48 +66,54 @@ public class InvalidationQueueService {
     private void sender() {
         try {
             while (!Thread.interrupted()) {
-                var data = pullAll();
-                Thread.sleep(delay);
-                data.entrySet().stream().filter(e -> persistentRemoteHostsService.existsHost(e.getKey())).forEach(forHost -> {
-                    String stats = "Sent invalidation: ";
-                    long sent = 0;
-                    long success = 0;
+                try {
+                    var data = pullAll();
+                    Thread.sleep(delay);
+                    data.entrySet().stream().filter(e -> persistentRemoteHostsService.existsHost(e.getKey())).forEach(forHost -> {
+                        String stats = "Sent invalidation: ";
+                        long sent = 0;
+                        long success = 0;
 
-                    while (!forHost.getValue().isEmpty()) {
-                        ArrayList<String> chunk = new ArrayList<>();
+                        while (!forHost.getValue().isEmpty()) {
+                            ArrayList<String> chunk = new ArrayList<>();
 
-                        while (chunk.size() < batchSize && !forHost.getValue().isEmpty()) {
-                            var got = forHost.getValue().removeFirst();
-                            chunk.add(got.getKey());
-                            if (got.getRight()) {
-                                jObjectManager.notifySent(got.getKey());
+                            while (chunk.size() < batchSize && !forHost.getValue().isEmpty()) {
+                                var got = forHost.getValue().removeFirst();
+                                chunk.add(got.getKey());
+                                if (got.getRight()) {
+                                    jObjectManager.notifySent(got.getKey());
+                                }
+                            }
+
+                            sent += chunk.size();
+                            success = sent;
+                            try {
+                                var errs = remoteObjectServiceClient.notifyUpdate(forHost.getKey(), chunk);
+                                for (var v : errs) {
+                                    Log.info("Failed to send invalidation to " + forHost.getKey() +
+                                            " of " + v.getObjectName() + ": " + v.getError() + ", will retry");
+                                    pushInvalidationToOne(forHost.getKey(), v.getObjectName(), false);
+                                    success--;
+                                }
+                            } catch (Exception e) {
+                                Log.info("Failed to send invalidation to " + forHost.getKey() + ": " + e.getMessage() + ", will retry");
+                                for (var c : chunk)
+                                    pushInvalidationToOne(forHost.getKey(), c, false);
+                                success = 0;
+                            }
+                            if (Thread.interrupted()) {
+                                Log.info("Invalidation sender exiting");
+                                return;
                             }
                         }
-
-                        sent += chunk.size();
-                        success = sent;
-                        try {
-                            var errs = remoteObjectServiceClient.notifyUpdate(forHost.getKey(), chunk);
-                            for (var v : errs) {
-                                Log.info("Failed to send invalidation to " + forHost.getKey() +
-                                        " of " + v.getObjectName() + ": " + v.getError() + ", will retry");
-                                pushInvalidationToOne(forHost.getKey(), v.getObjectName(), false);
-                                success--;
-                            }
-                        } catch (Exception e) {
-                            Log.info("Failed to send invalidation to " + forHost.getKey() + ": " + e.getMessage() + ", will retry");
-                            for (var c : chunk)
-                                pushInvalidationToOne(forHost.getKey(), c, false);
-                            success = 0;
-                        }
-                        if (Thread.interrupted()) {
-                            Log.info("Invalidation sender exiting");
-                            return;
-                        }
-                    }
-                    stats += forHost.getKey() + ": " + success + "/" + sent + " ";
-                    Log.info(stats);
-                });
+                        stats += forHost.getKey() + ": " + success + "/" + sent + " ";
+                        Log.info(stats);
+                    });
+                } catch (InterruptedException ie) {
+                    throw ie;
+                } catch (Exception e) {
+                    Log.error("Exception in invalidation sender thread: ", e);
+                }
             }
         } catch (InterruptedException ignored) {
         }
