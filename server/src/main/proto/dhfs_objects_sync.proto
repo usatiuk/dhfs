@@ -59,14 +59,14 @@ message CanDeleteRequest {
   string selfUuid = 10;
 
   string name = 2;
-  optional string ourReferrer = 3;
+  repeated string ourReferrers = 3;
 }
 
 message CanDeleteReply {
   string selfUuid = 10;
   string objName = 1;
   bool deletionCandidate = 2;
-  optional string referrer = 3;
+  repeated string referrers = 3;
 }
 
 message GetIndexRequest {

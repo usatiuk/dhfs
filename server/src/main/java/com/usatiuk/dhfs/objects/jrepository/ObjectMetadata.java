@@ -15,6 +15,7 @@ import java.io.ObjectInputStream;
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.*;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -106,10 +107,11 @@ public class ObjectMetadata implements Serializable {
         _written.set(true);
     }
 
-    private String _referrer = null;
+    private final Set<String> _referrers = new ConcurrentSkipListSet<>();
 
-    @Getter
-    private boolean _isReferred = false;
+    public boolean isReferred() {
+        return !_referrers.isEmpty();
+    }
 
     public void lock() {
         if (_locked) throw new IllegalArgumentException("Already locked");
@@ -123,33 +125,12 @@ public class ObjectMetadata implements Serializable {
     }
 
     public boolean checkRef(String from) {
-        return Objects.equals(_referrer, from) && _isReferred; // Racey!
+        return _referrers.contains(from);
     }
 
     public void addRef(String from) {
         _confirmedDeletes.clear();
-
-        if (_referrer == null) {
-            _referrer = from;
-            _isReferred = true;
-            return;
-        }
-
-        if (Objects.equals(_referrer, from)) {
-//            if (_isReferred)
-//                throw new IllegalStateException("Adding a ref to an already referenced object: " + getName());
-            _isReferred = true;
-            return;
-        }
-
-        if (_knownClass.get().isAnnotationPresent(Movable.class)) {
-            Log.debug("Object " + getName() + " changing ownership from " + _referrer + " to " + from);
-            _referrer = from;
-            _isReferred = true;
-            return;
-        }
-
-        throw new IllegalStateException("Trying to move an immovable object " + getName());
+        _referrers.add(from);
     }
 
     public void removeRef(String from) {
@@ -157,17 +138,11 @@ public class ObjectMetadata implements Serializable {
             unlock();
             Log.error("Object " + getName() + " is locked, but we removed a reference to it, unlocking!");
         }
-        if (!_isReferred)
-            throw new IllegalStateException("Removing a ref from an unreferenced object!: " + getName());
-        if (!Objects.equals(_referrer, from))
-            throw new IllegalStateException("Removing a wrong ref from an object " + getName() + " expected: " + _referrer + " have: " + from);
-
-        _isReferred = false;
+        _referrers.remove(from);
     }
 
-    public String getRef() {
-        if (_isReferred && _referrer != null) return _referrer;
-        return null;
+    public Collection<String> getReferrers() {
+        return _referrers.stream().toList();
     }
 
     public boolean isDeletionCandidate() {
@@ -217,7 +192,7 @@ public class ObjectMetadata implements Serializable {
     }
 
     public int metaHash() {
-        return Objects.hash(isSeen(), getKnownClass(), isDeleted(), _referrer, _isReferred, _locked, _remoteCopies, _savedRefs);
+        return Objects.hash(isSeen(), getKnownClass(), isDeleted(), _referrers, _locked, _remoteCopies, _savedRefs);
     }
 
     // Not really a hash

@@ -74,12 +74,13 @@ public class JObjectRefProcessor {
 
         executorService.submit(() -> {
             try {
-                var ourReferrer = obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> m.getRef());
-                var ret = remoteObjectServiceClient.canDelete(obj.getName(), ourReferrer);
+                var ourReferrers = obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> m.getReferrers());
+                var ret = remoteObjectServiceClient.canDelete(obj.getName(), ourReferrers);
 
                 for (var r : ret) {
-                    if (!r.getDeletionCandidate() && r.hasReferrer())
-                        autoSyncProcessor.add(r.getReferrer());
+                    if (!r.getDeletionCandidate())
+                        for (var rr : r.getReferrersList())
+                            autoSyncProcessor.add(rr);
                 }
 
                 obj.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {

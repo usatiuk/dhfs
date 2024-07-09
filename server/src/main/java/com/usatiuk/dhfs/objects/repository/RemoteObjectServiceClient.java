@@ -10,7 +10,6 @@ import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
-import jakarta.annotation.Nullable;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
@@ -128,14 +127,14 @@ public class RemoteObjectServiceClient {
         return rpcClientFactory.withObjSyncClient(host, client -> client.indexUpdate(send).getErrorsList());
     }
 
-    public Collection<CanDeleteReply> canDelete(String object, @Nullable String ourReferrer) {
+    public Collection<CanDeleteReply> canDelete(String object, Collection<String> ourReferrers) {
         return persistentRemoteHostsService.getHostsUuid().parallelStream()
                 .map(h -> {
                     try {
                         var req = CanDeleteRequest.newBuilder()
                                 .setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString())
                                 .setName(object);
-                        if (ourReferrer != null) req.setOurReferrer(ourReferrer);
+                        req.addAllOurReferrers(ourReferrers);
                         return rpcClientFactory.withObjSyncClient(h, client -> client.canDelete(req.build()));
                     } catch (Exception e) {
                         Log.debug("Error when asking canDelete for object " + object, e);

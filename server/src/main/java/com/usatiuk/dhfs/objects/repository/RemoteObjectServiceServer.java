@@ -83,8 +83,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
                 if (m.isDeleted() && !m.isDeletionCandidate())
                     throw new IllegalStateException("Object " + m.getName() + " is deleted but not a deletion candidate");
                 builder.setDeletionCandidate(m.isDeletionCandidate());
-                if (m.getRef() != null)
-                    builder.setReferrer(m.getRef());
+                builder.addAllReferrers(m.getReferrers());
                 return null;
             });
         } catch (DeletedObjectAccessException dox) {
@@ -96,9 +95,9 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
         var ret = builder.build();
 
-        if (!ret.getDeletionCandidate() && request.hasOurReferrer()) {
-            autoSyncProcessor.add(request.getOurReferrer());
-        }
+        if (!ret.getDeletionCandidate())
+            for (var rr : ret.getReferrersList())
+                autoSyncProcessor.add(rr);
 
         return Uni.createFrom().item(ret);
     }
