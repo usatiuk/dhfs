@@ -212,7 +212,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
 
             var dataHash = _metaPart.dataHash();
             var metaHash = Objects.hash(_metaPart.metaHash(), dataHash);
-            var prevData = _dataPart.get();
+            var prevData = hasLocalCopy();
 
             HashSet<String> oldRefs = null;
 
@@ -233,7 +233,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
 
             var newDataHash = _metaPart.dataHash();
             var newMetaHash = Objects.hash(_metaPart.metaHash(), newDataHash);
-            var newData = _dataPart.get();
+            var newData = hasLocalCopy();
 
             if (_resolver.bumpVerification) {
                 if (_dataPart.get() != null && _dataPart.get().assumeUnique())
