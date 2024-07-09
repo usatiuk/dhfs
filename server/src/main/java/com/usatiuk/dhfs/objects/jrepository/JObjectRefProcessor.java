@@ -13,6 +13,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.*;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 
 @ApplicationScoped
@@ -29,16 +30,20 @@ public class JObjectRefProcessor {
     PersistentRemoteHostsService persistentRemoteHostsService;
 
     @Inject
-    ExecutorService executorService;
-
-    @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
 
     @Inject
     AutoSyncProcessor autoSyncProcessor;
 
+    @ConfigProperty(name = "dhfs.objects.move-processor.threads")
+    int moveProcessorThreads;
+
+    ExecutorService _movableProcessorExecutorService;
+
     @Startup
     void init() {
+        _movableProcessorExecutorService = Executors.newFixedThreadPool(moveProcessorThreads);
+
         _refProcessorThread = new Thread(this::refProcessorThread);
         _refProcessorThread.setName("JObject Refcounter thread");
         _refProcessorThread.start();
@@ -72,7 +77,7 @@ public class JObjectRefProcessor {
             _movablesInProcessing.add(obj.getName());
         }
 
-        executorService.submit(() -> {
+        _movableProcessorExecutorService.submit(() -> {
             try {
                 var ourReferrers = obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> m.getReferrers());
                 var ret = remoteObjectServiceClient.canDelete(obj.getName(), ourReferrers);
