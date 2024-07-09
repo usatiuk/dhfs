@@ -114,9 +114,9 @@ public class PersistentRemoteHostsService {
         Log.info("Scheduling certificate update after " + obj.getName() + " was updated");
         executorService.submit(() -> {
             updateCerts();
-            invalidationQueueService.pushInvalidationToAll(PeerDirectory.PeerDirectoryObjName, true);
+            invalidationQueueService.pushInvalidationToAll(PeerDirectory.PeerDirectoryObjName);
             for (var p : getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.getPeers().stream().toList()))
-                invalidationQueueService.pushInvalidationToAll(PersistentPeerInfo.getNameFromUuid(p), true);
+                invalidationQueueService.pushInvalidationToAll(PersistentPeerInfo.getNameFromUuid(p));
         });
     }
 

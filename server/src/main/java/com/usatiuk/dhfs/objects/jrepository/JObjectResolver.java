@@ -147,7 +147,7 @@ public class JObjectResolver {
 
         var obj = remoteObjectServiceClient.getObject(jObject);
         jObjectWriteback.markDirty(jObject);
-        invalidationQueueService.pushInvalidationToAll(jObject.getName(), !jObject.getMeta().isSeen());
+        invalidationQueueService.pushInvalidationToAll(jObject.getName());
         return SerializationHelper.deserialize(obj);
     }
 
@@ -179,7 +179,7 @@ public class JObjectResolver {
         self.assertRWLock();
         jObjectWriteback.markDirty(self);
         if (self.isResolved()) {
-            invalidationQueueService.pushInvalidationToAll(self.getName(), !self.getMeta().isSeen());
+            invalidationQueueService.pushInvalidationToAll(self.getName());
             for (var t : _writeListeners.keySet()) { // FIXME:?
                 if (t.isAssignableFrom(self.getKnownClass()))
                     for (var cb : _writeListeners.get(t))

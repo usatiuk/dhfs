@@ -148,7 +148,7 @@ public class JObjectManagerImpl implements JObjectManager {
             JObject<D> finalRet = (JObject<D>) ret;
             boolean finalCreated = created;
             ret.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                if (object.pushResolution() && object.assumeUnique() && finalRet.getData() == null) {
+                if (object.getClass().isAnnotationPresent(PushResolution.class) && object.assumeUnique() && finalRet.getData() == null) {
                     finalRet.externalResolution(object);
                 }
 
@@ -205,14 +205,5 @@ public class JObjectManagerImpl implements JObjectManager {
                 }
             }
         }
-    }
-
-    @Override
-    public void notifySent(String key) {
-        //FIXME:
-        get(key).ifPresent(o -> o.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-            m.markSeen();
-            return null;
-        }));
     }
 }

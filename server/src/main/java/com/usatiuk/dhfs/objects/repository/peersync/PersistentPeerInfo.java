@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects.repository.peersync;
 
 import com.usatiuk.dhfs.files.conflicts.NotImplementedConflictResolver;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
+import com.usatiuk.dhfs.objects.jrepository.PushResolution;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -14,6 +15,7 @@ import java.util.UUID;
 
 @Getter
 @AllArgsConstructor
+@PushResolution
 public class PersistentPeerInfo extends JObjectData {
     @Serial
     private static final long serialVersionUID = 1;
@@ -28,11 +30,6 @@ public class PersistentPeerInfo extends JObjectData {
     @Override
     public String getName() {
         return getNameFromUuid(_uuid);
-    }
-
-    @Override
-    public boolean pushResolution() {
-        return true;
     }
 
     public boolean assumeUnique() {

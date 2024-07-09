@@ -210,7 +210,7 @@ public class ObjectMetadata implements Serializable {
         var headerBuilder = ObjectHeader.newBuilder().setName(getName());
         headerBuilder.setChangelog(toRpcChangelog());
 
-        if (data != null && data.pushResolution())
+        if (data != null && data.getClass().isAnnotationPresent(PushResolution.class))
             headerBuilder.setPushedData(SerializationHelper.serialize(data));
 
         return headerBuilder.build();

@@ -22,10 +22,6 @@ public abstract class JObjectData implements Serializable {
         throw new UnsupportedOperationException("This object shouldn't have refs");
     }
 
-    public boolean pushResolution() {
-        return false;
-    }
-
     public abstract Collection<String> extractRefs();
 
     public long estimateSize() {
