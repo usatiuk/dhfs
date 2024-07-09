@@ -193,7 +193,15 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     }
 
     private void verifyRefs() {
-        _resolver.verifyRefs(this);
+        _resolver.verifyRefs(this, null);
+    }
+
+    private void verifyRefs(HashSet<String> oldRefs) {
+        _resolver.verifyRefs(this, oldRefs);
+    }
+
+    public boolean hasRef(String ref) {
+        return _metaPart.checkRef(ref);
     }
 
     public <R> R runWriteLocked(ResolutionStrategy resolutionStrategy, ObjectFnWrite<T, R> fn) {
@@ -205,6 +213,14 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             var dataHash = _metaPart.dataHash();
             var metaHash = Objects.hash(_metaPart.metaHash(), dataHash);
             var prevData = _dataPart.get();
+
+            HashSet<String> oldRefs = null;
+
+            if (_resolver.refVerification) {
+                tryLocalResolve();
+                if (_dataPart.get() != null)
+                    oldRefs = new HashSet<>(_dataPart.get().extractRefs());
+            }
 
             VoidFn invalidateFn = () -> {
                 tryLocalResolve();
@@ -235,7 +251,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             if (!Objects.equals(newDataHash, dataHash)
                     || newData != prevData)
                 notifyWriteData();
-            verifyRefs();
+            verifyRefs(oldRefs);
             return ret;
         } finally {
             _lock.writeLock().unlock();

@@ -123,7 +123,7 @@ public class ObjectMetadata implements Serializable {
     }
 
     public boolean checkRef(String from) {
-        return Objects.equals(_referrer, from);
+        return Objects.equals(_referrer, from) && _isReferred; // Racey!
     }
 
     public void addRef(String from) {

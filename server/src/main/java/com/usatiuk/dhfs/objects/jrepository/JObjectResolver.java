@@ -9,12 +9,14 @@ import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
+import jakarta.annotation.Nullable;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -194,20 +196,25 @@ public class JObjectResolver {
         });
     }
 
-    protected void verifyRefs(JObject<?> self) {
+    protected void verifyRefs(JObject<?> self, @Nullable HashSet<String> oldRefs) {
         if (!refVerification) return;
         self.assertRWLock();
         if (!self.isResolved()) return;
         if (self.isDeleted()) return;
-        for (var r : self.getData().extractRefs()) {
+        var newRefs = self.getData().extractRefs();
+        if (oldRefs != null) for (var o : oldRefs)
+            if (!newRefs.contains(o)) {
+                jobjectManager.get(o).ifPresent(obj -> {
+                    if (obj.hasRef(self.getName()))
+                        throw new IllegalStateException("Object " + o + " is referenced from " + self.getName() + " but shouldn't be");
+                });
+            }
+        for (var r : newRefs) {
             var obj = jobjectManager.get(r).orElseThrow(() -> new IllegalStateException("Object " + r + " not found but should be referenced from " + self.getName()));
             if (obj.isDeleted())
                 throw new IllegalStateException("Object " + r + " deleted but referenced from " + self.getName());
-            obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
-                if (!m.checkRef(self.getName()))
-                    throw new IllegalStateException("Object " + r + " is not referenced by " + self.getName() + " but should be");
-                return null;
-            });
+            if (!obj.hasRef(self.getName()))
+                throw new IllegalStateException("Object " + r + " is not referenced by " + self.getName() + " but should be");
         }
     }
 }
