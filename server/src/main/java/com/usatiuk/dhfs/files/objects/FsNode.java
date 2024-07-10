@@ -1,8 +1,6 @@
 package com.usatiuk.dhfs.files.objects;
 
-import com.usatiuk.dhfs.files.conflicts.NotImplementedConflictResolver;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
-import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -41,10 +39,5 @@ public abstract class FsNode extends JObjectData {
     @Override
     public String getName() {
         return _uuid.toString();
-    }
-
-    @Override
-    public Class<? extends ConflictResolver> getConflictResolver() {
-        return NotImplementedConflictResolver.class;
     }
 }
