@@ -54,7 +54,7 @@ public class DhfsFuse extends FuseStubFS {
         var gid = new UnixSystem().getGid();
 
         mount(Paths.get(root), false, debug,
-                new String[]{"-o", "direct_io", "-o", "uid=" + uid, "-o", "gid=" + gid});
+                new String[]{"-o", "auto_cache", "-o", "uid=" + uid, "-o", "gid=" + gid});
     }
 
     void shutdown(@Observes @Priority(1) ShutdownEvent event) {
