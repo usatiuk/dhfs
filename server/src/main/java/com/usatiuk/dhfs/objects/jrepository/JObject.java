@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
-import io.quarkus.logging.Log;
 import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.NotImplementedException;
 
@@ -162,10 +161,8 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
 
         _lock.readLock().lock();
         try {
-            if (_metaPart.isDeleted()) {
-                Log.trace("Reading deleted object " + getName());
+            if (_metaPart.isDeleted())
                 throw new DeletedObjectAccessException();
-            }
             return fn.apply(_metaPart, _dataPart.get());
         } finally {
             _lock.readLock().unlock();
