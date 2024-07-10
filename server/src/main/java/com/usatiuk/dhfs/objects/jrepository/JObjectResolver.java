@@ -140,11 +140,7 @@ public class JObjectResolver {
         return Optional.empty();
     }
 
-    public <T extends JObjectData> T resolveData(JObject<T> jObject) {
-        jObject.assertRWLock();
-        var local = resolveDataLocal(jObject);
-        if (local.isPresent()) return local.get();
-
+    public <T extends JObjectData> T resolveDataRemote(JObject<T> jObject) {
         var obj = remoteObjectServiceClient.getObject(jObject);
         jObjectWriteback.markDirty(jObject);
         invalidationQueueService.pushInvalidationToAll(jObject.getName());
