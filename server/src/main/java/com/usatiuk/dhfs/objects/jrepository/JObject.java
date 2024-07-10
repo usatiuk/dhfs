@@ -156,7 +156,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         verifyRefs();
     }
 
-    public <R> R runReadLocked(ResolutionStrategy resolutionStrategy, ObjectFnRead<T, R> fn) {
+    public <R> R runReadLocked(ResolutionStrategy resolutionStrategy, ObjectFnRead<T, R> fn)  {
         tryResolve(resolutionStrategy);
 
         _lock.readLock().lock();

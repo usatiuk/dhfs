@@ -11,7 +11,10 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -31,8 +34,7 @@ public class SyncHandler {
     PersistentRemoteHostsService persistentRemoteHostsService;
 
     public void doInitialResync(UUID host) {
-        var got = remoteObjectServiceClient.getIndex(host);
-        handleRemoteUpdate(got);
+        remoteObjectServiceClient.getIndex(host);
         // Push our index to the other peer too, as they might not request it if
         // they didn't thing we were disconnected
         var objs = jObjectManager.find("");
@@ -143,20 +145,17 @@ public class SyncHandler {
     }
 
     public IndexUpdateReply handleRemoteUpdate(IndexUpdatePush request) {
-        var builder = IndexUpdateReply.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString());
-
-        for (var u : request.getHeaderList()) {
-            // TODO: Dedup
-            try {
-                handleOneUpdate(UUID.fromString(request.getSelfUuid()), u);
-            } catch (OutdatedUpdateException ignored) {
-                Log.info("Outdated update of " + u.getName() + " from " + request.getSelfUuid());
-            } catch (Exception ex) {
-                Log.info("Error when handling update from " + request.getSelfUuid() + " of " + u.getName(), ex);
-                builder.addErrors(IndexUpdateError.newBuilder().setObjectName(u.getName()).setError(ex + Arrays.toString(ex.getStackTrace())).build());
-            }
+        // TODO: Dedup
+        try {
+            handleOneUpdate(UUID.fromString(request.getSelfUuid()), request.getHeader());
+        } catch (OutdatedUpdateException ignored) {
+            Log.info("Outdated update of " + request.getHeader().getName() + " from " + request.getSelfUuid());
+        } catch (Exception ex) {
+            Log.info("Error when handling update from " + request.getSelfUuid() + " of " + request.getHeader().getName(), ex);
+            throw ex;
         }
-        return builder.build();
+
+        return IndexUpdateReply.getDefaultInstance();
     }
 
     protected static class OutdatedUpdateException extends RuntimeException {

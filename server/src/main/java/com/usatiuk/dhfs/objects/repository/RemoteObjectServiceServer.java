@@ -107,13 +107,12 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
     @Override
     @Blocking
-    public Uni<IndexUpdatePush> getIndex(GetIndexRequest request) {
+    public Uni<GetIndexReply> getIndex(GetIndexRequest request) {
         if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
         if (!persistentRemoteHostsService.existsHost(UUID.fromString(request.getSelfUuid())))
             throw new StatusRuntimeException(Status.UNAUTHENTICATED);
 
         Log.info("<-- getIndex: from " + request.getSelfUuid());
-        var builder = IndexUpdatePush.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString());
 
         var objs = jObjectManager.find("");
 
@@ -122,7 +121,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         for (var obj : objs)
             invalidationQueueService.pushInvalidationToOne(reqUuid, obj.getName());
 
-        return Uni.createFrom().item(builder.build());
+        return Uni.createFrom().item(GetIndexReply.getDefaultInstance());
     }
 
     @Override

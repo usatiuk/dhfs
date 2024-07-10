@@ -2,7 +2,6 @@ package com.usatiuk.dhfs.objects.repository;
 
 import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
-import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.jrepository.PushResolution;
@@ -93,44 +92,36 @@ public class RemoteObjectServiceClient {
         });
     }
 
-    public IndexUpdatePush getIndex(UUID host) {
+    public GetIndexReply getIndex(UUID host) {
         return rpcClientFactory.withObjSyncClient(host, client -> {
             var req = GetIndexRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).build();
             return client.getIndex(req);
         });
     }
 
-    public List<IndexUpdateError> notifyUpdate(UUID host, List<String> names) {
+    public IndexUpdateReply notifyUpdate(JObject<?> obj, UUID host) {
         var builder = IndexUpdatePush.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString());
-        for (var v : names) {
-            var obj = jObjectManager.get(v);
-            if (obj.isEmpty()) continue;
 
-            try {
-                var header = obj.get()
-                        .runReadLocked(
-                                obj.get().getKnownClass().isAnnotationPresent(PushResolution.class)
-                                        ? JObject.ResolutionStrategy.LOCAL_ONLY
-                                        : JObject.ResolutionStrategy.NO_RESOLUTION,
-                                (m, d) -> {
-                                    if (m.getKnownClass().isAnnotationPresent(PushResolution.class) && d == null)
-                                        Log.warn("Object " + m.getName() + " is marked as PushResolution but no resolution found");
-                                    return Pair.of(m.toRpcHeader(d), m.isSeen());
-                                });
-                if (!header.getRight())
-                    obj.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                        m.markSeen();
-                        return null;
-                    });
-                builder.addHeader(header.getLeft());
-            } catch (DeletedObjectAccessException e) {
-                continue;
-            }
-        }
+        var header = obj
+                .runReadLocked(
+                        obj.getKnownClass().isAnnotationPresent(PushResolution.class)
+                                ? JObject.ResolutionStrategy.LOCAL_ONLY
+                                : JObject.ResolutionStrategy.NO_RESOLUTION,
+                        (m, d) -> {
+                            if (m.getKnownClass().isAnnotationPresent(PushResolution.class) && d == null)
+                                Log.warn("Object " + m.getName() + " is marked as PushResolution but no resolution found");
+                            return Pair.of(m.toRpcHeader(d), m.isSeen());
+                        });
+        if (!header.getRight())
+            obj.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                m.markSeen();
+                return null;
+            });
+        builder.setHeader(header.getLeft());
 
         var send = builder.build();
 
-        return rpcClientFactory.withObjSyncClient(host, client -> client.indexUpdate(send).getErrorsList());
+        return rpcClientFactory.withObjSyncClient(host, client -> client.indexUpdate(send));
     }
 
     public Collection<CanDeleteReply> canDelete(Collection<UUID> targets, String object, Collection<String> ourReferrers) {

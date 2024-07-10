@@ -1,6 +1,8 @@
 package com.usatiuk.dhfs.objects.repository;
 
+import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
+import com.usatiuk.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.Startup;
@@ -10,7 +12,9 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.util.*;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @ApplicationScoped
 public class InvalidationQueueService {
@@ -26,85 +30,61 @@ public class InvalidationQueueService {
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
 
-    @ConfigProperty(name = "dhfs.objects.invalidation.batch_size")
-    Integer batchSize;
+    @ConfigProperty(name = "dhfs.objects.invalidation.threads")
+    int threads;
 
-    @ConfigProperty(name = "dhfs.objects.invalidation.delay")
-    Integer delay;
+    private record QueueEntry(UUID host, String obj) {
+    }
 
-    private Map<UUID, SequencedSet<String>> _hostToInvObj = new LinkedHashMap<>();
+    private final HashSetDelayedBlockingQueue<QueueEntry> _queue;
+    private ExecutorService _executor;
 
-    private Thread _senderThread;
+    public InvalidationQueueService(@ConfigProperty(name = "dhfs.objects.invalidation.delay") int delay) {
+        _queue = new HashSetDelayedBlockingQueue<>(delay);
+    }
 
     @Startup
     void init() {
-        _senderThread = new Thread(this::sender);
-        _senderThread.setName("Invalidation sender");
-        _senderThread.start();
+        _executor = Executors.newFixedThreadPool(threads);
+
+        for (int i = 0; i < threads; i++) {
+            _executor.submit(this::sender);
+        }
     }
 
     void shutdown(@Observes @Priority(10) ShutdownEvent event) throws InterruptedException {
-        _senderThread.interrupt();
-        _senderThread.join();
-    }
-
-    private SequencedSet<String> getSetForHost(UUID host) {
-        return _hostToInvObj.computeIfAbsent(host, k -> new LinkedHashSet<>());
-    }
-
-    public Map<UUID, SequencedSet<String>> pullAll() throws InterruptedException {
-        synchronized (this) {
-            while (_hostToInvObj.isEmpty())
-                this.wait();
-            var ret = _hostToInvObj;
-            _hostToInvObj = new LinkedHashMap<>();
-            return ret;
-        }
+        _executor.shutdownNow();
     }
 
     private void sender() {
         try {
             while (!Thread.interrupted()) {
                 try {
-                    var data = pullAll();
-                    Thread.sleep(delay);
-                    data.entrySet().stream().filter(e -> persistentRemoteHostsService.existsHost(e.getKey())).forEach(forHost -> {
-                        String stats = "Sent invalidation: ";
-                        long sent = 0;
-                        long success = 0;
+                    var data = _queue.getAllWait();
+                    String stats = "Sent invalidation: ";
+                    long success = 0;
 
-                        while (!forHost.getValue().isEmpty()) {
-                            ArrayList<String> chunk = new ArrayList<>();
+                    for (var e : data) {
+                        if (!persistentRemoteHostsService.existsHost(e.host)) continue;
 
-                            while (chunk.size() < batchSize && !forHost.getValue().isEmpty()) {
-                                var got = forHost.getValue().removeFirst();
-                                chunk.add(got);
-                            }
-
-                            sent += chunk.size();
-                            success = sent;
-                            try {
-                                var errs = remoteObjectServiceClient.notifyUpdate(forHost.getKey(), chunk);
-                                for (var v : errs) {
-                                    Log.info("Failed to send invalidation to " + forHost.getKey() +
-                                            " of " + v.getObjectName() + ": " + v.getError() + ", will retry");
-                                    pushInvalidationToOne(forHost.getKey(), v.getObjectName());
-                                    success--;
-                                }
-                            } catch (Exception e) {
-                                Log.info("Failed to send invalidation to " + forHost.getKey() + ": " + e.getMessage() + ", will retry");
-                                for (var c : chunk)
-                                    pushInvalidationToOne(forHost.getKey(), c);
-                                success = 0;
-                            }
-                            if (Thread.interrupted()) {
-                                Log.info("Invalidation sender exiting");
-                                return;
-                            }
+                        try {
+                            jObjectManager.get(e.obj).ifPresent(obj -> {
+                                remoteObjectServiceClient.notifyUpdate(obj, e.host);
+                            });
+                            success++;
+                        } catch (DeletedObjectAccessException ignored) {
+                        } catch (Exception ex) {
+                            Log.info("Failed to send invalidation to " + e.host + ", will retry", ex);
+                            pushInvalidationToOne(e.host, e.obj);
                         }
-                        stats += forHost.getKey() + ": " + success + "/" + sent + " ";
-                        Log.info(stats);
-                    });
+                        if (Thread.interrupted()) {
+                            Log.info("Invalidation sender exiting");
+                            return;
+                        }
+                    }
+
+                    stats += success + "/" + data.size() + " ";
+                    Log.info(stats);
                 } catch (InterruptedException ie) {
                     throw ie;
                 } catch (Exception e) {
@@ -117,20 +97,13 @@ public class InvalidationQueueService {
     }
 
     public void pushInvalidationToAll(String name) {
-        synchronized (this) {
-            var hosts = remoteHostManager.getSeenHosts();
-            if (hosts.isEmpty()) return;
-            for (var h : hosts) {
-                getSetForHost(h).add(name);
-            }
-            this.notifyAll();
+        var hosts = remoteHostManager.getSeenHosts();
+        for (var h : hosts) {
+            _queue.add(new QueueEntry(h, name));
         }
     }
 
     public void pushInvalidationToOne(UUID host, String name) {
-        synchronized (this) {
-            getSetForHost(host).add(name);
-            this.notifyAll();
-        }
+        _queue.add(new QueueEntry(host, name));
     }
 }

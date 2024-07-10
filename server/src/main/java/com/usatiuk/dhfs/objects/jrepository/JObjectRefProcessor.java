@@ -4,6 +4,7 @@ import com.google.common.collect.Streams;
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.objects.repository.autosync.AutoSyncProcessor;
+import com.usatiuk.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.Shutdown;
 import io.quarkus.runtime.Startup;
@@ -11,17 +12,18 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 
 @ApplicationScoped
 public class JObjectRefProcessor {
-    private final LinkedHashMap<String, Long> _candidates = new LinkedHashMap<>();
+    private final HashSetDelayedBlockingQueue<String> _candidates;
     private final HashSet<String> _movablesInProcessing = new HashSet<>();
-    @ConfigProperty(name = "dhfs.objects.deletion.delay")
-    Long deletionDelay;
     @Inject
     JObjectManager jObjectManager;
     @Inject
@@ -34,6 +36,10 @@ public class JObjectRefProcessor {
     int moveProcessorThreads;
     ExecutorService _movableProcessorExecutorService;
     private Thread _refProcessorThread;
+
+    public JObjectRefProcessor(@ConfigProperty(name = "dhfs.objects.deletion.delay") long deletionDelay) {
+        _candidates = new HashSetDelayedBlockingQueue<>(deletionDelay);
+    }
 
     @Startup
     void init() {
@@ -53,12 +59,8 @@ public class JObjectRefProcessor {
     public void putDeletionCandidate(String name) {
         synchronized (_movablesInProcessing) {
             if (_movablesInProcessing.contains(name)) return;
-            synchronized (_candidates) {
-                if (_candidates.putIfAbsent(name, System.currentTimeMillis()) == null) {
-                    Log.debug("Deletion candidate: " + name);
-                    _candidates.notify();
-                }
-            }
+            if (_candidates.add(name))
+                Log.debug("Deletion candidate: " + name);
         }
     }
 
@@ -121,22 +123,7 @@ public class JObjectRefProcessor {
     private void refProcessorThread() {
         try {
             while (!Thread.interrupted()) {
-                String next;
-                Long nextTime;
-
-                synchronized (_candidates) {
-                    while (_candidates.isEmpty())
-                        _candidates.wait();
-
-                    var e = _candidates.firstEntry();
-                    next = e.getKey();
-                    nextTime = e.getValue();
-                    _candidates.remove(next);
-                }
-
-                if ((System.currentTimeMillis() - nextTime) < deletionDelay) {
-                    Thread.sleep(deletionDelay);
-                }
+                String next = _candidates.get();
 
                 var got = jObjectManager.get(next);
                 if (got.isEmpty()) continue;
