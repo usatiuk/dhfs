@@ -4,14 +4,15 @@ import com.usatiuk.dhfs.files.conflicts.NoOpConflictResolver;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.Movable;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
 import java.io.Serial;
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 
 @Getter
+@EqualsAndHashCode(callSuper = false)
 @Movable
 public class ChunkInfo extends JObjectData {
     @Serial
@@ -24,19 +25,6 @@ public class ChunkInfo extends JObjectData {
         super();
         this._hash = hash;
         this._size = size;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ChunkInfo chunkInfo = (ChunkInfo) o;
-        return Objects.equals(_hash, chunkInfo._hash) && Objects.equals(_size, chunkInfo._size);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(_hash, _size);
     }
 
     @Override

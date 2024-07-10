@@ -1,10 +1,11 @@
 package com.usatiuk.dhfs.objects.repository.peersync;
 
-import com.usatiuk.dhfs.files.conflicts.NotImplementedConflictResolver;
+import com.usatiuk.dhfs.files.conflicts.NoOpConflictResolver;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.PushResolution;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
 import java.io.Serial;
@@ -15,6 +16,7 @@ import java.util.UUID;
 
 @Getter
 @AllArgsConstructor
+@EqualsAndHashCode(callSuper = false)
 @PushResolution
 public class PersistentPeerInfo extends JObjectData {
     @Serial
@@ -36,10 +38,9 @@ public class PersistentPeerInfo extends JObjectData {
         return true;
     }
 
-    // FIXME: Maybe check the certs?
     @Override
     public Class<? extends ConflictResolver> getConflictResolver() {
-        return NotImplementedConflictResolver.class;
+        return NoOpConflictResolver.class;
     }
 
     @Override

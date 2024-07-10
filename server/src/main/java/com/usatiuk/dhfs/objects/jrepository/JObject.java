@@ -35,9 +35,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         _resolver = resolver;
         _metaPart = new ObjectMetadata(name, false, obj.getClass());
         _dataPart.set(obj);
-        // FIXME:?
-        if (!obj.assumeUnique())
-            _metaPart.bumpVersion(selfUuid);
+        _metaPart.bumpVersion(selfUuid);
     }
 
     // Create an object from existing metadata

@@ -45,6 +45,11 @@ public class ChunkData extends JObjectData {
     }
 
     @Override
+    public int hashCode() {
+        return Objects.hashCode(_hash);
+    }
+
+    @Override
     public String getName() {
         return getNameFromHash(_hash);
     }
