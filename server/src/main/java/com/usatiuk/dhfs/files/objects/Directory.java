@@ -12,6 +12,9 @@ import java.util.*;
 public class Directory extends FsNode {
     @Serial
     private static final long serialVersionUID = 1;
+    @Getter
+    @Setter
+    private Map<String, UUID> _children = new TreeMap<>();
 
     public Directory(UUID uuid) {
         super(uuid);
@@ -20,10 +23,6 @@ public class Directory extends FsNode {
     public Directory(UUID uuid, long mode) {
         super(uuid, mode);
     }
-
-    @Getter
-    @Setter
-    private Map<String, UUID> _children = new TreeMap<>();
 
     @Override
     public Class<? extends ConflictResolver> getConflictResolver() {
@@ -46,6 +45,7 @@ public class Directory extends FsNode {
         _children.put(name, uuid);
         return true;
     }
+
     @Override
     public Class<? extends JObjectData> getRefType() {
         return FsNode.class;

@@ -32,29 +32,21 @@ import java.util.concurrent.ExecutorService;
 
 @ApplicationScoped
 public class PersistentRemoteHostsService {
+    final String dataFileName = "hosts";
     @ConfigProperty(name = "dhfs.objects.root")
     String dataRoot;
-
     @Inject
     PeerTrustManager peerTrustManager;
-
     @Inject
     JObjectManager jObjectManager;
-
     @Inject
     JObjectResolver jObjectResolver;
-
     @Inject
     ExecutorService executorService;
-
     @Inject
     InvalidationQueueService invalidationQueueService;
-
     @Inject
     RpcClientFactory rpcClientFactory;
-
-    final String dataFileName = "hosts";
-
     private PersistentRemoteHosts _persistentData = new PersistentRemoteHosts();
 
     private UUID _selfUuid;

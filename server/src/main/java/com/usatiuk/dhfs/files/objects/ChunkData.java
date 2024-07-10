@@ -36,6 +36,10 @@ public class ChunkData extends JObjectData {
         this._hash = name;
     }
 
+    public static String getNameFromHash(String hash) {
+        return "data_" + hash;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -57,10 +61,6 @@ public class ChunkData extends JObjectData {
     @Override
     public Class<? extends ConflictResolver> getConflictResolver() {
         return NoOpConflictResolver.class;
-    }
-
-    public static String getNameFromHash(String hash) {
-        return "data_" + hash;
     }
 
     @Override

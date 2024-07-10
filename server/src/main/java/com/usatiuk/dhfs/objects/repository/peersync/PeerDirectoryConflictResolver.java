@@ -1,10 +1,10 @@
 package com.usatiuk.dhfs.objects.repository.peersync;
 
-import com.usatiuk.dhfs.objects.repository.ObjectHeader;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
+import com.usatiuk.dhfs.objects.repository.ObjectHeader;
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import io.grpc.Status;

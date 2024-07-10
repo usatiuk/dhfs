@@ -15,6 +15,15 @@ public abstract class FsNode extends JObjectData {
 
     @Getter
     final UUID _uuid;
+    @Getter
+    @Setter
+    private long _mode;
+    @Getter
+    @Setter
+    private long _ctime;
+    @Getter
+    @Setter
+    private long _mtime;
 
     protected FsNode(UUID uuid) {
         this._uuid = uuid;
@@ -29,7 +38,6 @@ public abstract class FsNode extends JObjectData {
         this._mtime = this._ctime;
     }
 
-
     @Override
     public String getName() {
         return _uuid.toString();
@@ -39,16 +47,4 @@ public abstract class FsNode extends JObjectData {
     public Class<? extends ConflictResolver> getConflictResolver() {
         return NotImplementedConflictResolver.class;
     }
-
-    @Getter
-    @Setter
-    private long _mode;
-
-    @Getter
-    @Setter
-    private long _ctime;
-
-    @Getter
-    @Setter
-    private long _mtime;
 }

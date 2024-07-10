@@ -22,28 +22,14 @@ import java.util.Optional;
 
 @ApplicationScoped
 public class JObjectManagerImpl implements JObjectManager {
-    @Inject
-    ObjectPersistentStore objectPersistentStore;
-
-    @Inject
-    JObjectResolver jObjectResolver;
-
-    @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
-
-    private static class NamedSoftReference extends SoftReference<JObject<?>> {
-        public NamedSoftReference(JObject<?> target, ReferenceQueue<JObject<?>> q) {
-            super(target, q);
-            this._key = target.getName();
-        }
-
-        @Getter
-        final String _key;
-    }
-
     private final HashMap<String, NamedSoftReference> _map = new HashMap<>();
     private final ReferenceQueue<JObject<?>> _refQueue = new ReferenceQueue<>();
-
+    @Inject
+    ObjectPersistentStore objectPersistentStore;
+    @Inject
+    JObjectResolver jObjectResolver;
+    @Inject
+    PersistentRemoteHostsService persistentRemoteHostsService;
     private Thread _refCleanupThread;
 
     @Startup
@@ -204,6 +190,16 @@ public class JObjectManagerImpl implements JObjectManager {
                     return created;
                 }
             }
+        }
+    }
+
+    private static class NamedSoftReference extends SoftReference<JObject<?>> {
+        @Getter
+        final String _key;
+
+        public NamedSoftReference(JObject<?> target, ReferenceQueue<JObject<?>> q) {
+            super(target, q);
+            this._key = target.getName();
         }
     }
 }

@@ -17,24 +17,16 @@ import java.util.stream.Stream;
 
 @ApplicationScoped
 public class SyncHandler {
-    protected static class OutdatedUpdateException extends RuntimeException {
-    }
-
     @Inject
     JObjectManager jObjectManager;
-
     @Inject
     RemoteHostManager remoteHostManager;
-
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
-
     @Inject
     InvalidationQueueService invalidationQueueService;
-
     @Inject
     Instance<ConflictResolver> conflictResolvers;
-
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
 
@@ -165,5 +157,8 @@ public class SyncHandler {
             }
         }
         return builder.build();
+    }
+
+    protected static class OutdatedUpdateException extends RuntimeException {
     }
 }

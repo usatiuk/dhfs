@@ -25,22 +25,16 @@ import java.util.concurrent.ConcurrentMap;
 
 @ApplicationScoped
 public class RemoteHostManager {
+    private final TransientPeersState _transientPeersState = new TransientPeersState();
+    private final ConcurrentMap<UUID, TransientPeerState> _seenHostsButNotAdded = new ConcurrentHashMap<>();
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
-
     @Inject
     SyncHandler syncHandler;
-
     @Inject
     RpcClientFactory rpcClientFactory;
-
     @ConfigProperty(name = "dhfs.objects.sync.ping.timeout")
     long pingTimeout;
-
-    private final TransientPeersState _transientPeersState = new TransientPeersState();
-
-    private final ConcurrentMap<UUID, TransientPeerState> _seenHostsButNotAdded = new ConcurrentHashMap<>();
-
     boolean _initialized = false;
 
     void init(@Observes @Priority(350) StartupEvent event) throws IOException {

@@ -18,27 +18,22 @@ import java.util.stream.Stream;
 
 @ApplicationScoped
 public class JObjectRefProcessor {
-    private Thread _refProcessorThread;
-
+    private final LinkedHashMap<String, Long> _candidates = new LinkedHashMap<>();
+    private final HashSet<String> _movablesInProcessing = new HashSet<>();
     @ConfigProperty(name = "dhfs.objects.deletion.delay")
     Long deletionDelay;
-
     @Inject
     JObjectManager jObjectManager;
-
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
-
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
-
     @Inject
     AutoSyncProcessor autoSyncProcessor;
-
     @ConfigProperty(name = "dhfs.objects.move-processor.threads")
     int moveProcessorThreads;
-
     ExecutorService _movableProcessorExecutorService;
+    private Thread _refProcessorThread;
 
     @Startup
     void init() {
@@ -55,8 +50,6 @@ public class JObjectRefProcessor {
         _refProcessorThread.join();
     }
 
-    private final LinkedHashMap<String, Long> _candidates = new LinkedHashMap<>();
-
     public void putDeletionCandidate(String name) {
         synchronized (_movablesInProcessing) {
             if (_movablesInProcessing.contains(name)) return;
@@ -68,8 +61,6 @@ public class JObjectRefProcessor {
             }
         }
     }
-
-    private final HashSet<String> _movablesInProcessing = new HashSet<>();
 
     private void asyncProcessMovable(JObject<?> obj) {
         synchronized (_movablesInProcessing) {

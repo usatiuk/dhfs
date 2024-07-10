@@ -7,11 +7,6 @@ public class TransientPeersState {
     private final TransientPeersStateData _data = new TransientPeersStateData();
     private final ReadWriteLock _lock = new ReentrantReadWriteLock();
 
-    @FunctionalInterface
-    public interface TransientPeersStaten<R> {
-        R apply(TransientPeersStateData hostsData);
-    }
-
     public <R> R runReadLocked(TransientPeersStaten<R> fn) {
         _lock.readLock().lock();
         try {
@@ -28,5 +23,10 @@ public class TransientPeersState {
         } finally {
             _lock.writeLock().unlock();
         }
+    }
+
+    @FunctionalInterface
+    public interface TransientPeersStaten<R> {
+        R apply(TransientPeersStateData hostsData);
     }
 }

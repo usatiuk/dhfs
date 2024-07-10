@@ -19,24 +19,18 @@ import java.util.concurrent.Executors;
 
 @ApplicationScoped
 public class AutoSyncProcessor {
+    private final SequencedSet<String> _pending = new LinkedHashSet<>();
     @Inject
     JObjectResolver jObjectResolver;
-
     @Inject
     JObjectManager jObjectManager;
-
     @ConfigProperty(name = "dhfs.objects.autosync.threads")
     int autosyncThreads;
-
     @ConfigProperty(name = "dhfs.objects.autosync.download-all")
     boolean downloadAll;
-
-    private ExecutorService _autosyncExcecutor;
-
     @Inject
     ExecutorService executorService;
-
-    private final SequencedSet<String> _pending = new LinkedHashSet<>();
+    private ExecutorService _autosyncExcecutor;
 
     @Startup
     void init() {

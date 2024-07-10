@@ -14,6 +14,10 @@ import java.util.UUID;
 public class File extends FsNode {
     @Serial
     private static final long serialVersionUID = 1;
+    @Getter
+    private final NavigableMap<Long, String> _chunks = new TreeMap<>();
+    @Getter
+    private final UUID _parent;
 
     public File(UUID uuid, long mode, UUID parent) {
         super(uuid, mode);
@@ -34,12 +38,6 @@ public class File extends FsNode {
     public Collection<String> extractRefs() {
         return _chunks.values().stream().map(ChunkInfo::getNameFromHash).toList();
     }
-
-    @Getter
-    private final NavigableMap<Long, String> _chunks = new TreeMap<>();
-
-    @Getter
-    private final UUID _parent;
 
     @Override
     public long estimateSize() {

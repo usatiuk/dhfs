@@ -12,11 +12,6 @@ public class PersistentRemoteHosts implements Serializable {
     private final PersistentRemoteHostsData _data = new PersistentRemoteHostsData();
     private final ReadWriteLock _lock = new ReentrantReadWriteLock();
 
-    @FunctionalInterface
-    public interface PersistentRemoteHostsFn<R> {
-        R apply(PersistentRemoteHostsData hostsData);
-    }
-
     public <R> R runReadLocked(PersistentRemoteHostsFn<R> fn) {
         _lock.readLock().lock();
         try {
@@ -33,5 +28,10 @@ public class PersistentRemoteHosts implements Serializable {
         } finally {
             _lock.writeLock().unlock();
         }
+    }
+
+    @FunctionalInterface
+    public interface PersistentRemoteHostsFn<R> {
+        R apply(PersistentRemoteHostsData hostsData);
     }
 }

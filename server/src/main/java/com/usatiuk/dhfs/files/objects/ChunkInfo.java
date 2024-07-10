@@ -27,6 +27,10 @@ public class ChunkInfo extends JObjectData {
         this._size = size;
     }
 
+    public static String getNameFromHash(String hash) {
+        return "info_" + hash;
+    }
+
     @Override
     public String getName() {
         return getNameFromHash(_hash);
@@ -35,10 +39,6 @@ public class ChunkInfo extends JObjectData {
     @Override
     public Class<? extends ConflictResolver> getConflictResolver() {
         return NoOpConflictResolver.class;
-    }
-
-    public static String getNameFromHash(String hash) {
-        return "info_" + hash;
     }
 
     @Override

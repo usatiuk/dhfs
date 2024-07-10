@@ -8,6 +8,19 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 public class TransientPeerState {
+    @Getter
+    @Setter
+    private ConnectionState _state = ConnectionState.NOT_SEEN;
+    @Getter
+    @Setter
+    private String _addr;
+    @Getter
+    @Setter
+    private int _port;
+    @Getter
+    @Setter
+    private int _securePort;
+
     public TransientPeerState(ConnectionState connectionState) {
         _state = connectionState;
     }
@@ -17,20 +30,4 @@ public class TransientPeerState {
         REACHABLE,
         UNREACHABLE
     }
-
-    @Getter
-    @Setter
-    private ConnectionState _state = ConnectionState.NOT_SEEN;
-
-    @Getter
-    @Setter
-    private String _addr;
-
-    @Getter
-    @Setter
-    private int _port;
-
-    @Getter
-    @Setter
-    private int _securePort;
 }

@@ -6,15 +6,14 @@ import jnr.ffi.Pointer;
 import java.nio.ByteBuffer;
 
 public class JnrPtrByteOutput extends ByteOutput {
+    private final Pointer _backing;
+    private final long _size;
+    private long _pos;
     public JnrPtrByteOutput(Pointer backing, long size) {
         _backing = backing;
         _size = size;
         _pos = 0;
     }
-
-    private final Pointer _backing;
-    private final long _size;
-    private long _pos;
 
     @Override
     public void write(byte value) {

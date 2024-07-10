@@ -12,6 +12,29 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 
 public class JObject<T extends JObjectData> implements Serializable, Comparable<JObject<?>> {
+    private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
+    private final ObjectMetadata _metaPart;
+    private final JObjectResolver _resolver;
+    private final AtomicReference<T> _dataPart = new AtomicReference<>();
+
+    // Create a new object
+    protected JObject(JObjectResolver resolver, String name, UUID selfUuid, T obj) {
+        _resolver = resolver;
+        _metaPart = new ObjectMetadata(name, false, obj.getClass());
+        _dataPart.set(obj);
+        _metaPart.bumpVersion(selfUuid);
+    }
+
+    // Create an object from existing metadata
+    protected JObject(JObjectResolver resolver, ObjectMetadata objectMetadata) {
+        _resolver = resolver;
+        _metaPart = objectMetadata;
+    }
+
+    static public void rwLockAll(List<JObject<?>> objects) {
+        objects.stream().sorted(Comparator.comparingInt(System::identityHashCode)).forEach(JObject::rwLock);
+    }
+
     @Override
     public int compareTo(JObject<?> o) {
         return getName().compareTo(o.getName());
@@ -30,20 +53,6 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         return Objects.hashCode(_metaPart.getName());
     }
 
-    // Create a new object
-    protected JObject(JObjectResolver resolver, String name, UUID selfUuid, T obj) {
-        _resolver = resolver;
-        _metaPart = new ObjectMetadata(name, false, obj.getClass());
-        _dataPart.set(obj);
-        _metaPart.bumpVersion(selfUuid);
-    }
-
-    // Create an object from existing metadata
-    protected JObject(JObjectResolver resolver, ObjectMetadata objectMetadata) {
-        _resolver = resolver;
-        _metaPart = objectMetadata;
-    }
-
     public Class<? extends JObjectData> getKnownClass() {
         return _metaPart.getKnownClass();
     }
@@ -52,15 +61,9 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         _metaPart.narrowClass(klass);
     }
 
-
     public String getName() {
         return _metaPart.getName();
     }
-
-    private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
-    private final ObjectMetadata _metaPart;
-    private final JObjectResolver _resolver;
-    private final AtomicReference<T> _dataPart = new AtomicReference<>();
 
     public T getData() {
         assertRWLock();
@@ -91,21 +94,6 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
 
     public void markSeen() {
         _metaPart.markSeen();
-    }
-
-    @FunctionalInterface
-    public interface VoidFn {
-        void apply();
-    }
-
-    @FunctionalInterface
-    public interface ObjectFnRead<T, R> {
-        R apply(ObjectMetadata meta, @Nullable T data);
-    }
-
-    @FunctionalInterface
-    public interface ObjectFnWrite<T, R> {
-        R apply(ObjectMetadata indexData, @Nullable T data, VoidFn bump, VoidFn invalidate);
     }
 
     private void hydrateRefs() {
@@ -167,12 +155,6 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             _metaPart.lock();
         hydrateRefs();
         verifyRefs();
-    }
-
-    public enum ResolutionStrategy {
-        NO_RESOLUTION,
-        LOCAL_ONLY,
-        REMOTE
     }
 
     public <R> R runReadLocked(ResolutionStrategy resolutionStrategy, ObjectFnRead<T, R> fn) {
@@ -303,12 +285,29 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         _metaPart.setSavedRefs(Collections.emptySet());
     }
 
-    static public void rwLockAll(List<JObject<?>> objects) {
-        objects.stream().sorted(Comparator.comparingInt(System::identityHashCode)).forEach(JObject::rwLock);
-    }
-
     public void assertRWLock() {
         if (!_lock.isWriteLockedByCurrentThread())
             throw new IllegalStateException("Expected to be write-locked there: " + getName() + " " + Thread.currentThread().getName());
+    }
+
+    public enum ResolutionStrategy {
+        NO_RESOLUTION,
+        LOCAL_ONLY,
+        REMOTE
+    }
+
+    @FunctionalInterface
+    public interface VoidFn {
+        void apply();
+    }
+
+    @FunctionalInterface
+    public interface ObjectFnRead<T, R> {
+        R apply(ObjectMetadata meta, @Nullable T data);
+    }
+
+    @FunctionalInterface
+    public interface ObjectFnWrite<T, R> {
+        R apply(ObjectMetadata indexData, @Nullable T data, VoidFn bump, VoidFn invalidate);
     }
 }

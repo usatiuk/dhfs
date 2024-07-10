@@ -26,20 +26,13 @@ public class RpcChannelFactory {
     PersistentRemoteHostsService persistentRemoteHostsService;
     @Inject
     PeerTrustManager peerTrustManager;
+    private ConcurrentMap<SecureChannelKey, ManagedChannel> _secureChannelCache = new ConcurrentHashMap<>();
+    private ConcurrentMap<InsecureChannelKey, ManagedChannel> _insecureChannelCache = new ConcurrentHashMap<>();
 
     void shutdown(@Observes @Priority(100000) ShutdownEvent event) {
         for (var c : _secureChannelCache.values()) c.shutdownNow();
         for (var i : _insecureChannelCache.values()) i.shutdownNow();
     }
-
-    private record SecureChannelKey(String host, String address, int port) {
-    }
-
-    private record InsecureChannelKey(String address, int port) {
-    }
-
-    private ConcurrentMap<SecureChannelKey, ManagedChannel> _secureChannelCache = new ConcurrentHashMap<>();
-    private ConcurrentMap<InsecureChannelKey, ManagedChannel> _insecureChannelCache = new ConcurrentHashMap<>();
 
     private ChannelCredentials getChannelCredentials() {
         try {
@@ -79,5 +72,11 @@ public class RpcChannelFactory {
         _insecureChannelCache = new ConcurrentHashMap<>();
         oldS.values().forEach(ManagedChannel::shutdown);
         oldI.values().forEach(ManagedChannel::shutdown);
+    }
+
+    private record SecureChannelKey(String host, String address, int port) {
+    }
+
+    private record InsecureChannelKey(String address, int port) {
     }
 }

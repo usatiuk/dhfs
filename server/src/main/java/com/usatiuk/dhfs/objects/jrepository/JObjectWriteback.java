@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
-import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
 import com.usatiuk.dhfs.SerializationHelper;
+import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.Startup;
@@ -24,38 +24,27 @@ import java.util.concurrent.atomic.AtomicLong;
 @Singleton
 public class JObjectWriteback {
 
-    @Inject
-    ObjectPersistentStore objectPersistentStore;
-
-    @Inject
-    JObjectManager jObjectManager;
-
-    @Inject
-    JObjectSizeEstimator jObjectSizeEstimator;
-
-    @ConfigProperty(name = "dhfs.objects.writeback.delay")
-    long promotionDelay;
-
-    @ConfigProperty(name = "dhfs.objects.writeback.limit")
-    long sizeLimit;
-
-    @ConfigProperty(name = "dhfs.objects.writeback.nursery_limit")
-    int nurseryLimit;
-
-    @ConfigProperty(name = "dhfs.objects.writeback.threads")
-    int writebackThreads;
-
-    AtomicLong _currentSize = new AtomicLong(0);
-
     private final LinkedHashMap<JObject<?>, Pair<Long, Long>> _nursery = new LinkedHashMap<>();
     // FIXME: Kind of a hack
     private final OrderedBidiMap<Pair<Long, String>, JObject<?>> _writeQueue = new TreeBidiMap<>();
-
-    private Thread _promotionThread;
-
-    private ExecutorService _writebackExecutor;
-
+    @Inject
+    ObjectPersistentStore objectPersistentStore;
+    @Inject
+    JObjectManager jObjectManager;
+    @Inject
+    JObjectSizeEstimator jObjectSizeEstimator;
+    @ConfigProperty(name = "dhfs.objects.writeback.delay")
+    long promotionDelay;
+    @ConfigProperty(name = "dhfs.objects.writeback.limit")
+    long sizeLimit;
+    @ConfigProperty(name = "dhfs.objects.writeback.nursery_limit")
+    int nurseryLimit;
+    @ConfigProperty(name = "dhfs.objects.writeback.threads")
+    int writebackThreads;
+    AtomicLong _currentSize = new AtomicLong(0);
     boolean overload = false;
+    private Thread _promotionThread;
+    private ExecutorService _writebackExecutor;
 
     @Startup
     void init() {

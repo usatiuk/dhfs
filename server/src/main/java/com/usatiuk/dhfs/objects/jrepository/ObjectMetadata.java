@@ -22,40 +22,31 @@ import java.util.concurrent.atomic.AtomicReference;
 public class ObjectMetadata implements Serializable {
     @Serial
     private static final long serialVersionUID = 1;
+    @Getter
+    private final String _name;
+    @Getter
+    private final Map<UUID, Long> _remoteCopies = new LinkedHashMap<>();
+    private final AtomicReference<Class<? extends JObjectData>> _knownClass = new AtomicReference<>();
+    private final AtomicBoolean _seen = new AtomicBoolean(false);
+    private final AtomicBoolean _deleted = new AtomicBoolean(false);
+    @Getter
+    private final HashSet<UUID> _confirmedDeletes = new HashSet<>();
+    private final Set<String> _referrers = new ConcurrentSkipListSet<>();
+    @Getter
+    @Setter
+    private Map<UUID, Long> _changelog = new LinkedHashMap<>();
+    @Getter
+    @Setter
+    private Set<String> _savedRefs = Collections.emptySet();
+    @Getter
+    private boolean _locked = false;
+    private transient AtomicBoolean _written = new AtomicBoolean(true);
 
     public ObjectMetadata(String name, boolean written, Class<? extends JObjectData> knownClass) {
         _name = name;
         _written.set(written);
         _knownClass.set(knownClass);
     }
-
-    @Getter
-    private final String _name;
-
-    @Getter
-    private final Map<UUID, Long> _remoteCopies = new LinkedHashMap<>();
-
-    @Getter
-    @Setter
-    private Map<UUID, Long> _changelog = new LinkedHashMap<>();
-
-    @Getter
-    @Setter
-    private Set<String> _savedRefs = Collections.emptySet();
-
-    private final AtomicReference<Class<? extends JObjectData>> _knownClass = new AtomicReference<>();
-
-    @Getter
-    private boolean _locked = false;
-
-    private transient AtomicBoolean _written = new AtomicBoolean(true);
-
-    private final AtomicBoolean _seen = new AtomicBoolean(false);
-
-    private final AtomicBoolean _deleted = new AtomicBoolean(false);
-
-    @Getter
-    private final HashSet<UUID> _confirmedDeletes = new HashSet<>();
 
     public Class<? extends JObjectData> getKnownClass() {
         return _knownClass.get();
@@ -106,8 +97,6 @@ public class ObjectMetadata implements Serializable {
     public void markWritten() {
         _written.set(true);
     }
-
-    private final Set<String> _referrers = new ConcurrentSkipListSet<>();
 
     public boolean isReferred() {
         return !_referrers.isEmpty();

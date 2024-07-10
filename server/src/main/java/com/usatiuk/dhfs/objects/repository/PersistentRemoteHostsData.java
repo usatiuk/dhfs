@@ -16,15 +16,12 @@ public class PersistentRemoteHostsData implements Serializable {
 
     @Getter
     private final UUID _selfUuid = UUID.randomUUID();
-
+    @Getter
+    private final AtomicLong _selfCounter = new AtomicLong();
     @Getter
     @Setter
     private X509Certificate _selfCertificate = null;
-
     @Getter
     @Setter
     private KeyPair _selfKeyPair = null;
-
-    @Getter
-    private final AtomicLong _selfCounter = new AtomicLong();
 }

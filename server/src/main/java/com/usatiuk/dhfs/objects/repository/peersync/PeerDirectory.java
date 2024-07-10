@@ -13,13 +13,11 @@ import java.util.UUID;
 
 @PushResolution
 public class PeerDirectory extends JObjectData {
+    public static final String PeerDirectoryObjName = "peer_directory";
     @Serial
     private static final long serialVersionUID = 1;
-
     @Getter
     private final Set<UUID> _peers = new LinkedHashSet<>();
-
-    public static final String PeerDirectoryObjName = "peer_directory";
 
     @Override
     public String getName() {

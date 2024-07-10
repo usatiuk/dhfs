@@ -23,43 +23,29 @@ import java.util.stream.Stream;
 
 @Singleton
 public class JObjectResolver {
-    @Inject
-    ObjectPersistentStore objectPersistentStore;
-
-    @Inject
-    RemoteObjectServiceClient remoteObjectServiceClient;
-
-    @Inject
-    InvalidationQueueService invalidationQueueService;
-
-    @Inject
-    JObjectWriteback jObjectWriteback;
-
-    @Inject
-    JObjectManager jobjectManager;
-
-    @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
-
-    @Inject
-    JObjectRefProcessor jObjectRefProcessor;
-
     private final MultiValuedMap<Class<? extends JObjectData>, WriteListenerFn<?>> _writeListeners
             = new ArrayListValuedHashMap<>();
     private final MultiValuedMap<Class<? extends JObjectData>, WriteListenerFn<?>> _metaWriteListeners
             = new ArrayListValuedHashMap<>();
-
+    @Inject
+    ObjectPersistentStore objectPersistentStore;
+    @Inject
+    RemoteObjectServiceClient remoteObjectServiceClient;
+    @Inject
+    InvalidationQueueService invalidationQueueService;
+    @Inject
+    JObjectWriteback jObjectWriteback;
+    @Inject
+    JObjectManager jobjectManager;
+    @Inject
+    PersistentRemoteHostsService persistentRemoteHostsService;
+    @Inject
+    JObjectRefProcessor jObjectRefProcessor;
     @ConfigProperty(name = "dhfs.objects.ref_verification")
     boolean refVerification;
 
     @ConfigProperty(name = "dhfs.objects.bump_verification")
     boolean bumpVerification;
-
-
-    @FunctionalInterface
-    public interface WriteListenerFn<T extends JObjectData> {
-        void apply(JObject<T> obj);
-    }
 
     public <T extends JObjectData> void registerWriteListener(Class<T> klass, WriteListenerFn<T> fn) {
         _writeListeners.put(klass, fn);
@@ -220,5 +206,10 @@ public class JObjectResolver {
             if (!obj.hasRef(self.getName()))
                 throw new IllegalStateException("Object " + r + " is not referenced by " + self.getName() + " but should be");
         }
+    }
+
+    @FunctionalInterface
+    public interface WriteListenerFn<T extends JObjectData> {
+        void apply(JObject<T> obj);
     }
 }
