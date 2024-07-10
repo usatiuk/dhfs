@@ -1,5 +1,7 @@
 package com.usatiuk.dhfs.objects.repository;
 
+import lombok.Getter;
+
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -9,6 +11,7 @@ public class PersistentRemoteHosts implements Serializable {
     @Serial
     private static final long serialVersionUID = 1;
 
+    @Getter
     private final PersistentRemoteHostsData _data = new PersistentRemoteHostsData();
     private final ReadWriteLock _lock = new ReentrantReadWriteLock();
 

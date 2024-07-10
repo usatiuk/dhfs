@@ -145,7 +145,7 @@ public class PersistentRemoteHostsService {
     }
 
     public String getUniqueId() {
-        return _selfUuid.toString() + _persistentData.runReadLocked(d -> d.getSelfCounter().addAndGet(1)).toString();
+        return _selfUuid.toString() + _persistentData.getData().getSelfCounter().addAndGet(1);
     }
 
     public PersistentPeerInfo getInfo(UUID name) {
