@@ -5,6 +5,7 @@ import com.usatiuk.dhfs.files.objects.ChunkData;
 import com.usatiuk.dhfs.files.objects.ChunkInfo;
 import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
+import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import jakarta.inject.Inject;
@@ -183,5 +184,39 @@ public class DhfsFileServiceSimpleTestImpl {
 
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
                 fileService.read(fileService.open("/movedTest").get(), 0, 10).get().toByteArray());
+    }
+
+    @Test
+    void moveTest2() {
+        var ret = fileService.create("/moveTest", 777);
+        Assertions.assertTrue(ret.isPresent());
+        var uuid = ret.get();
+
+        fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+
+        var oldfile = jObjectManager.get(uuid).orElseThrow(IllegalStateException::new);
+        var chunk = oldfile.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> d.extractRefs()).stream().toList().get(0);
+        var chunkObj = jObjectManager.get(chunk).orElseThrow(IllegalStateException::new);
+
+        chunkObj.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
+            Assertions.assertTrue(m.getReferrers().contains(uuid));
+            return null;
+        });
+
+        Assertions.assertTrue(fileService.rename("/moveTest", "/movedTest"));
+        Assertions.assertFalse(fileService.open("/moveTest").isPresent());
+        Assertions.assertTrue(fileService.open("/movedTest").isPresent());
+
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+                fileService.read(fileService.open("/movedTest").get(), 0, 10).get().toByteArray());
+
+        var newfile = fileService.open("/movedTest").get();
+
+        chunkObj.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
+            Assertions.assertFalse(m.getReferrers().contains(uuid));
+            Assertions.assertTrue(m.getReferrers().contains(newfile));
+            return null;
+        });
     }
 }

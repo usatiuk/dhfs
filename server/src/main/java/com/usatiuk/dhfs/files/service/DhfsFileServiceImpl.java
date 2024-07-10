@@ -284,7 +284,6 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                     });
                 }
 
-                ((File) theFile.getData()).getChunks().clear();
                 theFile.getMeta().removeRef(dentFrom.getName());
                 jObjectManager.put(newFile, Optional.of(dentTo.getName()));
                 newDent = newFile;
