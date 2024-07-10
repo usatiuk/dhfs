@@ -110,6 +110,7 @@ public class JObjectResolver {
                 }
             }
             self.getMeta().setSavedRefs(null);
+            notifyWriteMeta(self);
         }
     }
 
