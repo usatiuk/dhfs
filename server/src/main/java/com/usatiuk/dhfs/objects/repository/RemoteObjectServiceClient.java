@@ -47,7 +47,7 @@ public class RemoteObjectServiceClient {
 
         var targets = jObject.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (md, d) -> {
             var ourVersion = md.getOurVersion();
-            if (ourVersion > 1)
+            if (ourVersion >= 1)
                 return md.getRemoteCopies().entrySet().stream()
                         .filter(entry -> entry.getValue().equals(ourVersion))
                         .map(Map.Entry::getKey).toList();
