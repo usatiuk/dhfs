@@ -156,7 +156,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         verifyRefs();
     }
 
-    public <R> R runReadLocked(ResolutionStrategy resolutionStrategy, ObjectFnRead<T, R> fn)  {
+    public <R> R runReadLocked(ResolutionStrategy resolutionStrategy, ObjectFnRead<T, R> fn) {
         tryResolve(resolutionStrategy);
 
         _lock.readLock().lock();
@@ -210,13 +210,6 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             var newDataHash = _metaPart.dataHash();
             var newMetaHash = Objects.hash(_metaPart.metaHash(), newDataHash);
             var newData = hasLocalCopy();
-
-            if (_resolver.bumpVerification) {
-                if (_dataPart.get() != null && _dataPart.get().assumeUnique())
-                    if (!Objects.equals(newDataHash, dataHash))
-                        throw new IllegalStateException("Object changed but is assumed immutable: " + getName());
-                // Todo: data check?
-            }
 
             if (_dataPart.get() != null)
                 _metaPart.narrowClass(_dataPart.get().getClass());

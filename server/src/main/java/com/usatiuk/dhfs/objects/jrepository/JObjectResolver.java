@@ -44,9 +44,6 @@ public class JObjectResolver {
     @ConfigProperty(name = "dhfs.objects.ref_verification")
     boolean refVerification;
 
-    @ConfigProperty(name = "dhfs.objects.bump_verification")
-    boolean bumpVerification;
-
     public <T extends JObjectData> void registerWriteListener(Class<T> klass, WriteListenerFn<T> fn) {
         _writeListeners.put(klass, fn);
     }
