@@ -114,13 +114,12 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         _resolver.hydrateRefs(this);
     }
 
-    private void tryRemoteResolve() {
+    private void resolveDataPart() {
         if (_dataPart.get() == null) {
             _lock.writeLock().lock();
             try {
-                tryLocalResolve();
                 if (_dataPart.get() == null) {
-                    var res = _resolver.resolveDataRemote(this);
+                    var res = _resolver.resolveData(this);
                     _metaPart.narrowClass(res.getClass());
                     _dataPart.set(res);
                     hydrateRefs();
@@ -178,7 +177,8 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     }
 
     public <R> R runReadLocked(ResolutionStrategy resolutionStrategy, ObjectFnRead<T, R> fn) {
-        tryResolve(resolutionStrategy);
+        if (resolutionStrategy == ResolutionStrategy.LOCAL_ONLY) tryLocalResolve();
+        else if (resolutionStrategy == ResolutionStrategy.REMOTE) resolveDataPart();
 
         _lock.readLock().lock();
         try {
@@ -207,7 +207,8 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     public <R> R runWriteLocked(ResolutionStrategy resolutionStrategy, ObjectFnWrite<T, R> fn) {
         _lock.writeLock().lock();
         try {
-            tryResolve(resolutionStrategy);
+            if (resolutionStrategy == ResolutionStrategy.LOCAL_ONLY) tryLocalResolve();
+            else if (resolutionStrategy == ResolutionStrategy.REMOTE) resolveDataPart();
 
             var dataHash = _metaPart.dataHash();
             var metaHash = Objects.hash(_metaPart.metaHash(), dataHash);
@@ -258,8 +259,10 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     }
 
     public boolean tryResolve(ResolutionStrategy resolutionStrategy) {
+        assertRWLock();
+
         if (resolutionStrategy == ResolutionStrategy.LOCAL_ONLY) tryLocalResolve();
-        else if (resolutionStrategy == ResolutionStrategy.REMOTE) tryRemoteResolve();
+        else if (resolutionStrategy == ResolutionStrategy.REMOTE) resolveDataPart();
 
         return _dataPart.get() != null;
     }
