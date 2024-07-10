@@ -37,6 +37,9 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
 
+    @Inject
+    InvalidationQueueService invalidationQueueService;
+
     @Override
     @Blocking
     public Uni<GetObjectReply> getObject(GetObjectRequest request) {
@@ -114,10 +117,11 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
         var objs = jObjectManager.find("");
 
-        for (var obj : objs) {
-            var header = obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (meta, data) -> meta.toRpcHeader(data));
-            builder.addHeader(header);
-        }
+        var reqUuid = UUID.fromString(request.getSelfUuid());
+
+        for (var obj : objs)
+            invalidationQueueService.pushInvalidationToOne(reqUuid, obj.getName());
+
         return Uni.createFrom().item(builder.build());
     }
 

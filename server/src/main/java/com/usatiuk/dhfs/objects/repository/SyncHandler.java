@@ -45,12 +45,8 @@ public class SyncHandler {
         // they didn't thing we were disconnected
         var objs = jObjectManager.find("");
 
-        for (var obj : objs) {
-            obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (meta, data) -> {
-                invalidationQueueService.pushInvalidationToOne(host, obj.getName());
-                return null;
-            });
-        }
+        for (var obj : objs)
+            invalidationQueueService.pushInvalidationToOne(host, obj.getName());
     }
 
     public void handleOneUpdate(UUID from, ObjectHeader header) {
