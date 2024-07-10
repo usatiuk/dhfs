@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects.repository.peertrust;
 
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
+import io.quarkus.logging.Log;
 import io.quarkus.security.credential.CertificateCredential;
 import io.quarkus.security.identity.AuthenticationRequestContext;
 import io.quarkus.security.identity.SecurityIdentity;
@@ -24,6 +25,7 @@ public class PeerRolesAugmentor implements SecurityIdentityAugmentor {
 
     private Supplier<SecurityIdentity> build(SecurityIdentity identity) {
         if (identity.isAnonymous()) {
+            Log.error("Unauthorized connection");
             return () -> identity;
         } else {
             QuarkusSecurityIdentity.Builder builder = QuarkusSecurityIdentity.builder(identity);
@@ -36,6 +38,7 @@ public class PeerRolesAugmentor implements SecurityIdentityAugmentor {
                 builder.addRole("cluster-member");
                 return builder::build;
             }
+            Log.error("Unauthorized connection from " + identity.getPrincipal().toString());
             return () -> identity;
 //            var uuid = identity.getPrincipal().getName().substring(3);
 //

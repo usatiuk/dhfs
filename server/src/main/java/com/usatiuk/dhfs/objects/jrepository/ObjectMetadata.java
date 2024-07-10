@@ -116,11 +116,13 @@ public class ObjectMetadata implements Serializable {
     public void lock() {
         if (_locked) throw new IllegalArgumentException("Already locked");
         _confirmedDeletes.clear();
+        Log.info("Locking " + getName());
         _locked = true;
     }
 
     public void unlock() {
         if (!_locked) throw new IllegalArgumentException("Already unlocked");
+        Log.info("Unlocking " + getName());
         _locked = false;
     }
 
@@ -131,6 +133,7 @@ public class ObjectMetadata implements Serializable {
     public void addRef(String from) {
         _confirmedDeletes.clear();
         _referrers.add(from);
+        Log.trace("Adding ref " + from + " to " + getName());
     }
 
     public void removeRef(String from) {
@@ -138,6 +141,7 @@ public class ObjectMetadata implements Serializable {
             unlock();
             Log.error("Object " + getName() + " is locked, but we removed a reference to it, unlocking!");
         }
+        Log.trace("Removing ref " + from + " from " + getName());
         _referrers.remove(from);
     }
 

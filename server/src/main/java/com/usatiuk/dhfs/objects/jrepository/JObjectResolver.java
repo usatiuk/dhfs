@@ -88,7 +88,14 @@ public class JObjectResolver {
     public void hydrateRefs(JObject<?> self) {
         self.assertRWLock();
         if (self.getMeta().getSavedRefs() != null) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("Hydrating refs for ").append(self.getName()).append("\n");
+            sb.append("Saved refs: ");
+            self.getMeta().getSavedRefs().forEach(r -> sb.append(r).append(" "));
+            sb.append("\nExtracted refs: ");
             var extracted = new LinkedHashSet<>(self.getData().extractRefs());
+            extracted.forEach(r -> sb.append(r).append(" "));
+            Log.debug(sb.toString());
             for (var r : self.getMeta().getSavedRefs()) {
                 if (!extracted.contains(r))
                     jobjectManager.get(r).ifPresent(ro -> ro.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {

@@ -18,6 +18,7 @@ import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class RemoteObjectServiceClient {
@@ -57,6 +58,8 @@ public class RemoteObjectServiceClient {
 
         if (targets.isEmpty())
             throw new IllegalStateException("No targets for object " + jObject.getName());
+
+        Log.info("Downloading object " + jObject.getName() + " from " + targets.stream().map(UUID::toString).collect(Collectors.joining(", ")));
 
         return rpcClientFactory.withObjSyncClient(targets, client -> {
             var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).setName(jObject.getName()).build());
