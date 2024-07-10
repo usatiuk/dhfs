@@ -71,8 +71,10 @@ public class PersistentRemoteHostsService {
                 }
                 return null;
             });
-            var dir = jObjectManager.put(new PeerDirectory(), Optional.empty());
-            jObjectManager.put(new PersistentPeerInfo(_selfUuid, getSelfCertificate()), Optional.of(dir.getName()));
+            var newpd = new PeerDirectory();
+            jObjectManager.put(new PersistentPeerInfo(_selfUuid, getSelfCertificate()), Optional.of(PeerDirectory.PeerDirectoryObjName));
+            newpd.getPeers().add(_selfUuid);
+            var dir = jObjectManager.put(newpd, Optional.empty());
         }
 
         jObjectResolver.registerWriteListener(PersistentPeerInfo.class, this::pushPeerUpdates);
