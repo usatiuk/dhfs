@@ -193,16 +193,16 @@ jobs:
         run: find .
 
       - name: Make run wrapper dirs
-        run: mkdir -p run-wrapper-out/data && mkdir -p run-wrapper-out/fuse && mkdir -p run-wrapper-out/app
+        run: mkdir -p run-wrapper-out/dhfs/data && mkdir -p run-wrapper-out/dhfs/fuse && mkdir -p run-wrapper-out/dhfs/app
 
       - name: Copy DHFS
-        run: cp -r ./dhfs-package-downloaded "run-wrapper-out/app/DHFS Package"
+        run: cp -r ./dhfs-package-downloaded "run-wrapper-out/dhfs/app/DHFS Package"
 
       - name: Copy Webui
-        run: cp -r ./webui-dist-downloaded "run-wrapper-out/app/Webui"
+        run: cp -r ./webui-dist-downloaded "run-wrapper-out/dhfs/app/Webui"
 
       - name: Copy run wrapper
-        run: cp -r ./run-wrapper/* "run-wrapper-out/app/"
+        run: cp -r ./run-wrapper/* "run-wrapper-out/dhfs/app/"
 
       - uses: actions/upload-artifact@v3
         with:
