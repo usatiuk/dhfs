@@ -14,7 +14,7 @@ CUR=$(cat "$SCRIPT_DIR"/version)
 
 echo Current: $CUR
 
-if [[ $CUR -gt $LATEST ]]; then
+if [[ $CUR -ge $LATEST ]]; then
     exit Already latest!
     exit 1
 fi
