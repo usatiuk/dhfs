@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects.jrepository;
 
 import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
+import com.usatiuk.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.Startup;
@@ -9,147 +10,131 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import org.apache.commons.collections4.OrderedBidiMap;
-import org.apache.commons.collections4.bidimap.TreeBidiMap;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Singleton
 public class JObjectWriteback {
+    private class QueueEntry {
+        private final JObject<?> _obj;
+        private long _size;
 
-    private final LinkedHashMap<JObject<?>, Pair<Long, Long>> _nursery = new LinkedHashMap<>();
-    // FIXME: Kind of a hack
-    private final OrderedBidiMap<Pair<Long, String>, JObject<?>> _writeQueue = new TreeBidiMap<>();
+        private QueueEntry(JObject<?> obj, long size) {
+            _obj = obj;
+            _size = size;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            QueueEntry that = (QueueEntry) o;
+            return Objects.equals(_obj, that._obj);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(_obj);
+        }
+    }
+
+    private final HashSetDelayedBlockingQueue<QueueEntry> _writeQueue;
     @Inject
     ObjectPersistentStore objectPersistentStore;
     @Inject
-    JObjectManager jObjectManager;
-    @Inject
     JObjectSizeEstimator jObjectSizeEstimator;
-    @ConfigProperty(name = "dhfs.objects.writeback.delay")
-    long promotionDelay;
     @ConfigProperty(name = "dhfs.objects.writeback.limit")
     long sizeLimit;
-    @ConfigProperty(name = "dhfs.objects.writeback.nursery_limit")
-    int nurseryLimit;
+    @ConfigProperty(name = "dhfs.objects.writeback.watermark-high")
+    float watermarkHighRatio;
+    @ConfigProperty(name = "dhfs.objects.writeback.watermark-low")
+    float watermarkLowRatio;
     @ConfigProperty(name = "dhfs.objects.writeback.threads")
     int writebackThreads;
-    AtomicLong _currentSize = new AtomicLong(0);
-    boolean overload = false;
-    private Thread _promotionThread;
+
+    private final AtomicLong _currentSize = new AtomicLong(0);
+    private final AtomicBoolean _watermarkReached = new AtomicBoolean(false);
+    private final AtomicBoolean _shutdown = new AtomicBoolean(false);
+
     private ExecutorService _writebackExecutor;
+    private ExecutorService _statusExecutor;
+
+    public JObjectWriteback(@ConfigProperty(name = "dhfs.objects.writeback.delay") long promotionDelay) {
+        _writeQueue = new HashSetDelayedBlockingQueue<>(promotionDelay);
+    }
 
     @Startup
     void init() {
-        _writebackExecutor = Executors.newFixedThreadPool(writebackThreads);
+        BasicThreadFactory factory = new BasicThreadFactory.Builder()
+                .namingPattern("writeback-%d")
+                .build();
+
+        _writebackExecutor = Executors.newFixedThreadPool(writebackThreads, factory);
+        _statusExecutor = Executors.newSingleThreadExecutor();
+        _statusExecutor.submit(() -> {
+            try {
+                while (true) {
+                    Thread.sleep(1000);
+                    Log.info("Writeback status: size="
+                            + _currentSize.get() / 1024 / 1024 + "MB"
+                            + " watermark=" + (_watermarkReached.get() ? "reached" : "not reached"));
+                }
+            } catch (InterruptedException ignored) {
+            }
+        });
         for (int i = 0; i < writebackThreads; i++) {
             _writebackExecutor.submit(this::writeback);
         }
-        _promotionThread = new Thread(this::promote);
-        _promotionThread.setName("Writeback promotion thread");
-        _promotionThread.start();
     }
 
     void shutdown(@Observes @Priority(10) ShutdownEvent event) {
-        _promotionThread.interrupt();
-        while (_promotionThread.isAlive()) {
-            try {
-                _promotionThread.join();
-            } catch (InterruptedException ignored) {
-            }
-        }
-
+        _shutdown.set(true);
         _writebackExecutor.shutdownNow();
+        _statusExecutor.shutdownNow();
 
-        HashSet<JObject<?>> toWrite = new LinkedHashSet<>();
-        toWrite.addAll(_nursery.keySet());
-        toWrite.addAll(_writeQueue.values());
+        var toWrite = _writeQueue.close();
 
         Log.info("Flushing objects");
         for (var v : toWrite) {
             try {
-                flushOne(v);
+                flushOne(v._obj);
             } catch (Exception e) {
-                Log.error("Failed writing object " + v.getName(), e);
+                Log.error("Failed writing object " + v._obj.getName(), e);
             }
         }
-    }
-
-    private void promote() {
-        try {
-            while (!Thread.interrupted()) {
-
-                var curTime = System.currentTimeMillis();
-
-                long wait = 0;
-
-                synchronized (_nursery) {
-                    while (_nursery.isEmpty())
-                        _nursery.wait();
-
-                    curTime = System.currentTimeMillis();
-
-                    if ((curTime - _nursery.firstEntry().getValue().getLeft()) <= promotionDelay) {
-                        wait = promotionDelay - (curTime - _nursery.firstEntry().getValue().getLeft());
-                    }
-                }
-
-                if (wait > 0)
-                    Thread.sleep(wait);
-
-                synchronized (_nursery) {
-                    while (!_nursery.isEmpty() && (curTime - _nursery.firstEntry().getValue().getLeft()) >= promotionDelay) {
-                        var got = _nursery.pollFirstEntry();
-                        synchronized (_writeQueue) {
-                            _writeQueue.put(Pair.of(got.getValue().getRight(), got.getKey().getName()), got.getKey());
-                            _writeQueue.notify();
-                        }
-                    }
-                }
-            }
-        } catch (InterruptedException ignored) {
-        }
-        Log.info("Writeback promotion thread exiting");
     }
 
     private void writeback() {
-        try {
-            while (!Thread.interrupted()) {
-                JObject<?> obj;
-                long removedSize;
-                synchronized (_writeQueue) {
-                    while (_writeQueue.isEmpty())
-                        _writeQueue.wait();
+        while (!_shutdown.get()) {
+            try {
+                QueueEntry got
+                        = _watermarkReached.get()
+                        ? _writeQueue.getNoDelay()
+                        : _writeQueue.get();
 
-                    var fk = _writeQueue.lastKey();
-                    removedSize = fk.getKey();
-                    obj = _writeQueue.remove(fk);
-                }
                 try {
-                    _currentSize.addAndGet(-removedSize);
-                    flushOne(obj);
+                    _currentSize.addAndGet(-got._size);
+                    flushOne(got._obj);
                 } catch (Exception e) {
-                    Log.error("Failed writing object " + obj.getName() + ", will retry.", e);
+                    Log.error("Failed writing object " + got._obj.getName() + ", will retry.", e);
                     try {
-                        obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
+                        got._obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
                             var size = jObjectSizeEstimator.estimateObjectSize(d);
-                            synchronized (_writeQueue) {
-                                _writeQueue.put(Pair.of(size, m.getName()), obj);
-                            }
+                            _currentSize.addAndGet(size);
+                            _writeQueue.add(new QueueEntry(got._obj, size));
                             return null;
                         });
                     } catch (DeletedObjectAccessException ignored) {
                     }
                 }
+            } catch (InterruptedException ignored) {
             }
-        } catch (InterruptedException ignored) {
         }
         Log.info("Writeback thread exiting");
     }
@@ -168,6 +153,7 @@ public class JObjectWriteback {
     }
 
     private <T extends JObjectData> void flushOneImmediate(ObjectMetadata m, T data) {
+        m.markWritten();
         if (m.isDeleted()) {
             if (!m.isDeletionCandidate())
                 throw new IllegalStateException("Object deleted but not deletable! " + m.getName());
@@ -177,7 +163,6 @@ public class JObjectWriteback {
             objectPersistentStore.deleteObject(m.getName());
             return;
         }
-        m.markWritten();
         objectPersistentStore.writeObject("meta_" + m.getName(), SerializationHelper.serialize(m));
         if (data != null)
             objectPersistentStore.writeObject(m.getName(), SerializationHelper.serialize(data));
@@ -185,20 +170,9 @@ public class JObjectWriteback {
 
     public void remove(JObject<?> object) {
         object.assertRWLock();
-        synchronized (_nursery) {
-            if (_nursery.containsKey(object)) {
-                var size = _nursery.get(object).getRight();
-                _nursery.remove(object);
-                _currentSize.addAndGet(-size);
-            }
-        }
-        synchronized (_writeQueue) {
-            if (_writeQueue.containsValue(object)) {
-                var size = _writeQueue.inverseBidiMap().get(object).getLeft();
-                _writeQueue.removeValue(object);
-                _currentSize.addAndGet(-size);
-            }
-        }
+        var got = _writeQueue.remove(new QueueEntry(object, 0));
+        if (got == null) return;
+        _currentSize.addAndGet(-got._size);
     }
 
     public void markDirty(JObject<?> object) {
@@ -208,69 +182,35 @@ public class JObjectWriteback {
             return;
         }
 
+        if (_currentSize.get() > (watermarkHighRatio * sizeLimit)) {
+            if (!_watermarkReached.get()) {
+                Log.trace("Watermark reached");
+                _watermarkReached.set(true);
+                _writeQueue.interrupt();
+            }
+        } else if (_currentSize.get() <= (watermarkLowRatio * sizeLimit)) {
+            if (_watermarkReached.get())
+                Log.trace("Watermark reset");
+            _watermarkReached.set(false);
+        }
+
+        if (_currentSize.get() > sizeLimit) {
+            try {
+                flushOneImmediate(object.getMeta(), object.getData());
+                return;
+            } catch (Exception e) {
+                Log.error("Failed writing object " + object.getName(), e);
+                throw e;
+            }
+        }
+
         var size = jObjectSizeEstimator.estimateObjectSize(object.getData());
 
-        synchronized (_nursery) {
-            if (_nursery.containsKey(object)) {
-                long oldSize = _nursery.get(object).getRight();
-                if (oldSize == size)
-                    return;
-                long oldTime = _nursery.get(object).getLeft();
-                if (nurseryLimit > 0 && size >= nurseryLimit) {
-                    _nursery.remove(object);
-                    _currentSize.addAndGet(-oldSize);
-                } else {
-                    _nursery.replace(object, Pair.of(oldTime, size));
-                    _currentSize.addAndGet(size - oldSize);
-                    return;
-                }
-            }
-        }
+        var old = _writeQueue.readd(new QueueEntry(object, size));
 
-        synchronized (_writeQueue) {
-            if (_writeQueue.containsValue(object)) {
-                long oldSize = _writeQueue.getKey(object).getKey();
-                if (oldSize == size)
-                    return;
-                _currentSize.addAndGet(size - oldSize);
-                _writeQueue.inverseBidiMap().replace(object, Pair.of(size, object.getName()));
-                return;
-            }
-        }
-
-        var curTime = System.currentTimeMillis();
-
-        if (nurseryLimit > 0 && size >= nurseryLimit) {
-            synchronized (_writeQueue) {
-                _currentSize.addAndGet(size);
-                _writeQueue.put(Pair.of(size, object.getName()), object);
-                _writeQueue.notify();
-                return;
-            }
-        }
-
-        synchronized (_nursery) {
-            if (_currentSize.get() < sizeLimit) {
-                if (overload) {
-                    overload = false;
-                    Log.trace("Writeback cache enabled");
-                }
-                _nursery.put(object, Pair.of(curTime, size));
-                _currentSize.addAndGet(size);
-                _nursery.notify();
-                return;
-            }
-        }
-
-        try {
-            if (!overload) {
-                overload = true;
-                Log.trace("Writeback cache disabled");
-            }
-            flushOneImmediate(object.getMeta(), object.getData());
-        } catch (Exception e) {
-            Log.error("Failed writing object " + object.getName(), e);
-            throw e;
-        }
+        if (old != null)
+            _currentSize.addAndGet(size - old._size);
+        else
+            _currentSize.addAndGet(size);
     }
 }

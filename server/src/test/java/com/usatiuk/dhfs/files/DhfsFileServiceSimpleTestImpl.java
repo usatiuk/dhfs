@@ -187,7 +187,7 @@ public class DhfsFileServiceSimpleTestImpl {
     }
 
     @Test
-    void moveTest2() {
+    void moveTest2() throws InterruptedException {
         var ret = fileService.create("/moveTest", 777);
         Assertions.assertTrue(ret.isPresent());
         var uuid = ret.get();
@@ -213,9 +213,11 @@ public class DhfsFileServiceSimpleTestImpl {
 
         var newfile = fileService.open("/movedTest").get();
 
+        Thread.sleep(1000);
+
         chunkObj.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
-            Assertions.assertFalse(m.getReferrers().contains(uuid));
             Assertions.assertTrue(m.getReferrers().contains(newfile));
+            Assertions.assertFalse(m.getReferrers().contains(uuid));
             return null;
         });
     }

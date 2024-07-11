@@ -36,7 +36,7 @@ public class JObjectResolver {
     @Inject
     JObjectWriteback jObjectWriteback;
     @Inject
-    JObjectManager jobjectManager;
+    JObjectManager jObjectManager;
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
     @Inject
@@ -81,7 +81,7 @@ public class JObjectResolver {
             Log.debug(sb.toString());
             for (var r : self.getMeta().getSavedRefs()) {
                 if (!extracted.contains(r))
-                    jobjectManager.get(r).ifPresent(ro -> ro.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                    jObjectManager.get(r).ifPresent(ro -> ro.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                         m.removeRef(self.getName());
                         return null;
                     }));
@@ -89,7 +89,7 @@ public class JObjectResolver {
             for (var r : extracted) {
                 if (!self.getMeta().getSavedRefs().contains(r)) {
                     Log.trace("Hydrating ref " + r + " for " + self.getName());
-                    jobjectManager.getOrPut(r, self.getData().getRefType(), Optional.of(self.getName()));
+                    jObjectManager.getOrPut(r, self.getData().getRefType(), Optional.of(self.getName()));
                 }
             }
             self.getMeta().setSavedRefs(null);
@@ -113,14 +113,39 @@ public class JObjectResolver {
 
             refs.forEach(r -> {
                 Log.trace("Hydrating ref after undelete " + r + " for " + self.getName());
-                jobjectManager.getOrPut(r, self.getData().getRefType(), Optional.of(self.getName()));
+                jObjectManager.getOrPut(r, self.getData().getRefType(), Optional.of(self.getName()));
             });
 
         }
 
         if (self.isDeletionCandidate() && !self.isDeleted()) {
-            jObjectRefProcessor.putDeletionCandidate(self.getName());
+            if (!self.getMeta().isSeen()) tryQuickDelete(self);
+            else jObjectRefProcessor.putDeletionCandidate(self.getName());
         }
+    }
+
+    private void tryQuickDelete(JObject<?> self) {
+        self.assertRWLock();
+        self.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
+
+        Log.trace("Quick delete of: " + self.getName());
+        self.getMeta().delete();
+
+        Stream<String> refs = Stream.empty();
+
+        if (self.getMeta().getSavedRefs() != null)
+            refs = self.getMeta().getSavedRefs().stream();
+        if (self.getData() != null)
+            refs = Streams.concat(refs, self.getData().extractRefs().stream());
+
+        self.discardData();
+
+        refs.forEach(c -> {
+            jObjectManager.get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
+                mc.removeRef(self.getName());
+                return null;
+            }));
+        });
     }
 
     public <T extends JObjectData> Optional<T> resolveDataLocal(JObject<T> jObject) {
@@ -191,13 +216,13 @@ public class JObjectResolver {
         var newRefs = self.getData().extractRefs();
         if (oldRefs != null) for (var o : oldRefs)
             if (!newRefs.contains(o)) {
-                jobjectManager.get(o).ifPresent(obj -> {
+                jObjectManager.get(o).ifPresent(obj -> {
                     if (obj.hasRef(self.getName()))
                         throw new IllegalStateException("Object " + o + " is referenced from " + self.getName() + " but shouldn't be");
                 });
             }
         for (var r : newRefs) {
-            var obj = jobjectManager.get(r).orElseThrow(() -> new IllegalStateException("Object " + r + " not found but should be referenced from " + self.getName()));
+            var obj = jObjectManager.get(r).orElseThrow(() -> new IllegalStateException("Object " + r + " not found but should be referenced from " + self.getName()));
             if (obj.isDeleted())
                 throw new IllegalStateException("Object " + r + " deleted but referenced from " + self.getName());
             if (!obj.hasRef(self.getName()))
