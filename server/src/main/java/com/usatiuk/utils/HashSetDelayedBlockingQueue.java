@@ -135,6 +135,10 @@ public class HashSetDelayedBlockingQueue<T> {
     }
 
     public Collection<T> getAllWait() throws InterruptedException {
+        return getAllWait(Integer.MAX_VALUE);
+    }
+
+    public Collection<T> getAllWait(int max) throws InterruptedException {
         ArrayList<T> out = new ArrayList<>();
         try {
             synchronized (this) {
@@ -150,7 +154,7 @@ public class HashSetDelayedBlockingQueue<T> {
                     var first = _set.firstEntry().getValue()._time;
                     if (first + _delay > curTime) sleep = (first + _delay) - curTime;
                     else {
-                        while (!_set.isEmpty()) {
+                        while (!_set.isEmpty() && (out.size() < max)) {
                             SetElement el = _set.firstEntry().getValue();
                             if (el._time + _delay > curTime) break;
                             out.add(_set.pollFirstEntry().getValue()._el);

@@ -60,7 +60,7 @@ public class InvalidationQueueService {
         try {
             while (!Thread.interrupted()) {
                 try {
-                    var data = _queue.getAllWait();
+                    var data = _queue.getAllWait(100); // TODO: config?
                     String stats = "Sent invalidation: ";
                     long success = 0;
 

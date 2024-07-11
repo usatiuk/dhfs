@@ -48,6 +48,63 @@ public class HashSetDelayedBlockingQueueTest {
 
 
     @Test
+    void GetAllLimit() throws InterruptedException {
+        var queue = new HashSetDelayedBlockingQueue<>(1000);
+
+        var curTime = System.currentTimeMillis();
+        var ex = Executors.newSingleThreadExecutor();
+        ex.submit(() -> {
+            try {
+                Thread.sleep(10);
+                queue.add("hello1");
+                queue.add("hello2");
+                queue.add("hello3");
+                queue.add("hello4");
+                queue.add("hello5");
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        Thread.sleep(100);
+        var got1 = queue.getAllWait(3);
+        var got2 = queue.getAllWait(3);
+        Assertions.assertEquals(3, got1.size());
+        Assertions.assertEquals(2, got2.size());
+        var gotTime = System.currentTimeMillis();
+        Assertions.assertIterableEquals(List.of("hello1", "hello2", "hello3"), got1);
+        Assertions.assertIterableEquals(List.of("hello4", "hello5"), got2);
+        Assertions.assertTrue((gotTime - curTime) >= 1010);
+    }
+
+    @Test
+    void GetAllLimitImmediate() throws InterruptedException {
+        var queue = new HashSetDelayedBlockingQueue<>(1000);
+
+        var curTime = System.currentTimeMillis();
+        var ex = Executors.newSingleThreadExecutor();
+        ex.submit(() -> {
+            try {
+                Thread.sleep(10);
+                queue.add("hello1");
+                queue.add("hello2");
+                queue.add("hello3");
+                queue.add("hello4");
+                queue.add("hello5");
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        Thread.sleep(1100);
+        var got1 = queue.getAllWait(3);
+        var got2 = queue.getAllWait(3);
+        Assertions.assertEquals(3, got1.size());
+        Assertions.assertEquals(2, got2.size());
+        var gotTime = System.currentTimeMillis();
+        Assertions.assertIterableEquals(List.of("hello1", "hello2", "hello3"), got1);
+        Assertions.assertIterableEquals(List.of("hello4", "hello5"), got2);
+    }
+
+    @Test
     void readdTest() throws InterruptedException {
         var queue = new HashSetDelayedBlockingQueue<>(1000);
 
