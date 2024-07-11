@@ -202,7 +202,7 @@ jobs:
         run: cp -r ./webui-dist-downloaded "run-wrapper-out/app/Webui"
 
       - name: Copy run wrapper
-        run: cp -r ./run-wrapper/run.sh "run-wrapper-out/app/"
+        run: cp -r ./run-wrapper/* "run-wrapper-out/app/"
 
       - uses: actions/upload-artifact@v3
         with:
