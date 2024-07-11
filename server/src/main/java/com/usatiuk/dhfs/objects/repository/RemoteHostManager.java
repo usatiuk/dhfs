@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.objects.repository;
 
-import com.usatiuk.dhfs.objects.repository.peersync.GetSelfInfoRequest;
+import com.usatiuk.dhfs.objects.repository.peersync.PeerSyncApiClientDynamic;
 import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
 import com.usatiuk.dhfs.objects.repository.webapi.AvailablePeerInfo;
 import io.quarkus.logging.Log;
@@ -16,10 +16,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
 import java.security.cert.CertificateException;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -33,6 +30,8 @@ public class RemoteHostManager {
     SyncHandler syncHandler;
     @Inject
     RpcClientFactory rpcClientFactory;
+    @Inject
+    PeerSyncApiClientDynamic peerSyncApiClient;
     @ConfigProperty(name = "dhfs.objects.sync.ping.timeout")
     long pingTimeout;
     boolean _initialized = false;
@@ -184,13 +183,12 @@ public class RemoteHostManager {
 
         // FIXME: race?
 
-        var info = rpcClientFactory.withPeerSyncClient(state.getAddr(), state.getPort(), 10000L, c -> {
-            return c.getSelfInfo(GetSelfInfoRequest.getDefaultInstance());
-        });
+        var info = peerSyncApiClient.getSelfInfo(state.getAddr(), state.getPort());
 
         try {
             persistentRemoteHostsService.addHost(
-                    new PersistentPeerInfo(UUID.fromString(info.getUuid()), CertificateTools.certFromBytes(info.getCert().toByteArray())));
+                    new PersistentPeerInfo(UUID.fromString(info.selfUuid()),
+                            CertificateTools.certFromBytes(Base64.getDecoder().decode(info.cert()))));
             Log.info("Added host: " + host.toString());
         } catch (CertificateException e) {
             throw new RuntimeException(e);

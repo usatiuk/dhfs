@@ -23,8 +23,8 @@ echo Downloading...
 
 cd "$SCRIPT_DIR"
 
-rm "Run wrapper.zip"
-rm -rf "dhfs"
+rm "Run wrapper.zip" || true
+rm -rf "dhfs" || true
 
 wget https://nightly.link/usatiuk/dhfs/actions/runs/$LATEST/Run%20wrapper.zip
 

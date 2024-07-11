@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.objects.repository;
 
-import com.usatiuk.dhfs.objects.repository.peersync.DhfsObjectPeerSyncGrpcGrpc;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -32,7 +31,6 @@ public class RpcClientFactory {
     RpcChannelFactory rpcChannelFactory;
     // FIXME: Leaks!
     private ConcurrentMap<ObjSyncStubKey, DhfsObjectSyncGrpcGrpc.DhfsObjectSyncGrpcBlockingStub> _objSyncCache = new ConcurrentHashMap<>();
-    private ConcurrentMap<PeerSyncStubKey, DhfsObjectPeerSyncGrpcGrpc.DhfsObjectPeerSyncGrpcBlockingStub> _peerSyncCache = new ConcurrentHashMap<>();
 
     public <R> R withObjSyncClient(Collection<UUID> targets, ObjectSyncClientFunction<R> fn) {
         var shuffledList = new ArrayList<>(targets);
@@ -85,27 +83,9 @@ public class RpcClientFactory {
         return fn.apply(stub.withDeadlineAfter(timeout, TimeUnit.SECONDS));
     }
 
-    public <R> R withPeerSyncClient(UUID target, PeerSyncClientFunction<R> fn) {
-        var hostinfo = remoteHostManager.getTransientState(target);
-        if (hostinfo.getAddr() == null) throw new IllegalStateException("Address for " + target + " not yet known");
-        return withPeerSyncClient(hostinfo.getAddr(), hostinfo.getPort(), peerSyncTimeout, fn);
-    }
-
-    public <R> R withPeerSyncClient(String addr, int port, long timeout, PeerSyncClientFunction<R> fn) {
-        var key = new PeerSyncStubKey(addr, port);
-        var stub = _peerSyncCache.computeIfAbsent(key, (k) -> {
-            var channel = rpcChannelFactory.getInsecureChannel(addr, port);
-            return DhfsObjectPeerSyncGrpcGrpc.newBlockingStub(channel)
-                    .withMaxOutboundMessageSize(Integer.MAX_VALUE)
-                    .withMaxInboundMessageSize(Integer.MAX_VALUE);
-        });
-        return fn.apply(stub.withDeadlineAfter(timeout, TimeUnit.SECONDS));
-    }
-
     public void dropCache() {
         rpcChannelFactory.dropCache();
         _objSyncCache = new ConcurrentHashMap<>();
-        _peerSyncCache = new ConcurrentHashMap<>();
     }
 
     @FunctionalInterface
@@ -113,15 +93,7 @@ public class RpcClientFactory {
         R apply(DhfsObjectSyncGrpcGrpc.DhfsObjectSyncGrpcBlockingStub client);
     }
 
-    @FunctionalInterface
-    public interface PeerSyncClientFunction<R> {
-        R apply(DhfsObjectPeerSyncGrpcGrpc.DhfsObjectPeerSyncGrpcBlockingStub client);
-    }
-
     private record ObjSyncStubKey(String host, String address, int port) {
-    }
-
-    private record PeerSyncStubKey(String address, int port) {
     }
 
 }
