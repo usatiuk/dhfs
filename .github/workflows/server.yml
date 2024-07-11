@@ -204,6 +204,9 @@ jobs:
       - name: Copy run wrapper
         run: cp -r ./run-wrapper/* "run-wrapper-out/dhfs/app/"
 
+      - name: Add version to run wrapper
+        run: echo $GITHUB_RUN_ID > "run-wrapper-out/dhfs/app/"version
+
       - uses: actions/upload-artifact@v3
         with:
           name: Run wrapper

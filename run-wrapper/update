@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -e
+set -u
+set -o pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+
+# 💀
+LATEST=$(curl "https://api.github.com/repos/usatiuk/dhfs/actions/runs?branch=main&status=completed&per_page=1" | tr -d "[:space:]" | sed -En "s/.*\[{\"id\":([0-9]*).*/\1/p")
+
+echo Latest: $LATEST
+
+CUR=$(cat "$SCRIPT_DIR"/version)
+
+echo Current: $CUR
+
+if [[ $CUR -gt $LATEST ]]; then
+    exit Already latest!
+    exit 1
+fi
+
+echo Downloading...
+
+cd "$SCRIPT_DIR"
+
+rm "Run wrapper.zip"
+rm -rf "dhfs"
+
+wget https://nightly.link/usatiuk/dhfs/actions/runs/$LATEST/Run%20wrapper.zip
+
+unzip "Run wrapper.zip"
+
+rm -rf "DHFS Package"
+rm -rf "Webui"
+
+mv dhfs/app/* .
+
+rm -rf "dhfs"
+
+chmod +x run
+chmod +x stop
+chmod +x update
+
+echo "Update complete!"
