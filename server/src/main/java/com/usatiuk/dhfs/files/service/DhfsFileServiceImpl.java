@@ -17,6 +17,7 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.NotImplementedException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -140,7 +141,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         var fuuid = UUID.randomUUID();
         Log.trace("Creating file " + fuuid);
-        File f = new File(fuuid, mode, UUID.fromString(parent.getName()));
+        File f = new File(fuuid, mode, UUID.fromString(parent.getName()), false);
 
         if (!parent.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, invalidate) -> {
             if (!(d instanceof Directory dir))
@@ -151,10 +152,13 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             bump.apply();
 
+            boolean created = dir.putKid(fname, fuuid);
+            if (!created) return false;
+
             jObjectManager.put(f, Optional.of(dir.getName()));
 
             dir.setMtime(System.currentTimeMillis());
-            return dir.putKid(fname, fuuid);
+            return true;
         }))
             return Optional.empty();
 
@@ -270,7 +274,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (theFile.getData() instanceof Directory d) {
                 newDent = d;
             } else if (theFile.getData() instanceof File f) {
-                var newFile = new File(UUID.randomUUID(), f.getMode(), UUID.fromString(dentTo.getName()));
+                var newFile = new File(UUID.randomUUID(), f.getMode(), UUID.fromString(dentTo.getName()), f.isSymlink());
                 newFile.setMtime(f.getMtime());
                 newFile.setCtime(f.getCtime());
                 newFile.getChunks().putAll(f.getChunks());
@@ -750,6 +754,65 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             return false;
         }
         return true;
+    }
+
+    @Override
+    public String readlink(String uuid) {
+        return readlinkBS(uuid).toStringUtf8();
+    }
+
+    @Override
+    public ByteString readlinkBS(String uuid) {
+        var fileOpt = jObjectManager.get(uuid).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("File not found when trying to readlink: " + uuid)));
+
+        return fileOpt.runReadLocked(JObject.ResolutionStrategy.REMOTE, (md, fileData) -> {
+            if (!(fileData instanceof File)) {
+                throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+            }
+
+            if (!((File) fileData).isSymlink())
+                throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Not a symlink: " + uuid));
+
+            return read(uuid, 0, Math.toIntExact(size(uuid))).get();
+        });
+    }
+
+    @Override
+    public String symlink(String oldpath, String newpath) {
+        var parent = traverse(getRoot(), Path.of(newpath).getParent());
+
+        String fname = Path.of(newpath).getFileName().toString();
+
+        var fuuid = UUID.randomUUID();
+        Log.trace("Creating file " + fuuid);
+        File f = new File(fuuid, 0, UUID.fromString(parent.getName()), true);
+
+        ChunkData newChunkData = createChunk(UnsafeByteOperations.unsafeWrap(oldpath.getBytes(StandardCharsets.UTF_8)));
+        ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
+
+        f.getChunks().put(0L, newChunkInfo.getHash());
+
+        if (!parent.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, invalidate) -> {
+            if (!(d instanceof Directory dir))
+                return false;
+
+            if (dir.getKid(fname).isPresent())
+                return false;
+
+            bump.apply();
+
+            boolean created = dir.putKid(fname, fuuid);
+            if (!created) return false;
+
+            jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
+            jObjectManager.put(newChunkInfo, Optional.of(f.getName()));
+            jObjectManager.put(f, Optional.of(dir.getName()));
+
+            dir.setMtime(System.currentTimeMillis());
+            return true;
+        })) return null;
+
+        return f.getName();
     }
 
     @Override

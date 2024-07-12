@@ -32,4 +32,22 @@ public class DhfsFuseTest {
         Assertions.assertDoesNotThrow(() -> Files.readAllBytes(testPath));
         Assertions.assertArrayEquals(Files.readAllBytes(testPath), testString);
     }
+
+    @Test
+    void symlinkTest() throws IOException, InterruptedException {
+        byte[] testString = "symlinkedfile".getBytes();
+        Path testPath = Path.of(root).resolve("symlinktarget");
+        Path testSymlink = Path.of(root).resolve("symlinktest");
+
+        Assertions.assertDoesNotThrow(() -> Files.createFile(testPath));
+        Assertions.assertDoesNotThrow(() -> Files.write(testPath, testString));
+        Assertions.assertDoesNotThrow(() -> Files.readAllBytes(testPath));
+        Assertions.assertArrayEquals(Files.readAllBytes(testPath), testString);
+
+        Assertions.assertDoesNotThrow(() -> Files.createSymbolicLink(testSymlink, testPath));
+        Assertions.assertTrue(() -> Files.isSymbolicLink(testSymlink));
+        Assertions.assertEquals(testPath, Files.readSymbolicLink(testSymlink));
+        Assertions.assertDoesNotThrow(() -> Files.readAllBytes(testSymlink));
+        Assertions.assertArrayEquals(Files.readAllBytes(testSymlink), testString);
+    }
 }

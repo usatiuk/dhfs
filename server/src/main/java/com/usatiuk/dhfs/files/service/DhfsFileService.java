@@ -33,4 +33,9 @@ public interface DhfsFileService {
     Long write(String fileUuid, long offset, byte[] data);
 
     Boolean truncate(String fileUuid, long length);
+
+    String readlink(String uuid);
+    ByteString readlinkBS(String uuid);
+
+    String symlink(String oldpath, String newpath);
 }

@@ -18,10 +18,13 @@ public class File extends FsNode {
     private final NavigableMap<Long, String> _chunks = new TreeMap<>();
     @Getter
     private final UUID _parent;
+    @Getter
+    private final boolean _symlink;
 
-    public File(UUID uuid, long mode, UUID parent) {
+    public File(UUID uuid, long mode, UUID parent, boolean symlink) {
         super(uuid, mode);
         _parent = parent;
+        _symlink = symlink;
     }
 
     @Override

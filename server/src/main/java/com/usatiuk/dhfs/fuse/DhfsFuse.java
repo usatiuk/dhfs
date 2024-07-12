@@ -28,8 +28,7 @@ import ru.serce.jnrfuse.struct.Timespec;
 import java.nio.file.Paths;
 import java.util.Optional;
 
-import static jnr.posix.FileStat.S_IFDIR;
-import static jnr.posix.FileStat.S_IFREG;
+import static jnr.posix.FileStat.*;
 
 @ApplicationScoped
 public class DhfsFuse extends FuseStubFS {
@@ -92,7 +91,10 @@ public class DhfsFuse extends FuseStubFS {
                 return -ErrorCodes.ENOENT();
             }
             if (found.get() instanceof File f) {
-                stat.st_mode.set(S_IFREG | f.getMode());
+                if (f.isSymlink())
+                    stat.st_mode.set(S_IFLNK | 0777); // FIXME?
+                else
+                    stat.st_mode.set(S_IFREG | f.getMode());
                 stat.st_nlink.set(1);
                 stat.st_size.set(fileService.size(uuid));
             } else if (found.get() instanceof Directory d) {
@@ -292,6 +294,36 @@ public class DhfsFuse extends FuseStubFS {
             return 0;
         } catch (Exception e) {
             Log.error("When readdir " + path, e);
+            return -ErrorCodes.EIO();
+        }
+    }
+
+    @Override
+    public int readlink(String path, Pointer buf, long size) {
+        if (size < 0) return -ErrorCodes.EINVAL();
+        try {
+            var fileOpt = fileService.open(path);
+            if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
+            var file = fileOpt.get();
+            var read = fileService.readlinkBS(fileOpt.get());
+            if (read.isEmpty()) return 0;
+            UnsafeByteOperations.unsafeWriteTo(read, new JnrPtrByteOutput(buf, size));
+            buf.putByte(Math.min(size - 1, read.size()), (byte) 0);
+            return 0;
+        } catch (Exception e) {
+            Log.error("When reading " + path, e);
+            return -ErrorCodes.EIO();
+        }
+    }
+
+    @Override
+    public int symlink(String oldpath, String newpath) {
+        try {
+            var ret = fileService.symlink(oldpath, newpath);
+            if (ret == null) return -ErrorCodes.EEXIST();
+            else return 0;
+        } catch (Exception e) {
+            Log.error("When creating " + newpath, e);
             return -ErrorCodes.EIO();
         }
     }

@@ -92,6 +92,7 @@ public class FileConflictResolver implements ConflictResolver {
 
                 boolean wasChanged = oursFile.getMtime() != first.getMtime()
                         || oursFile.getCtime() != first.getCtime()
+                        || first.isSymlink() != second.isSymlink()
                         || chunksDiff;
 
                 if (m.getBestVersion() > newChangelog.values().stream().reduce(0L, Long::sum))
@@ -127,7 +128,7 @@ public class FileConflictResolver implements ConflictResolver {
                     oursFile.setMtime(first.getMtime());
                     oursFile.setCtime(first.getCtime());
 
-                    var newFile = new File(UUID.randomUUID(), second.getMode(), oursDir.getUuid());
+                    var newFile = new File(UUID.randomUUID(), second.getMode(), oursDir.getUuid(), second.isSymlink());
 
                     newFile.setMtime(second.getMtime());
                     newFile.setCtime(second.getCtime());
