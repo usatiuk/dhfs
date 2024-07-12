@@ -183,7 +183,6 @@ public class JObjectManagerImpl implements JObjectManager {
                     _map.put(name, new NamedSoftReference(created, _refQueue));
                     created.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                         parent.ifPresent(m::addRef);
-                        created.notifyWrite();
                         m.markSeen();
                         return null;
                     });
