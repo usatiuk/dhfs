@@ -273,6 +273,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             FsNode newDent;
             if (theFile.getData() instanceof Directory d) {
                 newDent = d;
+                theFile.getMeta().removeRef(dentFrom.getName());
+                theFile.getMeta().addRef(dentTo.getName());
             } else if (theFile.getData() instanceof File f) {
                 var newFile = new File(UUID.randomUUID(), f.getMode(), UUID.fromString(dentTo.getName()), f.isSymlink());
                 newFile.setMtime(f.getMtime());
