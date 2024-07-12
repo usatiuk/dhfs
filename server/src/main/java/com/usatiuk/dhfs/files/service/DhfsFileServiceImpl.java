@@ -494,6 +494,9 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (!(fDataU instanceof File fData))
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
 
+            if (size(fileUuid) < offset)
+                truncate(fileUuid, offset);
+
             var chunksAll = fData.getChunks();
             var first = chunksAll.floorEntry(offset);
             var last = chunksAll.lowerEntry(offset + data.length);

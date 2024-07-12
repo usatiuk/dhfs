@@ -198,6 +198,22 @@ public class DhfsFileServiceSimpleTestImpl {
     }
 
     @Test
+    void writeOverSizeTest() {
+        var ret = fileService.create("/writeOverSizeTest", 777);
+        Assertions.assertTrue(ret.isPresent());
+        var uuid = ret.get();
+
+        fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+        fileService.write(uuid, 20, new byte[]{10, 11, 12, 13, 14, 15, 16, 17, 18, 19});
+        Assertions.assertArrayEquals(new byte[]{
+                0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
+                0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+                10, 11, 12, 13, 14, 15, 16, 17, 18, 19
+        }, fileService.read(uuid, 0, 30).get().toByteArray());
+    }
+
+    @Test
     void moveTest2() throws InterruptedException {
         var ret = fileService.create("/moveTest", 777);
         Assertions.assertTrue(ret.isPresent());
