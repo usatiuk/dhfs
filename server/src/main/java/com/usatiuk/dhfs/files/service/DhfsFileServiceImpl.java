@@ -410,6 +410,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             var toReadReally = Math.min(readableLen, toReadInChunk);
 
+            if (toReadReally < 0) break;
+
             buf = buf.concat(chunkBytes.substring((int) offInChunk, (int) (offInChunk + toReadReally)));
 
             curPos += toReadReally;
