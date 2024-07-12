@@ -109,14 +109,10 @@ public class RemoteObjectServiceClient {
                         (m, d) -> {
                             if (m.getKnownClass().isAnnotationPresent(PushResolution.class) && d == null)
                                 Log.warn("Object " + m.getName() + " is marked as PushResolution but no resolution found");
-                            return Pair.of(m.toRpcHeader(d), m.isSeen());
+                            return m.toRpcHeader(d);
                         });
-        if (!header.getRight())
-            obj.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                m.markSeen();
-                return null;
-            });
-        builder.setHeader(header.getLeft());
+        obj.markSeen();
+        builder.setHeader(header);
 
         var send = builder.build();
 

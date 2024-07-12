@@ -59,6 +59,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
             data.extractRefs().forEach(ref -> jObjectManager.get(ref).ifPresent(JObject::markSeen));
             return Pair.of(meta.toRpcHeader(), SerializationHelper.serialize(data));
         });
+        obj.markSeen();
         var replyObj = ApiObject.newBuilder().setHeader(read.getLeft()).setContent(read.getRight()).build();
         return Uni.createFrom().item(GetObjectReply.newBuilder()
                 .setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString())
