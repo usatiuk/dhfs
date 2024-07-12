@@ -450,6 +450,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     }
 
     private ByteString readChunk(String uuid) {
+        getChunkSize(uuid); // FIXME: This uncovers an ugly truth that ChunkData has truly the file as a parent, not ChunkInfo
+
         var chunkRead = jObjectManager.get(ChunkData.getNameFromHash(uuid));
 
         if (chunkRead.isEmpty()) {
