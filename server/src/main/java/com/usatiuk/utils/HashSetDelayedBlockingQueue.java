@@ -1,5 +1,7 @@
 package com.usatiuk.utils;
 
+import jakarta.annotation.Nullable;
+
 import java.util.*;
 
 public class HashSetDelayedBlockingQueue<T> {
@@ -74,7 +76,8 @@ public class HashSetDelayedBlockingQueue<T> {
         }
     }
 
-    public T get() throws InterruptedException {
+    public T get(Long timeout) throws InterruptedException {
+        long startedWaiting = System.currentTimeMillis();
         try {
             synchronized (this) {
                 _waiting.add(Thread.currentThread());
@@ -82,7 +85,13 @@ public class HashSetDelayedBlockingQueue<T> {
             while (!Thread.interrupted()) {
                 long sleep;
                 synchronized (this) {
-                    while (_set.isEmpty()) this.wait();
+                    while (_set.isEmpty()) {
+                        if (timeout == null) this.wait();
+                        else {
+                            this.wait(timeout);
+                            if (System.currentTimeMillis() > (startedWaiting + timeout)) return null;
+                        }
+                    }
 
                     var curTime = System.currentTimeMillis();
 
@@ -101,11 +110,28 @@ public class HashSetDelayedBlockingQueue<T> {
         throw new InterruptedException();
     }
 
+    public T get() throws InterruptedException {
+        return get(null);
+    }
+
     public T getNoDelay() throws InterruptedException {
         synchronized (this) {
             while (_set.isEmpty()) this.wait();
 
             return _set.pollFirstEntry().getValue()._el;
+        }
+    }
+
+    @Nullable
+    public T tryGet() throws InterruptedException {
+        synchronized (this) {
+            if (_set.isEmpty()) return null;
+
+            var curTime = System.currentTimeMillis();
+
+            var first = _set.firstEntry().getValue()._time;
+            if (first + _delay > curTime) return null;
+            else return _set.pollFirstEntry().getValue()._el;
         }
     }
 

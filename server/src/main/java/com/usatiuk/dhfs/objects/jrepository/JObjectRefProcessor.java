@@ -23,6 +23,7 @@ import java.util.stream.Stream;
 @ApplicationScoped
 public class JObjectRefProcessor {
     private final HashSetDelayedBlockingQueue<String> _candidates;
+    private final HashSetDelayedBlockingQueue<String> _canDeleteRetries;
     private final HashSet<String> _movablesInProcessing = new HashSet<>();
     @Inject
     JObjectManager jObjectManager;
@@ -34,11 +35,15 @@ public class JObjectRefProcessor {
     AutoSyncProcessor autoSyncProcessor;
     @ConfigProperty(name = "dhfs.objects.move-processor.threads")
     int moveProcessorThreads;
+    @ConfigProperty(name = "dhfs.objects.deletion.can-delete-retry-delay")
+    long canDeleteRetryDelay;
     ExecutorService _movableProcessorExecutorService;
     private Thread _refProcessorThread;
 
-    public JObjectRefProcessor(@ConfigProperty(name = "dhfs.objects.deletion.delay") long deletionDelay) {
+    public JObjectRefProcessor(@ConfigProperty(name = "dhfs.objects.deletion.delay") long deletionDelay,
+                               @ConfigProperty(name = "dhfs.objects.deletion.can-delete-retry-delay") long canDeleteRetryDelay) {
         _candidates = new HashSetDelayedBlockingQueue<>(deletionDelay);
+        _canDeleteRetries = new HashSetDelayedBlockingQueue<>(canDeleteRetryDelay);
     }
 
     @Startup
@@ -71,6 +76,7 @@ public class JObjectRefProcessor {
         }
 
         _movableProcessorExecutorService.submit(() -> {
+            boolean delay = false;
             try {
                 var knownHosts = persistentRemoteHostsService.getHostsUuid();
                 List<UUID> missing = new ArrayList<>();
@@ -82,10 +88,19 @@ public class JObjectRefProcessor {
                 });
                 var ret = remoteObjectServiceClient.canDelete(missing, obj.getName(), ourReferrers);
 
+                long ok = 0;
+
                 for (var r : ret) {
                     if (!r.getDeletionCandidate())
                         for (var rr : r.getReferrersList())
                             autoSyncProcessor.add(rr);
+                    else
+                        ok++;
+                }
+
+                if (ok != missing.size()) {
+                    Log.trace("Delaying deletion check of " + obj.getName());
+                    delay = true;
                 }
 
                 obj.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
@@ -95,11 +110,14 @@ public class JObjectRefProcessor {
                     return null;
                 });
             } catch (Exception e) {
-                Log.error("When processing deletion of movable object " + obj.getName(), e);
+                Log.warn("When processing deletion of movable object " + obj.getName(), e);
             } finally {
                 synchronized (_movablesInProcessing) {
                     _movablesInProcessing.remove(obj.getName());
-                    putDeletionCandidate(obj.getName());
+                    if (!delay)
+                        _candidates.add(obj.getName());
+                    else
+                        _canDeleteRetries.add(obj.getName());
                 }
             }
         });
@@ -123,7 +141,13 @@ public class JObjectRefProcessor {
     private void refProcessorThread() {
         try {
             while (!Thread.interrupted()) {
-                String next = _candidates.get();
+                String next = null;
+
+                while (next == null) {
+                    next = _canDeleteRetries.tryGet();
+                    if (next == null)
+                        next = _candidates.get(canDeleteRetryDelay);
+                }
 
                 var got = jObjectManager.get(next);
                 if (got.isEmpty()) continue;

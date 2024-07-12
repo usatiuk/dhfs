@@ -23,6 +23,16 @@ public class HashSetDelayedBlockingQueueTest {
         Assertions.assertTrue((gotTime - curTime) >= 1000);
     }
 
+    @Test
+    void GetTimeout() throws InterruptedException {
+        var queue = new HashSetDelayedBlockingQueue<>(1000);
+
+        var curTime = System.currentTimeMillis();
+        var thing = queue.get(500L);
+        Assertions.assertNull(thing);
+        var gotTime = System.currentTimeMillis();
+        Assertions.assertTrue((gotTime - curTime) <= 10000);
+    }
 
     @Test
     void GetAll() throws InterruptedException {

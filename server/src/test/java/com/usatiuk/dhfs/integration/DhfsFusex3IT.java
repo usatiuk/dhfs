@@ -36,7 +36,7 @@ public class DhfsFusex3IT {
     String c3uuid;
 
     @BeforeEach
-    void setup() throws IOException, InterruptedException, TimeoutException {
+    void setup(TestInfo testInfo) throws IOException, InterruptedException, TimeoutException {
         String buildPath = System.getProperty("buildDirectory");
         System.out.println("Build path: " + buildPath);
 
@@ -80,13 +80,16 @@ public class DhfsFusex3IT {
         c3uuid = container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_root_d/self_uuid").getStdout();
 
         waitingConsumer1 = new WaitingConsumer();
-        var loggingConsumer1 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFusex3IT.class)).withPrefix(c1uuid);
+        var loggingConsumer1 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFusex3IT.class))
+                .withPrefix(c1uuid.substring(0, 4) + "-" + testInfo.getDisplayName());
         container1.followOutput(loggingConsumer1.andThen(waitingConsumer1));
         waitingConsumer2 = new WaitingConsumer();
-        var loggingConsumer2 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFusex3IT.class)).withPrefix(c2uuid);
+        var loggingConsumer2 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFusex3IT.class))
+                .withPrefix(c2uuid.substring(0, 4) + "-" + testInfo.getDisplayName());
         container2.followOutput(loggingConsumer2.andThen(waitingConsumer2));
         waitingConsumer3 = new WaitingConsumer();
-        var loggingConsumer3 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFusex3IT.class)).withPrefix(c3uuid);
+        var loggingConsumer3 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFusex3IT.class))
+                .withPrefix(c3uuid.substring(0, 4) + "-" + testInfo.getDisplayName());
         container3.followOutput(loggingConsumer3.andThen(waitingConsumer3));
 
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c1uuid));

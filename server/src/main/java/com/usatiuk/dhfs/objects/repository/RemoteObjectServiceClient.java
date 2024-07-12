@@ -5,7 +5,6 @@ import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.jrepository.PushResolution;
-import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -126,6 +125,7 @@ public class RemoteObjectServiceClient {
 
     public Collection<CanDeleteReply> canDelete(Collection<UUID> targets, String object, Collection<String> ourReferrers) {
         ConcurrentLinkedDeque<CanDeleteReply> results = new ConcurrentLinkedDeque<>();
+        Log.trace("Asking canDelete for " + object + " from " + targets.stream().map(UUID::toString).collect(Collectors.joining(", ")));
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             try {
                 executor.invokeAll(targets.stream().<Callable<Void>>map(h -> () -> {
