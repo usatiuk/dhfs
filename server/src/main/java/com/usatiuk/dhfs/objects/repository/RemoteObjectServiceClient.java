@@ -52,7 +52,7 @@ public class RemoteObjectServiceClient {
                         .filter(entry -> entry.getValue().equals(ourVersion))
                         .map(Map.Entry::getKey).toList();
             else
-                return persistentRemoteHostsService.getHosts().stream().map(PersistentPeerInfo::getUuid).toList();
+                return persistentRemoteHostsService.getHostsUuid();
         });
 
         if (targets.isEmpty())

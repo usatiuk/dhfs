@@ -10,7 +10,7 @@ import lombok.Setter;
 public class TransientPeerState {
     @Getter
     @Setter
-    private ConnectionState _state = ConnectionState.NOT_SEEN;
+    private boolean _reachable = false;
     @Getter
     @Setter
     private String _addr;
@@ -21,13 +21,14 @@ public class TransientPeerState {
     @Setter
     private int _securePort;
 
-    public TransientPeerState(ConnectionState connectionState) {
-        _state = connectionState;
+    public TransientPeerState(boolean reachable) {
+        _reachable = reachable;
     }
 
-    public enum ConnectionState {
-        NOT_SEEN,
-        REACHABLE,
-        UNREACHABLE
+    public TransientPeerState(TransientPeerState source) {
+        _reachable = source._reachable;
+        _addr = source._addr;
+        _port = source._port;
+        _securePort = source._securePort;
     }
 }

@@ -10,11 +10,13 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @ApplicationScoped
 public class InvalidationQueueService {
@@ -30,13 +32,13 @@ public class InvalidationQueueService {
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
 
+    @Inject
+    DeferredInvalidationQueueService deferredInvalidationQueueService;
+
     @ConfigProperty(name = "dhfs.objects.invalidation.threads")
     int threads;
 
-    private record QueueEntry(UUID host, String obj) {
-    }
-
-    private final HashSetDelayedBlockingQueue<QueueEntry> _queue;
+    private final HashSetDelayedBlockingQueue<Pair<UUID, String>> _queue;
     private ExecutorService _executor;
 
     public InvalidationQueueService(@ConfigProperty(name = "dhfs.objects.invalidation.delay") int delay) {
@@ -54,6 +56,9 @@ public class InvalidationQueueService {
 
     void shutdown(@Observes @Priority(10) ShutdownEvent event) throws InterruptedException {
         _executor.shutdownNow();
+        if (!_executor.awaitTermination(30, TimeUnit.SECONDS)) {
+            Log.error("Failed to shut down invalidation sender thread");
+        }
     }
 
     private void sender() {
@@ -65,21 +70,26 @@ public class InvalidationQueueService {
                     long success = 0;
 
                     for (var e : data) {
-                        if (!persistentRemoteHostsService.existsHost(e.host)) continue;
+                        if (!persistentRemoteHostsService.existsHost(e.getLeft())) continue;
+
+                        if (!remoteHostManager.isReachable(e.getLeft())) {
+                            deferredInvalidationQueueService.defer(e.getLeft(), e.getRight());
+                            continue;
+                        }
 
                         try {
-                            jObjectManager.get(e.obj).ifPresent(obj -> {
-                                remoteObjectServiceClient.notifyUpdate(obj, e.host);
+                            jObjectManager.get(e.getRight()).ifPresent(obj -> {
+                                remoteObjectServiceClient.notifyUpdate(obj, e.getLeft());
                             });
                             success++;
                         } catch (DeletedObjectAccessException ignored) {
                         } catch (Exception ex) {
-                            Log.info("Failed to send invalidation to " + e.host + ", will retry", ex);
-                            pushInvalidationToOne(e.host, e.obj);
+                            Log.info("Failed to send invalidation to " + e.getLeft() + ", will retry", ex);
+                            pushInvalidationToOne(e.getLeft(), e.getRight());
                         }
                         if (Thread.interrupted()) {
                             Log.info("Invalidation sender exiting");
-                            return;
+                            break;
                         }
                     }
 
@@ -94,16 +104,29 @@ public class InvalidationQueueService {
         } catch (InterruptedException ignored) {
         }
         Log.info("Invalidation sender exiting");
+        var data = _queue.close();
+        for (var e : data)
+            deferredInvalidationQueueService.defer(e.getLeft(), e.getRight());
+        Log.info("Invalidation sender exited");
     }
 
     public void pushInvalidationToAll(String name) {
-        var hosts = remoteHostManager.getSeenHosts();
-        for (var h : hosts) {
-            _queue.add(new QueueEntry(h, name));
-        }
+        var hosts = remoteHostManager.getAvailableHosts();
+        for (var h : hosts)
+            _queue.add(Pair.of(h, name));
+        var unavailable = remoteHostManager.getUnavailableHosts();
+        for (var u : unavailable)
+            deferredInvalidationQueueService.defer(u, name);
     }
 
     public void pushInvalidationToOne(UUID host, String name) {
-        _queue.add(new QueueEntry(host, name));
+        if (remoteHostManager.isReachable(host))
+            _queue.add(Pair.of(host, name));
+        else
+            deferredInvalidationQueueService.returnForHost(host);
+    }
+
+    protected void pushDeferredInvalidations(UUID host, String name) {
+        _queue.add(Pair.of(host, name));
     }
 }

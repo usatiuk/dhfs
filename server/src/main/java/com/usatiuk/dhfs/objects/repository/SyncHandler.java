@@ -34,6 +34,8 @@ public class SyncHandler {
     PersistentRemoteHostsService persistentRemoteHostsService;
 
     public void doInitialResync(UUID host) {
+        Log.info("Doing initial resync for " + host);
+
         remoteObjectServiceClient.getIndex(host);
         // Push our index to the other peer too, as they might not request it if
         // they didn't thing we were disconnected

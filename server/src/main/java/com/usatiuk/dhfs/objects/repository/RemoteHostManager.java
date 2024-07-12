@@ -17,13 +17,15 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.io.IOException;
 import java.security.cert.CertificateException;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.*;
 
 @ApplicationScoped
 public class RemoteHostManager {
     private final TransientPeersState _transientPeersState = new TransientPeersState();
     private final ConcurrentMap<UUID, TransientPeerState> _seenHostsButNotAdded = new ConcurrentHashMap<>();
+    // FIXME: Ideally not call them on every ping
+    private final ArrayList<ConnectionEventListener> _connectedListeners = new ArrayList<>();
+    private final ArrayList<ConnectionEventListener> _disconnectedListeners = new ArrayList<>();
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
     @Inject
@@ -34,9 +36,18 @@ public class RemoteHostManager {
     PeerSyncApiClientDynamic peerSyncApiClient;
     @ConfigProperty(name = "dhfs.objects.sync.ping.timeout")
     long pingTimeout;
+    private ExecutorService _heartbeatExecutor;
     boolean _initialized = false;
 
+    // Note: keep priority updated with below
     void init(@Observes @Priority(350) StartupEvent event) throws IOException {
+        _heartbeatExecutor = Executors.newVirtualThreadPerTaskExecutor();
+
+        // Note: newly added hosts aren't in _transientPeersState
+        // but that's ok as they don't have initialSyncDone set
+        for (var h : persistentRemoteHostsService.getHostsUuid())
+            _transientPeersState.runWriteLocked(d -> d.get(h));
+
         _initialized = true;
     }
 
@@ -47,54 +58,84 @@ public class RemoteHostManager {
     @Blocking
     public void tryConnectAll() {
         if (!_initialized) return;
-        for (var host : persistentRemoteHostsService.getHosts()) {
-            try {
-                var shouldTry = _transientPeersState.runReadLocked(d -> {
-                    var s = d.getStates().get(host.getUuid());
-                    if (s == null) return true;
-                    return !s.getState().equals(TransientPeerState.ConnectionState.REACHABLE) && s.getAddr() != null;
-                });
-                if (shouldTry) {
-                    Log.info("Trying to connect to " + host.getUuid());
-                    if (pingCheck(host.getUuid())) {
-                        handleConnectionSuccess(host.getUuid());
-                    }
-                }
-            } catch (Exception e) {
-                Log.error("Failed to connect to " + host.getUuid(), e);
-                continue;
-            }
+        try {
+            _heartbeatExecutor.invokeAll(persistentRemoteHostsService.getHostsUuid().stream()
+                    .<Callable<Void>>map(host -> () -> {
+                        try {
+                            Log.debug("Trying to connect to " + host);
+                            if (pingCheck(host))
+                                handleConnectionSuccess(host);
+                            else
+                                handleConnectionError(host);
+                        } catch (Exception e) {
+                            Log.error("Failed to connect to " + host, e);
+                        }
+                        return null;
+                    }).toList(), 30, TimeUnit.SECONDS); //FIXME:
+        } catch (InterruptedException iex) {
+            Log.error("Heartbeat was interrupted");
+        }
+    }
+
+    @FunctionalInterface
+    public interface ConnectionEventListener {
+        void apply(UUID host);
+    }
+
+    // Note: registrations should be completed with Priority < 350
+    public void registerConnectEventListener(ConnectionEventListener listener) {
+        synchronized (_connectedListeners) {
+            _connectedListeners.add(listener);
+        }
+    }
+
+    // Note: registrations should be completed with Priority < 350
+    public void registerDisconnectEventListener(ConnectionEventListener listener) {
+        synchronized (_disconnectedListeners) {
+            _disconnectedListeners.add(listener);
         }
     }
 
     public void handleConnectionSuccess(UUID host) {
-        if (_transientPeersState.runReadLocked(d -> d.getStates().getOrDefault(
-                host, new TransientPeerState(TransientPeerState.ConnectionState.NOT_SEEN)
-        )).getState().equals(TransientPeerState.ConnectionState.REACHABLE)) return;
+        boolean wasReachable = isReachable(host);
+
         _transientPeersState.runWriteLocked(d -> {
-            d.getStates().putIfAbsent(host, new TransientPeerState());
-            var curState = d.getStates().get(host);
-            curState.setState(TransientPeerState.ConnectionState.REACHABLE);
+            d.get(host).setReachable(true);
             return null;
         });
+
+        for (var l : _connectedListeners) {
+            l.apply(host);
+        }
+
+        if (wasReachable) return;
+
         Log.info("Connected to " + host);
-        syncHandler.doInitialResync(host);
+
+        if (persistentRemoteHostsService.markInitialSyncDone(host))
+            syncHandler.doInitialResync(host);
     }
 
     public void handleConnectionError(UUID host) {
-        Log.info("Lost connection to " + host);
+        boolean wasReachable = isReachable(host);
+
+        if (wasReachable)
+            Log.info("Lost connection to " + host);
+
         _transientPeersState.runWriteLocked(d -> {
-            d.getStates().putIfAbsent(host, new TransientPeerState());
-            var curState = d.getStates().get(host);
-            curState.setState(TransientPeerState.ConnectionState.UNREACHABLE);
+            d.get(host).setReachable(false);
             return null;
         });
+
+        for (var l : _disconnectedListeners) {
+            l.apply(host);
+        }
     }
 
     // FIXME:
     private boolean pingCheck(UUID host) {
-        TransientPeerState state = _transientPeersState.runReadLocked(s -> s.getStates().get(host));
-        if (state == null) return false;
+        TransientPeerState state = _transientPeersState.runReadLocked(s -> s.getCopy(host));
+
         try {
             return rpcClientFactory.withObjSyncClient(host.toString(), state.getAddr(), state.getSecurePort(), pingTimeout, c -> {
                 var ret = c.ping(PingRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).build());
@@ -110,28 +151,22 @@ public class RemoteHostManager {
     }
 
     public boolean isReachable(UUID host) {
-        return _transientPeersState.runReadLocked(d -> {
-            var res = d.getStates().get(host);
-            return res.getState() == TransientPeerState.ConnectionState.REACHABLE;
-        });
+        return _transientPeersState.runReadLocked(d -> d.get(host).isReachable());
     }
 
     public TransientPeerState getTransientState(UUID host) {
-        return _transientPeersState.runReadLocked(d -> {
-            d.getStates().putIfAbsent(host, new TransientPeerState());
-            return d.getStates().get(host);
-        });
+        return _transientPeersState.runReadLocked(d -> d.getCopy(host));
     }
 
     public List<UUID> getAvailableHosts() {
         return _transientPeersState.runReadLocked(d -> d.getStates().entrySet().stream()
-                .filter(e -> e.getValue().getState().equals(TransientPeerState.ConnectionState.REACHABLE))
+                .filter(e -> e.getValue().isReachable())
                 .map(Map.Entry::getKey).toList());
     }
 
-    public List<UUID> getSeenHosts() {
+    public List<UUID> getUnavailableHosts() {
         return _transientPeersState.runReadLocked(d -> d.getStates().entrySet().stream()
-                .filter(e -> !e.getValue().getState().equals(TransientPeerState.ConnectionState.NOT_SEEN))
+                .filter(e -> !e.getValue().isReachable())
                 .map(Map.Entry::getKey).toList());
     }
 
@@ -154,10 +189,9 @@ public class RemoteHostManager {
 
         _transientPeersState.runWriteLocked(d -> {
 //            Log.trace("Updating connection info for " + host + ": addr=" + addr + " port=" + port);
-            d.getStates().putIfAbsent(host, new TransientPeerState()); // FIXME:? set reachable here?
-            d.getStates().get(host).setAddr(addr);
-            d.getStates().get(host).setPort(port);
-            d.getStates().get(host).setSecurePort(securePort);
+            d.get(host).setAddr(addr);
+            d.get(host).setPort(port);
+            d.get(host).setSecurePort(securePort);
             return null;
         });
     }

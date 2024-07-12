@@ -36,38 +36,27 @@ public class RpcClientFactory {
         var shuffledList = new ArrayList<>(targets);
         Collections.shuffle(shuffledList);
         for (UUID target : shuffledList) {
-            var hostinfo = remoteHostManager.getTransientState(target);
-
-            boolean reachable = remoteHostManager.isReachable(target);
-            var addr = hostinfo.getAddr();
-            boolean shouldTry = reachable && addr != null;
-
-            if (!shouldTry) {
-                Log.trace("Not trying " + target + ": " + "addr=" + addr + " reachable=" + reachable);
-                continue;
-            }
-
             try {
-                return withObjSyncClient(target.toString(), hostinfo.getAddr(), hostinfo.getSecurePort(), syncTimeout, fn);
+                return withObjSyncClient(target, fn);
             } catch (StatusRuntimeException e) {
-                if (e.getStatus().getCode().equals(Status.UNAVAILABLE.getCode())) {
-                    Log.info("Host " + target + " is unreachable: " + e.getMessage());
-                    remoteHostManager.handleConnectionError(target);
-                } else {
-                    Log.error("When calling " + target, e);
-                    continue;
-                }
+                if (e.getStatus().getCode().equals(Status.UNAVAILABLE.getCode()))
+                    Log.trace("Host " + target + " is unreachable: " + e.getMessage());
+                else
+                    Log.warn("When calling " + target + " " + e.getMessage());
             } catch (Exception e) {
-                Log.error("When calling " + target, e);
-                continue;
+                Log.warn("When calling " + target + " " + e.getMessage());
             }
         }
-        throw new IllegalStateException("No reachable targets!");
+        throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("No reachable targets!"));
     }
 
     public <R> R withObjSyncClient(UUID target, ObjectSyncClientFunction<R> fn) {
         var hostinfo = remoteHostManager.getTransientState(target);
-        if (hostinfo.getAddr() == null) throw new IllegalStateException("Address for " + target + " not yet known");
+        boolean reachable = remoteHostManager.isReachable(target);
+
+        if (hostinfo.getAddr() == null || !reachable)
+            throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Address for " + target + " not yet known"));
+
         return withObjSyncClient(target.toString(), hostinfo.getAddr(), hostinfo.getSecurePort(), syncTimeout, fn);
     }
 

@@ -7,6 +7,7 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
+import java.util.HashSet;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -24,4 +25,7 @@ public class PersistentRemoteHostsData implements Serializable {
     @Getter
     @Setter
     private KeyPair _selfKeyPair = null;
+
+    @Getter
+    private final HashSet<UUID> _initialSyncDone = new HashSet<>();
 }

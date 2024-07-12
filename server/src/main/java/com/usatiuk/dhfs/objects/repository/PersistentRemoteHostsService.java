@@ -201,6 +201,7 @@ public class PersistentRemoteHostsService {
         boolean removed = getPeerDirectory().runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
             boolean removedInner = d.getPeers().remove(host);
             if (removedInner) {
+                _persistentData.runWriteLocked(pd -> pd.getInitialSyncDone().remove(host));
                 getPeer(host).runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mp, dp, bp, vp) -> {
                     mp.removeRef(m.getName());
                     return null;
@@ -238,6 +239,11 @@ public class PersistentRemoteHostsService {
 
     public X509Certificate getSelfCertificate() {
         return _persistentData.runReadLocked(PersistentRemoteHostsData::getSelfCertificate);
+    }
+
+    // Returns true if host's initial sync wasn't done before, and marks it as done
+    public boolean markInitialSyncDone(UUID connectedHost) {
+        return _persistentData.runWriteLocked(d -> d.getInitialSyncDone().add(connectedHost));
     }
 
 }

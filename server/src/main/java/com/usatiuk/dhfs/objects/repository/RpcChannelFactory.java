@@ -4,7 +4,6 @@ import com.usatiuk.dhfs.objects.repository.peertrust.PeerTrustManager;
 import io.grpc.ChannelCredentials;
 import io.grpc.ManagedChannel;
 import io.grpc.TlsChannelCredentials;
-import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.quarkus.runtime.ShutdownEvent;
 import jakarta.annotation.Priority;
@@ -27,11 +26,9 @@ public class RpcChannelFactory {
     @Inject
     PeerTrustManager peerTrustManager;
     private ConcurrentMap<SecureChannelKey, ManagedChannel> _secureChannelCache = new ConcurrentHashMap<>();
-    private ConcurrentMap<InsecureChannelKey, ManagedChannel> _insecureChannelCache = new ConcurrentHashMap<>();
 
     void shutdown(@Observes @Priority(100000) ShutdownEvent event) {
         for (var c : _secureChannelCache.values()) c.shutdownNow();
-        for (var i : _insecureChannelCache.values()) i.shutdownNow();
     }
 
     private ChannelCredentials getChannelCredentials() {
@@ -58,20 +55,10 @@ public class RpcChannelFactory {
         });
     }
 
-    ManagedChannel getInsecureChannel(String address, int port) {
-        var key = new InsecureChannelKey(address, port);
-        return _insecureChannelCache.computeIfAbsent(key, (k) -> {
-            return NettyChannelBuilder.forAddress(address, port).negotiationType(NegotiationType.PLAINTEXT).idleTimeout(10, TimeUnit.SECONDS).usePlaintext().build();
-        });
-    }
-
     public void dropCache() {
         var oldS = _secureChannelCache;
-        var oldI = _insecureChannelCache;
         _secureChannelCache = new ConcurrentHashMap<>();
-        _insecureChannelCache = new ConcurrentHashMap<>();
         oldS.values().forEach(ManagedChannel::shutdown);
-        oldI.values().forEach(ManagedChannel::shutdown);
     }
 
     private record SecureChannelKey(String host, String address, int port) {
