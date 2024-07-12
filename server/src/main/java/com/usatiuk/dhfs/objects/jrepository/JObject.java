@@ -93,6 +93,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
 
     public void markSeen() {
         _metaPart.markSeen();
+        _resolver.notifyWriteMeta(this);
     }
 
     private void hydrateRefs() {
