@@ -46,7 +46,7 @@ public class DhfsFusex3IT {
                 .withDockerfileFromBuilder(builder ->
                         builder
                                 .from("azul/zulu-openjdk-debian:21-jre-latest")
-                                .run("apt update && apt install -y libfuse2 curl")
+                                .run("apt update && apt install -y libfuse2 curl gcc")
                                 .copy("/app", "/app")
                                 .cmd("java", "-ea", "-Xmx128M", "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
                                         "-Ddhfs.objects.peerdiscovery.interval=500",
@@ -139,6 +139,25 @@ public class DhfsFusex3IT {
         Thread.sleep(1000);
         Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
         Assertions.assertEquals("tesempty\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+    }
+
+    @Test
+    void gccHelloWorldTest() throws IOException, InterruptedException, TimeoutException {
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo '#include<stdio.h>\nint main(){printf(\"hello world\"); return 0;}' > /root/dhfs_data/dhfs_fuse_root/hello.c").getExitCode());
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "cd /root/dhfs_data/dhfs_fuse_root && gcc hello.c").getExitCode());
+        var helloOut1 = container1.execInContainer("/bin/sh", "-c", "/root/dhfs_data/dhfs_fuse_root/a.out");
+        Log.info(helloOut1);
+        Assertions.assertEquals(0, helloOut1.getExitCode());
+        Assertions.assertEquals("hello world", helloOut1.getStdout());
+        Thread.sleep(1000);
+        var helloOut2 = container2.execInContainer("/bin/sh", "-c", "/root/dhfs_data/dhfs_fuse_root/a.out");
+        Log.info(helloOut2);
+        Assertions.assertEquals(0, helloOut2.getExitCode());
+        Assertions.assertEquals("hello world", helloOut2.getStdout());
+        var helloOut3 = container3.execInContainer("/bin/sh", "-c", "/root/dhfs_data/dhfs_fuse_root/a.out");
+        Log.info(helloOut3);
+        Assertions.assertEquals(0, helloOut3.getExitCode());
+        Assertions.assertEquals("hello world", helloOut3.getStdout());
     }
 
     @Test
