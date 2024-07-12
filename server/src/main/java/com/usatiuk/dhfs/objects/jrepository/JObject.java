@@ -92,8 +92,12 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     }
 
     public void markSeen() {
-        _metaPart.markSeen();
-        _resolver.notifyWriteMeta(this);
+        if (!_metaPart.isSeen()) {
+            runWriteLocked(ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
+                m.markSeen();
+                return null;
+            });
+        }
     }
 
     private void hydrateRefs() {

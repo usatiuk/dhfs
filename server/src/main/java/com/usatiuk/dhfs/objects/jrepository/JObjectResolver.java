@@ -178,7 +178,7 @@ public class JObjectResolver {
     }
 
     public <T extends JObjectData> void notifyWriteMeta(JObject<T> self) {
-//        self.assertRWLock();
+        self.assertRWLock();
         jObjectWriteback.markDirty(self);
         for (var t : _metaWriteListeners.keySet()) { // FIXME:?
             if (t.isAssignableFrom(self.getKnownClass()))
