@@ -62,7 +62,10 @@ public class RemoteHostManager {
             _heartbeatExecutor.invokeAll(persistentRemoteHostsService.getHostsUuid().stream()
                     .<Callable<Void>>map(host -> () -> {
                         try {
-                            Log.debug("Trying to connect to " + host);
+                            if(isReachable(host))
+                                Log.trace("Heartbeat: " + host);
+                            else
+                                Log.info("Trying to connect to " + host);
                             if (pingCheck(host))
                                 handleConnectionSuccess(host);
                             else
