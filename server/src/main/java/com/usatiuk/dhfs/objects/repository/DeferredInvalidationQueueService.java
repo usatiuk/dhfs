@@ -24,7 +24,7 @@ public class DeferredInvalidationQueueService {
     InvalidationQueueService invalidationQueueService;
     @ConfigProperty(name = "dhfs.objects.root")
     String dataRoot;
-    private static final String dataFileName = "hosts";
+    private static final String dataFileName = "invqueue";
 
     // FIXME: DB when?
     private DeferredInvalidationQueueData _persistentData = new DeferredInvalidationQueueData();
