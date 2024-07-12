@@ -78,6 +78,7 @@ public class ObjectMetadata implements Serializable {
     }
 
     public void markSeen() {
+        Log.trace("Marking seen: " + getName());
         _seen.set(true);
     }
 

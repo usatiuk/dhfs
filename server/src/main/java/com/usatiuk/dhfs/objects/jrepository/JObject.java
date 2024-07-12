@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
+import io.quarkus.logging.Log;
 import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.NotImplementedException;
 
@@ -22,12 +23,14 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         _metaPart = new ObjectMetadata(name, false, obj.getClass());
         _dataPart.set(obj);
         _metaPart.bumpVersion(selfUuid);
+        Log.trace("new JObject: " + getName());
     }
 
     // Create an object from existing metadata
     protected JObject(JObjectResolver resolver, ObjectMetadata objectMetadata) {
         _resolver = resolver;
         _metaPart = objectMetadata;
+        Log.trace("new JObject (ext): " + getName());
     }
 
     static public void rwLockAll(List<JObject<?>> objects) {
