@@ -768,19 +768,21 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Override
     public Long size(String uuid) {
-
         var read = jObjectManager.get(uuid)
                 .orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
         try {
             return read.runReadLocked(JObject.ResolutionStrategy.REMOTE, (fsNodeData, fileData) -> {
-                long size = 0;
                 if (!(fileData instanceof File fd))
                     throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-                for (var chunk : fd.getChunks().entrySet()) {
-                    size += getChunkSize(chunk.getValue());
-                }
-                return size;
+
+                var last = fd.getChunks().lastEntry();
+
+                if (last == null)
+                    return 0L;
+
+                var lastSize = getChunkSize(last.getValue());
+                return last.getKey() + lastSize;
             });
         } catch (Exception e) {
             Log.error("Error reading file: " + uuid, e);
