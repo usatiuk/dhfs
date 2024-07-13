@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.objects.repository.autosync;
 import com.usatiuk.dhfs.objects.jrepository.*;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerDirectory;
 import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
+import com.usatiuk.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.Startup;
@@ -12,14 +13,13 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.util.LinkedHashSet;
-import java.util.SequencedSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @ApplicationScoped
 public class AutoSyncProcessor {
-    private final SequencedSet<String> _pending = new LinkedHashSet<>();
+    private final HashSetDelayedBlockingQueue<String> _pending = new HashSetDelayedBlockingQueue<>(0);
+    private final HashSetDelayedBlockingQueue<String> _retries = new HashSetDelayedBlockingQueue<>(1000); //FIXME:
     @Inject
     JObjectResolver jObjectResolver;
     @Inject
@@ -57,6 +57,7 @@ public class AutoSyncProcessor {
 
     private void alwaysSaveCallback(JObject<?> obj) {
         obj.assertRWLock();
+        if (obj.getMeta().isDeleted()) return;
         if (obj.getData() != null) return;
         if (obj.hasLocalCopy()) return;
 
@@ -68,43 +69,38 @@ public class AutoSyncProcessor {
     }
 
     public void add(String name) {
-        synchronized (_pending) {
-            _pending.add(name);
-            _pending.notify(); // FIXME: Delay?
-        }
-
+        _pending.add(name);
     }
 
     private void autosync() {
         try {
             while (!Thread.interrupted()) {
-                String name;
-                synchronized (_pending) {
-                    while (_pending.isEmpty())
-                        _pending.wait();
+                String name = null;
 
-                    name = _pending.removeFirst();
+                while (name == null) {
+                    name = _retries.tryGet();
+                    if (name == null)
+                        name = _pending.get(1000L); //FIXME:
                 }
 
                 try {
                     jObjectManager.get(name).ifPresent(obj -> {
                         // FIXME: does this double lock make sense?
-                        if (obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> obj.hasLocalCopy() || m.isDeleted()))
+                        if (obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> d != null || m.isDeleted() || obj.hasLocalCopy()))
                             return;
                         boolean ok = obj.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, i, v) -> {
                             if (obj.hasLocalCopy()) return true;
                             return obj.tryResolve(JObject.ResolutionStrategy.REMOTE);
                         });
                         if (!ok) {
-                            Log.warn("Failed downloading object " + name + ", will retry.");
-                            add(name);
+                            Log.warn("Failed downloading object " + obj.getName() + ", will retry.");
+                            _retries.add(obj.getName());
                         }
                     });
                 } catch (DeletedObjectAccessException ignored) {
                 } catch (Exception e) {
                     Log.error("Failed downloading object " + name + ", will retry.", e);
-                    add(name);
-                    // Delay?
+                    _retries.add(name);
                 }
             }
         } catch (InterruptedException ignored) {
