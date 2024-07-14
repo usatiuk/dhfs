@@ -51,11 +51,10 @@ public class DhfsFusex3IT {
                                 .cmd("java", "-ea", "-Xmx128M", "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
                                         "-Ddhfs.objects.peerdiscovery.interval=500",
                                         "-Ddhfs.objects.invalidation.delay=200",
-                                        "-Djava.util.concurrent.ForkJoinPool.common.parallelism=4",
+                                        "-Ddhfs.objects.deletion.delay=0",
                                         "-Ddhfs.objects.ref_verification=true",
                                         "-Ddhfs.objects.sync.timeout=5",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
-                                        "-Dquarkus.log.category.\"com.usatiuk.dhfs\".min-level=TRACE",
                                         "-jar", "/app/quarkus-run.jar")
                                 .build())
                 .withFileFromPath("/app", Paths.get(buildPath, "quarkus-app"));

@@ -48,6 +48,7 @@ public class DhfsFuseIT {
                                         "-Ddhfs.objects.peerdiscovery.interval=500",
                                         "-Ddhfs.objects.invalidation.delay=200",
                                         "-Ddhfs.objects.ref_verification=true",
+                                        "-Ddhfs.objects.deletion.delay=0",
                                         "-Ddhfs.objects.sync.timeout=5",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".min-level=TRACE",
