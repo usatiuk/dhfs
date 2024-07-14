@@ -50,8 +50,8 @@ public class DhfsFuseIT {
                                         "-Ddhfs.objects.ref_verification=true",
                                         "-Ddhfs.objects.deletion.delay=0",
                                         "-Ddhfs.objects.sync.timeout=5",
+                                        "-Ddhfs.objects.reconnect_interval=1s",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
-                                        "-Dquarkus.log.category.\"com.usatiuk.dhfs\".min-level=TRACE",
                                         "-jar", "/app/quarkus-run.jar")
                                 .build())
                 .withFileFromPath("/app", Paths.get(buildPath, "quarkus-app"));

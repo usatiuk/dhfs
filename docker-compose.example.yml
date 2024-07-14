@@ -2,23 +2,23 @@ version: "3.2"
 
 services:
   dhfs1:
-    image: ghcr.io/usatiuk/dhfs:main
-    #  build: .
+    # image: ghcr.io/usatiuk/dhfs:main
+    build: .
     privileged: true
     devices:
       - /dev/fuse
-    command: "./dockerentry.sh -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5010"
+    command: "./dockerentry.sh -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5010 -Ddhfs.objects.autosync.download-all=true"
     ports:
       - 8080:8080
       - 8081:8443
       - 5005:5005
   dhfs2:
-    image: ghcr.io/usatiuk/dhfs:main
-    # build: .
+    # image: ghcr.io/usatiuk/dhfs:main
+    build: .
     privileged: true
     devices:
       - /dev/fuse
-    command: "./dockerentry.sh -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5010"
+    command: "./dockerentry.sh -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5010 -Ddhfs.objects.autosync.download-all=true"
     ports:
       - 8090:8080
       - 8091:8443
