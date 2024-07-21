@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
 import com.usatiuk.dhfs.SerializationHelper;
+import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.repository.ObjectChangelog;
 import com.usatiuk.dhfs.objects.repository.ObjectChangelogEntry;
 import com.usatiuk.dhfs.objects.repository.ObjectHeader;
@@ -82,7 +83,7 @@ public class ObjectMetadata implements Serializable {
         _seen.set(true);
     }
 
-    public void delete() {
+    public void markDeleted() {
         _deleted.set(true);
     }
 
@@ -139,6 +140,10 @@ public class ObjectMetadata implements Serializable {
         return _referrers.stream().toList();
     }
 
+    protected Collection<String> getReferrersMutable() {
+        return _referrers;
+    }
+
     public boolean isDeletionCandidate() {
         return !isLocked() && !isReferred();
     }
@@ -176,12 +181,12 @@ public class ObjectMetadata implements Serializable {
         return headerBuilder.build();
     }
 
-    public ObjectHeader toRpcHeader(JObjectData data) {
+    public ObjectHeader toRpcHeader(JObjectDataP data) {
         var headerBuilder = ObjectHeader.newBuilder().setName(getName());
         headerBuilder.setChangelog(toRpcChangelog());
 
         if (data != null && data.getClass().isAnnotationPresent(PushResolution.class))
-            headerBuilder.setPushedData(SerializationHelper.serialize(data));
+            headerBuilder.setPushedData(data);
 
         return headerBuilder.build();
     }

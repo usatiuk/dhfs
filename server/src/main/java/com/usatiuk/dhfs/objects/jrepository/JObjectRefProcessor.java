@@ -164,7 +164,7 @@ public class JObjectRefProcessor {
                         got.get().tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
 
                         Log.trace("Deleting " + m.getName());
-                        m.delete();
+                        m.markDeleted();
 
                         Stream<String> refs = Stream.empty();
 

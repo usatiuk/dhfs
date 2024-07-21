@@ -1,10 +1,11 @@
 package com.usatiuk.dhfs.objects.repository;
 
 import com.google.common.collect.Maps;
-import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.jrepository.PushResolution;
+import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
+import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -33,15 +34,17 @@ public class RemoteObjectServiceClient {
     SyncHandler syncHandler;
     @Inject
     InvalidationQueueService invalidationQueueService;
+    @Inject
+    ProtoSerializerService protoSerializerService;
 
-    public Pair<ObjectHeader, ByteString> getSpecificObject(UUID host, String name) {
+    public Pair<ObjectHeader, JObjectDataP> getSpecificObject(UUID host, String name) {
         return rpcClientFactory.withObjSyncClient(host, client -> {
             var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).setName(name).build());
             return Pair.of(reply.getObject().getHeader(), reply.getObject().getContent());
         });
     }
 
-    public ByteString getObject(JObject<?> jObject) {
+    public JObjectDataP getObject(JObject<?> jObject) {
         jObject.assertRWLock();
 
         var targets = jObject.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (md, d) -> {
@@ -109,7 +112,10 @@ public class RemoteObjectServiceClient {
                         (m, d) -> {
                             if (m.getKnownClass().isAnnotationPresent(PushResolution.class) && d == null)
                                 Log.warn("Object " + m.getName() + " is marked as PushResolution but no resolution found");
-                            return m.toRpcHeader(d);
+                            if (m.getKnownClass().isAnnotationPresent(PushResolution.class))
+                                return m.toRpcHeader(protoSerializerService.serializeToJObjectDataP(d));
+                            else
+                                return m.toRpcHeader(null);
                         });
         obj.markSeen();
         builder.setHeader(header);

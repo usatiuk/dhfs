@@ -1,10 +1,10 @@
 package com.usatiuk.dhfs.objects.repository;
 
-import com.google.protobuf.ByteString;
-import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
+import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.autosync.AutoSyncProcessor;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -40,6 +40,9 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Inject
     InvalidationQueueService invalidationQueueService;
 
+    @Inject
+    ProtoSerializerService protoSerializerService;
+
     @Override
     @Blocking
     public Uni<GetObjectReply> getObject(GetObjectRequest request) {
@@ -51,13 +54,13 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
         var obj = jObjectManager.get(request.getName()).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
-        Pair<ObjectHeader, ByteString> read = obj.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (meta, data) -> {
+        Pair<ObjectHeader, JObjectDataP> read = obj.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (meta, data) -> {
             if (data == null) {
                 Log.info("<-- getObject FAIL: " + request.getName() + " from " + request.getSelfUuid());
                 throw new StatusRuntimeException(Status.ABORTED.withDescription("Not available locally"));
             }
             data.extractRefs().forEach(ref -> jObjectManager.get(ref).ifPresent(JObject::markSeen));
-            return Pair.of(meta.toRpcHeader(), SerializationHelper.serialize(data));
+            return Pair.of(meta.toRpcHeader(), protoSerializerService.serializeToJObjectDataP(data));
         });
         obj.markSeen();
         var replyObj = ApiObject.newBuilder().setHeader(read.getLeft()).setContent(read.getRight()).build();

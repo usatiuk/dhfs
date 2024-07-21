@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.usatiuk.dhfs.objects.persistence";
+option java_outer_classname = "DhfsObjectPersistence";
+
+package dhfs.objects.persistence;
+
+message ObjectMetadataP {
+  string name = 1;
+  map<string, int64> remoteCopies = 2;
+  string knownClass = 3;
+  bool seen = 4;
+  bool deleted = 5;
+  repeated string confirmedDeletes = 6;
+  repeated string referrers = 7;
+  map<string, int64> changelog = 8;
+  repeated string savedRefs = 9;
+  bool locked = 10;
+}
+
+message FsNodeP {
+  string uuid = 1;
+  int64 mode = 2;
+  int64 ctime = 3;
+  int64 mtime = 4;
+}
+
+message FileP {
+  FsNodeP fsNode = 1;
+  map<int64, string> chunks = 2;
+  string parent = 3;
+  bool symlink = 4;
+}
+
+message DirectoryP {
+  FsNodeP fsNode = 1;
+  map<string, string> children = 2;
+}
+
+message ChunkInfoP {
+  string name = 1;
+  int32 size = 2;
+}
+
+message ChunkDataP {
+  string name = 1;
+  bytes data = 2;
+}
+
+message PeerDirectoryP {
+  repeated string peers = 1;
+}
+
+message PersistentPeerInfoP {
+  string uuid = 1;
+  bytes cert = 2;
+}
+
+message JObjectDataP {
+  oneof obj {
+    FileP file = 2;
+    DirectoryP directory = 3;
+    ChunkInfoP chunkInfo = 4;
+    ChunkDataP chunkData = 5;
+    PeerDirectoryP peerDirectory = 6;
+    PersistentPeerInfoP persistentPeerInfo = 7;
+  }
+}
+
+message BlobP {
+  oneof dtype {
+    ObjectMetadataP metadata = 1;
+    JObjectDataP data = 2;
+  }
+}

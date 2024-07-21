@@ -27,10 +27,6 @@ public abstract class SerializationHelper {
         return deserialize(new ByteArrayInputStream(objectData));
     }
 
-    public static <T> T deserialize(final ByteString objectData) {
-        return deserialize(objectData.newInput());
-    }
-
     public static <T extends Serializable> ByteString serialize(final T obj) {
         return UnsafeByteOperations.unsafeWrap(SerializationUtils.serialize(obj));
     }

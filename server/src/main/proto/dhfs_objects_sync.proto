@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "dhfs_objects_serial.proto";
+
 option java_multiple_files = true;
 option java_package = "com.usatiuk.dhfs.objects.repository";
 option java_outer_classname = "DhfsObjectSyncApi";
@@ -35,12 +37,12 @@ message ObjectChangelog {
 message ObjectHeader {
   string name = 2;
   ObjectChangelog changelog = 5;
-  optional bytes pushedData = 6;
+  optional dhfs.objects.persistence.JObjectDataP pushedData = 6;
 }
 
 message ApiObject {
   ObjectHeader header = 1;
-  bytes content = 2;
+  dhfs.objects.persistence.JObjectDataP content = 2;
 }
 
 message GetObjectRequest {

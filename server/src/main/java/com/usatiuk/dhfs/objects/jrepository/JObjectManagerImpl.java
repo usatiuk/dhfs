@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
-import com.google.protobuf.ByteString;
-import com.usatiuk.dhfs.SerializationHelper;
+import com.usatiuk.dhfs.objects.persistence.BlobP;
+import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
@@ -30,6 +30,8 @@ public class JObjectManagerImpl implements JObjectManager {
     JObjectResolver jObjectResolver;
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
+    @Inject
+    ProtoSerializerService protoSerializerService;
     private Thread _refCleanupThread;
 
     @Startup
@@ -78,7 +80,7 @@ public class JObjectManagerImpl implements JObjectManager {
             if (inMap != null) return Optional.of(inMap);
         }
 
-        ByteString readMd;
+        BlobP readMd;
         try {
             readMd = objectPersistentStore.readObject("meta_" + name);
         } catch (StatusRuntimeException ex) {
@@ -86,7 +88,7 @@ public class JObjectManagerImpl implements JObjectManager {
                 return Optional.empty();
             throw ex;
         }
-        var meta = SerializationHelper.deserialize(readMd);
+        var meta = protoSerializerService.deserialize(readMd);
         if (!(meta instanceof ObjectMetadata))
             throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Unexpected metadata type for " + name));
 

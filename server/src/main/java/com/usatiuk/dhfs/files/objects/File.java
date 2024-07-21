@@ -23,6 +23,8 @@ public class File extends FsNode {
 
     public File(UUID uuid, long mode, UUID parent, boolean symlink) {
         super(uuid, mode);
+        if (parent == null)
+            throw new IllegalArgumentException("Parent UUID cannot be null");
         _parent = parent;
         _symlink = symlink;
     }

@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
-import com.usatiuk.dhfs.SerializationHelper;
+import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
 import com.usatiuk.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
@@ -49,6 +49,8 @@ public class JObjectWriteback {
     ObjectPersistentStore objectPersistentStore;
     @Inject
     JObjectSizeEstimator jObjectSizeEstimator;
+    @Inject
+    ProtoSerializerService protoSerializerService;
     @ConfigProperty(name = "dhfs.objects.writeback.limit")
     long sizeLimit;
     @ConfigProperty(name = "dhfs.objects.writeback.watermark-high")
@@ -164,9 +166,9 @@ public class JObjectWriteback {
             objectPersistentStore.deleteObject(m.getName());
             return;
         }
-        objectPersistentStore.writeObject("meta_" + m.getName(), SerializationHelper.serialize(m));
+        objectPersistentStore.writeObject("meta_" + m.getName(), protoSerializerService.serializeToBlobP(m));
         if (data != null)
-            objectPersistentStore.writeObject(m.getName(), SerializationHelper.serialize(data));
+            objectPersistentStore.writeObject(m.getName(), protoSerializerService.serializeToBlobP(data));
     }
 
     public void remove(JObject<?> object) {

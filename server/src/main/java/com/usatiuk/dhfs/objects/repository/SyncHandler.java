@@ -4,6 +4,7 @@ import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -32,6 +33,8 @@ public class SyncHandler {
     Instance<ConflictResolver> conflictResolvers;
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
+    @Inject
+    ProtoSerializerService protoSerializerService;
 
     public void doInitialResync(UUID host) {
         Log.info("Doing initial resync for " + host);
@@ -104,12 +107,12 @@ public class SyncHandler {
                 md.getChangelog().putAll(receivedMap);
                 md.getChangelog().putIfAbsent(persistentRemoteHostsService.getSelfUuid(), 0L);
                 if (header.hasPushedData())
-                    found.externalResolution(SerializationHelper.deserialize(header.getPushedData()));
+                    found.externalResolution(protoSerializerService.deserialize(header.getPushedData()));
                 return false;
             } else if (data == null && header.hasPushedData()) {
                 found.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
                 if (found.getData() == null)
-                    found.externalResolution(SerializationHelper.deserialize(header.getPushedData()));
+                    found.externalResolution(protoSerializerService.deserialize(header.getPushedData()));
             }
 
             assert Objects.equals(receivedTotalVer, md.getOurVersion());
@@ -127,10 +130,10 @@ public class SyncHandler {
             ObjectHeader theirsHeader;
             if (header.hasPushedData()) {
                 theirsHeader = header;
-                theirsData = SerializationHelper.deserialize(header.getPushedData());
+                theirsData = protoSerializerService.deserialize(header.getPushedData());
             } else {
                 var got = remoteObjectServiceClient.getSpecificObject(from, header.getName());
-                theirsData = SerializationHelper.deserialize(got.getRight());
+                theirsData = protoSerializerService.deserialize(got.getRight());
                 theirsHeader = got.getLeft();
             }
 

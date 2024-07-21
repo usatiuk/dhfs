@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects.jrepository;
 
 import com.google.common.collect.Streams;
 import com.usatiuk.dhfs.SerializationHelper;
+import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
@@ -39,6 +40,8 @@ public class JObjectResolver {
     JObjectManager jObjectManager;
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
+    @Inject
+    ProtoSerializerService protoSerializerService;
     @Inject
     JObjectRefProcessor jObjectRefProcessor;
     @ConfigProperty(name = "dhfs.objects.ref_verification")
@@ -129,7 +132,7 @@ public class JObjectResolver {
         self.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
 
         Log.trace("Quick delete of: " + self.getName());
-        self.getMeta().delete();
+        self.getMeta().markDeleted();
 
         Stream<String> refs = Stream.empty();
 
@@ -152,7 +155,7 @@ public class JObjectResolver {
         // jObject.assertRWLock();
         // FIXME: No way to assert read lock?
         if (objectPersistentStore.existsObject(jObject.getName()))
-            return Optional.of(SerializationHelper.deserialize(objectPersistentStore.readObject(jObject.getName())));
+            return Optional.of(protoSerializerService.deserialize(objectPersistentStore.readObject(jObject.getName())));
         return Optional.empty();
     }
 
@@ -160,7 +163,7 @@ public class JObjectResolver {
         var obj = remoteObjectServiceClient.getObject(jObject);
         jObjectWriteback.markDirty(jObject);
         invalidationQueueService.pushInvalidationToAll(jObject.getName());
-        return SerializationHelper.deserialize(obj);
+        return protoSerializerService.deserialize(obj);
     }
 
     public void removeLocal(JObject<?> jObject, String name) {

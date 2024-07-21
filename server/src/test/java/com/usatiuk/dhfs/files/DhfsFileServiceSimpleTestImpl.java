@@ -64,7 +64,7 @@ public class DhfsFileServiceSimpleTestImpl {
             ChunkInfo c2i = new ChunkInfo(c2.getHash(), c2.getBytes().size());
             ChunkData c3 = new ChunkData(ByteString.copyFrom("91011".getBytes()));
             ChunkInfo c3i = new ChunkInfo(c3.getHash(), c3.getBytes().size());
-            File f = new File(fuuid, 777, null, false);
+            File f = new File(fuuid, 777, new UUID(0, 0), false);
             f.getChunks().put(0L, c1.getHash());
             f.getChunks().put((long) c1.getBytes().size(), c2.getHash());
             f.getChunks().put((long) c1.getBytes().size() + c2.getBytes().size(), c3.getHash());

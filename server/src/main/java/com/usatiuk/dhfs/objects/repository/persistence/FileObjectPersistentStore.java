@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.objects.repository.persistence;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.UnsafeByteOperations;
+import com.usatiuk.dhfs.objects.persistence.BlobP;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -13,6 +12,8 @@ import jakarta.enterprise.event.Observes;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.annotation.Nonnull;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -65,12 +66,12 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     @Nonnull
     @Override
-    public ByteString readObject(String name) {
+    public BlobP readObject(String name) {
         var file = Path.of(root, name);
 
-        try {
-            return UnsafeByteOperations.unsafeWrap(Files.readAllBytes(file));
-        } catch (NoSuchFileException fx) {
+        try (var fs = new FileInputStream(file.toFile())) {
+            return BlobP.parseFrom(fs);
+        } catch (FileNotFoundException | NoSuchFileException fx) {
             throw new StatusRuntimeException(Status.NOT_FOUND);
         } catch (IOException e) {
             Log.error("Error reading file " + file, e);
@@ -79,14 +80,12 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     }
 
     @Override
-    public void writeObject(String name, ByteString data) {
+    public void writeObject(String name, BlobP data) {
         var file = Path.of(root, name);
 
         try {
-            try (var fc = new FileOutputStream(file.toFile(), false);
-                 var ch = fc.getChannel().truncate(0)) {
-                if (ch.write(data.asReadOnlyByteBuffer()) != data.size())
-                    throw new StatusRuntimeException(Status.INTERNAL.withDescription("Could not write all bytes to file"));
+            try (var fc = new FileOutputStream(file.toFile(), false)) {
+                data.writeTo(fc);
             }
         } catch (IOException e) {
             Log.error("Error writing file " + file, e);
