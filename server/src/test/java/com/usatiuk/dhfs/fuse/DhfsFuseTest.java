@@ -50,4 +50,28 @@ public class DhfsFuseTest {
         Assertions.assertDoesNotThrow(() -> Files.readAllBytes(testSymlink));
         Assertions.assertArrayEquals(Files.readAllBytes(testSymlink), testString);
     }
+
+    @Test
+    void dontRemoveEmptyDirTest() throws IOException {
+        byte[] testString = "dontRemoveEmptyDirTestStr".getBytes();
+        Path testDir = Path.of(root).resolve("dontRemoveEmptyDirTestDir");
+        Path testFile = testDir.resolve("dontRemoveEmptyDirTestFile");
+
+        Assertions.assertDoesNotThrow(() -> Files.createDirectory(testDir));
+        Assertions.assertDoesNotThrow(() -> Files.createFile(testFile));
+        Assertions.assertDoesNotThrow(() -> Files.write(testFile, testString));
+        Assertions.assertDoesNotThrow(() -> Files.readAllBytes(testFile));
+        Assertions.assertArrayEquals(Files.readAllBytes(testFile), testString);
+
+        Assertions.assertThrows(Exception.class, () -> Files.delete(testDir));
+        Assertions.assertDoesNotThrow(() -> Files.readAllBytes(testFile));
+        Assertions.assertArrayEquals(Files.readAllBytes(testFile), testString);
+
+        Assertions.assertDoesNotThrow(() -> Files.delete(testFile));
+        Assertions.assertDoesNotThrow(() -> Files.delete(testDir));
+        Assertions.assertFalse(Files.exists(testDir));
+        Assertions.assertFalse(Files.exists(testFile));
+        Assertions.assertThrows(Exception.class, () -> Files.readAllBytes(testFile));
+    }
+
 }

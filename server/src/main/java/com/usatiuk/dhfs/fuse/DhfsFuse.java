@@ -6,6 +6,7 @@ import com.usatiuk.dhfs.files.objects.Directory;
 import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.objects.FsNode;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
+import com.usatiuk.dhfs.files.service.DirectoryNotEmptyException;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -209,6 +210,8 @@ public class DhfsFuse extends FuseStubFS {
             var ret = fileService.rmdir(path);
             if (!ret) return -ErrorCodes.ENOENT();
             else return 0;
+        } catch (DirectoryNotEmptyException ex) {
+            return -ErrorCodes.ENOTEMPTY();
         } catch (Exception e) {
             Log.error("When removing dir " + path, e);
             return -ErrorCodes.EIO();

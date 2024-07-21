@@ -229,7 +229,13 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (dir.getKid(kname).isEmpty())
                 return false;
 
-            kid.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m2, d2, bump2, i2) -> {
+            kid.get().runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m2, d2, bump2, i2) -> {
+                if (d2 == null)
+                    throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Pessimistically not removing unresolved maybe-directory"));
+                if (d2 instanceof Directory)
+                    if (!((Directory) d2).getChildren().isEmpty())
+                        throw new DirectoryNotEmptyException();
+
                 m2.removeRef(m.getName());
                 return null;
             });
