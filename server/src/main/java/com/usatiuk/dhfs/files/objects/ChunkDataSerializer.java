@@ -9,14 +9,11 @@ import jakarta.enterprise.context.ApplicationScoped;
 public class ChunkDataSerializer implements ProtoSerializer<ChunkDataP, ChunkData>, ProtoDeserializer<ChunkDataP, ChunkData> {
     @Override
     public ChunkData deserialize(ChunkDataP message) {
-        return new ChunkData(message.getData(), message.getName());
+        return new ChunkData(message);
     }
 
     @Override
     public ChunkDataP serialize(ChunkData object) {
-        return ChunkDataP.newBuilder()
-                .setData(object.getBytes())
-                .setName(object.getHash())
-                .build();
+        return object.getData();
     }
 }

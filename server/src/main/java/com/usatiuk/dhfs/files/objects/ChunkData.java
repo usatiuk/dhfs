@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.files.objects;
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.files.conflicts.NoOpConflictResolver;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
+import com.usatiuk.dhfs.objects.persistence.ChunkDataP;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import lombok.Getter;
 import net.openhft.hashing.LongTupleHashFunction;
@@ -19,21 +20,37 @@ public class ChunkData extends JObjectData {
     @Serial
     private static final long serialVersionUID = 1;
 
-    final String _hash;
-    final ByteString _bytes;
+    final ChunkDataP _data;
 
     public ChunkData(ByteString bytes) {
         super();
-        this._bytes = bytes;
-        // TODO: There might be (most definitely) a copy there
-        this._hash = Arrays.stream(LongTupleHashFunction.xx128().hashBytes(_bytes.asReadOnlyByteBuffer()))
-                .mapToObj(Long::toHexString).collect(Collectors.joining());
+        _data = ChunkDataP.newBuilder()
+                .setData(bytes)
+                // TODO: There might be (most definitely) a copy there
+                .setName(Arrays.stream(LongTupleHashFunction.xx128().hashBytes(bytes.asReadOnlyByteBuffer()))
+                        .mapToObj(Long::toHexString).collect(Collectors.joining()))
+                .build();
     }
 
     public ChunkData(ByteString bytes, String name) {
         super();
-        this._bytes = bytes;
-        this._hash = name;
+        _data = ChunkDataP.newBuilder()
+                .setData(bytes)
+                .setName(name)
+                .build();
+    }
+
+    public ChunkData(ChunkDataP chunkDataP) {
+        super();
+        _data = chunkDataP;
+    }
+
+    public String getHash() {
+        return _data.getName();
+    }
+
+    public ByteString getBytes() {
+        return _data.getData();
     }
 
     public static String getNameFromHash(String hash) {
@@ -45,17 +62,17 @@ public class ChunkData extends JObjectData {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ChunkData chunkData = (ChunkData) o;
-        return Objects.equals(_hash, chunkData._hash);
+        return Objects.equals(_data.getName(), chunkData.getData().getName());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(_hash);
+        return Objects.hashCode(_data.getName());
     }
 
     @Override
     public String getName() {
-        return getNameFromHash(_hash);
+        return getNameFromHash(_data.getName());
     }
 
     @Override
@@ -75,6 +92,6 @@ public class ChunkData extends JObjectData {
 
     @Override
     public long estimateSize() {
-        return _bytes.size();
+        return _data.getData().size();
     }
 }
