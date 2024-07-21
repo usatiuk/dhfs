@@ -103,15 +103,13 @@ public class DhfsFuse extends FuseStubFS {
             }
             var foundDent = (FsNode) found.get();
 
-            var atime = System.currentTimeMillis();
-            stat.st_atim.tv_sec.set(atime / 1000);
-            stat.st_atim.tv_nsec.set((atime % 1000) * 1000);
-
             // FIXME: Race?
             stat.st_ctim.tv_sec.set(foundDent.getCtime() / 1000);
             stat.st_ctim.tv_nsec.set((foundDent.getCtime() % 1000) * 1000);
             stat.st_mtim.tv_sec.set(foundDent.getMtime() / 1000);
             stat.st_mtim.tv_nsec.set((foundDent.getMtime() % 1000) * 1000);
+            stat.st_atim.tv_sec.set(foundDent.getMtime() / 1000);
+            stat.st_atim.tv_nsec.set((foundDent.getMtime() % 1000) * 1000);
         } catch (Exception e) {
             Log.error("When getattr " + path, e);
             return -ErrorCodes.EIO();
