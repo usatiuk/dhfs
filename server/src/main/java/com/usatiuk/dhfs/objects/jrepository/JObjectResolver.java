@@ -43,6 +43,8 @@ public class JObjectResolver {
     ProtoSerializerService protoSerializerService;
     @Inject
     JObjectRefProcessor jObjectRefProcessor;
+    @Inject
+    JObjectLRU jObjectLRU;
     @ConfigProperty(name = "dhfs.objects.ref_verification")
     boolean refVerification;
 
@@ -52,6 +54,10 @@ public class JObjectResolver {
 
     public <T extends JObjectData> void registerMetaWriteListener(Class<T> klass, WriteListenerFn<T> fn) {
         _metaWriteListeners.put(klass, fn);
+    }
+
+    public void notifyAccess(JObject<?> self) {
+        jObjectLRU.notifyAccess(self);
     }
 
     public boolean hasLocalCopy(JObject<?> self) {
@@ -187,6 +193,7 @@ public class JObjectResolver {
     public <T extends JObjectData> void notifyWriteMeta(JObject<T> self) {
         self.assertRWLock();
         jObjectWriteback.markDirty(self);
+        jObjectLRU.notifyAccess(self);
         for (var t : _metaWriteListeners.keySet()) { // FIXME:?
             if (t.isAssignableFrom(self.getKnownClass()))
                 for (var cb : _metaWriteListeners.get(t))
@@ -197,6 +204,7 @@ public class JObjectResolver {
     public <T extends JObjectData> void notifyWriteData(JObject<T> self) {
         self.assertRWLock();
         jObjectWriteback.markDirty(self);
+        jObjectLRU.notifyAccess(self);
         if (self.isResolved()) {
             invalidationQueueService.pushInvalidationToAll(self.getName());
             for (var t : _writeListeners.keySet()) { // FIXME:?

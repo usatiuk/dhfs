@@ -32,6 +32,9 @@ public class JObjectManagerImpl implements JObjectManager {
     PersistentRemoteHostsService persistentRemoteHostsService;
     @Inject
     ProtoSerializerService protoSerializerService;
+    @Inject
+    JObjectLRU jObjectLRU;
+
     private Thread _refCleanupThread;
 
     @Startup
@@ -99,9 +102,13 @@ public class JObjectManagerImpl implements JObjectManager {
 
         synchronized (this) {
             var inMap = getFromMap(name);
-            if (inMap != null) return Optional.of(inMap);
+            if (inMap != null) {
+                jObjectLRU.notifyAccess(inMap);
+                return Optional.of(inMap);
+            }
             JObject<?> newObj = new JObject<>(jObjectResolver, (ObjectMetadata) meta);
             _map.put(name, new NamedSoftReference(newObj, _refQueue));
+            jObjectLRU.notifyAccess(newObj);
             return Optional.of(newObj);
         }
     }
@@ -151,6 +158,7 @@ public class JObjectManagerImpl implements JObjectManager {
                 if (finalCreated) finalRet.notifyWrite();// Kind of a hack?
                 return null;
             });
+            jObjectLRU.notifyAccess(ret);
             return (JObject<D>) ret;
         }
     }
@@ -169,6 +177,7 @@ public class JObjectManagerImpl implements JObjectManager {
                     m.addRef(s);
                     return true;
                 }));
+                jObjectLRU.notifyAccess(got.get());
                 return got.get();
             }
 
@@ -188,6 +197,7 @@ public class JObjectManagerImpl implements JObjectManager {
                         m.markSeen();
                         return null;
                     });
+                    jObjectLRU.notifyAccess(created);
                     return created;
                 }
             }

@@ -69,7 +69,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     }
 
     public T getData() {
-        assertRWLock();
+//        assertRWLock(); FIXME:
         return _dataPart.get();
     }
 
@@ -178,6 +178,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         try {
             if (_metaPart.isDeleted())
                 throw new DeletedObjectAccessException();
+            _resolver.notifyAccess(this);
             return fn.apply(_metaPart, _dataPart.get());
         } finally {
             _lock.readLock().unlock();
@@ -235,6 +236,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             if (!Objects.equals(newDataHash, dataHash)
                     || newData != prevData)
                 notifyWriteData();
+            _resolver.notifyAccess(this);
             verifyRefs(oldRefs);
             return ret;
         } finally {
