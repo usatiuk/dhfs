@@ -164,6 +164,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             throw new IllegalStateException("Expected external resolution only for classes with pushResolution " + getName());
         _metaPart.narrowClass(data.getClass());
         _dataPart.set(data);
+        _metaPart.getHaveLocalCopy().set(true);
         if (!_metaPart.isLocked())
             _metaPart.lock();
         hydrateRefs();
