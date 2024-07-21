@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 @ApplicationScoped
 public class DhfsFileServiceImpl implements DhfsFileService {
@@ -47,6 +48,9 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @ConfigProperty(name = "dhfs.files.use_hash_for_chunks")
     boolean useHashForChunks;
 
+    @ConfigProperty(name = "dhfs.objects.ref_verification")
+    boolean refVerification;
+
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
 
@@ -65,45 +69,49 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         getRoot();
     }
 
-    private JObject<? extends FsNode> traverse(JObject<? extends FsNode> from, Path path) {
-        if (path.getNameCount() == 0) return from;
-
-        var pathFirstPart = path.getName(0).toString();
-
-        var notFound = new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND.withDescription("Not found: " + from.getName() + "/" + path));
+    private JObject<? extends FsNode> traverse(JObject<? extends FsNode> from, Path path, int curPos) {
+        Supplier<StatusRuntimeExceptionNoStacktrace> notFound
+                = () -> new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND.withDescription("Not found: " + from.getName() + "/" + path));
 
         var found = from.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
             if (d instanceof Directory dir)
-                return dir.getKid(pathFirstPart);
+                return dir.getKid(path.getName(curPos).toString());
             return Optional.empty();
-        }).orElseThrow(() -> notFound);
+        }).orElseThrow(notFound);
 
         Optional<JObject<?>> ref = jObjectManager.get(found.toString());
 
         if (ref.isEmpty()) {
             Log.error("File missing when traversing directory " + from.getName() + ": " + found);
-            throw notFound;
+            throw notFound.get();
         }
 
-        ref.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
-            if (!(d instanceof FsNode))
-                throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + m.getName()));
-            return null;
-        });
-
-        if (path.getNameCount() == 1) {
+        if (refVerification)
             ref.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
-                if (d instanceof File f) {
-                    if (!Objects.equals(f.getParent().toString(), from.getName())) {
-                        throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Parent mismatch for file " + path));
-                    }
-                }
+                if (!(d instanceof FsNode))
+                    throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + m.getName()));
                 return null;
             });
+
+        if (path.getNameCount() - 1 == curPos) {
+            if (refVerification)
+                ref.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
+                    if (d instanceof File f) {
+                        if (!Objects.equals(f.getParent().toString(), from.getName())) {
+                            throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Parent mismatch for file " + path));
+                        }
+                    }
+                    return null;
+                });
             return (JObject<? extends FsNode>) ref.get();
         }
 
-        return traverse((JObject<? extends FsNode>) ref.get(), path.subpath(1, path.getNameCount()));
+        return traverse((JObject<? extends FsNode>) ref.get(), path, curPos + 1);
+    }
+
+    private JObject<? extends FsNode> traverse(JObject<? extends FsNode> from, Path path) {
+        if (path.getNameCount() == 0) return from;
+        return traverse(from, path, 0);
     }
 
     private JObject<? extends FsNode> getDirEntry(String name) {

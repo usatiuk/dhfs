@@ -16,7 +16,7 @@ public class Directory extends FsNode {
     private static final long serialVersionUID = 1;
     @Getter
     @Setter
-    private Map<String, UUID> _children = new TreeMap<>();
+    private Map<String, UUID> _children = new HashMap<>();
 
     public Directory(UUID uuid) {
         super(uuid);
