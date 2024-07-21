@@ -317,6 +317,18 @@ public class DhfsFuse extends FuseStubFS {
     }
 
     @Override
+    public int chown(String path, long uid, long gid) {
+        try {
+            var fileOpt = fileService.open(path);
+            if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
+            return 0;
+        } catch (Exception e) {
+            Log.error("When chown " + path, e);
+            return -ErrorCodes.EIO();
+        }
+    }
+
+    @Override
     public int symlink(String oldpath, String newpath) {
         try {
             var ret = fileService.symlink(oldpath, newpath);
