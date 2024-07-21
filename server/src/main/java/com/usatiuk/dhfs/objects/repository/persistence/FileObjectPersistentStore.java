@@ -12,10 +12,7 @@ import jakarta.enterprise.event.Observes;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.annotation.Nonnull;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -69,7 +66,8 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     public BlobP readObject(String name) {
         var file = Path.of(root, name);
 
-        try (var fs = new FileInputStream(file.toFile())) {
+        try (var fsb = new FileInputStream(file.toFile());
+             var fs = new BufferedInputStream(fsb, 1048576)) {
             return BlobP.parseFrom(fs);
         } catch (FileNotFoundException | NoSuchFileException fx) {
             throw new StatusRuntimeException(Status.NOT_FOUND);
@@ -84,8 +82,9 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         var file = Path.of(root, name);
 
         try {
-            try (var fc = new FileOutputStream(file.toFile(), false)) {
-                data.writeTo(fc);
+            try (var fsb = new FileOutputStream(file.toFile(), false);
+                 var fs = new BufferedOutputStream(fsb, 1048576)) {
+                data.writeTo(fs);
             }
         } catch (IOException e) {
             Log.error("Error writing file " + file, e);
