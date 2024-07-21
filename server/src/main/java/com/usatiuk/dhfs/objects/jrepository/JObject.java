@@ -21,6 +21,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     protected JObject(JObjectResolver resolver, String name, UUID selfUuid, T obj) {
         _resolver = resolver;
         _metaPart = new ObjectMetadata(name, false, obj.getClass());
+        _metaPart.getHaveLocalCopy().set(true);
         _dataPart.set(obj);
         _metaPart.bumpVersion(selfUuid);
         Log.trace("new JObject: " + getName());
@@ -77,6 +78,10 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         return _metaPart;
     }
 
+    public boolean hasLocalCopyMd() {
+        return _metaPart.getHaveLocalCopy().get();
+    }
+
     public Class<? extends ConflictResolver> getConflictResolver() {
         if (_dataPart.get() == null) throw new NotImplementedException("Data part not found!");
         return _dataPart.get().getConflictResolver();
@@ -116,6 +121,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
                     var res = _resolver.resolveDataRemote(this);
                     _metaPart.narrowClass(res.getClass());
                     _dataPart.set(res);
+                    _metaPart.getHaveLocalCopy().set(true);
                     hydrateRefs();
                     verifyRefs();
                 } // _dataPart.get() == null

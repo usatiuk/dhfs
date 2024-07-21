@@ -17,6 +17,7 @@ message ObjectMetadataP {
   map<string, int64> changelog = 8;
   repeated string savedRefs = 9;
   bool locked = 10;
+  bool haveLocalCopy = 11;
 }
 
 message FsNodeP {

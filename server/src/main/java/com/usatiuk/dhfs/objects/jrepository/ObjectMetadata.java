@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
-import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.repository.ObjectChangelog;
 import com.usatiuk.dhfs.objects.repository.ObjectChangelogEntry;
@@ -41,6 +40,8 @@ public class ObjectMetadata implements Serializable {
     private Set<String> _savedRefs = Collections.emptySet();
     @Getter
     private boolean _locked = false;
+    @Getter
+    private AtomicBoolean _haveLocalCopy = new AtomicBoolean(false);
     private transient AtomicBoolean _written = new AtomicBoolean(true);
 
     public ObjectMetadata(String name, boolean written, Class<? extends JObjectData> knownClass) {

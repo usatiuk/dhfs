@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
 import com.google.common.collect.Streams;
-import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
@@ -56,8 +55,12 @@ public class JObjectResolver {
     }
 
     public boolean hasLocalCopy(JObject<?> self) {
+        if (!self.isDeleted() && refVerification) {
+            if (self.hasLocalCopyMd() && !(self.getData() != null || objectPersistentStore.existsObject(self.getName())))
+                throw new IllegalStateException("hasLocalCopy mismatch for " + self.getName());
+        }
         // FIXME: Read/write lock assert?
-        return objectPersistentStore.existsObject(self.getName());
+        return self.hasLocalCopyMd();
     }
 
     public void backupRefs(JObject<?> self) {
@@ -170,6 +173,7 @@ public class JObjectResolver {
         jObject.assertRWLock();
         try {
             Log.trace("Invalidating " + name);
+            jObject.getMeta().getHaveLocalCopy().set(false);
             jObjectWriteback.remove(jObject);
             objectPersistentStore.deleteObject(name);
         } catch (StatusRuntimeException sx) {
