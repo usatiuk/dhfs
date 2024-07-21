@@ -80,7 +80,10 @@ public class JObjectManagerImpl implements JObjectManager {
     public Optional<JObject<?>> get(String name) {
         synchronized (this) {
             var inMap = getFromMap(name);
-            if (inMap != null) return Optional.of(inMap);
+            if (inMap != null) {
+                jObjectLRU.notifyAccess(inMap);
+                return Optional.of(inMap);
+            }
         }
 
         BlobP readMd;

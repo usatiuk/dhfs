@@ -56,10 +56,6 @@ public class JObjectResolver {
         _metaWriteListeners.put(klass, fn);
     }
 
-    public void notifyAccess(JObject<?> self) {
-        jObjectLRU.notifyAccess(self);
-    }
-
     public boolean hasLocalCopy(JObject<?> self) {
         if (!self.isDeleted() && refVerification) {
             if (self.hasLocalCopyMd() && !(self.getData() != null || objectPersistentStore.existsObject(self.getName())))
@@ -193,7 +189,6 @@ public class JObjectResolver {
     public <T extends JObjectData> void notifyWriteMeta(JObject<T> self) {
         self.assertRWLock();
         jObjectWriteback.markDirty(self);
-        jObjectLRU.notifyAccess(self);
         for (var t : _metaWriteListeners.keySet()) { // FIXME:?
             if (t.isAssignableFrom(self.getKnownClass()))
                 for (var cb : _metaWriteListeners.get(t))
@@ -204,7 +199,6 @@ public class JObjectResolver {
     public <T extends JObjectData> void notifyWriteData(JObject<T> self) {
         self.assertRWLock();
         jObjectWriteback.markDirty(self);
-        jObjectLRU.notifyAccess(self);
         if (self.isResolved()) {
             invalidationQueueService.pushInvalidationToAll(self.getName());
             for (var t : _writeListeners.keySet()) { // FIXME:?
