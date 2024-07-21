@@ -18,11 +18,11 @@ import java.lang.ref.SoftReference;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 @ApplicationScoped
 public class JObjectManagerImpl implements JObjectManager {
-    private final ConcurrentSkipListMap<String, NamedSoftReference> _map = new ConcurrentSkipListMap<>();
+    private final ConcurrentHashMap<String, NamedSoftReference> _map = new ConcurrentHashMap<>();
     private final ReferenceQueue<JObject<?>> _refQueue = new ReferenceQueue<>();
     @Inject
     ObjectPersistentStore objectPersistentStore;
