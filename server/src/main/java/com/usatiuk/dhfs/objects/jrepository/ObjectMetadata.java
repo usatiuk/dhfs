@@ -193,7 +193,7 @@ public class ObjectMetadata implements Serializable {
     }
 
     public int metaHash() {
-        return Objects.hash(isSeen(), getKnownClass(), isDeleted(), _referrers, _locked, _remoteCopies, _savedRefs);
+        return Objects.hash(isSeen(), getKnownClass(), isDeleted(), _referrers, _locked, _remoteCopies, _savedRefs, _haveLocalCopy);
     }
 
     // Not really a hash
