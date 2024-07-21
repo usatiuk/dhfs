@@ -17,12 +17,12 @@ import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 @ApplicationScoped
 public class JObjectManagerImpl implements JObjectManager {
-    private final HashMap<String, NamedSoftReference> _map = new HashMap<>();
+    private final ConcurrentSkipListMap<String, NamedSoftReference> _map = new ConcurrentSkipListMap<>();
     private final ReferenceQueue<JObject<?>> _refQueue = new ReferenceQueue<>();
     @Inject
     ObjectPersistentStore objectPersistentStore;
@@ -54,10 +54,7 @@ public class JObjectManagerImpl implements JObjectManager {
         try {
             while (!Thread.interrupted()) {
                 NamedSoftReference cur = (NamedSoftReference) _refQueue.remove();
-                synchronized (this) {
-                    if (_map.containsKey(cur._key) && (_map.get(cur._key).get() == null))
-                        _map.remove(cur._key);
-                }
+                _map.remove(cur._key, cur);
             }
         } catch (InterruptedException ignored) {
         }
@@ -65,20 +62,16 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     private JObject<?> getFromMap(String key) {
-        synchronized (this) {
-            if (_map.containsKey(key)) {
-                var ref = _map.get(key).get();
-                if (ref != null) {
-                    return ref;
-                }
-            }
+        var ret = _map.get(key);
+        if (ret != null && ret.get() != null) {
+            return ret.get();
         }
         return null;
     }
 
     @Override
     public Optional<JObject<?>> get(String name) {
-        synchronized (this) {
+        {
             var inMap = getFromMap(name);
             if (inMap != null) {
                 jObjectLRU.notifyAccess(inMap);
@@ -103,17 +96,15 @@ public class JObjectManagerImpl implements JObjectManager {
             return Optional.empty();
         }
 
-        synchronized (this) {
-            var inMap = getFromMap(name);
-            if (inMap != null) {
-                jObjectLRU.notifyAccess(inMap);
-                return Optional.of(inMap);
-            }
-            JObject<?> newObj = new JObject<>(jObjectResolver, (ObjectMetadata) meta);
-            _map.put(name, new NamedSoftReference(newObj, _refQueue));
-            jObjectLRU.notifyAccess(newObj);
-            return Optional.of(newObj);
+        JObject<?> ret = null;
+        var newObj = new JObject<>(jObjectResolver, (ObjectMetadata) meta);
+        while (ret == null) {
+            var ref = _map.computeIfAbsent(name, k -> new NamedSoftReference(newObj, _refQueue));
+            if (ref.get() == null) _map.remove(name, ref);
+            else ret = ref.get();
         }
+        jObjectLRU.notifyAccess(ret);
+        return Optional.of(ret);
     }
 
     @Override
@@ -132,35 +123,45 @@ public class JObjectManagerImpl implements JObjectManager {
         while (true) {
             JObject<?> ret;
             boolean created = false;
-            synchronized (this) {
+            JObject<?> newObj = null;
+            try {
                 ret = getFromMap(object.getName());
                 if (ret != null) {
                     if (!object.assumeUnique())
                         throw new IllegalArgumentException("Trying to insert different object with same key");
                 } else {
-                    ret = new JObject<D>(jObjectResolver, object.getName(), persistentRemoteHostsService.getSelfUuid(), object);
-                    _map.put(object.getName(), new NamedSoftReference(ret, _refQueue));
+                    newObj = new JObject<D>(jObjectResolver, object.getName(), persistentRemoteHostsService.getSelfUuid(), object);
+                    newObj.rwLock();
+                    while (ret == null) {
+                        JObject<?> finalNewObj = newObj;
+                        var ref = _map.computeIfAbsent(object.getName(), k -> new NamedSoftReference(finalNewObj, _refQueue));
+                        if (ref.get() == null) _map.remove(object.getName(), ref);
+                        else ret = ref.get();
+                    }
+                    if (ret != newObj) continue;
                     created = true;
                 }
+                JObject<D> finalRet = (JObject<D>) ret;
+                boolean finalCreated = created;
+                ret.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                    if (object.getClass().isAnnotationPresent(PushResolution.class) && object.assumeUnique() && finalRet.getData() == null) {
+                        finalRet.externalResolution(object);
+                    }
+
+                    if (parent.isPresent()) {
+                        m.addRef(parent.get());
+                        if (m.isLocked())
+                            m.unlock();
+                    } else {
+                        m.lock();
+                    }
+
+                    if (finalCreated) finalRet.notifyWrite();// Kind of a hack?
+                    return null;
+                });
+            } finally {
+                if (newObj != null) newObj.rwUnlock();
             }
-            JObject<D> finalRet = (JObject<D>) ret;
-            boolean finalCreated = created;
-            ret.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                if (object.getClass().isAnnotationPresent(PushResolution.class) && object.assumeUnique() && finalRet.getData() == null) {
-                    finalRet.externalResolution(object);
-                }
-
-                if (parent.isPresent()) {
-                    m.addRef(parent.get());
-                    if (m.isLocked())
-                        m.unlock();
-                } else {
-                    m.lock();
-                }
-
-                if (finalCreated) finalRet.notifyWrite();// Kind of a hack?
-                return null;
-            });
             jObjectLRU.notifyAccess(ret);
             return (JObject<D>) ret;
         }
@@ -184,26 +185,27 @@ public class JObjectManagerImpl implements JObjectManager {
                 return got.get();
             }
 
-            synchronized (this) {
-                var inMap = getFromMap(name);
-                if (inMap != null) {
-                    continue;
-                } else {
-                    // FIXME:
-                    if (objectPersistentStore.existsObject("meta_" + name))
-                        continue;
-
-                    var created = new JObject<>(jObjectResolver, new ObjectMetadata(name, false, klass));
-                    _map.put(name, new NamedSoftReference(created, _refQueue));
-                    created.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                        parent.ifPresent(m::addRef);
-                        m.markSeen();
-                        return null;
-                    });
-                    jObjectLRU.notifyAccess(created);
-                    return created;
+            JObject<?> ret = null;
+            var created = new JObject<>(jObjectResolver, new ObjectMetadata(name, false, klass));
+            created.rwLock();
+            try {
+                while (ret == null) {
+                    var ref = _map.computeIfAbsent(name, k -> new NamedSoftReference(created, _refQueue));
+                    if (ref.get() == null) _map.remove(name, ref);
+                    else ret = ref.get();
                 }
+                if (ret != created) continue;
+
+                created.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                    parent.ifPresent(m::addRef);
+                    m.markSeen();
+                    return null;
+                });
+            } finally {
+                created.rwUnlock();
             }
+            jObjectLRU.notifyAccess(created);
+            return created;
         }
     }
 
