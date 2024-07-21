@@ -162,7 +162,8 @@ public class JObjectManagerImpl implements JObjectManager {
             } finally {
                 if (newObj != null) newObj.rwUnlock();
             }
-            jObjectLRU.notifyAccess(ret);
+            if (!created)
+                jObjectLRU.notifyAccess(ret);
             return (JObject<D>) ret;
         }
     }
@@ -204,7 +205,6 @@ public class JObjectManagerImpl implements JObjectManager {
             } finally {
                 created.rwUnlock();
             }
-            jObjectLRU.notifyAccess(created);
             return created;
         }
     }
