@@ -6,6 +6,7 @@ import com.usatiuk.dhfs.files.objects.*;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
+import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -69,7 +70,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         var pathFirstPart = path.getName(0).toString();
 
-        var notFound = new StatusRuntimeException(Status.NOT_FOUND.withDescription("Not found: " + from.getName() + "/" + path));
+        var notFound = new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND.withDescription("Not found: " + from.getName() + "/" + path));
 
         var found = from.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
             if (d instanceof Directory dir)
