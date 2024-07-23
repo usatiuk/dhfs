@@ -115,7 +115,7 @@ public class RemoteObjectServiceClient {
                             if (m.getKnownClass().isAnnotationPresent(PushResolution.class))
                                 return m.toRpcHeader(protoSerializerService.serializeToJObjectDataP(d));
                             else
-                                return m.toRpcHeader(null);
+                                return m.toRpcHeader();
                         });
         obj.markSeen();
         builder.setHeader(header);
