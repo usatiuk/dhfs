@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects.repository.peersync;
 
 import com.usatiuk.dhfs.files.conflicts.NoOpConflictResolver;
+import com.usatiuk.dhfs.objects.jrepository.AssumedUnique;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.PushResolution;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
@@ -18,6 +19,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = false)
 @PushResolution
+@AssumedUnique
 public class PersistentPeerInfo extends JObjectData {
     @Serial
     private static final long serialVersionUID = 1;
@@ -32,10 +34,6 @@ public class PersistentPeerInfo extends JObjectData {
     @Override
     public String getName() {
         return getNameFromUuid(_uuid);
-    }
-
-    public boolean assumeUnique() {
-        return true;
     }
 
     @Override

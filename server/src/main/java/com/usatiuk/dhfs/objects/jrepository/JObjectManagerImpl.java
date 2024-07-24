@@ -127,7 +127,7 @@ public class JObjectManagerImpl implements JObjectManager {
             try {
                 ret = getFromMap(object.getName());
                 if (ret != null) {
-                    if (!object.assumeUnique())
+                    if (!object.getClass().isAnnotationPresent(AssumedUnique.class))
                         throw new IllegalArgumentException("Trying to insert different object with same key");
                 } else {
                     newObj = new JObject<D>(jObjectResolver, object.getName(), persistentRemoteHostsService.getSelfUuid(), object);
@@ -144,7 +144,9 @@ public class JObjectManagerImpl implements JObjectManager {
                 JObject<D> finalRet = (JObject<D>) ret;
                 boolean finalCreated = created;
                 ret.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                    if (object.getClass().isAnnotationPresent(PushResolution.class) && object.assumeUnique() && finalRet.getData() == null) {
+                    if (object.getClass().isAnnotationPresent(PushResolution.class)
+                            && object.getClass().isAnnotationPresent(AssumedUnique.class)
+                            && finalRet.getData() == null) {
                         finalRet.externalResolution(object);
                     }
 

@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.files.objects;
 
 import com.usatiuk.dhfs.files.conflicts.NoOpConflictResolver;
+import com.usatiuk.dhfs.objects.jrepository.AssumedUnique;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.Movable;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
@@ -14,6 +15,7 @@ import java.util.List;
 @Getter
 @EqualsAndHashCode(callSuper = false)
 @Movable
+@AssumedUnique
 public class ChunkInfo extends JObjectData {
     @Serial
     private static final long serialVersionUID = 1;
@@ -49,11 +51,6 @@ public class ChunkInfo extends JObjectData {
     @Override
     public Collection<String> extractRefs() {
         return List.of(ChunkData.getNameFromHash(_hash));
-    }
-
-    @Override
-    public boolean assumeUnique() {
-        return true;
     }
 
     @Override
