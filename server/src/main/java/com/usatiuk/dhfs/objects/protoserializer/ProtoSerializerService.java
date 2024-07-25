@@ -9,6 +9,7 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 import java.lang.reflect.ParameterizedType;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Optional;
 
@@ -38,8 +39,13 @@ public class ProtoSerializerService {
     @PostConstruct
     void init() {
         for (var s : _protoSerializers) {
-            var args = ((ParameterizedType) ClientProxy.unwrap(s).getClass()
-                    .getGenericInterfaces()[0]).getActualTypeArguments(); //FIXME:
+            var args = ((ParameterizedType) Arrays.stream(ClientProxy.unwrap(s).getClass().getGenericInterfaces())
+                    .filter(t -> {
+                        if (t instanceof ParameterizedType)
+                            return ((ParameterizedType) t).getRawType().equals(ProtoSerializer.class);
+                        return false;
+                    }).findFirst().orElseThrow(() -> new IllegalArgumentException("ProtoSerializer interface not found on ProtoSerializer?")))
+                    .getActualTypeArguments(); //FIXME:
             Class<? extends Message> messageClass = (Class<? extends Message>) args[0];
             Class<?> objClass = (Class<?>) args[1];
 
@@ -50,8 +56,13 @@ public class ProtoSerializerService {
         }
 
         for (var s : _protoDeserializers) {
-            var args = ((ParameterizedType) ClientProxy.unwrap(s).getClass()
-                    .getGenericInterfaces()[0]).getActualTypeArguments(); //FIXME:
+            var args = ((ParameterizedType) Arrays.stream(ClientProxy.unwrap(s).getClass().getGenericInterfaces())
+                    .filter(t -> {
+                        if (t instanceof ParameterizedType)
+                            return ((ParameterizedType) t).getRawType().equals(ProtoDeserializer.class);
+                        return false;
+                    }).findFirst().orElseThrow(() -> new IllegalArgumentException("ProtoSerializer interface not found on ProtoSerializer?")))
+                    .getActualTypeArguments(); //FIXME:
             Class<? extends Message> messageClass = (Class<? extends Message>) args[0];
             Class<?> objClass = (Class<?>) args[1];
 
