@@ -45,11 +45,11 @@ public class DhfsFuseIT {
                                 .run("apt update && apt install -y libfuse2 curl")
                                 .copy("/app", "/app")
                                 .cmd("java", "-ea", "-Xmx128M", "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
-                                        "-Ddhfs.objects.peerdiscovery.interval=500",
-                                        "-Ddhfs.objects.invalidation.delay=200",
+                                        "-Ddhfs.objects.peerdiscovery.interval=100",
+                                        "-Ddhfs.objects.invalidation.delay=100",
                                         "-Ddhfs.objects.ref_verification=true",
                                         "-Ddhfs.objects.deletion.delay=0",
-                                        "-Ddhfs.objects.sync.timeout=5",
+                                        "-Ddhfs.objects.sync.timeout=2",
                                         "-Ddhfs.objects.reconnect_interval=1s",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
                                         "-jar", "/app/quarkus-run.jar")
