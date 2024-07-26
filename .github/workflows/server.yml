@@ -36,18 +36,18 @@ jobs:
           cache: maven
 
       - name: Build and test with Maven
-        run: cd server && mvn --batch-mode --update-snapshots package verify
+        run: cd dhfs-parent && mvn --batch-mode --update-snapshots package verify
 
       - uses: actions/upload-artifact@v3
         with:
-          name: DHFS Package
-          path: server/target/quarkus-app
+          name: DHFS Server Package
+          path: dhfs-parent/server/target/quarkus-app
 
       - uses: actions/upload-artifact@v3
         if: ${{ always() }}
         with:
           name: Test logs
-          path: server/target/*-reports
+          path: dhfs-parent/**/target/*-reports
 
   build-webui:
     runs-on: ubuntu-latest
@@ -90,7 +90,7 @@ jobs:
 
       - uses: actions/download-artifact@v3
         with:
-          name: DHFS Package
+          name: DHFS Server Package
           path: dhfs-package-downloaded
 
       - uses: actions/download-artifact@v3
