@@ -72,10 +72,8 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         for (var s : read) {
             if (s.isDirectory()) {
                 findAllObjectsImpl(out, s.toPath());
-                return;
             } else {
-                var rel = metaPath.relativize(s.toPath());
-                out.add(rel.toString());
+                out.add(s.getName());
             }
         }
     }
