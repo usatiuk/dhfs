@@ -62,7 +62,7 @@ public class RemoteHostManager {
             _heartbeatExecutor.invokeAll(persistentRemoteHostsService.getHostsUuid().stream()
                     .<Callable<Void>>map(host -> () -> {
                         try {
-                            if(isReachable(host))
+                            if (isReachable(host))
                                 Log.trace("Heartbeat: " + host);
                             else
                                 Log.info("Trying to connect to " + host);
@@ -184,9 +184,10 @@ public class RemoteHostManager {
         state.setSecurePort(securePort);
 
         if (!persistentRemoteHostsService.existsHost(host)) {
-            _seenHostsButNotAdded.put(host, state);
+            var prev = _seenHostsButNotAdded.put(host, state);
             // Needed for tests
-            Log.trace("Ignoring new address from unknown host " + ": addr=" + addr + " port=" + port);
+            if (prev == null)
+                Log.trace("Ignoring new address from unknown host " + ": addr=" + addr + " port=" + port);
             return;
         }
 
