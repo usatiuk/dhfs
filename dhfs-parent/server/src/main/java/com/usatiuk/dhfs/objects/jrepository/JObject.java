@@ -1,12 +1,15 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.NotImplementedException;
 
 import java.io.Serializable;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -114,7 +117,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
 
     private void tryRemoteResolve() {
         if (_dataPart.get() == null) {
-            _lock.writeLock().lock();
+            rwLock();
             try {
                 tryLocalResolve();
                 if (_dataPart.get() == null) {
@@ -133,7 +136,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
 
     private void tryLocalResolve() {
         if (_dataPart.get() == null) {
-            _lock.readLock().lock();
+            rLock();
             try {
                 if (_dataPart.get() == null) {
                     var res = _resolver.resolveDataLocal(this);
@@ -171,10 +174,36 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         verifyRefs();
     }
 
+    public boolean tryRLock() {
+        try {
+            return _lock.readLock().tryLock(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public boolean tryRWLock() {
+        try {
+            return _lock.writeLock().tryLock(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void rwLock() {
+        if (!tryRWLock())
+            throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Failed to acquire write lock for " + getName()));
+    }
+
+    public void rLock() {
+        if (!tryRLock())
+            throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Failed to acquire read lock for " + getName()));
+    }
+
     public <R> R runReadLocked(ResolutionStrategy resolutionStrategy, ObjectFnRead<T, R> fn) {
         tryResolve(resolutionStrategy);
 
-        _lock.readLock().lock();
+        rLock();
         try {
             if (_metaPart.isDeleted())
                 throw new DeletedObjectAccessException();
@@ -197,7 +226,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     }
 
     public <R> R runWriteLocked(ResolutionStrategy resolutionStrategy, ObjectFnWrite<T, R> fn) {
-        _lock.writeLock().lock();
+        rwLock();
         try {
             tryResolve(resolutionStrategy);
 
@@ -268,14 +297,6 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     public void bumpVer() {
         assertRWLock();
         _resolver.bumpVersionSelf(this);
-    }
-
-    public void rwLock() {
-        _lock.writeLock().lock();
-    }
-
-    public boolean tryRwLock() {
-        return _lock.writeLock().tryLock();
     }
 
     public void rwUnlock() {
