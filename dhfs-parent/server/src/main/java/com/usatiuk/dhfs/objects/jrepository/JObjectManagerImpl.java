@@ -16,10 +16,12 @@ import lombok.Getter;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Stream;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class JObjectManagerImpl implements JObjectManager {
@@ -110,8 +112,14 @@ public class JObjectManagerImpl implements JObjectManager {
 
     @Override
     public Collection<JObject<?>> findAll() {
-        Stream<JObject<?>> x = objectPersistentStore.findAllObjects().stream().map(f -> get(f).orElse(null));
-        return x.filter(Objects::nonNull).toList(); // Somehow this is needed otherwise typing breaks
+        var out = _map.values().stream().map(SoftReference::get)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection((Supplier<LinkedHashSet<JObject<?>>>) LinkedHashSet::new));
+        objectPersistentStore.findAllObjects().stream()
+                .map(f -> get(f).orElse(null))
+                .filter(Objects::nonNull)
+                .forEach(out::add);
+        return out;
     }
 
     @Override

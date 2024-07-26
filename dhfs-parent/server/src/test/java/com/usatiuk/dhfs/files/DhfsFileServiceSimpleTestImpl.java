@@ -71,13 +71,22 @@ public class DhfsFileServiceSimpleTestImpl {
 
             // FIXME: dhfs_files
 
-            jObjectManager.put(c1, Optional.of(c1i.getName()));
-            jObjectManager.put(c2, Optional.of(c2i.getName()));
-            jObjectManager.put(c3, Optional.of(c3i.getName()));
-            jObjectManager.put(c1i, Optional.of(f.getName()));
-            jObjectManager.put(c2i, Optional.of(f.getName()));
-            jObjectManager.put(c3i, Optional.of(f.getName()));
-            jObjectManager.put(f, Optional.empty());
+            var c1o = jObjectManager.put(c1, Optional.of(c1i.getName()));
+            var c2o = jObjectManager.put(c2, Optional.of(c2i.getName()));
+            var c3o = jObjectManager.put(c3, Optional.of(c3i.getName()));
+            var c1io = jObjectManager.put(c1i, Optional.of(f.getName()));
+            var c2io = jObjectManager.put(c2i, Optional.of(f.getName()));
+            var c3io = jObjectManager.put(c3i, Optional.of(f.getName()));
+            var fo = jObjectManager.put(f, Optional.empty());
+
+            var all = jObjectManager.findAll();
+            Assertions.assertTrue(all.contains(c1o));
+            Assertions.assertTrue(all.contains(c2o));
+            Assertions.assertTrue(all.contains(c3o));
+            Assertions.assertTrue(all.contains(c1io));
+            Assertions.assertTrue(all.contains(c2io));
+            Assertions.assertTrue(all.contains(c3io));
+            Assertions.assertTrue(all.contains(fo));
         }
 
         String all = "1234567891011";
@@ -207,8 +216,8 @@ public class DhfsFileServiceSimpleTestImpl {
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
         fileService.write(uuid, 20, new byte[]{10, 11, 12, 13, 14, 15, 16, 17, 18, 19});
         Assertions.assertArrayEquals(new byte[]{
-                0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
-                0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 10, 11, 12, 13, 14, 15, 16, 17, 18, 19
         }, fileService.read(uuid, 0, 30).get().toByteArray());
     }
