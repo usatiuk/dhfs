@@ -200,10 +200,15 @@
                         </native.image.path>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         <buildDirectory>${project.build.directory}</buildDirectory>
-                        <junit.jupiter.execution.parallel.enabled>false</junit.jupiter.execution.parallel.enabled>
+                        <junit.jupiter.execution.parallel.enabled>
+                            true
+                        </junit.jupiter.execution.parallel.enabled>
                         <junit.jupiter.execution.parallel.mode.default>
                             concurrent
                         </junit.jupiter.execution.parallel.mode.default>
+                        <junit.jupiter.execution.parallel.config.dynamic.factor>
+                            0.5
+                        </junit.jupiter.execution.parallel.config.dynamic.factor>
                         <junit.platform.output.capture.stdout>true</junit.platform.output.capture.stdout>
                         <junit.platform.output.capture.stderr>true</junit.platform.output.capture.stderr>
                         <maven.home>${maven.home}</maven.home>
