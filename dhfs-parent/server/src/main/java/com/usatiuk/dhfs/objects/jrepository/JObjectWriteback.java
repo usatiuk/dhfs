@@ -162,13 +162,12 @@ public class JObjectWriteback {
                 throw new IllegalStateException("Object deleted but not deletable! " + m.getName());
             // FIXME: assert Rw lock here?
             Log.trace("Deleting from persistent storage " + m.getName());
-            objectPersistentStore.deleteObject("meta_" + m.getName());
             objectPersistentStore.deleteObject(m.getName());
             return;
         }
-        objectPersistentStore.writeObject("meta_" + m.getName(), protoSerializerService.serializeToBlobP(m));
+        objectPersistentStore.writeObjectMeta(m.getName(), protoSerializerService.serialize(m));
         if (data != null)
-            objectPersistentStore.writeObject(m.getName(), protoSerializerService.serializeToBlobP(data));
+            objectPersistentStore.writeObject(m.getName(), protoSerializerService.serializeToJObjectDataP(data));
     }
 
     public void remove(JObject<?> object) {

@@ -1,14 +1,17 @@
 package com.usatiuk.dhfs.objects.repository.persistence;
 
-import com.usatiuk.dhfs.objects.persistence.BlobP;
+import com.google.protobuf.Message;
+import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
+import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
+import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
 import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.annotation.Nonnull;
@@ -18,15 +21,26 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Objects;
 
 @ApplicationScoped
 public class FileObjectPersistentStore implements ObjectPersistentStore {
-    @ConfigProperty(name = "dhfs.objects.persistence.files.root")
-    String root;
+    private final String root;
+
+    private final Path metaPath;
+    private final Path dataPath;
+
+    public FileObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.persistence.files.root") String root) {
+        this.root = root;
+        this.metaPath = Paths.get(root, "meta");
+        this.dataPath = Paths.get(root, "data");
+    }
 
     void init(@Observes @Priority(200) StartupEvent event) {
-        Paths.get(root).toFile().mkdirs();
+        metaPath.toFile().mkdirs();
+        dataPath.toFile().mkdirs();
         Log.info("Initializing with root " + root);
     }
 
@@ -34,74 +48,125 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         Log.info("Shutdown");
     }
 
+    private Pair<String, String> getDirPathComponents(@Nonnull String obj) {
+        int h = Objects.hash(obj);
+        int p1 = h & 0b00000000_00000000_11111111_00000000;
+        int p2 = h & 0b00000000_00000000_00000000_11111111;
+        return Pair.ofNonNull(String.valueOf(p1 >> 8), String.valueOf(p2));
+    }
+
+    private Path getMetaPath(@Nonnull String obj) {
+        var components = getDirPathComponents(obj);
+        return metaPath.resolve(components.getLeft()).resolve(components.getRight()).resolve(obj);
+    }
+
+    private Path getDataPath(@Nonnull String obj) {
+        var components = getDirPathComponents(obj);
+        return dataPath.resolve(components.getLeft()).resolve(components.getRight()).resolve(obj);
+    }
+
+    private void findAllObjectsImpl(Collection<String> out, Path path) {
+        var read = path.toFile().listFiles();
+        if (read == null) return;
+
+        for (var s : read) {
+            if (s.isDirectory()) {
+                findAllObjectsImpl(out, s.toPath());
+                return;
+            } else {
+                var rel = metaPath.relativize(s.toPath());
+                out.add(rel.toString());
+            }
+        }
+    }
+
     @Nonnull
     @Override
-    public List<String> findObjects(String prefix) {
-        Path nsRoot = Paths.get(root);
-
-        if (!nsRoot.toFile().isDirectory())
-            throw new StatusRuntimeException(Status.NOT_FOUND);
-
-        var read = nsRoot.toFile().listFiles();
-        if (read == null) return List.of();
+    public Collection<String> findAllObjects() {
         ArrayList<String> out = new ArrayList<>();
-        for (var s : read) {
-            var rel = nsRoot.relativize(s.toPath()).toString();
-            if (rel.startsWith(prefix))
-                out.add(rel);
-        }
-        return out;
+        findAllObjectsImpl(out, metaPath);
+        return Collections.unmodifiableCollection(out);
     }
 
     @Nonnull
     @Override
     public Boolean existsObject(String name) {
-        Path obj = Paths.get(root, name);
-
-        return obj.toFile().isFile();
+        return getMetaPath(name).toFile().isFile();
     }
 
     @Nonnull
     @Override
-    public BlobP readObject(String name) {
-        var file = Path.of(root, name);
+    public Boolean existsObjectData(String name) {
+        return getDataPath(name).toFile().isFile();
+    }
 
-        try (var fsb = new FileInputStream(file.toFile());
+    private <T extends Message> T readObjectImpl(T defaultInstance, Path path) {
+        try (var fsb = new FileInputStream(path.toFile());
              var fs = new BufferedInputStream(fsb, 1048576)) {
-            return BlobP.parseFrom(fs);
+            return (T) defaultInstance.getParserForType().parseFrom(fs);
         } catch (FileNotFoundException | NoSuchFileException fx) {
-            throw new StatusRuntimeException(Status.NOT_FOUND);
+            throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
         } catch (IOException e) {
-            Log.error("Error reading file " + file, e);
-            throw new StatusRuntimeException(Status.INTERNAL);
+            Log.error("Error reading file " + path, e);
+            throw new StatusRuntimeExceptionNoStacktrace(Status.INTERNAL);
         }
     }
 
+    @Nonnull
     @Override
-    public void writeObject(String name, BlobP data) {
-        var file = Path.of(root, name);
+    public JObjectDataP readObject(String name) {
+        return readObjectImpl(JObjectDataP.getDefaultInstance(), getDataPath(name));
+    }
 
+    @Nonnull
+    @Override
+    public ObjectMetadataP readObjectMeta(String name) {
+        return readObjectImpl(ObjectMetadataP.getDefaultInstance(), getMetaPath(name));
+    }
+
+    private void writeObjectImpl(Path path, Message data) {
         try {
-            try (var fsb = new FileOutputStream(file.toFile(), false);
+            var file = path.toFile();
+            file.getParentFile().mkdirs();
+            try (var fsb = new FileOutputStream(file, false);
                  var fs = new BufferedOutputStream(fsb, 1048576)) {
                 data.writeTo(fs);
             }
         } catch (IOException e) {
-            Log.error("Error writing file " + file, e);
-            throw new StatusRuntimeException(Status.INTERNAL);
+            Log.error("Error writing file " + path, e);
+            throw new StatusRuntimeExceptionNoStacktrace(Status.INTERNAL);
         }
     }
 
     @Override
-    public void deleteObject(String name) {
-        var file = Path.of(root, name);
+    public void writeObject(String name, JObjectDataP data) {
+        writeObjectImpl(getDataPath(name), data);
+    }
 
+    @Override
+    public void writeObjectMeta(String name, ObjectMetadataP data) {
+        writeObjectImpl(getMetaPath(name), data);
+    }
+
+    private void deleteImpl(Path path) {
         try {
-            Files.delete(file);
+            Files.delete(path);
         } catch (NoSuchFileException ignored) {
         } catch (IOException e) {
-            Log.error("Error deleting file " + file, e);
-            throw new StatusRuntimeException(Status.INTERNAL);
+            Log.error("Error deleting file " + path, e);
+            throw new StatusRuntimeExceptionNoStacktrace(Status.INTERNAL);
         }
+    }
+
+    @Override
+    public void deleteObjectData(String name) {
+        deleteImpl(getDataPath(name));
+    }
+
+    @Override
+    public void deleteObject(String name) {
+        deleteImpl(getDataPath(name));
+        // FIXME: Race?
+        deleteImpl(getMetaPath(name));
     }
 }

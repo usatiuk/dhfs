@@ -80,7 +80,7 @@ public class ProtoSerializerService {
     }
 
     // FIXME: This is annoying
-    public <O> Optional<JObjectDataP> serializeToJObjectDataPInternal(O object) {
+    private <O> Optional<JObjectDataP> serializeToJObjectDataPInternal(O object) {
         var ser = serialize(object);
         if (ser instanceof FileP) {
             return Optional.of(JObjectDataP.newBuilder().setFile((FileP) ser).build());
@@ -104,22 +104,6 @@ public class ProtoSerializerService {
         if (object == null) throw new IllegalArgumentException("Object to serialize shouldn't be null");
 
         return serializeToJObjectDataPInternal(object).orElseThrow(() -> new IllegalStateException("Unknown JObjectDataP type: " + object.getClass()));
-    }
-
-    public <O> BlobP serializeToBlobP(O object) {
-        if (object == null) throw new IllegalArgumentException("Object to serialize shouldn't be null");
-
-        var jobjd = serializeToJObjectDataPInternal(object);
-        if (jobjd.isPresent()) {
-            return BlobP.newBuilder().setData((JObjectDataP) jobjd.get()).build();
-        }
-
-        var ser = serialize(object);
-        if (ser instanceof ObjectMetadataP) {
-            return BlobP.newBuilder().setMetadata((ObjectMetadataP) ser).build();
-        } else {
-            throw new IllegalStateException("Unknown BlobP type: " + ser.getClass());
-        }
     }
 
     public <M extends Message, O> O deserialize(M message) {

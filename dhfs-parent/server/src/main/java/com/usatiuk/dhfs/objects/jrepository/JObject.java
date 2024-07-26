@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
+import com.usatiuk.utils.VoidFn;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -320,11 +321,6 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         NO_RESOLUTION,
         LOCAL_ONLY,
         REMOTE
-    }
-
-    @FunctionalInterface
-    public interface VoidFn {
-        void apply();
     }
 
     @FunctionalInterface

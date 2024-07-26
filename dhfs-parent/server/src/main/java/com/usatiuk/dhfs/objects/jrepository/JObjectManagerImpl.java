@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
-import com.usatiuk.dhfs.objects.persistence.BlobP;
+import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
@@ -79,9 +79,9 @@ public class JObjectManagerImpl implements JObjectManager {
             }
         }
 
-        BlobP readMd;
+        ObjectMetadataP readMd;
         try {
-            readMd = objectPersistentStore.readObject("meta_" + name);
+            readMd = objectPersistentStore.readObjectMeta(name);
         } catch (StatusRuntimeException ex) {
             if (ex.getStatus().getCode().equals(Status.NOT_FOUND.getCode()))
                 return Optional.empty();
@@ -110,7 +110,7 @@ public class JObjectManagerImpl implements JObjectManager {
     @Override
     public Collection<JObject<?>> find(String prefix) {
         var ret = new ArrayList<JObject<?>>();
-        for (var f : objectPersistentStore.findObjects("meta_")) {
+        for (var f : objectPersistentStore.findAllObjects()) {
             var got = get(f.substring(5));
             if (got.isPresent())
                 ret.add(got.get());

@@ -1,22 +1,33 @@
 package com.usatiuk.dhfs.objects.repository.persistence;
 
-import com.google.protobuf.ByteString;
-import com.usatiuk.dhfs.objects.persistence.BlobP;
+import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
+import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
 
 import javax.annotation.Nonnull;
-import java.util.List;
+import java.util.Collection;
 
 public interface ObjectPersistentStore {
     @Nonnull
-    List<String> findObjects(String prefix);
+    Collection<String> findAllObjects();
 
     @Nonnull
     Boolean existsObject(String name);
 
     @Nonnull
-    BlobP readObject(String name);
+    Boolean existsObjectData(String name);
 
-    void writeObject(String name, BlobP data);
+    @Nonnull
+    JObjectDataP readObject(String name);
 
+    @Nonnull
+    ObjectMetadataP readObjectMeta(String name);
+
+    void writeObject(String name, JObjectDataP data);
+
+    void writeObjectMeta(String name, ObjectMetadataP data);
+
+    void deleteObjectData(String name);
+
+    // Deletes object metadata and data
     void deleteObject(String name);
 }

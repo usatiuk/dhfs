@@ -58,7 +58,7 @@ public class JObjectResolver {
 
     public boolean hasLocalCopy(JObject<?> self) {
         if (!self.isDeleted() && refVerification) {
-            if (self.hasLocalCopyMd() && !(self.getData() != null || objectPersistentStore.existsObject(self.getName())))
+            if (self.hasLocalCopyMd() && !(self.getData() != null || objectPersistentStore.existsObjectData(self.getName())))
                 throw new IllegalStateException("hasLocalCopy mismatch for " + self.getName());
         }
         // FIXME: Read/write lock assert?
@@ -159,7 +159,7 @@ public class JObjectResolver {
     public <T extends JObjectData> Optional<T> resolveDataLocal(JObject<T> jObject) {
         // jObject.assertRWLock();
         // FIXME: No way to assert read lock?
-        if (objectPersistentStore.existsObject(jObject.getName()))
+        if (objectPersistentStore.existsObjectData(jObject.getName()))
             return Optional.of(protoSerializerService.deserialize(objectPersistentStore.readObject(jObject.getName())));
         return Optional.empty();
     }
@@ -177,7 +177,7 @@ public class JObjectResolver {
             Log.trace("Invalidating " + name);
             jObject.getMeta().getHaveLocalCopy().set(false);
             jObjectWriteback.remove(jObject);
-            objectPersistentStore.deleteObject(name);
+            objectPersistentStore.deleteObjectData(name);
         } catch (StatusRuntimeException sx) {
             if (sx.getStatus() != Status.NOT_FOUND)
                 Log.info("Couldn't delete object from persistent store: ", sx);

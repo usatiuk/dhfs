@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.persistence;
 
-import com.usatiuk.dhfs.objects.persistence.BlobP;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.persistence.PeerDirectoryP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
@@ -22,9 +21,13 @@ public class ProtoSerializationTest {
     void SerializeDeserializePeerDirectory() {
         var pd = new PeerDirectory();
         pd.getPeers().add(UUID.randomUUID());
-        var ser = BlobP.newBuilder().setData(JObjectDataP.newBuilder().setPeerDirectory((PeerDirectoryP) protoSerializerService.serialize(pd)).build()).build();
+        var ser = JObjectDataP.newBuilder().setPeerDirectory((PeerDirectoryP) protoSerializerService.serialize(pd)).build();
         var deser = (PeerDirectory) protoSerializerService.deserialize(ser);
         Assertions.assertIterableEquals(pd.getPeers(), deser.getPeers());
+
+        var ser2 = protoSerializerService.serializeToJObjectDataP(pd);
+        var deser2 = (PeerDirectory) protoSerializerService.deserialize(ser2);
+        Assertions.assertIterableEquals(pd.getPeers(), deser2.getPeers());
     }
 
 }

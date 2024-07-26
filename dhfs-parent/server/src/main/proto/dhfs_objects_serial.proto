@@ -68,10 +68,3 @@ message JObjectDataP {
     PersistentPeerInfoP persistentPeerInfo = 7;
   }
 }
-
-message BlobP {
-  oneof dtype {
-    ObjectMetadataP metadata = 1;
-    JObjectDataP data = 2;
-  }
-}
