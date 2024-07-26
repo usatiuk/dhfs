@@ -44,7 +44,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
             metaPath.toFile().mkdirs();
             dataPath.toFile().mkdirs();
             for (int i = 0; i < 256; i++) {
-                for (int j = 0; j < 256; j++) {
+                for (int j = 0; j < 16; j++) {
                     metaPath.resolve(String.valueOf(i)).resolve(String.valueOf(j)).toFile().mkdirs();
                     dataPath.resolve(String.valueOf(i)).resolve(String.valueOf(j)).toFile().mkdirs();
                 }
@@ -59,7 +59,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     private Pair<String, String> getDirPathComponents(@Nonnull String obj) {
         int h = Objects.hash(obj);
         int p1 = h & 0b00000000_00000000_11111111_00000000;
-        int p2 = h & 0b00000000_00000000_00000000_11111111;
+        int p2 = h & 0b00000000_00000000_00000000_00001111;
         return Pair.ofNonNull(String.valueOf(p1 >> 8), String.valueOf(p2));
     }
 
