@@ -189,6 +189,8 @@ public class RemoteHostManager {
             if (prev == null)
                 Log.trace("Ignoring new address from unknown host " + ": addr=" + addr + " port=" + port);
             return;
+        } else {
+            _seenHostsButNotAdded.remove(host);
         }
 
         _transientPeersState.runWriteLocked(d -> {
