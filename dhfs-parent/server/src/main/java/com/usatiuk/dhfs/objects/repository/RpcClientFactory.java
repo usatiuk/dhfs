@@ -54,8 +54,11 @@ public class RpcClientFactory {
         var hostinfo = remoteHostManager.getTransientState(target);
         boolean reachable = remoteHostManager.isReachable(target);
 
-        if (hostinfo.getAddr() == null || !reachable)
+        if (hostinfo.getAddr() == null)
             throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Address for " + target + " not yet known"));
+
+        if (!reachable)
+            throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Not known to be reachable: " + target));
 
         return withObjSyncClient(target.toString(), hostinfo.getAddr(), hostinfo.getSecurePort(), syncTimeout, fn);
     }
