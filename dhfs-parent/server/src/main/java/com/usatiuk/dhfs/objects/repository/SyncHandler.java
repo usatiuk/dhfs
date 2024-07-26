@@ -43,8 +43,10 @@ public class SyncHandler {
         // they didn't thing we were disconnected
         var objs = jObjectManager.findAll();
 
-        for (var obj : objs)
+        for (var obj : objs) {
+            Log.trace("IS: " + obj.getName() + " to " + host);
             invalidationQueueService.pushInvalidationToOne(host, obj.getName());
+        }
     }
 
     public void handleOneUpdate(UUID from, ObjectHeader header) {
