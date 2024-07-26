@@ -12,6 +12,7 @@ import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
+import jakarta.annotation.Nullable;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -107,8 +108,13 @@ public class PersistentRemoteHostsService {
         return (JObject<PeerDirectory>) got;
     }
 
-    private void pushPeerUpdates(JObject<?> obj) {
-        Log.info("Scheduling certificate update after " + obj.getName() + " was updated");
+    private void pushPeerUpdates() {
+        pushPeerUpdates(null);
+    }
+
+    private void pushPeerUpdates(@Nullable JObject<?> obj) {
+        if (obj != null)
+            Log.info("Scheduling certificate update after " + obj.getName() + " was updated");
         executorService.submit(() -> {
             updateCerts();
             invalidationQueueService.pushInvalidationToAll(PeerDirectory.PeerDirectoryObjName);
@@ -192,8 +198,6 @@ public class PersistentRemoteHostsService {
             }
             return addedInner;
         });
-        if (added)
-            updateCerts();
         return added;
     }
 
@@ -210,19 +214,22 @@ public class PersistentRemoteHostsService {
             }
             return removedInner;
         });
-        if (removed)
-            updateCerts();
         return removed;
     }
 
     private void updateCerts() {
-        getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
-            peerTrustManager.reloadTrustManagerHosts(getHostsNoNulls());
-            // Fixme:? I don't think it should be needed with custom trust store
-            // but it doesn't work?
-            rpcClientFactory.dropCache();
-            return null;
-        });
+        try {
+            getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
+                peerTrustManager.reloadTrustManagerHosts(getHostsNoNulls());
+                // Fixme:? I don't think it should be needed with custom trust store
+                // but it doesn't work?
+                rpcClientFactory.dropCache();
+                return null;
+            });
+        } catch (Exception ex) {
+            Log.error("Error when refreshing certificates, will retry", ex);
+            pushPeerUpdates();
+        }
     }
 
     public boolean existsHost(UUID uuid) {
