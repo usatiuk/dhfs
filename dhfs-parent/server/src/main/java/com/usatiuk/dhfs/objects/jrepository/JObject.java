@@ -20,6 +20,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     private final ObjectMetadata _metaPart;
     private final JObjectResolver _resolver;
     private final AtomicReference<T> _dataPart = new AtomicReference<>();
+    private static final int lockTimeoutSecs = 15;
 
     // Create a new object
     protected JObject(JObjectResolver resolver, String name, UUID selfUuid, T obj) {
@@ -177,7 +178,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
 
     public boolean tryRLock() {
         try {
-            return _lock.readLock().tryLock(5, TimeUnit.SECONDS);
+            return _lock.readLock().tryLock(lockTimeoutSecs, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -185,7 +186,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
 
     public boolean tryRWLock() {
         try {
-            return _lock.writeLock().tryLock(5, TimeUnit.SECONDS);
+            return _lock.writeLock().tryLock(lockTimeoutSecs, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }

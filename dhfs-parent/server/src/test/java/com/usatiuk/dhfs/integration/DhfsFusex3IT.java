@@ -53,7 +53,7 @@ public class DhfsFusex3IT {
                                         "-Ddhfs.objects.invalidation.delay=100",
                                         "-Ddhfs.objects.deletion.delay=0",
                                         "-Ddhfs.objects.ref_verification=true",
-                                        "-Ddhfs.objects.sync.timeout=2",
+                                        "-Ddhfs.objects.sync.timeout=20",
                                         "-Ddhfs.objects.reconnect_interval=1s",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
                                         "-jar", "/app/quarkus-run.jar")
