@@ -181,7 +181,7 @@ jobs:
 
       - uses: actions/download-artifact@v3
         with:
-          name: DHFS Package
+          name: DHFS Server Package
           path: dhfs-package-downloaded
 
       - uses: actions/download-artifact@v3
