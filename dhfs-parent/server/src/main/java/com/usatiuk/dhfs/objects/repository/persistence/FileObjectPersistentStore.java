@@ -39,9 +39,17 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     }
 
     void init(@Observes @Priority(200) StartupEvent event) {
-        metaPath.toFile().mkdirs();
-        dataPath.toFile().mkdirs();
-        Log.info("Initializing with root " + root);
+        if (!metaPath.toFile().exists()) {
+            Log.info("Initializing with root " + root);
+            metaPath.toFile().mkdirs();
+            dataPath.toFile().mkdirs();
+            for (int i = 0; i < 256; i++) {
+                for (int j = 0; j < 256; j++) {
+                    metaPath.resolve(String.valueOf(i)).resolve(String.valueOf(j)).toFile().mkdirs();
+                    dataPath.resolve(String.valueOf(i)).resolve(String.valueOf(j)).toFile().mkdirs();
+                }
+            }
+        }
     }
 
     void shutdown(@Observes @Priority(400) ShutdownEvent event) {
@@ -124,9 +132,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     private void writeObjectImpl(Path path, Message data) {
         try {
-            var file = path.toFile();
-            file.getParentFile().mkdirs();
-            try (var fsb = new FileOutputStream(file, false);
+            try (var fsb = new FileOutputStream(path.toFile(), false);
                  var fs = new BufferedOutputStream(fsb, 1048576)) {
                 data.writeTo(fs);
             }
