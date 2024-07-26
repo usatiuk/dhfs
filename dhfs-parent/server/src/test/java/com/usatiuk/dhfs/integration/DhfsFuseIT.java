@@ -50,6 +50,7 @@ public class DhfsFuseIT {
                                         "-Ddhfs.objects.ref_verification=true",
                                         "-Ddhfs.objects.deletion.delay=0",
                                         "-Ddhfs.objects.sync.timeout=20",
+                                        "-Ddhfs.objects.sync.ping.timeout=20",
                                         "-Ddhfs.objects.reconnect_interval=1s",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
                                         "-jar", "/app/quarkus-run.jar")

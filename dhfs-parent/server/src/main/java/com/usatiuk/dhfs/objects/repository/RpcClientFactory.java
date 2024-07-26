@@ -21,9 +21,6 @@ public class RpcClientFactory {
     @ConfigProperty(name = "dhfs.objects.sync.timeout")
     long syncTimeout;
 
-    @ConfigProperty(name = "dhfs.objects.peersync.timeout")
-    long peerSyncTimeout;
-
     @Inject
     RemoteHostManager remoteHostManager;
 
