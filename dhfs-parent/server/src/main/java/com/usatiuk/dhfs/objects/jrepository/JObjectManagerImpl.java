@@ -15,10 +15,11 @@ import lombok.Getter;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 @ApplicationScoped
 public class JObjectManagerImpl implements JObjectManager {
@@ -108,14 +109,9 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     @Override
-    public Collection<JObject<?>> find(String prefix) {
-        var ret = new ArrayList<JObject<?>>();
-        for (var f : objectPersistentStore.findAllObjects()) {
-            var got = get(f.substring(5));
-            if (got.isPresent())
-                ret.add(got.get());
-        }
-        return ret;
+    public Collection<JObject<?>> findAll() {
+        Stream<JObject<?>> x = objectPersistentStore.findAllObjects().stream().map(f -> get(f).orElse(null));
+        return x.filter(Objects::nonNull).toList(); // Somehow this is needed otherwise typing breaks
     }
 
     @Override

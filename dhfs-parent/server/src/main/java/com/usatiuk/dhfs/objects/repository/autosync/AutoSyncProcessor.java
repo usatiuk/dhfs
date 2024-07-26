@@ -48,7 +48,7 @@ public class AutoSyncProcessor {
 
         if (downloadAll)
             executorService.submit(() -> {
-                for (var obj : jObjectManager.find("")) {
+                for (var obj : jObjectManager.findAll()) {
                     if (!obj.hasLocalCopy())
                         add(obj.getName());
                 }

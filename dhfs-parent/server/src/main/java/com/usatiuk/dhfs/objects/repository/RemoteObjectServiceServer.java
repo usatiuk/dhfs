@@ -118,7 +118,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
         Log.info("<-- getIndex: from " + request.getSelfUuid());
 
-        var objs = jObjectManager.find("");
+        var objs = jObjectManager.findAll();
 
         var reqUuid = UUID.fromString(request.getSelfUuid());
 

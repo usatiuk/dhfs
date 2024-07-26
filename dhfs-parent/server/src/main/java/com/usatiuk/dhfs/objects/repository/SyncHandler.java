@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.objects.repository;
 
-import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
@@ -42,7 +41,7 @@ public class SyncHandler {
         remoteObjectServiceClient.getIndex(host);
         // Push our index to the other peer too, as they might not request it if
         // they didn't thing we were disconnected
-        var objs = jObjectManager.find("");
+        var objs = jObjectManager.findAll();
 
         for (var obj : objs)
             invalidationQueueService.pushInvalidationToOne(host, obj.getName());
