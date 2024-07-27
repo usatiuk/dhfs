@@ -80,13 +80,13 @@ public class DhfsFileServiceSimpleTestImpl {
             var fo = jObjectManager.put(f, Optional.empty());
 
             var all = jObjectManager.findAll();
-            Assertions.assertTrue(all.contains(c1o));
-            Assertions.assertTrue(all.contains(c2o));
-            Assertions.assertTrue(all.contains(c3o));
-            Assertions.assertTrue(all.contains(c1io));
-            Assertions.assertTrue(all.contains(c2io));
-            Assertions.assertTrue(all.contains(c3io));
-            Assertions.assertTrue(all.contains(fo));
+            Assertions.assertTrue(all.contains(c1o.getName()));
+            Assertions.assertTrue(all.contains(c2o.getName()));
+            Assertions.assertTrue(all.contains(c3o.getName()));
+            Assertions.assertTrue(all.contains(c1io.getName()));
+            Assertions.assertTrue(all.contains(c2io.getName()));
+            Assertions.assertTrue(all.contains(c3io.getName()));
+            Assertions.assertTrue(all.contains(fo.getName()));
         }
 
         String all = "1234567891011";

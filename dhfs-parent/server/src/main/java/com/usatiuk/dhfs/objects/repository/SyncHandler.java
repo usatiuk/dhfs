@@ -44,8 +44,8 @@ public class SyncHandler {
         var objs = jObjectManager.findAll();
 
         for (var obj : objs) {
-            Log.trace("IS: " + obj.getName() + " to " + host);
-            invalidationQueueService.pushInvalidationToOne(host, obj.getName());
+            Log.trace("IS: " + obj + " to " + host);
+            invalidationQueueService.pushInvalidationToOne(host, obj);
         }
     }
 

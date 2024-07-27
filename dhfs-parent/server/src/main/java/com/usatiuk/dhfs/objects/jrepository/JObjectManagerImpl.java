@@ -111,14 +111,12 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     @Override
-    public Collection<JObject<?>> findAll() {
+    public Collection<String> findAll() {
         var out = _map.values().stream().map(SoftReference::get)
                 .filter(Objects::nonNull)
-                .collect(Collectors.toCollection((Supplier<LinkedHashSet<JObject<?>>>) LinkedHashSet::new));
-        objectPersistentStore.findAllObjects().stream()
-                .map(f -> get(f).orElse(null))
-                .filter(Objects::nonNull)
-                .forEach(out::add);
+                .map(JObject::getName)
+                .collect(Collectors.toCollection((Supplier<LinkedHashSet<String>>) LinkedHashSet::new));
+        out.addAll(objectPersistentStore.findAllObjects());
         return out;
     }
 

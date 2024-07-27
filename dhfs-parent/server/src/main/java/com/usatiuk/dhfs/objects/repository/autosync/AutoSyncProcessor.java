@@ -49,8 +49,9 @@ public class AutoSyncProcessor {
         if (downloadAll)
             executorService.submit(() -> {
                 for (var obj : jObjectManager.findAll()) {
-                    if (!obj.hasLocalCopy())
-                        add(obj.getName());
+                    var got = jObjectManager.get(obj);
+                    if (got.isEmpty() || !got.get().hasLocalCopy())
+                        add(obj);
                 }
             });
     }

@@ -7,7 +7,7 @@ public interface JObjectManager {
 
     Optional<JObject<?>> get(String name);
 
-    Collection<JObject<?>> findAll();
+    Collection<String> findAll();
 
     // Put a new object
     <T extends JObjectData> JObject<T> put(T object, Optional<String> parent);

@@ -123,8 +123,8 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         var reqUuid = UUID.fromString(request.getSelfUuid());
 
         for (var obj : objs) {
-            Log.trace("GI: " + obj.getName() + " to " + reqUuid);
-            invalidationQueueService.pushInvalidationToOne(reqUuid, obj.getName());
+            Log.trace("GI: " + obj + " to " + reqUuid);
+            invalidationQueueService.pushInvalidationToOne(reqUuid, obj);
         }
 
         return Uni.createFrom().item(GetIndexReply.getDefaultInstance());
