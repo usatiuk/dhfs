@@ -53,6 +53,7 @@ public class DhfsFusex3IT {
                                         "-Ddhfs.objects.invalidation.delay=100",
                                         "-Ddhfs.objects.deletion.delay=0",
                                         "-Ddhfs.objects.ref_verification=true",
+                                        "-Ddhfs.objects.write_log=true",
                                         "-Ddhfs.objects.sync.timeout=20",
                                         "-Ddhfs.objects.sync.ping.timeout=20",
                                         "-Ddhfs.objects.reconnect_interval=1s",

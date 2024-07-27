@@ -51,6 +51,9 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @ConfigProperty(name = "dhfs.objects.ref_verification")
     boolean refVerification;
 
+    @ConfigProperty(name = "dhfs.objects.write_log")
+    boolean writeLogging;
+
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
 
@@ -512,6 +515,21 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (meta, fDataU, bump, i) -> {
             if (!(fDataU instanceof File fData))
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+
+            if (writeLogging) {
+                StringBuffer sb = new StringBuffer();
+                sb.append("Writing to file: ");
+                sb.append(meta.getName());
+                sb.append(" size=");
+                sb.append(size(fileUuid));
+                sb.append(" ");
+                sb.append(offset);
+                sb.append(" ");
+                sb.append(data.length);
+                sb.append(" ");
+                sb.append(data);
+                Log.info(sb.toString());
+            }
 
             if (size(fileUuid) < offset)
                 truncate(fileUuid, offset);
