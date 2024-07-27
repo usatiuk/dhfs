@@ -115,16 +115,6 @@ public class FileConflictResolver implements ConflictResolver {
                     }
                     HashSet<String> oursNew = new HashSet<>(oursFile.getChunks().values());
 
-                    for (var cuuid : oursBackup) {
-                        if (!oursNew.contains(cuuid))
-                            jObjectManager
-                                    .get(ChunkInfo.getNameFromHash(cuuid))
-                                    .ifPresent(jObject -> jObject.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, d, b, v) -> {
-                                        mc.removeRef(oursFile.getName());
-                                        return null;
-                                    }));
-                    }
-
                     oursFile.setMtime(first.getMtime());
                     oursFile.setCtime(first.getCtime());
 
@@ -157,6 +147,16 @@ public class FileConflictResolver implements ConflictResolver {
                     } while (true);
 
                     bumpDir.apply();
+
+                    for (var cuuid : oursBackup) {
+                        if (!oursNew.contains(cuuid))
+                            jObjectManager
+                                    .get(ChunkInfo.getNameFromHash(cuuid))
+                                    .ifPresent(jObject -> jObject.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, d, b, v) -> {
+                                        mc.removeRef(oursFile.getName());
+                                        return null;
+                                    }));
+                    }
                 }
 
                 m.setChangelog(newChangelog);
