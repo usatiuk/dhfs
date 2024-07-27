@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects.repository;
 
 import com.usatiuk.dhfs.SerializationHelper;
+import com.usatiuk.dhfs.ShutdownChecker;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.jrepository.JObjectResolver;
@@ -31,6 +32,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
+
 @ApplicationScoped
 public class PersistentRemoteHostsService {
     final String dataFileName = "hosts";
@@ -48,6 +51,8 @@ public class PersistentRemoteHostsService {
     InvalidationQueueService invalidationQueueService;
     @Inject
     RpcClientFactory rpcClientFactory;
+    @Inject
+    ShutdownChecker shutdownChecker;
     private PersistentRemoteHosts _persistentData = new PersistentRemoteHosts();
 
     private UUID _selfUuid;
@@ -57,6 +62,9 @@ public class PersistentRemoteHostsService {
         Log.info("Initializing with root " + dataRoot);
         if (Paths.get(dataRoot).resolve(dataFileName).toFile().exists()) {
             Log.info("Reading hosts");
+            _persistentData = SerializationHelper.deserialize(Files.readAllBytes(Paths.get(dataRoot).resolve(dataFileName)));
+        } else if (Paths.get(dataRoot).resolve(dataFileName + ".bak").toFile().exists()) {
+            Log.warn("Reading hosts from backup");
             _persistentData = SerializationHelper.deserialize(Files.readAllBytes(Paths.get(dataRoot).resolve(dataFileName)));
         }
         _selfUuid = _persistentData.runReadLocked(PersistentRemoteHostsData::getSelfUuid);
@@ -78,6 +86,10 @@ public class PersistentRemoteHostsService {
             var dir = jObjectManager.put(newpd, Optional.empty());
         }
 
+        if (!shutdownChecker.lastShutdownClean()) {
+            _persistentData.getData().getIrregularShutdownCounter().addAndGet(1);
+        }
+
         jObjectResolver.registerWriteListener(PersistentPeerInfo.class, this::pushPeerUpdates);
         jObjectResolver.registerWriteListener(PeerDirectory.class, this::pushPeerUpdates);
 
@@ -89,12 +101,24 @@ public class PersistentRemoteHostsService {
 
         Files.writeString(Paths.get(dataRoot, "self_uuid"), _selfUuid.toString());
         Log.info("Self uuid is: " + _selfUuid.toString());
+        writeData();
     }
 
     void shutdown(@Observes @Priority(300) ShutdownEvent event) throws IOException {
         Log.info("Saving hosts");
-        Files.write(Paths.get(dataRoot).resolve(dataFileName), SerializationUtils.serialize(_persistentData));
+        writeData();
         Log.info("Shutdown");
+    }
+
+    private void writeData() {
+        try {
+            if (Paths.get(dataRoot).resolve(dataFileName).toFile().exists())
+                Files.move(Paths.get(dataRoot).resolve(dataFileName), Paths.get(dataRoot).resolve(dataFileName + ".bak"), REPLACE_EXISTING);
+            Files.write(Paths.get(dataRoot).resolve(dataFileName), SerializationUtils.serialize(_persistentData));
+        } catch (IOException iex) {
+            Log.error("Error writing persistent hosts data", iex);
+            throw new RuntimeException(iex);
+        }
     }
 
     private JObject<PeerDirectory> getPeerDirectory() {
@@ -153,7 +177,12 @@ public class PersistentRemoteHostsService {
     }
 
     public String getUniqueId() {
-        return _selfUuid.toString() + _persistentData.getData().getSelfCounter().addAndGet(1);
+        StringBuilder sb = new StringBuilder(64);
+        sb.append(_selfUuid);
+        sb.append(_persistentData.getData().getIrregularShutdownCounter());
+        sb.append("_");
+        sb.append(_persistentData.getData().getSelfCounter().addAndGet(1));
+        return sb.toString();
     }
 
     public PersistentPeerInfo getInfo(UUID name) {

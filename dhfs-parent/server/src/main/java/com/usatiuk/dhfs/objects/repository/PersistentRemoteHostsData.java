@@ -20,6 +20,8 @@ public class PersistentRemoteHostsData implements Serializable {
     @Getter
     private final AtomicLong _selfCounter = new AtomicLong();
     @Getter
+    private final AtomicLong _irregularShutdownCounter = new AtomicLong();
+    @Getter
     @Setter
     private X509Certificate _selfCertificate = null;
     @Getter

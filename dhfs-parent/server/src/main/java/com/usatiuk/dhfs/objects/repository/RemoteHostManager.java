@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.objects.repository;
 
+import com.usatiuk.dhfs.ShutdownChecker;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerSyncApiClientDynamic;
 import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
 import com.usatiuk.dhfs.objects.repository.webapi.AvailablePeerInfo;
@@ -34,6 +35,8 @@ public class RemoteHostManager {
     RpcClientFactory rpcClientFactory;
     @Inject
     PeerSyncApiClientDynamic peerSyncApiClient;
+    @Inject
+    ShutdownChecker shutdownChecker;
     @ConfigProperty(name = "dhfs.objects.sync.ping.timeout")
     long pingTimeout;
     private ExecutorService _heartbeatExecutor;
@@ -115,8 +118,11 @@ public class RemoteHostManager {
 
         Log.info("Connected to " + host);
 
-        if (persistentRemoteHostsService.markInitialSyncDone(host))
+        if (persistentRemoteHostsService.markInitialSyncDone(host) || !shutdownChecker.lastShutdownClean()) {
+            if (!shutdownChecker.lastShutdownClean())
+                Log.info("Resyncing with " + host + " as last shutdown wasn't clean");
             syncHandler.doInitialResync(host);
+        }
     }
 
     public void handleConnectionError(UUID host) {

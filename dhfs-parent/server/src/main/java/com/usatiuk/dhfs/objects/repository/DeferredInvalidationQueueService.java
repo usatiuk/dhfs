@@ -16,6 +16,8 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.UUID;
 
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
+
 @ApplicationScoped
 public class DeferredInvalidationQueueService {
     @Inject
@@ -33,7 +35,10 @@ public class DeferredInvalidationQueueService {
         Paths.get(dataRoot).toFile().mkdirs();
         Log.info("Initializing with root " + dataRoot);
         if (Paths.get(dataRoot).resolve(dataFileName).toFile().exists()) {
-            Log.info("Reading hosts");
+            Log.info("Reading invalidation queue");
+            _persistentData = SerializationHelper.deserialize(Files.readAllBytes(Paths.get(dataRoot).resolve(dataFileName)));
+        } else if (Paths.get(dataRoot).resolve(dataFileName + ".bak").toFile().exists()) {
+            Log.warn("Reading invalidation queue from backup");
             _persistentData = SerializationHelper.deserialize(Files.readAllBytes(Paths.get(dataRoot).resolve(dataFileName)));
         }
 
@@ -42,8 +47,20 @@ public class DeferredInvalidationQueueService {
 
     void shutdown(@Observes @Priority(300) ShutdownEvent event) throws IOException {
         Log.info("Saving deferred invalidations");
-        Files.write(Paths.get(dataRoot).resolve(dataFileName), SerializationUtils.serialize(_persistentData));
+        writeData();
         Log.info("Saved deferred invalidations");
+    }
+
+
+    private void writeData() {
+        try {
+            if (Paths.get(dataRoot).resolve(dataFileName).toFile().exists())
+                Files.move(Paths.get(dataRoot).resolve(dataFileName), Paths.get(dataRoot).resolve(dataFileName + ".bak"), REPLACE_EXISTING);
+            Files.write(Paths.get(dataRoot).resolve(dataFileName), SerializationUtils.serialize(_persistentData));
+        } catch (IOException iex) {
+            Log.error("Error writing deferred invalidations data", iex);
+            throw new RuntimeException(iex);
+        }
     }
 
     void returnForHost(UUID host) {
