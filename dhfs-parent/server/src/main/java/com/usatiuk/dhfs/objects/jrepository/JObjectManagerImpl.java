@@ -14,7 +14,7 @@ import jakarta.inject.Inject;
 import lombok.Getter;
 
 import java.lang.ref.ReferenceQueue;
-import java.lang.ref.SoftReference;
+import java.lang.ref.WeakReference;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class JObjectManagerImpl implements JObjectManager {
-    private final ConcurrentHashMap<String, NamedSoftReference> _map = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, NamedWeakReference> _map = new ConcurrentHashMap<>();
     private final ReferenceQueue<JObject<?>> _refQueue = new ReferenceQueue<>();
     @Inject
     ObjectPersistentStore objectPersistentStore;
@@ -56,7 +56,7 @@ public class JObjectManagerImpl implements JObjectManager {
     private void refCleanupThread() {
         try {
             while (!Thread.interrupted()) {
-                NamedSoftReference cur = (NamedSoftReference) _refQueue.remove();
+                NamedWeakReference cur = (NamedWeakReference) _refQueue.remove();
                 _map.remove(cur._key, cur);
             }
         } catch (InterruptedException ignored) {
@@ -102,7 +102,7 @@ public class JObjectManagerImpl implements JObjectManager {
         JObject<?> ret = null;
         var newObj = new JObject<>(jObjectResolver, (ObjectMetadata) meta);
         while (ret == null) {
-            var ref = _map.computeIfAbsent(name, k -> new NamedSoftReference(newObj, _refQueue));
+            var ref = _map.computeIfAbsent(name, k -> new NamedWeakReference(newObj, _refQueue));
             if (ref.get() == null) _map.remove(name, ref);
             else ret = ref.get();
         }
@@ -112,7 +112,7 @@ public class JObjectManagerImpl implements JObjectManager {
 
     @Override
     public Collection<String> findAll() {
-        var out = _map.values().stream().map(SoftReference::get)
+        var out = _map.values().stream().map(WeakReference::get)
                 .filter(Objects::nonNull)
                 .map(JObject::getName)
                 .collect(Collectors.toCollection((Supplier<LinkedHashSet<String>>) LinkedHashSet::new));
@@ -135,7 +135,7 @@ public class JObjectManagerImpl implements JObjectManager {
                     newObj.rwLock();
                     while (ret == null) {
                         JObject<?> finalNewObj = newObj;
-                        var ref = _map.computeIfAbsent(object.getName(), k -> new NamedSoftReference(finalNewObj, _refQueue));
+                        var ref = _map.computeIfAbsent(object.getName(), k -> new NamedWeakReference(finalNewObj, _refQueue));
                         if (ref.get() == null) _map.remove(object.getName(), ref);
                         else ret = ref.get();
                     }
@@ -192,7 +192,7 @@ public class JObjectManagerImpl implements JObjectManager {
             created.rwLock();
             try {
                 while (ret == null) {
-                    var ref = _map.computeIfAbsent(name, k -> new NamedSoftReference(created, _refQueue));
+                    var ref = _map.computeIfAbsent(name, k -> new NamedWeakReference(created, _refQueue));
                     if (ref.get() == null) _map.remove(name, ref);
                     else ret = ref.get();
                 }
@@ -210,11 +210,11 @@ public class JObjectManagerImpl implements JObjectManager {
         }
     }
 
-    private static class NamedSoftReference extends SoftReference<JObject<?>> {
+    private static class NamedWeakReference extends WeakReference<JObject<?>> {
         @Getter
         final String _key;
 
-        public NamedSoftReference(JObject<?> target, ReferenceQueue<JObject<?>> q) {
+        public NamedWeakReference(JObject<?> target, ReferenceQueue<JObject<?>> q) {
             super(target, q);
             this._key = target.getName();
         }
