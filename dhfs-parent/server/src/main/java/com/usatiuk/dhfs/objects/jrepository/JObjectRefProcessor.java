@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
-import com.google.common.collect.Streams;
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.objects.repository.autosync.AutoSyncProcessor;
@@ -15,7 +14,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Stream;
 
 @ApplicationScoped
 public class JObjectRefProcessor {
@@ -171,12 +169,14 @@ public class JObjectRefProcessor {
                         m.markDeleted();
 
                         Collection<String> extracted = null;
-                        if (got.getData() != null) extracted = got.getData().extractRefs();
+                        if (got.getData() != null)
+                            extracted = got.getData().extractRefs();
+                        Collection<String> saved = got.getMeta().getSavedRefs();
 
                         got.discardData();
 
-                        if (got.getMeta().getSavedRefs() != null)
-                            for (var r : got.getMeta().getSavedRefs()) deleteRef(got, r);
+                        if (saved != null)
+                            for (var r : saved) deleteRef(got, r);
                         if (extracted != null)
                             for (var r : extracted) deleteRef(got, r);
 

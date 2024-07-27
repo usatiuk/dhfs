@@ -150,12 +150,14 @@ public class JObjectResolver {
         self.getMeta().markDeleted();
 
         Collection<String> extracted = null;
-        if (self.getData() != null) extracted = self.getData().extractRefs();
+        if (self.getData() != null)
+            extracted = self.getData().extractRefs();
+        Collection<String> saved = self.getMeta().getSavedRefs();
 
         self.discardData();
 
-        if (self.getMeta().getSavedRefs() != null)
-            for (var r : self.getMeta().getSavedRefs()) quickDeleteRef(self, r);
+        if (saved != null)
+            for (var r : saved) quickDeleteRef(self, r);
         if (extracted != null)
             for (var r : extracted) quickDeleteRef(self, r);
     }
