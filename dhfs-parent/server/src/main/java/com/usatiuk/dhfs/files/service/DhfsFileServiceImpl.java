@@ -527,7 +527,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 sb.append(" ");
                 sb.append(data.length);
                 sb.append(" ");
-                sb.append(data);
+                sb.append(Arrays.toString(data));
                 Log.info(sb.toString());
             }
 
