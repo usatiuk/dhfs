@@ -11,6 +11,7 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -51,7 +52,11 @@ public class InvalidationQueueService {
 
     @Startup
     void init() {
-        _executor = Executors.newFixedThreadPool(threads);
+        BasicThreadFactory factory = new BasicThreadFactory.Builder()
+                .namingPattern("invalidation-%d")
+                .build();
+
+        _executor = Executors.newFixedThreadPool(threads, factory);
 
         for (int i = 0; i < threads; i++) {
             _executor.submit(this::sender);

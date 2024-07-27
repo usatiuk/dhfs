@@ -11,6 +11,7 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.concurrent.ExecutorService;
@@ -34,7 +35,11 @@ public class AutoSyncProcessor {
 
     @Startup
     void init() {
-        _autosyncExcecutor = Executors.newFixedThreadPool(autosyncThreads);
+        BasicThreadFactory factory = new BasicThreadFactory.Builder()
+                .namingPattern("autosync-%d")
+                .build();
+
+        _autosyncExcecutor = Executors.newFixedThreadPool(autosyncThreads, factory);
         for (int i = 0; i < autosyncThreads; i++) {
             _autosyncExcecutor.submit(this::autosync);
         }
