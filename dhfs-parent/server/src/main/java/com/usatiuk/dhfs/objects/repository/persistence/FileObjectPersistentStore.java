@@ -108,7 +108,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     private <T extends Message> T readObjectImpl(T defaultInstance, Path path) {
         try (var fsb = new FileInputStream(path.toFile());
-             var fs = new BufferedInputStream(fsb, 1048576)) {
+             var fs = new BufferedInputStream(fsb, 131072)) {
             return (T) defaultInstance.getParserForType().parseFrom(fs);
         } catch (FileNotFoundException | NoSuchFileException fx) {
             throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
@@ -133,7 +133,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     private void writeObjectImpl(Path path, Message data) {
         try {
             try (var fsb = new FileOutputStream(path.toFile(), false);
-                 var fs = new BufferedOutputStream(fsb, 1048576)) {
+                 var fs = new BufferedOutputStream(fsb, 131072)) {
                 data.writeTo(fs);
             }
         } catch (IOException e) {

@@ -16,6 +16,7 @@ import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Optional;
@@ -131,6 +132,13 @@ public class JObjectResolver {
         }
     }
 
+    private void quickDeleteRef(JObject<?> self, String name) {
+        jObjectManager.get(name).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
+            mc.removeRef(self.getName());
+            return null;
+        }));
+    }
+
     private void tryQuickDelete(JObject<?> self) {
         self.assertRWLock();
         self.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
@@ -138,21 +146,15 @@ public class JObjectResolver {
         Log.trace("Quick delete of: " + self.getName());
         self.getMeta().markDeleted();
 
-        Stream<String> refs = Stream.empty();
-
-        if (self.getMeta().getSavedRefs() != null)
-            refs = self.getMeta().getSavedRefs().stream();
-        if (self.getData() != null)
-            refs = Streams.concat(refs, self.getData().extractRefs().stream());
+        Collection<String> extracted = null;
+        if (self.getData() != null) extracted = self.getData().extractRefs();
 
         self.discardData();
 
-        refs.forEach(c -> {
-            jObjectManager.get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
-                mc.removeRef(self.getName());
-                return null;
-            }));
-        });
+        if (self.getMeta().getSavedRefs() != null)
+            for (var r : self.getMeta().getSavedRefs()) quickDeleteRef(self, r);
+        if (extracted != null)
+            for (var r : extracted) quickDeleteRef(self, r);
     }
 
     public <T extends JObjectData> Optional<T> resolveDataLocal(JObject<T> jObject) {
@@ -185,7 +187,8 @@ public class JObjectResolver {
         }
     }
 
-    public <T extends JObjectData> void notifyWrite(JObject<T> self, boolean metaChanged, boolean externalChanged, boolean hasDataChanged) {
+    public <T extends JObjectData> void notifyWrite(JObject<T> self, boolean metaChanged,
+                                                    boolean externalChanged, boolean hasDataChanged) {
         self.assertRWLock();
         if (metaChanged || hasDataChanged)
             jObjectWriteback.markDirty(self);

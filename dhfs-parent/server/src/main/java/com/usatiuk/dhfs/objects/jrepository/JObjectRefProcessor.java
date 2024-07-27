@@ -12,10 +12,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Stream;
@@ -138,6 +135,13 @@ public class JObjectRefProcessor {
         return false;
     }
 
+    private void deleteRef(JObject<?> self, String name) {
+        jObjectManager.get(name).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
+            mc.removeRef(self.getName());
+            return null;
+        }));
+    }
+
     private void refProcessorThread() {
         try {
             while (!Thread.interrupted()) {
@@ -149,38 +153,32 @@ public class JObjectRefProcessor {
                         next = _candidates.get(canDeleteRetryDelay);
                 }
 
-                var got = jObjectManager.get(next);
-                if (got.isEmpty()) continue;
+                var got = jObjectManager.get(next).orElse(null);
+                if (got == null) continue;
                 try {
-                    got.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, v, i) -> {
+                    got.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, v, i) -> {
                         if (m.isLocked()) return null;
                         if (m.isDeleted()) return null;
                         if (!m.isDeletionCandidate()) return null;
                         if (m.isSeen() && m.getKnownClass().isAnnotationPresent(Movable.class)) {
-                            if (!processMovable(got.get()))
+                            if (!processMovable(got))
                                 return null;
                         }
 
-                        got.get().tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
+                        got.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
 
                         Log.trace("Deleting " + m.getName());
                         m.markDeleted();
 
-                        Stream<String> refs = Stream.empty();
+                        Collection<String> extracted = null;
+                        if (got.getData() != null) extracted = got.getData().extractRefs();
 
-                        if (m.getSavedRefs() != null)
-                            refs = m.getSavedRefs().stream();
-                        if (got.get().getData() != null)
-                            refs = Streams.concat(refs, got.get().getData().extractRefs().stream());
+                        got.discardData();
 
-                        got.get().discardData();
-
-                        refs.forEach(c -> {
-                            jObjectManager.get(c).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
-                                mc.removeRef(m.getName());
-                                return null;
-                            }));
-                        });
+                        if (got.getMeta().getSavedRefs() != null)
+                            for (var r : got.getMeta().getSavedRefs()) deleteRef(got, r);
+                        if (extracted != null)
+                            for (var r : extracted) deleteRef(got, r);
 
                         return null;
                     });
