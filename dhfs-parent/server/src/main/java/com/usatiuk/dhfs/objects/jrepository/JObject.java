@@ -327,6 +327,7 @@ public class JObject<T extends JObjectData> {
         if (!isDeleted())
             throw new IllegalStateException("Expected to be deleted when discarding data");
         _dataPart.set(null);
+        _metaPart.setHaveLocalCopy(false);
         _metaPart.setSavedRefs(Collections.emptySet());
     }
 
