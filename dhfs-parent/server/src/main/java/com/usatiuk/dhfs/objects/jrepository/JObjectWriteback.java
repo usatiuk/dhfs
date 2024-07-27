@@ -124,6 +124,10 @@ public class JObjectWriteback {
                 try {
                     _currentSize.addAndGet(-got._size);
                     flushOne(got._obj);
+                    if (_currentSize.get() <= sizeLimit)
+                        synchronized (this) {
+                            this.notifyAll();
+                        }
                 } catch (Exception e) {
                     Log.error("Failed writing object " + got._obj.getName() + ", will retry.", e);
                     try {
@@ -197,12 +201,27 @@ public class JObjectWriteback {
         }
 
         if (_currentSize.get() > sizeLimit) {
-            try {
-                flushOneImmediate(object.getMeta(), object.getData());
-                return;
-            } catch (Exception e) {
-                Log.error("Failed writing object " + object.getName(), e);
-                throw e;
+            long started = System.currentTimeMillis();
+            final long timeout = 15000L; // FIXME:
+            boolean finished = false;
+            while (System.currentTimeMillis() - started < timeout) {
+                synchronized (this) {
+                    try {
+                        this.wait();
+                        finished = true;
+                    } catch (InterruptedException ignored) {
+                    }
+                }
+            }
+            if (!finished) {
+                Log.error("Timed out waiting for writeback to drain");
+                try {
+                    flushOneImmediate(object.getMeta(), object.getData());
+                    return;
+                } catch (Exception e) {
+                    Log.error("Failed writing object " + object.getName(), e);
+                    throw e;
+                }
             }
         }
 

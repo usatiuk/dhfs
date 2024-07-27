@@ -14,9 +14,6 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.lang.ref.Reference;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -46,7 +43,7 @@ public class InvalidationQueueService {
     private final HashSetDelayedBlockingQueue<Pair<UUID, String>> _queue;
     private final AtomicReference<ConcurrentHashSet<String>> _toAllQueue = new AtomicReference<>(new ConcurrentHashSet<>());
     private ExecutorService _executor;
-    private boolean _shutdown = false;
+    private volatile boolean _shutdown = false;
 
     public InvalidationQueueService(@ConfigProperty(name = "dhfs.objects.invalidation.delay") int delay) {
         _queue = new HashSetDelayedBlockingQueue<>(delay);
