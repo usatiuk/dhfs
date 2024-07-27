@@ -13,10 +13,14 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.lang.ref.Reference;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 @ApplicationScoped
 public class InvalidationQueueService {
@@ -39,8 +43,9 @@ public class InvalidationQueueService {
     int threads;
 
     private final HashSetDelayedBlockingQueue<Pair<UUID, String>> _queue;
-    private final HashSetDelayedBlockingQueue<String> _toAllQueue = new HashSetDelayedBlockingQueue<>(0);
+    private final AtomicReference<LinkedHashSet<String>> _toAllQueue = new AtomicReference<>(new LinkedHashSet<>());
     private ExecutorService _executor;
+    private boolean _shutdown = false;
 
     public InvalidationQueueService(@ConfigProperty(name = "dhfs.objects.invalidation.delay") int delay) {
         _queue = new HashSetDelayedBlockingQueue<>(delay);
@@ -56,6 +61,7 @@ public class InvalidationQueueService {
     }
 
     void shutdown(@Observes @Priority(10) ShutdownEvent event) throws InterruptedException {
+        _shutdown = true;
         _executor.shutdownNow();
         if (!_executor.awaitTermination(30, TimeUnit.SECONDS)) {
             Log.error("Failed to shut down invalidation sender thread");
@@ -63,14 +69,21 @@ public class InvalidationQueueService {
     }
 
     private void sender() {
-        try {
-            while (!Thread.interrupted()) {
+        while (!_shutdown) {
+            try {
                 try {
-                    var toAllProcess = _toAllQueue.getAll();
+                    LinkedHashSet<String> toAllQueue;
+                    synchronized (_toAllQueue) {
+                        toAllQueue = _toAllQueue.getPlain();
+                        if (!toAllQueue.isEmpty())
+                            _toAllQueue.setPlain(new LinkedHashSet<>());
+                        else
+                            toAllQueue = null;
+                    }
 
-                    if (!toAllProcess.isEmpty()) {
+                    if (toAllQueue != null) {
                         var hostInfo = remoteHostManager.getHostStateSnapshot();
-                        for (var o : toAllProcess) {
+                        for (var o : toAllQueue) {
                             for (var h : hostInfo.available())
                                 _queue.add(Pair.of(h, o));
                             for (var u : hostInfo.unavailable())
@@ -100,7 +113,7 @@ public class InvalidationQueueService {
                             Log.info("Failed to send invalidation to " + e.getLeft() + ", will retry", ex);
                             pushInvalidationToOne(e.getLeft(), e.getRight());
                         }
-                        if (Thread.interrupted()) {
+                        if (_shutdown) {
                             Log.info("Invalidation sender exiting");
                             break;
                         }
@@ -113,8 +126,8 @@ public class InvalidationQueueService {
                 } catch (Exception e) {
                     Log.error("Exception in invalidation sender thread: ", e);
                 }
+            } catch (InterruptedException ignored) {
             }
-        } catch (InterruptedException ignored) {
         }
         Log.info("Invalidation sender exiting");
         var data = _queue.close();
@@ -124,7 +137,10 @@ public class InvalidationQueueService {
     }
 
     public void pushInvalidationToAll(String name) {
-        _toAllQueue.add(name);
+        synchronized (_toAllQueue) {
+            _toAllQueue.getPlain().add(name);
+        }
+        _queue.interruptOneIfEmpty();
     }
 
     public void pushInvalidationToOne(UUID host, String name) {

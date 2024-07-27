@@ -144,7 +144,7 @@ public class HashSetDelayedBlockingQueueTest {
             }
         });
         var thing = queue.getAllWait(); // Theoretically you can get one...
-        if (thing.size() == 1) thing.add(queue.getAllWait().stream().findFirst());
+        if (thing.size() == 1) thing.add(queue.getAllWait().stream().findFirst().get());
         var gotTime = System.currentTimeMillis();
         Assertions.assertIterableEquals(List.of("hello1", "hello2"), thing);
         Assertions.assertTrue((gotTime - curTime) >= 1810);

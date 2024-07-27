@@ -207,4 +207,11 @@ public class HashSetDelayedBlockingQueue<T> {
         }
     }
 
+    public void interruptOneIfEmpty() {
+        synchronized (this) {
+            if (!_set.isEmpty()) return;
+            if (!_waiting.isEmpty())
+                _waiting.getFirst().interrupt();
+        }
+    }
 }
