@@ -59,6 +59,8 @@ public class JObjectWriteback {
     float watermarkLowRatio;
     @ConfigProperty(name = "dhfs.objects.writeback.threads")
     int writebackThreads;
+    @ConfigProperty(name = "dhfs.objects.writeback.delay")
+    long promotionDelay;
 
     private final AtomicLong _currentSize = new AtomicLong(0);
     private final AtomicBoolean _watermarkReached = new AtomicBoolean(false);
@@ -116,10 +118,7 @@ public class JObjectWriteback {
     private void writeback() {
         while (!_shutdown.get()) {
             try {
-                QueueEntry got
-                        = _watermarkReached.get()
-                        ? _writeQueue.getNoDelay()
-                        : _writeQueue.get();
+                QueueEntry got = _writeQueue.get();
 
                 try {
                     _currentSize.addAndGet(-got._size);
@@ -192,12 +191,14 @@ public class JObjectWriteback {
             if (!_watermarkReached.get()) {
                 Log.trace("Watermark reached");
                 _watermarkReached.set(true);
-                _writeQueue.interrupt();
+                _writeQueue.setDelay(0);
             }
         } else if (_currentSize.get() <= (watermarkLowRatio * sizeLimit)) {
-            if (_watermarkReached.get())
+            if (_watermarkReached.get()) {
                 Log.trace("Watermark reset");
-            _watermarkReached.set(false);
+                _watermarkReached.set(false);
+                _writeQueue.setDelay(promotionDelay);
+            }
         }
 
         if (_currentSize.get() > sizeLimit) {

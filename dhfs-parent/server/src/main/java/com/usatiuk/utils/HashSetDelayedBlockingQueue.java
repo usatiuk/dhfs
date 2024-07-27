@@ -3,37 +3,22 @@ package com.usatiuk.utils;
 import jakarta.annotation.Nullable;
 import lombok.Getter;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 
 public class HashSetDelayedBlockingQueue<T> {
-    private class SetElement {
-        private final T _el;
-        private final long _time;
-
-        private SetElement(T el, long time) {
-            _el = el;
-            _time = time;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            SetElement setElement = (SetElement) o;
-            return Objects.equals(_el, setElement._el);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hashCode(_el);
-        }
+    private record SetElement<T>(T el, long time) {
     }
 
-    private final LinkedHashMap<SetElement, SetElement> _set = new LinkedHashMap<>();
-    private final LinkedHashSet<Thread> _waiting = new LinkedHashSet<>();
+    private final LinkedHashMap<T, SetElement<T>> _set = new LinkedHashMap<>();
+
     @Getter
-    private final long _delay;
+    private long _delay;
+
     private boolean _closed = false;
+
+    private final Object _sleepSynchronizer = new Object();
 
     public HashSetDelayedBlockingQueue(long delay) {
         _delay = delay;
@@ -44,13 +29,15 @@ public class HashSetDelayedBlockingQueue<T> {
     public boolean add(T el) {
         synchronized (this) {
             if (_closed) throw new IllegalStateException("Adding to a queue that is closed!");
-            var sel = new SetElement(el, System.currentTimeMillis());
-            if (_set.put(sel, sel) == null) {
-                this.notify();
-                return true;
-            }
+
+            if (_set.containsKey(el))
+                return false;
+
+            _set.put(el, new SetElement<>(el, System.currentTimeMillis()));
+
+            this.notify();
+            return true;
         }
-        return false;
     }
 
     // Adds the object to the queue, if it exists re-adds it with a new delay
@@ -58,69 +45,73 @@ public class HashSetDelayedBlockingQueue<T> {
     public T readd(T el) {
         synchronized (this) {
             if (_closed) throw new IllegalStateException("Adding to a queue that is closed!");
-            var sel = new SetElement(el, System.currentTimeMillis());
-            SetElement contains = _set.putLast(sel, sel);
+
+            SetElement<T> old = _set.putLast(el, new SetElement<>(el, System.currentTimeMillis()));
             this.notify();
-            if (contains != null)
-                return contains._el;
-            else return null;
+
+            if (old != null)
+                return old.el();
+            else
+                return null;
         }
     }
 
-    // Adds the object to the queue, if it exists re-adds it with a new delay
-    // Returns true if the object wasn't in the queue
+    // Removes the object
     public T remove(T el) {
         synchronized (this) {
-            var rem = _set.remove(new SetElement(el, 0));
+            var rem = _set.remove(el);
             if (rem == null) return null;
-            return rem._el;
+            return rem.el();
         }
     }
 
-    public T get(Long timeout) throws InterruptedException {
-        long startedWaiting = System.currentTimeMillis();
-        try {
+    public T get(long timeout) throws InterruptedException {
+        long startedWaiting = timeout > 0 ? System.currentTimeMillis() : -1;
+
+        while (!Thread.interrupted()) {
+            long sleep;
             synchronized (this) {
-                _waiting.add(Thread.currentThread());
-            }
-            while (!Thread.interrupted()) {
-                long sleep;
-                synchronized (this) {
-                    while (_set.isEmpty()) {
-                        if (timeout == null) this.wait();
-                        else {
-                            this.wait(timeout);
-                            if (System.currentTimeMillis() > (startedWaiting + timeout)) return null;
-                        }
+                if (timeout > 0)
+                    if (System.currentTimeMillis() > (startedWaiting + timeout)) return null;
+
+                while (_set.isEmpty()) {
+                    if (timeout > 0) {
+                        this.wait(Math.max(timeout - (System.currentTimeMillis() - startedWaiting), 1));
+                        if (System.currentTimeMillis() > (startedWaiting + timeout)) return null;
+                    } else {
+                        this.wait();
                     }
-
-                    var curTime = System.currentTimeMillis();
-
-                    var first = _set.firstEntry().getValue()._time;
-                    if (first + _delay > curTime) sleep = (first + _delay) - curTime;
-                    else return _set.pollFirstEntry().getValue()._el;
                 }
-                Thread.sleep(sleep);
+
+                var curTime = System.currentTimeMillis();
+
+                var first = _set.firstEntry().getValue().time();
+
+                if (first + _delay > curTime)
+                    sleep = (first + _delay) - curTime;
+                else
+                    return _set.pollFirstEntry().getValue().el();
             }
-        } finally {
-            synchronized (this) {
-                Thread.interrupted();
-                _waiting.remove(Thread.currentThread());
+
+            if (timeout > 0)
+                sleep = Math.min(sleep, (startedWaiting + timeout) - System.currentTimeMillis());
+
+            if (sleep <= 0)
+                continue;
+
+            synchronized (_sleepSynchronizer) {
+                _sleepSynchronizer.wait(sleep);
             }
         }
+
         throw new InterruptedException();
     }
 
     public T get() throws InterruptedException {
-        return get(null);
-    }
-
-    public T getNoDelay() throws InterruptedException {
-        synchronized (this) {
-            while (_set.isEmpty()) this.wait();
-
-            return _set.pollFirstEntry().getValue()._el;
-        }
+        T ret;
+        do {
+        } while ((ret = get(-1)) == null);
+        return ret;
     }
 
     public boolean hasImmediate() {
@@ -129,7 +120,7 @@ public class HashSetDelayedBlockingQueue<T> {
 
             var curTime = System.currentTimeMillis();
 
-            var first = _set.firstEntry().getValue()._time;
+            var first = _set.firstEntry().getValue().time();
             return first + _delay <= curTime;
         }
     }
@@ -141,9 +132,12 @@ public class HashSetDelayedBlockingQueue<T> {
 
             var curTime = System.currentTimeMillis();
 
-            var first = _set.firstEntry().getValue()._time;
-            if (first + _delay > curTime) return null;
-            else return _set.pollFirstEntry().getValue()._el;
+            var first = _set.firstEntry().getValue().time();
+
+            if (first + _delay > curTime)
+                return null;
+            else
+                return _set.pollFirstEntry().getValue().el();
         }
     }
 
@@ -154,9 +148,9 @@ public class HashSetDelayedBlockingQueue<T> {
             var curTime = System.currentTimeMillis();
 
             while (!_set.isEmpty()) {
-                SetElement el = _set.firstEntry().getValue();
-                if (el._time + _delay > curTime) break;
-                out.add(_set.pollFirstEntry().getValue()._el);
+                SetElement<T> el = _set.firstEntry().getValue();
+                if (el.time() + _delay > curTime) break;
+                out.add(_set.pollFirstEntry().getValue().el());
             }
         }
 
@@ -166,78 +160,83 @@ public class HashSetDelayedBlockingQueue<T> {
     public Collection<T> close() {
         synchronized (this) {
             _closed = true;
-            var ret = _set.values().stream().map(o -> o._el).toList();
+            var ret = _set.values().stream().map(SetElement::el).toList();
             _set.clear();
             return ret;
         }
     }
 
     public Collection<T> getAllWait() throws InterruptedException {
-        return getAllWait(Integer.MAX_VALUE, -1);
+        Collection<T> out;
+        do {
+        } while ((out = getAllWait(Integer.MAX_VALUE, -1)).isEmpty());
+        return out;
     }
 
     public Collection<T> getAllWait(int max) throws InterruptedException {
-        return getAllWait(max, -1);
+        Collection<T> out;
+        do {
+        } while ((out = getAllWait(max, -1)).isEmpty());
+        return out;
     }
 
     public Collection<T> getAllWait(int max, long timeout) throws InterruptedException {
         ArrayList<T> out = new ArrayList<>();
+
         long startedWaiting = timeout > 0 ? System.currentTimeMillis() : -1;
-        try {
+
+        while (!Thread.interrupted()) {
+            if (timeout > 0)
+                if (System.currentTimeMillis() > (startedWaiting + timeout)) return out;
+
+            long sleep = 0;
+
             synchronized (this) {
-                _waiting.add(Thread.currentThread());
-            }
-            while (!Thread.interrupted()) {
-                if (timeout > 0)
-                    if (System.currentTimeMillis() > (startedWaiting + timeout)) return out;
-                long sleep = 0;
-                synchronized (this) {
-                    while (_set.isEmpty()) {
-                        if (timeout > 0) {
-                            this.wait(timeout);
-                            if (System.currentTimeMillis() > (startedWaiting + timeout))
-                                return out;
-                        } else {
-                            this.wait();
-                        }
-                    }
-
-                    var curTime = System.currentTimeMillis();
-
-                    var first = _set.firstEntry().getValue()._time;
-                    if (first + _delay > curTime) sleep = (first + _delay) - curTime;
-                    else {
-                        while (!_set.isEmpty() && (out.size() < max)) {
-                            SetElement el = _set.firstEntry().getValue();
-                            if (el._time + _delay > curTime) break;
-                            out.add(_set.pollFirstEntry().getValue()._el);
-                        }
+                while (_set.isEmpty()) {
+                    if (timeout > 0) {
+                        this.wait(Math.max(timeout - (System.currentTimeMillis() - startedWaiting), 1));
+                        if (System.currentTimeMillis() > (startedWaiting + timeout))
+                            return out;
+                    } else {
+                        this.wait();
                     }
                 }
 
-                if (timeout > 0) {
-                    var cur = System.currentTimeMillis();
-                    if (cur > (startedWaiting + timeout)) return out;
-                    sleep = Math.min(sleep, (startedWaiting + timeout) - cur);
-                }
+                var curTime = System.currentTimeMillis();
 
-                if (sleep > 0)
-                    Thread.sleep(sleep);
-                else
-                    return out;
+                var first = _set.firstEntry().getValue().time();
+                if (first + _delay > curTime)
+                    sleep = (first + _delay) - curTime;
+                else {
+                    while (!_set.isEmpty() && (out.size() < max)) {
+                        SetElement<T> el = _set.firstEntry().getValue();
+                        if (el.time() + _delay > curTime) break;
+                        out.add(_set.pollFirstEntry().getValue().el());
+                    }
+                }
             }
-        } finally {
-            synchronized (this) {
-                Thread.interrupted();
-                _waiting.remove(Thread.currentThread());
+
+            if (timeout > 0) {
+                var cur = System.currentTimeMillis();
+                if (cur > (startedWaiting + timeout)) return out;
+                sleep = Math.min(sleep, (startedWaiting + timeout) - cur);
             }
+
+            if (sleep > 0) {
+                synchronized (_sleepSynchronizer) {
+                    _sleepSynchronizer.wait(sleep);
+                }
+            } else
+                return out;
         }
+
         return out;
     }
 
-    public void interrupt() {
-        synchronized (this) {
-            for (var t : _waiting) t.interrupt();
+    public void setDelay(long delay) {
+        synchronized (_sleepSynchronizer) {
+            _delay = delay;
+            _sleepSynchronizer.notifyAll();
         }
     }
 }
