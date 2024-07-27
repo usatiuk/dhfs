@@ -276,6 +276,12 @@ public class DhfsFusex3IT {
         for (var c : List.of(container1, container2, container3)) {
             var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
             var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
+            Log.info("fileConflictTest2: " + ls);
+            Log.info("fileConflictTest2: " + cat);
+        }
+        for (var c : List.of(container1, container2, container3)) {
+            var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
+            var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
             Log.info(ls);
             Log.info(cat);
             Assertions.assertTrue(cat.getStdout().contains("test1"));
