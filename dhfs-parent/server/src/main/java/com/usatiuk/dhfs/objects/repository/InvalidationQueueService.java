@@ -6,6 +6,7 @@ import com.usatiuk.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.Startup;
+import io.vertx.core.impl.ConcurrentHashSet;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -43,7 +44,7 @@ public class InvalidationQueueService {
     int threads;
 
     private final HashSetDelayedBlockingQueue<Pair<UUID, String>> _queue;
-    private final AtomicReference<LinkedHashSet<String>> _toAllQueue = new AtomicReference<>(new LinkedHashSet<>());
+    private final AtomicReference<ConcurrentHashSet<String>> _toAllQueue = new AtomicReference<>(new ConcurrentHashSet<>());
     private ExecutorService _executor;
     private boolean _shutdown = false;
 
@@ -72,22 +73,27 @@ public class InvalidationQueueService {
         while (!_shutdown) {
             try {
                 try {
-                    LinkedHashSet<String> toAllQueue;
-                    synchronized (_toAllQueue) {
-                        toAllQueue = _toAllQueue.getPlain();
-                        if (!toAllQueue.isEmpty())
-                            _toAllQueue.setPlain(new LinkedHashSet<>());
-                        else
-                            toAllQueue = null;
-                    }
+                    if (!_queue.hasImmediate()) {
+                        ConcurrentHashSet<String> toAllQueue;
 
-                    if (toAllQueue != null) {
-                        var hostInfo = remoteHostManager.getHostStateSnapshot();
-                        for (var o : toAllQueue) {
-                            for (var h : hostInfo.available())
-                                _queue.add(Pair.of(h, o));
-                            for (var u : hostInfo.unavailable())
-                                deferredInvalidationQueueService.defer(u, o);
+                        while (true) {
+                            toAllQueue = _toAllQueue.get();
+                            if (toAllQueue != null) {
+                                if (_toAllQueue.compareAndSet(toAllQueue, null))
+                                    break;
+                            } else {
+                                break;
+                            }
+                        }
+
+                        if (toAllQueue != null) {
+                            var hostInfo = remoteHostManager.getHostStateSnapshot();
+                            for (var o : toAllQueue) {
+                                for (var h : hostInfo.available())
+                                    _queue.add(Pair.of(h, o));
+                                for (var u : hostInfo.unavailable())
+                                    deferredInvalidationQueueService.defer(u, o);
+                            }
                         }
                     }
 
@@ -137,8 +143,17 @@ public class InvalidationQueueService {
     }
 
     public void pushInvalidationToAll(String name) {
-        synchronized (_toAllQueue) {
-            _toAllQueue.getPlain().add(name);
+        while (true) {
+            var queue = _toAllQueue.get();
+            if (queue == null) {
+                var nq = new ConcurrentHashSet<String>();
+                if (!_toAllQueue.compareAndSet(null, nq)) continue;
+                queue = nq;
+            }
+
+            queue.add(name);
+
+            if (_toAllQueue.get() == queue) break;
         }
     }
 

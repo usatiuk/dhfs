@@ -124,6 +124,17 @@ public class HashSetDelayedBlockingQueue<T> {
         }
     }
 
+    public boolean hasImmediate() {
+        synchronized (this) {
+            if (_set.isEmpty()) return false;
+
+            var curTime = System.currentTimeMillis();
+
+            var first = _set.firstEntry().getValue()._time;
+            return first + _delay <= curTime;
+        }
+    }
+
     @Nullable
     public T tryGet() throws InterruptedException {
         synchronized (this) {
