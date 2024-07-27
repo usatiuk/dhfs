@@ -211,7 +211,7 @@ jobs:
         run: echo $GITHUB_RUN_ID > "run-wrapper-out/dhfs/app/"version
 
       - name: Tar run wrapper
-        run: tar -cvf ~/run-wrapper.tar.gz ./run-wrapper
+        run: tar -cvf ~/run-wrapper.tar.gz ./run-wrapper-out
 
       - uses: actions/upload-artifact@v3
         with:

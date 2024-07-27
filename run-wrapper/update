@@ -23,11 +23,14 @@ echo Downloading...
 
 cd "$SCRIPT_DIR"
 
+rm "Run wrapper.zip" || true
 rm "Run wrapper.tar.gz" || true
 rm -rf "dhfs" || true
 
-wget https://nightly.link/usatiuk/dhfs/actions/runs/$LATEST/Run%20wrapper.tar.gz
+wget https://nightly.link/usatiuk/dhfs/actions/runs/$LATEST/Run%20wrapper.zip
 
+unzip "Run wrapper.zip"
+rm "Run wrapper.zip"
 tar xvf "Run wrapper.tar.gz"
 
 rm -rf "DHFS Package"
