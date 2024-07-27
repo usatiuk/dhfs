@@ -103,7 +103,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         var ret = builder.build();
 
         if (!ret.getDeletionCandidate())
-            for (var rr : ret.getReferrersList())
+            for (var rr : request.getOurReferrersList())
                 autoSyncProcessor.add(rr);
 
         return Uni.createFrom().item(ret);
