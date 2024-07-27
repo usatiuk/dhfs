@@ -28,11 +28,13 @@ public class ObjectMetadata implements Serializable {
     @Getter
     private final Map<UUID, Long> _remoteCopies = new LinkedHashMap<>();
     private final AtomicReference<Class<? extends JObjectData>> _knownClass = new AtomicReference<>();
-    private final AtomicBoolean _seen = new AtomicBoolean(false);
-    private final AtomicBoolean _deleted = new AtomicBoolean(false);
     @Getter
-    private final HashSet<UUID> _confirmedDeletes = new HashSet<>();
-    private final Set<String> _referrers = new HashSet<>();
+    private volatile boolean _seen = false;
+    @Getter
+    private volatile boolean _deleted = false;
+    @Getter
+    private final HashSet<UUID> _confirmedDeletes = new LinkedHashSet<>();
+    private final Set<String> _referrers = new LinkedHashSet<>();
     @Getter
     @Setter
     private Map<UUID, Long> _changelog = new LinkedHashMap<>(4);
@@ -42,12 +44,14 @@ public class ObjectMetadata implements Serializable {
     @Getter
     private boolean _locked = false;
     @Getter
-    private AtomicBoolean _haveLocalCopy = new AtomicBoolean(false);
-    private transient AtomicBoolean _written = new AtomicBoolean(true);
+    @Setter
+    private volatile boolean _haveLocalCopy = false;
+    @Getter
+    private transient volatile boolean _written = true;
 
     public ObjectMetadata(String name, boolean written, Class<? extends JObjectData> knownClass) {
         _name = name;
-        _written.set(written);
+        _written = written;
         _knownClass.set(knownClass);
     }
 
@@ -69,37 +73,25 @@ public class ObjectMetadata implements Serializable {
     @Serial
     private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
         in.defaultReadObject();
-        _written = new AtomicBoolean(true);
-    }
-
-    public boolean isSeen() {
-        return _seen.get();
-    }
-
-    public boolean isDeleted() {
-        return _deleted.get();
+        _written = true;
     }
 
     public void markSeen() {
         Log.trace("Marking seen: " + getName());
-        _seen.set(true);
+        _seen = true;
     }
 
     public void markDeleted() {
-        _deleted.set(true);
+        _deleted = true;
     }
 
     public void undelete() {
         _confirmedDeletes.clear();
-        _deleted.set(false);
-    }
-
-    public boolean isWritten() {
-        return _written.get();
+        _deleted = false;
     }
 
     public void markWritten() {
-        _written.set(true);
+        _written = true;
     }
 
     public boolean isReferred() {
@@ -126,7 +118,8 @@ public class ObjectMetadata implements Serializable {
     public void addRef(String from) {
         _confirmedDeletes.clear();
         _referrers.add(from);
-        Log.trace("Adding ref " + from + " to " + getName());
+        if (Log.isTraceEnabled())
+            Log.trace("Adding ref " + from + " to " + getName());
     }
 
     public void removeRef(String from) {
@@ -134,7 +127,8 @@ public class ObjectMetadata implements Serializable {
             unlock();
             Log.error("Object " + getName() + " is locked, but we removed a reference to it, unlocking!");
         }
-        Log.trace("Removing ref " + from + " from " + getName());
+        if (Log.isTraceEnabled())
+            Log.trace("Removing ref " + from + " from " + getName());
         _referrers.remove(from);
     }
 

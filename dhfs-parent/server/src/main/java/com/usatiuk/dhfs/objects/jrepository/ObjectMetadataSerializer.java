@@ -28,7 +28,7 @@ public class ObjectMetadataSerializer implements ProtoSerializer<ObjectMetadataP
                 .putAllChangelog(object.getChangelog().entrySet().stream().collect(Collectors.toMap(e -> e.getKey().toString(), Map.Entry::getValue)))
                 .addAllSavedRefs(object.getSavedRefs() != null ? object.getSavedRefs() : Collections.emptyList())
                 .setLocked(object.isLocked())
-                .setHaveLocalCopy(object.getHaveLocalCopy().get())
+                .setHaveLocalCopy(object.isHaveLocalCopy())
                 .build();
     }
 
@@ -51,7 +51,7 @@ public class ObjectMetadataSerializer implements ProtoSerializer<ObjectMetadataP
             if (message.getLocked())
                 obj.lock();
             if (message.getHaveLocalCopy())
-                obj.getHaveLocalCopy().set(true);
+                obj.setHaveLocalCopy(true);
 
             return obj;
         } catch (ClassNotFoundException cx) {

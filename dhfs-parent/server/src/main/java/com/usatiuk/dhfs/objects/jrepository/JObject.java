@@ -75,10 +75,11 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     protected JObject(JObjectResolver resolver, String name, UUID selfUuid, T obj) {
         _resolver = resolver;
         _metaPart = new ObjectMetadata(name, false, obj.getClass());
-        _metaPart.getHaveLocalCopy().set(true);
+        _metaPart.setHaveLocalCopy(true);
         _dataPart.set(obj);
         _metaPart.getChangelog().put(selfUuid, 1L);
-        Log.trace("new JObject: " + getName());
+        if (Log.isTraceEnabled())
+            Log.trace("new JObject: " + getName());
     }
 
     // Create an object from existing metadata
@@ -133,7 +134,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     }
 
     protected boolean hasLocalCopyMd() {
-        return _metaPart.getHaveLocalCopy().get();
+        return _metaPart.isHaveLocalCopy();
     }
 
     public Class<? extends ConflictResolver> getConflictResolver() {
@@ -175,7 +176,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
                     var res = _resolver.resolveDataRemote(this);
                     _metaPart.narrowClass(res.getClass());
                     _dataPart.set(res);
-                    _metaPart.getHaveLocalCopy().set(true);
+                    _metaPart.setHaveLocalCopy(true);
                     hydrateRefs();
                     verifyRefs();
                 } // _dataPart.get() == null
@@ -218,7 +219,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             throw new IllegalStateException("Expected external resolution only for classes with pushResolution " + getName());
         _metaPart.narrowClass(data.getClass());
         _dataPart.set(data);
-        _metaPart.getHaveLocalCopy().set(true);
+        _metaPart.setHaveLocalCopy(true);
         if (!_metaPart.isLocked())
             _metaPart.lock();
         hydrateRefs();

@@ -179,7 +179,7 @@ public class JObjectResolver {
         jObject.assertRWLock();
         try {
             Log.debug("Invalidating " + name);
-            jObject.getMeta().getHaveLocalCopy().set(false);
+            jObject.getMeta().setHaveLocalCopy(false);
             jObjectWriteback.remove(jObject);
             objectPersistentStore.deleteObjectData(name);
         } catch (StatusRuntimeException sx) {
