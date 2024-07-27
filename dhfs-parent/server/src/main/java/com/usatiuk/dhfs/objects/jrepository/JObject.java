@@ -22,6 +22,54 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     private final AtomicReference<T> _dataPart = new AtomicReference<>();
     private static final int lockTimeoutSecs = 15;
 
+    private class TransactionState {
+        final int dataHash;
+        final int metaHash;
+        final int externalHash;
+        final boolean data;
+        final HashSet<String> oldRefs;
+
+        TransactionState() {
+            this.dataHash = _metaPart.dataHash();
+            this.metaHash = _metaPart.metaHash();
+            this.externalHash = _metaPart.externalHash();
+            this.data = _dataPart.get() != null || hasLocalCopy();
+
+            if (_resolver.refVerification) {
+                tryLocalResolve();
+                if (_dataPart.get() != null)
+                    oldRefs = new HashSet<>(_dataPart.get().extractRefs());
+                else
+                    oldRefs = null;
+            } else {
+                oldRefs = null;
+            }
+        }
+
+        void commit() {
+            _resolver.updateDeletionState(JObject.this);
+
+            var newDataHash = _metaPart.dataHash();
+            var newMetaHash = _metaPart.metaHash();
+            var newExternalHash = _metaPart.externalHash();
+            var newData = _dataPart.get() != null || hasLocalCopy();
+
+            if (_dataPart.get() != null)
+                _metaPart.narrowClass(_dataPart.get().getClass());
+
+            notifyWrite(
+                    newMetaHash != metaHash,
+                    newExternalHash != externalHash,
+                    newDataHash != dataHash
+                            || newData != data
+            );
+
+            verifyRefs(oldRefs);
+        }
+    }
+
+    private TransactionState _transactionState = null;
+
     // Create a new object
     protected JObject(JObjectResolver resolver, String name, UUID selfUuid, T obj) {
         _resolver = resolver;
@@ -65,7 +113,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         return _metaPart.getKnownClass();
     }
 
-    public void narrowClass(Class<? extends JObjectData> klass) {
+    protected void narrowClass(Class<? extends JObjectData> klass) {
         _metaPart.narrowClass(klass);
     }
 
@@ -83,7 +131,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         return _metaPart;
     }
 
-    public boolean hasLocalCopyMd() {
+    protected boolean hasLocalCopyMd() {
         return _metaPart.getHaveLocalCopy().get();
     }
 
@@ -131,7 +179,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
                     verifyRefs();
                 } // _dataPart.get() == null
             } finally {
-                _lock.writeLock().unlock();
+                rwUnlock();
             } // try
         } // _dataPart.get() == null
     }
@@ -151,7 +199,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
                     _dataPart.compareAndSet(null, res.get());
                 } // _dataPart.get() == null
             } finally {
-                _lock.readLock().unlock();
+                rUnlock();
             } // try
         } // _dataPart.get() == null
     }
@@ -195,11 +243,36 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     public void rwLock() {
         if (!tryRWLock())
             throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Failed to acquire write lock for " + getName()));
+        if (_lock.writeLock().getHoldCount() == 1) {
+            _transactionState = new TransactionState();
+        }
     }
 
     public void rLock() {
         if (!tryRLock())
             throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Failed to acquire read lock for " + getName()));
+    }
+
+    public void rUnlock() {
+        _lock.readLock().unlock();
+    }
+
+    public void rwUnlock() {
+        try {
+            if (_lock.writeLock().getHoldCount() == 1) {
+                _transactionState.commit();
+                _transactionState = null;
+            }
+        } catch (Exception ex) {
+            Log.error("When committing changes to " + getName(), ex);
+        } finally {
+            _lock.writeLock().unlock();
+        }
+    }
+
+    public void assertRWLock() {
+        if (!_lock.isWriteLockedByCurrentThread())
+            throw new IllegalStateException("Expected to be write-locked there: " + getName() + " " + Thread.currentThread().getName());
     }
 
     public <R> R runReadLocked(ResolutionStrategy resolutionStrategy, ObjectFnRead<T, R> fn) {
@@ -211,7 +284,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
                 throw new DeletedObjectAccessException();
             return fn.apply(_metaPart, _dataPart.get());
         } finally {
-            _lock.readLock().unlock();
+            rUnlock();
         }
     }
 
@@ -231,45 +304,15 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         rwLock();
         try {
             tryResolve(resolutionStrategy);
-
-            var dataHash = _metaPart.dataHash();
-            var metaHash = Objects.hash(_metaPart.metaHash(), dataHash);
-            var prevData = _dataPart.get() != null || hasLocalCopy();
-
-            HashSet<String> oldRefs = null;
-
-            if (_resolver.refVerification) {
-                tryLocalResolve();
-                if (_dataPart.get() != null)
-                    oldRefs = new HashSet<>(_dataPart.get().extractRefs());
-            }
-
             VoidFn invalidateFn = () -> {
                 tryLocalResolve();
                 _resolver.backupRefs(this);
                 _dataPart.set(null);
                 _resolver.removeLocal(this, _metaPart.getName());
             };
-            var ret = fn.apply(_metaPart, _dataPart.get(), this::bumpVer, invalidateFn);
-            _resolver.updateDeletionState(this);
-
-            var newDataHash = _metaPart.dataHash();
-            var newMetaHash = Objects.hash(_metaPart.metaHash(), newDataHash);
-            var newData = _dataPart.get() != null || hasLocalCopy();
-
-            if (_dataPart.get() != null)
-                _metaPart.narrowClass(_dataPart.get().getClass());
-
-            if (!Objects.equals(newMetaHash, metaHash)
-                    || newData != prevData)
-                notifyWriteMeta();
-            if (!Objects.equals(newDataHash, dataHash)
-                    || newData != prevData)
-                notifyWriteData();
-            verifyRefs(oldRefs);
-            return ret;
+            return fn.apply(_metaPart, _dataPart.get(), this::bumpVer, invalidateFn);
         } finally {
-            _lock.writeLock().unlock();
+            rwUnlock();
         }
     }
 
@@ -280,20 +323,13 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         return _dataPart.get() != null;
     }
 
-    public void notifyWriteMeta() {
+    private void notifyWrite(boolean metaChanged, boolean externalChanged, boolean hasDataChanged) {
         assertRWLock();
-        _resolver.notifyWriteMeta(this);
+        _resolver.notifyWrite(this, metaChanged, externalChanged, hasDataChanged);
     }
 
-    public void notifyWriteData() {
-        assertRWLock();
-        _resolver.notifyWriteData(this);
-    }
-
-    public void notifyWrite() {
-        _resolver.updateDeletionState(this);
-        notifyWriteMeta();
-        notifyWriteData();
+    protected void notifyCreated() {
+        notifyWrite(true, true, true);
     }
 
     public void bumpVer() {
@@ -301,9 +337,6 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         _resolver.bumpVersionSelf(this);
     }
 
-    public void rwUnlock() {
-        _lock.writeLock().unlock();
-    }
 
     public void discardData() {
         assertRWLock();
@@ -311,11 +344,6 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             throw new IllegalStateException("Expected to be deleted when discarding data");
         _dataPart.set(null);
         _metaPart.setSavedRefs(Collections.emptySet());
-    }
-
-    public void assertRWLock() {
-        if (!_lock.isWriteLockedByCurrentThread())
-            throw new IllegalStateException("Expected to be write-locked there: " + getName() + " " + Thread.currentThread().getName());
     }
 
     public enum ResolutionStrategy {

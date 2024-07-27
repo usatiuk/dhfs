@@ -325,14 +325,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             dentToD.setMtime(System.currentTimeMillis());
 
             dentFrom.bumpVer();
-            dentFrom.notifyWrite();
-
             dentTo.bumpVer();
-            dentTo.notifyWrite();
         } finally {
             dentFrom.rwUnlock();
             dentTo.rwUnlock();
-            theFile.notifyWrite();
             theFile.rwUnlock();
         }
 

@@ -101,7 +101,6 @@ public class JObjectResolver {
                 }
             }
             self.getMeta().setSavedRefs(null);
-            notifyWriteMeta(self);
         }
     }
 
@@ -186,26 +185,24 @@ public class JObjectResolver {
         }
     }
 
-    public <T extends JObjectData> void notifyWriteMeta(JObject<T> self) {
+    public <T extends JObjectData> void notifyWrite(JObject<T> self, boolean metaChanged, boolean externalChanged, boolean hasDataChanged) {
         self.assertRWLock();
-        jObjectWriteback.markDirty(self);
-        for (var t : _metaWriteListeners.keySet()) { // FIXME:?
-            if (t.isAssignableFrom(self.getKnownClass()))
-                for (var cb : _metaWriteListeners.get(t))
-                    cb.apply((JObject) self);
-        }
-    }
-
-    public <T extends JObjectData> void notifyWriteData(JObject<T> self) {
-        self.assertRWLock();
-        jObjectWriteback.markDirty(self);
-        if (self.isResolved()) {
-            invalidationQueueService.pushInvalidationToAll(self.getName());
+        if (metaChanged || hasDataChanged)
+            jObjectWriteback.markDirty(self);
+        if (metaChanged)
+            for (var t : _metaWriteListeners.keySet()) { // FIXME:?
+                if (t.isAssignableFrom(self.getKnownClass()))
+                    for (var cb : _metaWriteListeners.get(t))
+                        cb.apply((JObject) self);
+            }
+        if (hasDataChanged)
             for (var t : _writeListeners.keySet()) { // FIXME:?
                 if (t.isAssignableFrom(self.getKnownClass()))
                     for (var cb : _writeListeners.get(t))
                         cb.apply((JObject) self);
             }
+        if (externalChanged) {
+            invalidationQueueService.pushInvalidationToAll(self.getName());
         }
     }
 

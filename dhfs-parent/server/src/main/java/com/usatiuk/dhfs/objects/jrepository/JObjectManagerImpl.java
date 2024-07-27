@@ -160,7 +160,7 @@ public class JObjectManagerImpl implements JObjectManager {
                         m.lock();
                     }
 
-                    if (finalCreated) finalRet.notifyWrite();// Kind of a hack?
+                    if (finalCreated) finalRet.notifyCreated();// Kind of a hack?
                     return null;
                 });
             } finally {

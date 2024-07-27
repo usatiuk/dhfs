@@ -190,7 +190,11 @@ public class ObjectMetadata implements Serializable {
     }
 
     public int metaHash() {
-        return Objects.hash(isSeen(), getKnownClass(), isDeleted(), _referrers, _locked, _remoteCopies, _savedRefs, _haveLocalCopy);
+        return Objects.hash(_name, isSeen(), getKnownClass(), isDeleted(), _confirmedDeletes, _referrers, _changelog, _locked, _remoteCopies, _savedRefs, _haveLocalCopy);
+    }
+
+    public int externalHash() {
+        return Objects.hash(_changelog, _haveLocalCopy);
     }
 
     // Not really a hash

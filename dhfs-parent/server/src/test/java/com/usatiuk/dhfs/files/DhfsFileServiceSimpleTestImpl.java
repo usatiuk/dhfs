@@ -224,7 +224,7 @@ public class DhfsFileServiceSimpleTestImpl {
 
     @Test
     void moveTest2() throws InterruptedException {
-        var ret = fileService.create("/moveTest", 777);
+        var ret = fileService.create("/moveTest2", 777);
         Assertions.assertTrue(ret.isPresent());
         var uuid = ret.get();
 
@@ -240,14 +240,14 @@ public class DhfsFileServiceSimpleTestImpl {
             return null;
         });
 
-        Assertions.assertTrue(fileService.rename("/moveTest", "/movedTest"));
-        Assertions.assertFalse(fileService.open("/moveTest").isPresent());
-        Assertions.assertTrue(fileService.open("/movedTest").isPresent());
+        Assertions.assertTrue(fileService.rename("/moveTest2", "/movedTest2"));
+        Assertions.assertFalse(fileService.open("/moveTest2").isPresent());
+        Assertions.assertTrue(fileService.open("/movedTest2").isPresent());
 
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-                fileService.read(fileService.open("/movedTest").get(), 0, 10).get().toByteArray());
+                fileService.read(fileService.open("/movedTest2").get(), 0, 10).get().toByteArray());
 
-        var newfile = fileService.open("/movedTest").get();
+        var newfile = fileService.open("/movedTest2").get();
 
         Thread.sleep(1000);
 
