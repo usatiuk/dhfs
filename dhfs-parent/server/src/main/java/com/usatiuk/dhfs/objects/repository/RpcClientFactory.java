@@ -37,7 +37,7 @@ public class RpcClientFactory {
                 return withObjSyncClient(target, fn);
             } catch (StatusRuntimeException e) {
                 if (e.getStatus().getCode().equals(Status.UNAVAILABLE.getCode()))
-                    Log.trace("Host " + target + " is unreachable: " + e.getMessage());
+                    Log.debug("Host " + target + " is unreachable: " + e.getMessage());
                 else
                     Log.warn("When calling " + target + " " + e.getMessage());
             } catch (Exception e) {

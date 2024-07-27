@@ -149,7 +149,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         String fname = Path.of(name).getFileName().toString();
 
         var fuuid = UUID.randomUUID();
-        Log.trace("Creating file " + fuuid);
+        Log.debug("Creating file " + fuuid);
         File f = new File(fuuid, mode, UUID.fromString(parent.getName()), false);
 
         if (!parent.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, invalidate) -> {
@@ -181,7 +181,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         String dname = Path.of(name).getFileName().toString();
 
         var duuid = UUID.randomUUID();
-        Log.trace("Creating dir " + duuid);
+        Log.debug("Creating dir " + duuid);
         Directory ndir = new Directory(duuid, mode); //FIXME:
 
         if (!found.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, invalidate) -> {
@@ -799,7 +799,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         String fname = Path.of(newpath).getFileName().toString();
 
         var fuuid = UUID.randomUUID();
-        Log.trace("Creating file " + fuuid);
+        Log.debug("Creating file " + fuuid);
         File f = new File(fuuid, 0, UUID.fromString(parent.getName()), true);
 
         ChunkData newChunkData = createChunk(UnsafeByteOperations.unsafeWrap(oldpath.getBytes(StandardCharsets.UTF_8)));

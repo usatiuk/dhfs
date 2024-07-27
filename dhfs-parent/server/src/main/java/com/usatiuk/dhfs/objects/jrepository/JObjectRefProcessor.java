@@ -96,7 +96,7 @@ public class JObjectRefProcessor {
                 }
 
                 if (ok != missing.size()) {
-                    Log.trace("Delaying deletion check of " + obj.getName());
+                    Log.debug("Delaying deletion check of " + obj.getName());
                     delay = true;
                 }
 
@@ -167,7 +167,7 @@ public class JObjectRefProcessor {
 
                         got.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
 
-                        Log.trace("Deleting " + m.getName());
+                        Log.debug("Deleting " + m.getName());
                         m.markDeleted();
 
                         Collection<String> extracted = null;

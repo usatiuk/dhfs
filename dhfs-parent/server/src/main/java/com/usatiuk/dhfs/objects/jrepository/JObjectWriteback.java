@@ -161,7 +161,7 @@ public class JObjectWriteback {
             if (!m.isDeletionCandidate())
                 throw new IllegalStateException("Object deleted but not deletable! " + m.getName());
             // FIXME: assert Rw lock here?
-            Log.trace("Deleting from persistent storage " + m.getName());
+            Log.debug("Deleting from persistent storage " + m.getName());
             objectPersistentStore.deleteObject(m.getName());
             return;
         }

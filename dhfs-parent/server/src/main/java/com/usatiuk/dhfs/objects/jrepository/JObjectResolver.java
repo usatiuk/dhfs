@@ -175,7 +175,7 @@ public class JObjectResolver {
     public void removeLocal(JObject<?> jObject, String name) {
         jObject.assertRWLock();
         try {
-            Log.trace("Invalidating " + name);
+            Log.debug("Invalidating " + name);
             jObject.getMeta().getHaveLocalCopy().set(false);
             jObjectWriteback.remove(jObject);
             objectPersistentStore.deleteObjectData(name);

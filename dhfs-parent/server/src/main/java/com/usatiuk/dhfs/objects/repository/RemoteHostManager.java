@@ -63,7 +63,7 @@ public class RemoteHostManager {
                     .<Callable<Void>>map(host -> () -> {
                         try {
                             if (isReachable(host))
-                                Log.trace("Heartbeat: " + host);
+                                Log.debug("Heartbeat: " + host);
                             else
                                 Log.info("Trying to connect to " + host);
                             if (pingCheck(host))
@@ -206,7 +206,7 @@ public class RemoteHostManager {
             var prev = _seenHostsButNotAdded.put(host, state);
             // Needed for tests
             if (prev == null)
-                Log.trace("Ignoring new address from unknown host " + ": addr=" + addr + " port=" + port);
+                Log.debug("Ignoring new address from unknown host " + ": addr=" + addr + " port=" + port);
             return;
         } else {
             _seenHostsButNotAdded.remove(host);

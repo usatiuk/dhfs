@@ -35,8 +35,11 @@ jobs:
           distribution: "zulu"
           cache: maven
 
-      - name: Build and test with Maven
+      - name: Test with Maven
         run: cd dhfs-parent && mvn --batch-mode --update-snapshots package verify
+
+      - name: Build with Maven
+        run: cd dhfs-parent && mvn --batch-mode --update-snapshots package -Dquarkus.log.category.\"com.usatiuk.dhfs\".min-level=DEBUG
 
       - uses: actions/upload-artifact@v3
         with:
