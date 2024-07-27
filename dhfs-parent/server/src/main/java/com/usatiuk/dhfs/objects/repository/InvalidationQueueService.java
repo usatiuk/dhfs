@@ -91,7 +91,7 @@ public class InvalidationQueueService {
                         }
                     }
 
-                    var data = _queue.getAllWait(100); // TODO: config?
+                    var data = _queue.getAllWait(100, _queue.getDelay()); // TODO: config?
                     String stats = "Sent invalidation: ";
                     long success = 0;
 
@@ -140,7 +140,6 @@ public class InvalidationQueueService {
         synchronized (_toAllQueue) {
             _toAllQueue.getPlain().add(name);
         }
-        _queue.interruptOneIfEmpty();
     }
 
     public void pushInvalidationToOne(UUID host, String name) {

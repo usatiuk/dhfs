@@ -1,6 +1,7 @@
 package com.usatiuk.utils;
 
 import jakarta.annotation.Nullable;
+import lombok.Getter;
 
 import java.util.*;
 
@@ -30,6 +31,7 @@ public class HashSetDelayedBlockingQueue<T> {
 
     private final LinkedHashMap<SetElement, SetElement> _set = new LinkedHashMap<>();
     private final LinkedHashSet<Thread> _waiting = new LinkedHashSet<>();
+    @Getter
     private final long _delay;
     private boolean _closed = false;
 
@@ -161,19 +163,34 @@ public class HashSetDelayedBlockingQueue<T> {
     }
 
     public Collection<T> getAllWait() throws InterruptedException {
-        return getAllWait(Integer.MAX_VALUE);
+        return getAllWait(Integer.MAX_VALUE, -1);
     }
 
     public Collection<T> getAllWait(int max) throws InterruptedException {
+        return getAllWait(max, -1);
+    }
+
+    public Collection<T> getAllWait(int max, long timeout) throws InterruptedException {
         ArrayList<T> out = new ArrayList<>();
+        long startedWaiting = timeout > 0 ? System.currentTimeMillis() : -1;
         try {
             synchronized (this) {
                 _waiting.add(Thread.currentThread());
             }
             while (!Thread.interrupted()) {
+                if (timeout > 0)
+                    if (System.currentTimeMillis() > (startedWaiting + timeout)) throw new InterruptedException();
                 long sleep = 0;
                 synchronized (this) {
-                    while (_set.isEmpty()) this.wait();
+                    while (_set.isEmpty()) {
+                        if (timeout > 0) {
+                            this.wait(timeout);
+                            if (System.currentTimeMillis() > (startedWaiting + timeout))
+                                throw new InterruptedException();
+                        } else {
+                            this.wait();
+                        }
+                    }
 
                     var curTime = System.currentTimeMillis();
 
@@ -187,6 +204,13 @@ public class HashSetDelayedBlockingQueue<T> {
                         }
                     }
                 }
+
+                if (timeout > 0) {
+                    var cur = System.currentTimeMillis();
+                    if (cur > (startedWaiting + timeout)) throw new InterruptedException();
+                    sleep = Math.min(sleep, (startedWaiting + timeout) - cur);
+                }
+
                 if (sleep > 0)
                     Thread.sleep(sleep);
                 else
@@ -204,14 +228,6 @@ public class HashSetDelayedBlockingQueue<T> {
     public void interrupt() {
         synchronized (this) {
             for (var t : _waiting) t.interrupt();
-        }
-    }
-
-    public void interruptOneIfEmpty() {
-        synchronized (this) {
-            if (!_set.isEmpty()) return;
-            if (!_waiting.isEmpty())
-                _waiting.getFirst().interrupt();
         }
     }
 }
