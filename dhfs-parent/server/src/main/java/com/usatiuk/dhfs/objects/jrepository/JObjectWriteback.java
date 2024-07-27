@@ -205,7 +205,7 @@ public class JObjectWriteback {
             long started = System.currentTimeMillis();
             final long timeout = 15000L; // FIXME:
             boolean finished = false;
-            while (System.currentTimeMillis() - started < timeout) {
+            while (!finished && System.currentTimeMillis() - started < timeout) {
                 synchronized (this) {
                     try {
                         this.wait();
@@ -213,6 +213,8 @@ public class JObjectWriteback {
                     } catch (InterruptedException ignored) {
                     }
                 }
+                if (_currentSize.get() > sizeLimit)
+                    finished = false;
             }
             if (!finished) {
                 Log.error("Timed out waiting for writeback to drain");
