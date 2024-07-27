@@ -133,17 +133,20 @@ public class JObjectResolver {
     }
 
     private void quickDeleteRef(JObject<?> self, String name) {
-        jObjectManager.get(name).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
-            mc.removeRef(self.getName());
-            return null;
-        }));
+        jObjectManager.get(name)
+                .ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
+                    mc.removeRef(self.getName());
+                    return null;
+                }));
     }
 
     private void tryQuickDelete(JObject<?> self) {
         self.assertRWLock();
         self.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
 
-        Log.trace("Quick delete of: " + self.getName());
+        if (Log.isTraceEnabled())
+            Log.trace("Quick delete of: " + self.getName());
+
         self.getMeta().markDeleted();
 
         Collection<String> extracted = null;
