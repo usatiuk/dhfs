@@ -32,6 +32,7 @@ java \
     -Ddhfs.objects.root="$SCRIPT_DIR"/../data/configs \
     -Ddhfs.fuse.root="$SCRIPT_DIR"/../fuse \
     -Dquarkus.http.host=0.0.0.0 \
+    -Ddhfs.objects.ref_verification=false \
     -Dquarkus.log.category.\"com.usatiuk.dhfs\".level=INFO \
     -Ddhfs.webui.root="$SCRIPT_DIR"/Webui $EXTRAOPTS_PARSED \
     -jar "$SCRIPT_DIR"/"DHFS Package"/quarkus-run.jar >quarkus.log 2>&1 &
