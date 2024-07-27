@@ -76,9 +76,9 @@ public class DhfsFusex3IT {
 
         Stream.of(container1, container2, container3).parallel().forEach(GenericContainer::start);
 
-        c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_root_d/self_uuid").getStdout();
-        c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_root_d/self_uuid").getStdout();
-        c3uuid = container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_root_d/self_uuid").getStdout();
+        c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/data/stuff/self_uuid").getStdout();
+        c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/data/stuff/self_uuid").getStdout();
+        c3uuid = container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/data/stuff/self_uuid").getStdout();
 
         waitingConsumer1 = new WaitingConsumer();
         var loggingConsumer1 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFusex3IT.class))
@@ -139,26 +139,26 @@ public class DhfsFusex3IT {
 
     @Test
     void readWriteFileTest() throws IOException, InterruptedException, TimeoutException {
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
         Thread.sleep(1000);
-        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
-        Assertions.assertEquals("tesempty\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
+        Assertions.assertEquals("tesempty\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
     }
 
     @Test
     void gccHelloWorldTest() throws IOException, InterruptedException, TimeoutException {
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo '#include<stdio.h>\nint main(){printf(\"hello world\"); return 0;}' > /root/dhfs_data/dhfs_fuse_root/hello.c").getExitCode());
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "cd /root/dhfs_data/dhfs_fuse_root && gcc hello.c").getExitCode());
-        var helloOut1 = container1.execInContainer("/bin/sh", "-c", "/root/dhfs_data/dhfs_fuse_root/a.out");
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo '#include<stdio.h>\nint main(){printf(\"hello world\"); return 0;}' > /root/dhfs_default/fuse/hello.c").getExitCode());
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "cd /root/dhfs_default/fuse && gcc hello.c").getExitCode());
+        var helloOut1 = container1.execInContainer("/bin/sh", "-c", "/root/dhfs_default/fuse/a.out");
         Log.info(helloOut1);
         Assertions.assertEquals(0, helloOut1.getExitCode());
         Assertions.assertEquals("hello world", helloOut1.getStdout());
         Thread.sleep(1000);
-        var helloOut2 = container2.execInContainer("/bin/sh", "-c", "/root/dhfs_data/dhfs_fuse_root/a.out");
+        var helloOut2 = container2.execInContainer("/bin/sh", "-c", "/root/dhfs_default/fuse/a.out");
         Log.info(helloOut2);
         Assertions.assertEquals(0, helloOut2.getExitCode());
         Assertions.assertEquals("hello world", helloOut2.getStdout());
-        var helloOut3 = container3.execInContainer("/bin/sh", "-c", "/root/dhfs_data/dhfs_fuse_root/a.out");
+        var helloOut3 = container3.execInContainer("/bin/sh", "-c", "/root/dhfs_default/fuse/a.out");
         Log.info(helloOut3);
         Assertions.assertEquals(0, helloOut3.getExitCode());
         Assertions.assertEquals("hello world", helloOut3.getStdout());
@@ -166,10 +166,10 @@ public class DhfsFusex3IT {
 
     @Test
     void removeHostTest() throws IOException, InterruptedException, TimeoutException {
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
         Thread.sleep(1000);
-        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
-        Assertions.assertEquals("tesempty\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
+        Assertions.assertEquals("tesempty\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
 
         var c3curl = container3.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
@@ -178,18 +178,18 @@ public class DhfsFusex3IT {
                         "  http://localhost:8080/objects-manage/known-peers");
 
         Thread.sleep(1000);
-        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "echo rewritten > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
+        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "echo rewritten > /root/dhfs_default/fuse/testf1").getExitCode());
         Thread.sleep(1000);
-        Assertions.assertEquals("rewritten\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
-        Assertions.assertEquals("tesempty\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
-        Assertions.assertEquals("tesempty\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+        Assertions.assertEquals("rewritten\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
+        Assertions.assertEquals("tesempty\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
+        Assertions.assertEquals("tesempty\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
     }
 
     @Test
     void dirConflictTest() throws IOException, InterruptedException, TimeoutException {
-        boolean createFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_data/dhfs_fuse_root/testf"),
-                Pair.of(container2, "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf"),
-                Pair.of(container3, "echo test3 >> /root/dhfs_data/dhfs_fuse_root/testf")).parallel().map(p -> {
+        boolean createFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_default/fuse/testf"),
+                Pair.of(container2, "echo test2 >> /root/dhfs_default/fuse/testf"),
+                Pair.of(container3, "echo test3 >> /root/dhfs_default/fuse/testf")).parallel().map(p -> {
             try {
                 return p.getLeft().execInContainer("/bin/sh", "-c", p.getRight()).getExitCode();
             } catch (Exception e) {
@@ -199,34 +199,34 @@ public class DhfsFusex3IT {
         Assumptions.assumeTrue(!createFail, "Failed creating one or more files");
         Thread.sleep(1000);
         for (var c : List.of(container1, container2, container3)) {
-            var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
-            var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
+            var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
+            var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
             Log.info(ls);
             Log.info(cat);
             Assertions.assertTrue(cat.getStdout().contains("test1"));
             Assertions.assertTrue(cat.getStdout().contains("test2"));
             Assertions.assertTrue(cat.getStdout().contains("test3"));
         }
-        Assertions.assertEquals(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getStdout(),
-                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getStdout());
-        Assertions.assertEquals(container3.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getStdout(),
-                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getStdout());
-        Assertions.assertEquals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*").getStdout(),
-                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*").getStdout());
-        Assertions.assertEquals(container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*").getStdout(),
-                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*").getStdout());
+        Assertions.assertEquals(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout(),
+                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout());
+        Assertions.assertEquals(container3.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout(),
+                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout());
+        Assertions.assertEquals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout(),
+                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout());
+        Assertions.assertEquals(container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout(),
+                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout());
     }
 
 
     @Test
     void dirConflictTest3() throws IOException, InterruptedException, TimeoutException {
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode());
-        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode());
-        Assertions.assertEquals(0, container3.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getExitCode());
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
+        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
+        Assertions.assertEquals(0, container3.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
         boolean createFail = Stream.of(
-                Pair.of(container1, "echo test1 >> /root/dhfs_data/dhfs_fuse_root/testf"),
-                Pair.of(container2, "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf"),
-                Pair.of(container3, "echo test3 >> /root/dhfs_data/dhfs_fuse_root/testf")).parallel().map(p -> {
+                Pair.of(container1, "echo test1 >> /root/dhfs_default/fuse/testf"),
+                Pair.of(container2, "echo test2 >> /root/dhfs_default/fuse/testf"),
+                Pair.of(container3, "echo test3 >> /root/dhfs_default/fuse/testf")).parallel().map(p -> {
             try {
                 Log.info("Creating");
                 return p.getLeft().execInContainer("/bin/sh", "-c", p.getRight()).getExitCode();
@@ -237,34 +237,34 @@ public class DhfsFusex3IT {
         Assumptions.assumeTrue(!createFail, "Failed creating one or more files");
         Thread.sleep(1000);
         for (var c : List.of(container1, container2, container3)) {
-            var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
-            var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
+            var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
+            var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
             Log.info(ls);
             Log.info(cat);
             Assertions.assertTrue(cat.getStdout().contains("test1"));
             Assertions.assertTrue(cat.getStdout().contains("test2"));
             Assertions.assertTrue(cat.getStdout().contains("test3"));
         }
-        Assertions.assertEquals(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getStdout(),
-                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getStdout());
-        Assertions.assertEquals(container3.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getStdout(),
-                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getStdout());
-        Assertions.assertEquals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*").getStdout(),
-                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*").getStdout());
-        Assertions.assertEquals(container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*").getStdout(),
-                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*").getStdout());
+        Assertions.assertEquals(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout(),
+                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout());
+        Assertions.assertEquals(container3.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout(),
+                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout());
+        Assertions.assertEquals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout(),
+                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout());
+        Assertions.assertEquals(container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout(),
+                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout());
     }
 
     @Test
     void fileConflictTest2() throws IOException, InterruptedException, TimeoutException {
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_data/dhfs_fuse_root/testf1").getExitCode());
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
         Thread.sleep(1000);
-        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
-        Assertions.assertEquals("tesempty\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/testf1").getStdout());
+        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
+        Assertions.assertEquals("tesempty\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
 
-        boolean writeFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_data/dhfs_fuse_root/testf1"),
-                Pair.of(container2, "echo test2 >> /root/dhfs_data/dhfs_fuse_root/testf1"),
-                Pair.of(container3, "echo test3 >> /root/dhfs_data/dhfs_fuse_root/testf1")).parallel().map(p -> {
+        boolean writeFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_default/fuse/testf1"),
+                Pair.of(container2, "echo test2 >> /root/dhfs_default/fuse/testf1"),
+                Pair.of(container3, "echo test3 >> /root/dhfs_default/fuse/testf1")).parallel().map(p -> {
             try {
                 return p.getLeft().execInContainer("/bin/sh", "-c", p.getRight()).getExitCode();
             } catch (Exception e) {
@@ -274,22 +274,22 @@ public class DhfsFusex3IT {
         Assumptions.assumeTrue(!writeFail, "Failed creating one or more files");
         Thread.sleep(1000);
         for (var c : List.of(container1, container2, container3)) {
-            var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root");
-            var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*");
+            var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
+            var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
             Log.info(ls);
             Log.info(cat);
             Assertions.assertTrue(cat.getStdout().contains("test1"));
             Assertions.assertTrue(cat.getStdout().contains("test2"));
             Assertions.assertTrue(cat.getStdout().contains("test3"));
         }
-        Assertions.assertEquals(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getStdout(),
-                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getStdout());
-        Assertions.assertEquals(container3.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getStdout(),
-                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_data/dhfs_fuse_root").getStdout());
-        Assertions.assertEquals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*").getStdout(),
-                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*").getStdout());
-        Assertions.assertEquals(container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*").getStdout(),
-                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_data/dhfs_fuse_root/*").getStdout());
+        Assertions.assertEquals(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout(),
+                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout());
+        Assertions.assertEquals(container3.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout(),
+                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout());
+        Assertions.assertEquals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout(),
+                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout());
+        Assertions.assertEquals(container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout(),
+                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout());
     }
 
 }
