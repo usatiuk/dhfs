@@ -24,12 +24,15 @@ EXTRAOPTS_PARSED="$(tr '\n\r' ' ' <"$EXTRAOPTS")"
 echo "Extra options: $EXTRAOPTS_PARSED"
 
 java \
-    -Xmx256M -Ddhfs.objects.writeback.limit=134217728 \
+    -Xmx384M \
+    -Ddhfs.objects.writeback.limit=134217728 \
+    -Ddhfs.objects.lru.limit=134217728 \
     --add-exports java.base/sun.nio.ch=ALL-UNNAMED \
     -Ddhfs.objects.persistence.files.root="$SCRIPT_DIR"/../data/objects \
     -Ddhfs.objects.root="$SCRIPT_DIR"/../data/configs \
     -Ddhfs.fuse.root="$SCRIPT_DIR"/../fuse \
     -Dquarkus.http.host=0.0.0.0 \
+    -Dquarkus.log.category.\"com.usatiuk.dhfs\".level=INFO \
     -Ddhfs.webui.root="$SCRIPT_DIR"/Webui $EXTRAOPTS_PARSED \
     -jar "$SCRIPT_DIR"/"DHFS Package"/quarkus-run.jar >quarkus.log 2>&1 &
 
