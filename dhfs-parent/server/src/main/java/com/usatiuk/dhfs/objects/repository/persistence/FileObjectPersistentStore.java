@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects.repository.persistence;
 
 import com.google.protobuf.Message;
+import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
 import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
@@ -109,7 +110,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     private <T extends Message> T readObjectImpl(T defaultInstance, Path path) {
         try (var fsb = new FileInputStream(path.toFile())) {
             var file = fsb.readAllBytes();
-            return (T) defaultInstance.getParserForType().parseFrom(file);
+            return (T) defaultInstance.getParserForType().parseFrom(UnsafeByteOperations.unsafeWrap(file));
         } catch (FileNotFoundException | NoSuchFileException fx) {
             throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
         } catch (IOException e) {
@@ -132,8 +133,9 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     private void writeObjectImpl(Path path, Message data) {
         try {
-            try (var fsb = new FileOutputStream(path.toFile(), false)) {
-                fsb.write(data.toByteArray());
+            try (var fsb = new FileOutputStream(path.toFile(), false);
+                 var buf = new BufferedOutputStream(fsb, Math.min(65536, data.getSerializedSize()))) {
+                data.writeTo(buf);
             }
         } catch (IOException e) {
             Log.error("Error writing file " + path, e);
