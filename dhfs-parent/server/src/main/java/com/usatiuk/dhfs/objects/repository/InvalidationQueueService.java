@@ -98,6 +98,7 @@ public class InvalidationQueueService {
                     }
 
                     var data = _queue.getAllWait(100, _queue.getDelay()); // TODO: config?
+                    if (data.isEmpty()) continue;
                     String stats = "Sent invalidation: ";
                     long success = 0;
 

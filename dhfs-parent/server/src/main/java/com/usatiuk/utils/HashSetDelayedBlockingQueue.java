@@ -190,14 +190,14 @@ public class HashSetDelayedBlockingQueue<T> {
             }
             while (!Thread.interrupted()) {
                 if (timeout > 0)
-                    if (System.currentTimeMillis() > (startedWaiting + timeout)) throw new InterruptedException();
+                    if (System.currentTimeMillis() > (startedWaiting + timeout)) return out;
                 long sleep = 0;
                 synchronized (this) {
                     while (_set.isEmpty()) {
                         if (timeout > 0) {
                             this.wait(timeout);
                             if (System.currentTimeMillis() > (startedWaiting + timeout))
-                                throw new InterruptedException();
+                                return out;
                         } else {
                             this.wait();
                         }
@@ -218,7 +218,7 @@ public class HashSetDelayedBlockingQueue<T> {
 
                 if (timeout > 0) {
                     var cur = System.currentTimeMillis();
-                    if (cur > (startedWaiting + timeout)) throw new InterruptedException();
+                    if (cur > (startedWaiting + timeout)) return out;
                     sleep = Math.min(sleep, (startedWaiting + timeout) - cur);
                 }
 
@@ -233,7 +233,7 @@ public class HashSetDelayedBlockingQueue<T> {
                 _waiting.remove(Thread.currentThread());
             }
         }
-        throw new InterruptedException();
+        return out;
     }
 
     public void interrupt() {
