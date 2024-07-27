@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 
-public class JObject<T extends JObjectData> implements Serializable, Comparable<JObject<?>> {
+public class JObject<T extends JObjectData> {
     private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
     private final ObjectMetadata _metaPart;
     private final JObjectResolver _resolver;
@@ -91,24 +91,6 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
 
     static public void rwLockAll(List<JObject<?>> objects) {
         objects.stream().sorted(Comparator.comparingInt(System::identityHashCode)).forEach(JObject::rwLock);
-    }
-
-    @Override
-    public int compareTo(JObject<?> o) {
-        return getName().compareTo(o.getName());
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        JObject<?> jObject = (JObject<?>) o;
-        return Objects.equals(_metaPart.getName(), jObject._metaPart.getName());
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hashCode(_metaPart.getName());
     }
 
     public Class<? extends JObjectData> getKnownClass() {
