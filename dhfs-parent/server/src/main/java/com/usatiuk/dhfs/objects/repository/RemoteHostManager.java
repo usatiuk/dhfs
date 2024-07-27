@@ -173,6 +173,25 @@ public class RemoteHostManager {
                 .map(Map.Entry::getKey).toList());
     }
 
+    public record HostStateSnapshot(List<UUID> available, List<UUID> unavailable) {
+    }
+
+    public HostStateSnapshot getHostStateSnapshot() {
+        ArrayList<UUID> available = new ArrayList<>();
+        ArrayList<UUID> unavailable = new ArrayList<>();
+        _transientPeersState.runReadLocked(d -> {
+                    for (var v : d.getStates().entrySet()) {
+                        if (v.getValue().isReachable())
+                            available.add(v.getKey());
+                        else
+                            unavailable.add(v.getKey());
+                    }
+                    return null;
+                }
+        );
+        return new HostStateSnapshot(available, unavailable);
+    }
+
     public void notifyAddr(UUID host, String addr, Integer port, Integer securePort) {
         if (host.equals(persistentRemoteHostsService.getSelfUuid())) {
             return;

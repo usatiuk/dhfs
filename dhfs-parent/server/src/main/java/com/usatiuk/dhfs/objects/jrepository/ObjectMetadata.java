@@ -7,6 +7,7 @@ import com.usatiuk.dhfs.objects.repository.ObjectHeader;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
+import io.vertx.core.impl.ConcurrentHashSet;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -31,10 +32,10 @@ public class ObjectMetadata implements Serializable {
     private final AtomicBoolean _deleted = new AtomicBoolean(false);
     @Getter
     private final HashSet<UUID> _confirmedDeletes = new HashSet<>();
-    private final Set<String> _referrers = new ConcurrentSkipListSet<>();
+    private final Set<String> _referrers = new HashSet<>();
     @Getter
     @Setter
-    private Map<UUID, Long> _changelog = new LinkedHashMap<>();
+    private Map<UUID, Long> _changelog = new LinkedHashMap<>(4);
     @Getter
     @Setter
     private Set<String> _savedRefs = Collections.emptySet();

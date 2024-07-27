@@ -39,6 +39,7 @@ public class InvalidationQueueService {
     int threads;
 
     private final HashSetDelayedBlockingQueue<Pair<UUID, String>> _queue;
+    private final HashSetDelayedBlockingQueue<String> _toAllQueue = new HashSetDelayedBlockingQueue<>(0);
     private ExecutorService _executor;
 
     public InvalidationQueueService(@ConfigProperty(name = "dhfs.objects.invalidation.delay") int delay) {
@@ -65,6 +66,18 @@ public class InvalidationQueueService {
         try {
             while (!Thread.interrupted()) {
                 try {
+                    var toAllProcess = _toAllQueue.getAll();
+
+                    if (!toAllProcess.isEmpty()) {
+                        var hostInfo = remoteHostManager.getHostStateSnapshot();
+                        for (var o : toAllProcess) {
+                            for (var h : hostInfo.available())
+                                _queue.add(Pair.of(h, o));
+                            for (var u : hostInfo.unavailable())
+                                deferredInvalidationQueueService.defer(u, o);
+                        }
+                    }
+
                     var data = _queue.getAllWait(100); // TODO: config?
                     String stats = "Sent invalidation: ";
                     long success = 0;
@@ -111,12 +124,7 @@ public class InvalidationQueueService {
     }
 
     public void pushInvalidationToAll(String name) {
-        var hosts = remoteHostManager.getAvailableHosts();
-        for (var h : hosts)
-            _queue.add(Pair.of(h, name));
-        var unavailable = remoteHostManager.getUnavailableHosts();
-        for (var u : unavailable)
-            deferredInvalidationQueueService.defer(u, name);
+        _toAllQueue.add(name);
     }
 
     public void pushInvalidationToOne(UUID host, String name) {

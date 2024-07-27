@@ -124,7 +124,6 @@ public class JObjectManagerImpl implements JObjectManager {
     public <D extends JObjectData> JObject<D> put(D object, Optional<String> parent) {
         while (true) {
             JObject<?> ret;
-            boolean created = false;
             JObject<?> newObj = null;
             try {
                 ret = getFromMap(object.getName());
@@ -141,10 +140,8 @@ public class JObjectManagerImpl implements JObjectManager {
                         else ret = ref.get();
                     }
                     if (ret != newObj) continue;
-                    created = true;
                 }
                 JObject<D> finalRet = (JObject<D>) ret;
-                boolean finalCreated = created;
                 ret.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                     if (object.getClass().isAnnotationPresent(PushResolution.class)
                             && object.getClass().isAnnotationPresent(AssumedUnique.class)
@@ -160,13 +157,13 @@ public class JObjectManagerImpl implements JObjectManager {
                         m.lock();
                     }
 
-                    if (finalCreated) finalRet.notifyCreated();// Kind of a hack?
                     return null;
                 });
             } finally {
-                if (newObj != null) newObj.rwUnlock();
+                if (newObj != null)
+                    newObj.rwUnlock(true);
             }
-            if (!created)
+            if (newObj == null)
                 jObjectLRU.notifyAccess(ret);
             return (JObject<D>) ret;
         }

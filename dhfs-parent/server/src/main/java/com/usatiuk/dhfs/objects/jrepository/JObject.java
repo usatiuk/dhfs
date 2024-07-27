@@ -46,7 +46,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
             }
         }
 
-        void commit() {
+        void commit(boolean forceInvalidate) {
             _resolver.updateDeletionState(JObject.this);
 
             var newDataHash = _metaPart.dataHash();
@@ -58,10 +58,11 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
                 _metaPart.narrowClass(_dataPart.get().getClass());
 
             notifyWrite(
-                    newMetaHash != metaHash,
-                    newExternalHash != externalHash,
+                    newMetaHash != metaHash || forceInvalidate,
+                    newExternalHash != externalHash || forceInvalidate,
                     newDataHash != dataHash
                             || newData != data
+                            || forceInvalidate
             );
 
             verifyRefs(oldRefs);
@@ -76,7 +77,7 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
         _metaPart = new ObjectMetadata(name, false, obj.getClass());
         _metaPart.getHaveLocalCopy().set(true);
         _dataPart.set(obj);
-        _metaPart.bumpVersion(selfUuid);
+        _metaPart.getChangelog().put(selfUuid, 1L);
         Log.trace("new JObject: " + getName());
     }
 
@@ -258,9 +259,13 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     }
 
     public void rwUnlock() {
+        rwUnlock(false);
+    }
+
+    public void rwUnlock(boolean forceInvalidate) {
         try {
             if (_lock.writeLock().getHoldCount() == 1) {
-                _transactionState.commit();
+                _transactionState.commit(forceInvalidate);
                 _transactionState = null;
             }
         } catch (Exception ex) {
@@ -326,10 +331,6 @@ public class JObject<T extends JObjectData> implements Serializable, Comparable<
     private void notifyWrite(boolean metaChanged, boolean externalChanged, boolean hasDataChanged) {
         assertRWLock();
         _resolver.notifyWrite(this, metaChanged, externalChanged, hasDataChanged);
-    }
-
-    protected void notifyCreated() {
-        notifyWrite(true, true, true);
     }
 
     public void bumpVer() {
