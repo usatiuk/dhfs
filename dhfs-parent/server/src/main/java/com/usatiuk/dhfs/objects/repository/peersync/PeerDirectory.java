@@ -41,6 +41,6 @@ public class PeerDirectory extends JObjectData {
 
     @Override
     public long estimateSize() {
-        return _peers.size() * 16L;
+        return _peers.size() * 32L;
     }
 }

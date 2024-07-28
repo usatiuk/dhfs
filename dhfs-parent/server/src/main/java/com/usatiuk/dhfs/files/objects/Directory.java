@@ -62,6 +62,6 @@ public class Directory extends FsNode {
 
     @Override
     public long estimateSize() {
-        return _children.size() * 16L;
+        return _children.size() * 192L;
     }
 }
