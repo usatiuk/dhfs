@@ -49,6 +49,9 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @ConfigProperty(name = "dhfs.files.use_hash_for_chunks")
     boolean useHashForChunks;
 
+    @ConfigProperty(name = "dhfs.files.allow_recursive_delete")
+    boolean allowRecursiveDelete;
+
     @ConfigProperty(name = "dhfs.objects.ref_verification")
     boolean refVerification;
 
@@ -255,9 +258,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
                     if (d2 == null)
                         throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Pessimistically not removing unresolved maybe-directory"));
-                    if (d2 instanceof Directory)
-                        if (!((Directory) d2).getChildren().isEmpty())
-                            throw new DirectoryNotEmptyException();
+                    if (!allowRecursiveDelete)
+                        if (d2 instanceof Directory)
+                            if (!((Directory) d2).getChildren().isEmpty())
+                                throw new DirectoryNotEmptyException();
 
                     m2.removeRef(m.getName());
                     removedRef.set(true);
@@ -276,9 +280,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
                             if (d2 == null)
                                 throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Pessimistically not removing unresolved maybe-directory"));
-                            if (d2 instanceof Directory)
-                                if (!((Directory) d2).getChildren().isEmpty())
-                                    throw new DirectoryNotEmptyException();
+                            if (!allowRecursiveDelete)
+                                if (d2 instanceof Directory)
+                                    if (!((Directory) d2).getChildren().isEmpty())
+                                        throw new DirectoryNotEmptyException();
 
                             m2.addRef(m.getName());
                             addedRef.set(true);
