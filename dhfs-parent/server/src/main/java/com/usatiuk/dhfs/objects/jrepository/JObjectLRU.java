@@ -20,6 +20,8 @@ public class JObjectLRU {
     JObjectSizeEstimator jObjectSizeEstimator;
     @ConfigProperty(name = "dhfs.objects.lru.limit")
     long sizeLimit;
+    @ConfigProperty(name = "dhfs.objects.lru.print-stats")
+    boolean printStats;
 
     private long _curSize = 0;
     private long _evict = 0;
@@ -28,29 +30,32 @@ public class JObjectLRU {
     private final AtomicLong _lastDrain = new AtomicLong(0);
 
     private final LinkedHashMap<JObject<?>, Long> _cache = new LinkedHashMap<>();
-    private ExecutorService _statusExecutor;
+    private ExecutorService _statusExecutor = null;
 
     @Startup
     void init() {
-        _statusExecutor = Executors.newSingleThreadExecutor();
-        _statusExecutor.submit(() -> {
-            try {
-                while (true) {
-                    Thread.sleep(1000);
-                    if (_curSize > 0)
-                        Log.info("Cache status: size="
-                                + _curSize / 1024 / 1024 + "MB"
-                                + " evicted=" + _evict);
-                    _evict = 0;
+        if (printStats) {
+            _statusExecutor = Executors.newSingleThreadExecutor();
+            _statusExecutor.submit(() -> {
+                try {
+                    while (true) {
+                        Thread.sleep(1000);
+                        if (_curSize > 0)
+                            Log.info("Cache status: size="
+                                    + _curSize / 1024 / 1024 + "MB"
+                                    + " evicted=" + _evict);
+                        _evict = 0;
+                    }
+                } catch (InterruptedException ignored) {
                 }
-            } catch (InterruptedException ignored) {
-            }
-        });
+            });
+        }
     }
 
     @Shutdown
     void shutdown() {
-        _statusExecutor.shutdownNow();
+        if (_statusExecutor != null)
+            _statusExecutor.shutdownNow();
     }
 
     public void notifyAccess(JObject<?> obj) {
