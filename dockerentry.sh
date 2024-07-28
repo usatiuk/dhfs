@@ -6,6 +6,7 @@ set -o pipefail || true
 set -x || true
 
 exec java \
+    -Xmx512M \
     --add-exports java.base/sun.nio.ch=ALL-UNNAMED \
     -Ddhfs.objects.persistence.files.root=/dhfs_root/p \
     -Ddhfs.objects.root=/dhfs_root/d \

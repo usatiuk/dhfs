@@ -24,7 +24,7 @@ EXTRAOPTS_PARSED="$(tr '\n\r' ' ' <"$EXTRAOPTS")"
 echo "Extra options: $EXTRAOPTS_PARSED"
 
 java \
-    -Xmx384M \
+    -Xmx512M \
     -Ddhfs.objects.writeback.limit=134217728 \
     -Ddhfs.objects.lru.limit=134217728 \
     --add-exports java.base/sun.nio.ch=ALL-UNNAMED \
