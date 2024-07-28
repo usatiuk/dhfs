@@ -82,7 +82,16 @@ public class JObjectLRU {
     public void updateSize(JObject<?> obj) {
         long size = jObjectSizeEstimator.estimateObjectSize(obj.getData());
         synchronized (_cache) {
-            _cache.put(obj, size);
+            _curSize += size;
+            var old = _cache.put(obj, size);
+            if (old != null)
+                _curSize -= old;
+
+            while (_curSize >= sizeLimit) {
+                var del = _cache.pollFirstEntry();
+                _curSize -= del.getValue();
+                _evict++;
+            }
         }
     }
 }
