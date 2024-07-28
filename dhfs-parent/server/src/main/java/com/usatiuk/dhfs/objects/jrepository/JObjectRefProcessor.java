@@ -9,11 +9,13 @@ import io.quarkus.runtime.Shutdown;
 import io.quarkus.runtime.Startup;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @ApplicationScoped
 public class JObjectRefProcessor {
@@ -30,10 +32,12 @@ public class JObjectRefProcessor {
     AutoSyncProcessor autoSyncProcessor;
     @ConfigProperty(name = "dhfs.objects.move-processor.threads")
     int moveProcessorThreads;
+    @ConfigProperty(name = "dhfs.objects.ref-processor.threads")
+    int refProcessorThreads;
     @ConfigProperty(name = "dhfs.objects.deletion.can-delete-retry-delay")
     long canDeleteRetryDelay;
-    ExecutorService _movableProcessorExecutorService;
-    private Thread _refProcessorThread;
+    private ExecutorService _movableProcessorExecutorService;
+    private ExecutorService _refProcessorExecutorService;
 
     public JObjectRefProcessor(@ConfigProperty(name = "dhfs.objects.deletion.delay") long deletionDelay,
                                @ConfigProperty(name = "dhfs.objects.deletion.can-delete-retry-delay") long canDeleteRetryDelay) {
@@ -43,17 +47,26 @@ public class JObjectRefProcessor {
 
     @Startup
     void init() {
-        _movableProcessorExecutorService = Executors.newFixedThreadPool(moveProcessorThreads);
+        BasicThreadFactory factory = new BasicThreadFactory.Builder()
+                .namingPattern("move-proc-%d")
+                .build();
+        _movableProcessorExecutorService = Executors.newFixedThreadPool(moveProcessorThreads, factory);
 
-        _refProcessorThread = new Thread(this::refProcessorThread);
-        _refProcessorThread.setName("JObject Refcounter thread");
-        _refProcessorThread.start();
+        BasicThreadFactory factoryRef = new BasicThreadFactory.Builder()
+                .namingPattern("ref-proc-%d")
+                .build();
+        _refProcessorExecutorService = Executors.newFixedThreadPool(refProcessorThreads, factoryRef);
+        for (int i = 0; i < refProcessorThreads; i++) {
+            _refProcessorExecutorService.submit(this::refProcessor);
+        }
     }
 
     @Shutdown
     void shutdown() throws InterruptedException {
-        _refProcessorThread.interrupt();
-        _refProcessorThread.join();
+        _refProcessorExecutorService.shutdownNow();
+        if (!_refProcessorExecutorService.awaitTermination(30, TimeUnit.SECONDS)) {
+            Log.error("Refcounting threads didn't exit in 30 seconds");
+        }
     }
 
     public void putDeletionCandidate(String name) {
@@ -140,7 +153,7 @@ public class JObjectRefProcessor {
         }));
     }
 
-    private void refProcessorThread() {
+    private void refProcessor() {
         try {
             while (!Thread.interrupted()) {
                 String next = null;
