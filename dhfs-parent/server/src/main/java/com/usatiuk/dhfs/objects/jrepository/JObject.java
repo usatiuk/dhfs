@@ -8,7 +8,6 @@ import io.quarkus.logging.Log;
 import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.NotImplementedException;
 
-import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -180,7 +179,8 @@ public class JObject<T extends JObjectData> {
                         throw new IllegalStateException("Object " + getName() + " has non-hydrated refs when written locally");
 
                     _metaPart.narrowClass(res.get().getClass());
-                    _dataPart.compareAndSet(null, res.get());
+                    if (_dataPart.compareAndSet(null, res.get()))
+                        _resolver.onResolution(this);
                 } // _dataPart.get() == null
             } finally {
                 rUnlock();

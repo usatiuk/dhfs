@@ -178,6 +178,10 @@ public class JObjectResolver {
         return protoSerializerService.deserialize(obj);
     }
 
+    public void onResolution(JObject<?> self) {
+        jObjectLRU.notifyAccess(self);
+    }
+
     public void removeLocal(JObject<?> jObject, String name) {
         jObject.assertRWLock();
         try {
@@ -196,6 +200,7 @@ public class JObjectResolver {
     public <T extends JObjectData> void notifyWrite(JObject<T> self, boolean metaChanged,
                                                     boolean externalChanged, boolean hasDataChanged) {
         self.assertRWLock();
+        jObjectLRU.notifyAccess(self);
         if (metaChanged || hasDataChanged)
             jObjectWriteback.markDirty(self);
         if (metaChanged)

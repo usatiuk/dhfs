@@ -33,12 +33,22 @@ public class JObjectLRU {
             _statusExecutor.submit(() -> {
                 try {
                     while (true) {
-                        Thread.sleep(1000);
+                        Thread.sleep(10000);
                         if (_curSize > 0)
                             Log.info("Cache status: size="
                                     + _curSize / 1024 / 1024 + "MB"
                                     + " evicted=" + _evict);
                         _evict = 0;
+                        if (Log.isTraceEnabled()) {
+                            long realSize = 0;
+                            synchronized (_cache) {
+                                for (JObject<?> object : _cache.keySet()) {
+                                    realSize += jObjectSizeEstimator.estimateObjectSize(object.getData());
+                                }
+                                Log.info("Cache status: real size="
+                                        + realSize / 1024 / 1024 + "MB" + " entries=" + _cache.size());
+                            }
+                        }
                     }
                 } catch (InterruptedException ignored) {
                 }
@@ -52,7 +62,10 @@ public class JObjectLRU {
             _statusExecutor.shutdownNow();
     }
 
+    // Called in JObjectManager getters to add into cache,
+    // and when resolving/modifying to update size
     public void notifyAccess(JObject<?> obj) {
+        if (obj.getData() == null) return;
         long size = jObjectSizeEstimator.estimateObjectSize(obj.getData());
         synchronized (_cache) {
             _curSize += size;
