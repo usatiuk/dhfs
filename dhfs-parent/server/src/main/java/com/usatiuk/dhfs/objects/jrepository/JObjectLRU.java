@@ -82,10 +82,13 @@ public class JObjectLRU {
     public void updateSize(JObject<?> obj) {
         long size = jObjectSizeEstimator.estimateObjectSize(obj.getData());
         synchronized (_cache) {
-            _curSize += size;
-            var old = _cache.put(obj, size);
-            if (old != null)
+            var old = _cache.replace(obj, size);
+            if (old != null) {
+                _curSize += size;
                 _curSize -= old;
+            } else {
+                return;
+            }
 
             while (_curSize >= sizeLimit) {
                 var del = _cache.pollFirstEntry();
