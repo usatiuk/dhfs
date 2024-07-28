@@ -66,9 +66,9 @@ public class RemoteHostManager {
                     .<Callable<Void>>map(host -> () -> {
                         try {
                             if (isReachable(host))
-                                Log.debug("Heartbeat: " + host);
+                                Log.trace("Heartbeat: " + host);
                             else
-                                Log.info("Trying to connect to " + host);
+                                Log.debug("Trying to connect to " + host);
                             if (pingCheck(host))
                                 handleConnectionSuccess(host);
                             else
@@ -154,7 +154,7 @@ public class RemoteHostManager {
                 return true;
             });
         } catch (Exception ignored) {
-            Log.info("Host " + host + " is unreachable: " + ignored.getMessage() + " " + ignored.getCause());
+            Log.debug("Host " + host + " is unreachable: " + ignored.getMessage() + " " + ignored.getCause());
             return false;
         }
     }
