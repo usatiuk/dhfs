@@ -126,7 +126,7 @@ public class HashSetDelayedBlockingQueue<T> {
     }
 
     @Nullable
-    public T tryGet() throws InterruptedException {
+    public T tryGet() {
         synchronized (this) {
             if (_set.isEmpty()) return null;
 

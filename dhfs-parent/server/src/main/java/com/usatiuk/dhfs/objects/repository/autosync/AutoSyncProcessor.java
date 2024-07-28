@@ -84,7 +84,9 @@ public class AutoSyncProcessor {
                 String name = null;
 
                 while (name == null) {
-                    name = _retries.tryGet();
+                    name = _pending.tryGet();
+                    if (name == null)
+                        name = _retries.tryGet();
                     if (name == null)
                         name = _pending.get(1000L); //FIXME:
                 }
