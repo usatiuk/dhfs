@@ -165,13 +165,14 @@ public class JObjectRefProcessor {
                                 return null;
                         }
 
-                        got.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
+                        if (!got.getKnownClass().isAnnotationPresent(Leaf.class))
+                            got.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
 
                         Log.debug("Deleting " + m.getName());
                         m.markDeleted();
 
                         Collection<String> extracted = null;
-                        if (got.getData() != null)
+                        if (!got.getKnownClass().isAnnotationPresent(Leaf.class) && got.getData() != null)
                             extracted = got.getData().extractRefs();
                         Collection<String> saved = got.getMeta().getSavedRefs();
 

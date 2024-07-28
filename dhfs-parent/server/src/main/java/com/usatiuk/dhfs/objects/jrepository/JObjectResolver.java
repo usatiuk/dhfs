@@ -142,7 +142,8 @@ public class JObjectResolver {
 
     private void tryQuickDelete(JObject<?> self) {
         self.assertRWLock();
-        self.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
+        if (!self.getKnownClass().isAnnotationPresent(Leaf.class))
+            self.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
 
         if (Log.isTraceEnabled())
             Log.trace("Quick delete of: " + self.getName());
@@ -150,7 +151,7 @@ public class JObjectResolver {
         self.getMeta().markDeleted();
 
         Collection<String> extracted = null;
-        if (self.getData() != null)
+        if (!self.getKnownClass().isAnnotationPresent(Leaf.class) && self.getData() != null)
             extracted = self.getData().extractRefs();
         Collection<String> saved = self.getMeta().getSavedRefs();
 

@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.files.conflicts.NoOpConflictResolver;
 import com.usatiuk.dhfs.objects.jrepository.AssumedUnique;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
+import com.usatiuk.dhfs.objects.jrepository.Leaf;
 import com.usatiuk.dhfs.objects.persistence.ChunkDataP;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import lombok.Getter;
@@ -18,6 +19,7 @@ import java.util.stream.Collectors;
 
 @Getter
 @AssumedUnique
+@Leaf
 public class ChunkData extends JObjectData {
     @Serial
     private static final long serialVersionUID = 1;
