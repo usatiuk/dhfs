@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
@@ -162,13 +163,17 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (dir.getKid(fname).isPresent())
                 return false;
 
-            bump.apply();
-
             boolean created = dir.putKid(fname, fuuid);
             if (!created) return false;
 
-            jObjectManager.put(f, Optional.of(dir.getName()));
+            try {
+                jObjectManager.put(f, Optional.of(dir.getName()));
+            } catch (Exception ex) {
+                Log.error("Failed creating file " + fuuid);
+                dir.removeKid(fname);
+            }
 
+            bump.apply();
             dir.setMtime(System.currentTimeMillis());
             return true;
         }))
@@ -194,12 +199,20 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (dir.getKid(dname).isPresent())
                 return false;
 
+            boolean created = dir.putKid(dname, duuid);
+            if (!created) return false;
+
+            try {
+                jObjectManager.put(ndir, Optional.of(dir.getName()));
+            } catch (Exception ex) {
+                Log.error("Failed creating directory " + dname);
+                dir.removeKid(dname);
+            }
+
             bump.apply();
 
-            jObjectManager.put(ndir, Optional.of(dir.getName()));
-
             dir.setMtime(System.currentTimeMillis());
-            return dir.putKid(dname, duuid);
+            return true;
         }))
             return Optional.empty();
 
@@ -232,21 +245,62 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (dir.getKid(kname).isEmpty())
                 return false;
 
-            kid.get().runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m2, d2, bump2, i2) -> {
-                if (d2 == null)
-                    throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Pessimistically not removing unresolved maybe-directory"));
-                if (d2 instanceof Directory)
-                    if (!((Directory) d2).getChildren().isEmpty())
-                        throw new DirectoryNotEmptyException();
+            AtomicBoolean hadRef = new AtomicBoolean(false);
+            AtomicBoolean removedRef = new AtomicBoolean(false);
 
-                m2.removeRef(m.getName());
-                return null;
-            });
+            try {
+                kid.get().runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m2, d2, bump2, i2) -> {
+                    if (m2.checkRef(m.getName()))
+                        hadRef.set(true);
+
+                    if (d2 == null)
+                        throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Pessimistically not removing unresolved maybe-directory"));
+                    if (d2 instanceof Directory)
+                        if (!((Directory) d2).getChildren().isEmpty())
+                            throw new DirectoryNotEmptyException();
+
+                    m2.removeRef(m.getName());
+                    removedRef.set(true);
+                    return null;
+                });
+            } catch (Exception ex) {
+                Log.error("Failed removing dentry " + name, ex);
+                // If we failed something and removed the ref, try re-adding it
+                if (hadRef.get() && removedRef.get()) {
+                    AtomicBoolean hadRef2 = new AtomicBoolean(false);
+                    AtomicBoolean addedRef = new AtomicBoolean(false);
+                    try {
+                        kid.get().runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m2, d2, bump2, i2) -> {
+                            if (m2.checkRef(m.getName()))
+                                hadRef2.set(true);
+
+                            if (d2 == null)
+                                throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Pessimistically not removing unresolved maybe-directory"));
+                            if (d2 instanceof Directory)
+                                if (!((Directory) d2).getChildren().isEmpty())
+                                    throw new DirectoryNotEmptyException();
+
+                            m2.addRef(m.getName());
+                            addedRef.set(true);
+                            return null;
+                        });
+                    } catch (Exception e) {
+                        Log.error("Failed fixing up failed-removed dentry " + name, ex);
+                        // If it is not there and we haven't added it, continue removing
+                        if (!(!hadRef2.get() && !addedRef.get())) {
+                            return false;
+                        }
+                    }
+                } else { // Otherwise, we didn't remove anything, go back.
+                    return false;
+                }
+            }
 
             boolean removed = dir.removeKid(kname);
-
-            bump.apply();
-            dir.setMtime(System.currentTimeMillis());
+            if (removed) {
+                bump.apply();
+                dir.setMtime(System.currentTimeMillis());
+            }
             return removed;
         });
     }
