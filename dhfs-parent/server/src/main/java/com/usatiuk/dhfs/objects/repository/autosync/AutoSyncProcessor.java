@@ -20,7 +20,7 @@ import java.util.concurrent.Executors;
 @ApplicationScoped
 public class AutoSyncProcessor {
     private final HashSetDelayedBlockingQueue<String> _pending = new HashSetDelayedBlockingQueue<>(0);
-    private final HashSetDelayedBlockingQueue<String> _retries = new HashSetDelayedBlockingQueue<>(1000); //FIXME:
+    private final HashSetDelayedBlockingQueue<String> _retries = new HashSetDelayedBlockingQueue<>(10000); //FIXME:
     @Inject
     JObjectResolver jObjectResolver;
     @Inject
@@ -101,13 +101,13 @@ public class AutoSyncProcessor {
                             return obj.tryResolve(JObject.ResolutionStrategy.REMOTE);
                         });
                         if (!ok) {
-                            Log.warn("Failed downloading object " + obj.getName() + ", will retry.");
+                            Log.debug("Failed downloading object " + obj.getName() + ", will retry.");
                             _retries.add(obj.getName());
                         }
                     });
                 } catch (DeletedObjectAccessException ignored) {
                 } catch (Exception e) {
-                    Log.error("Failed downloading object " + name + ", will retry.", e);
+                    Log.debug("Failed downloading object " + name + ", will retry.", e);
                     _retries.add(name);
                 }
             }
