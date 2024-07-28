@@ -174,4 +174,20 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         // FIXME: Race?
         deleteImpl(getMetaPath(name));
     }
+
+    @Override
+    public long getTotalSpace() {
+        return dataPath.toFile().getTotalSpace();
+    }
+
+    @Override
+    public long getFreeSpace() {
+        return dataPath.toFile().getFreeSpace();
+    }
+
+    @Override
+    public long getUsableSpace() {
+        return dataPath.toFile().getUsableSpace();
+    }
+
 }

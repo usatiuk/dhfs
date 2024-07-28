@@ -30,4 +30,8 @@ public interface ObjectPersistentStore {
 
     // Deletes object metadata and data
     void deleteObject(String name);
+
+    long getTotalSpace();
+    long getFreeSpace();
+    long getUsableSpace();
 }

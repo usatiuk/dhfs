@@ -7,6 +7,7 @@ import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.objects.FsNode;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
 import com.usatiuk.dhfs.files.service.DirectoryNotEmptyException;
+import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -33,6 +34,9 @@ import static jnr.posix.FileStat.*;
 
 @ApplicationScoped
 public class DhfsFuse extends FuseStubFS {
+    @Inject
+    ObjectPersistentStore persistentStore; // FIXME?
+
     @ConfigProperty(name = "dhfs.fuse.root")
     String root;
 
@@ -67,13 +71,11 @@ public class DhfsFuse extends FuseStubFS {
     @Override
     public int statfs(String path, Statvfs stbuf) {
         try {
-            //FIXME:
-            if ("/".equals(path)) {
-                stbuf.f_blocks.set(1024 * 1024 * 1024); // total data blocks in file system
-                stbuf.f_frsize.set(1024);        // fs block size
-                stbuf.f_bfree.set(1024 * 1024 * 1024);  // free blocks in fs
-                stbuf.f_bavail.set(1024 * 1024 * 1024); // avail blocks in fs
-            }
+            stbuf.f_frsize.set(4096);
+            stbuf.f_blocks.set(persistentStore.getTotalSpace() / 4096L); // total data blocks in file system
+            stbuf.f_bfree.set(persistentStore.getFreeSpace() / 4096L);  // free blocks in fs
+            stbuf.f_bavail.set(persistentStore.getUsableSpace() / 4096L); // avail blocks in fs
+            stbuf.f_namemax.set(2048);
             return super.statfs(path, stbuf);
         } catch (Exception e) {
             Log.error("When statfs " + path, e);
