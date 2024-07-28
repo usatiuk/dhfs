@@ -179,7 +179,7 @@ public class JObjectResolver {
     }
 
     public void onResolution(JObject<?> self) {
-        jObjectLRU.notifyAccess(self);
+        jObjectLRU.updateSize(self);
     }
 
     public void removeLocal(JObject<?> jObject, String name) {
@@ -200,7 +200,7 @@ public class JObjectResolver {
     public <T extends JObjectData> void notifyWrite(JObject<T> self, boolean metaChanged,
                                                     boolean externalChanged, boolean hasDataChanged) {
         self.assertRWLock();
-        jObjectLRU.notifyAccess(self);
+        jObjectLRU.updateSize(self);
         if (metaChanged || hasDataChanged)
             jObjectWriteback.markDirty(self);
         if (metaChanged)

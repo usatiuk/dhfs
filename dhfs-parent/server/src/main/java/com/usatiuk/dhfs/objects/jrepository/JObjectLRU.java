@@ -62,8 +62,6 @@ public class JObjectLRU {
             _statusExecutor.shutdownNow();
     }
 
-    // Called in JObjectManager getters to add into cache,
-    // and when resolving/modifying to update size
     public void notifyAccess(JObject<?> obj) {
         if (obj.getData() == null) return;
         long size = jObjectSizeEstimator.estimateObjectSize(obj.getData());
@@ -78,6 +76,13 @@ public class JObjectLRU {
                 _curSize -= del.getValue();
                 _evict++;
             }
+        }
+    }
+
+    public void updateSize(JObject<?> obj) {
+        long size = jObjectSizeEstimator.estimateObjectSize(obj.getData());
+        synchronized (_cache) {
+            _cache.put(obj, size);
         }
     }
 }
