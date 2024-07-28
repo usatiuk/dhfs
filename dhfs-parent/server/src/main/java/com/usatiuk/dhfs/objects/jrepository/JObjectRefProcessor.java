@@ -146,7 +146,9 @@ public class JObjectRefProcessor {
                 String next = null;
 
                 while (next == null) {
-                    next = _canDeleteRetries.tryGet();
+                    next = _candidates.tryGet();
+                    if (next == null)
+                        next = _canDeleteRetries.tryGet();
                     if (next == null)
                         next = _candidates.get(canDeleteRetryDelay);
                 }
