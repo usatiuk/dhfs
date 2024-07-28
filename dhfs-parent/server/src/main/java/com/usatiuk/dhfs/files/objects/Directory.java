@@ -32,9 +32,7 @@ public class Directory extends FsNode {
     }
 
     public Optional<UUID> getKid(String name) {
-        if (_children.containsKey(name))
-            return Optional.of(_children.get(name));
-        else return Optional.empty();
+        return Optional.ofNullable(_children.get(name));
     }
 
     public boolean removeKid(String name) {
