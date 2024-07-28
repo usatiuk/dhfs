@@ -5,6 +5,15 @@ set -o pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
+PIDFILE="$SCRIPT_DIR"/.pid
+
+if [ -f "$PIDFILE" ]; then
+    if kill -0 $(cat "$PIDFILE") >/dev/null; then
+        echo "Already running: "$(cat "$PIDFILE")
+        exit 2
+    fi
+fi
+
 # 💀
 LATEST=$(curl "https://api.github.com/repos/usatiuk/dhfs/actions/runs?branch=main&status=completed&per_page=1" | tr -d "[:space:]" | sed -n "s/.*\[{\"id\":\([0-9]*\).*/\1/p")
 
