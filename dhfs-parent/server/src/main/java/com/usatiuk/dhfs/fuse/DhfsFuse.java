@@ -50,6 +50,9 @@ public class DhfsFuse extends FuseStubFS {
     int targetChunkSize;
 
     @Inject
+    JnrPtrByteOutputAccessors jnrPtrByteOutputAccessors;
+
+    @Inject
     DhfsFileService fileService;
 
     void init(@Observes @Priority(100000) StartupEvent event) {
@@ -166,7 +169,7 @@ public class DhfsFuse extends FuseStubFS {
             var file = fileOpt.get();
             var read = fileService.read(fileOpt.get(), offset, (int) size);
             if (read.isEmpty()) return 0;
-            UnsafeByteOperations.unsafeWriteTo(read.get(), new JnrPtrByteOutput(buf, size));
+            UnsafeByteOperations.unsafeWriteTo(read.get(), new JnrPtrByteOutput(jnrPtrByteOutputAccessors, buf, size));
             return read.get().size();
         } catch (Exception e) {
             Log.error("When reading " + path, e);
@@ -318,7 +321,7 @@ public class DhfsFuse extends FuseStubFS {
             var file = fileOpt.get();
             var read = fileService.readlinkBS(fileOpt.get());
             if (read.isEmpty()) return 0;
-            UnsafeByteOperations.unsafeWriteTo(read, new JnrPtrByteOutput(buf, size));
+            UnsafeByteOperations.unsafeWriteTo(read, new JnrPtrByteOutput(jnrPtrByteOutputAccessors, buf, size));
             buf.putByte(Math.min(size - 1, read.size()), (byte) 0);
             return 0;
         } catch (Exception e) {

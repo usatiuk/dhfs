@@ -8,7 +8,10 @@
 
     <properties>
         <compiler-plugin.version>3.12.1</compiler-plugin.version>
-        <maven.compiler.release>21</maven.compiler.release>
+        <!--FIXME-->
+        <maven.compiler.release></maven.compiler.release>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
@@ -167,6 +170,8 @@
                 <configuration>
                     <compilerArgs>
                         <arg>-parameters</arg>
+                        <arg>--add-exports</arg>
+                        <arg>java.base/jdk.internal.access=ALL-UNNAMED</arg>
                     </compilerArgs>
                 </configuration>
             </plugin>
@@ -178,7 +183,10 @@
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         <maven.home>${maven.home}</maven.home>
                     </systemPropertyVariables>
-                    <argLine>--add-exports java.base/sun.nio.ch=ALL-UNNAMED</argLine>
+                    <argLine>
+                        --add-exports java.base/sun.nio.ch=ALL-UNNAMED
+                        --add-exports java.base/jdk.internal.access=ALL-UNNAMED
+                    </argLine>
                     <skipTests>${skip.unit}</skipTests>
                 </configuration>
             </plugin>

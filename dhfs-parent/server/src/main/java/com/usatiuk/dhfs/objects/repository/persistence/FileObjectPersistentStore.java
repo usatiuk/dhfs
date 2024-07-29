@@ -114,9 +114,14 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     private <T extends Message> T readObjectImpl(T defaultInstance, Path path) {
         try (var rf = new RandomAccessFile(path.toFile(), "r")) {
             var len = rf.length();
-            if (len > mmapThreshold)
-                return (T) defaultInstance.getParserForType().parseFrom(UnsafeByteOperations.unsafeWrap(rf.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, len)));
-            else {
+            if (len > mmapThreshold) {
+                var bs = UnsafeByteOperations.unsafeWrap(rf.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, len));
+                // This way, the input will be considered "immutable" which would allow avoiding copies
+                // when parsing byte arrays
+                var ch = bs.newCodedInput();
+                ch.enableAliasing(true);
+                return (T) defaultInstance.getParserForType().parseFrom(ch);
+            } else {
                 var arr = new byte[(int) len];
                 rf.readFully(arr, 0, (int) len);
                 return (T) defaultInstance.getParserForType().parseFrom(UnsafeByteOperations.unsafeWrap(arr));

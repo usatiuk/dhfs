@@ -49,6 +49,7 @@ public class DhfsFusex3IT {
                                 .run("apt update && apt install -y libfuse2 curl gcc")
                                 .copy("/app", "/app")
                                 .cmd("java", "-ea", "-Xmx128M", "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
+                                        "--add-exports", "java.base/jdk.internal.access=ALL-UNNAMED",
                                         "-Ddhfs.objects.peerdiscovery.interval=100",
                                         "-Ddhfs.objects.invalidation.delay=100",
                                         "-Ddhfs.objects.deletion.delay=0",

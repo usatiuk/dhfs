@@ -9,10 +9,13 @@ public class JnrPtrByteOutput extends ByteOutput {
     private final Pointer _backing;
     private final long _size;
     private long _pos;
-    public JnrPtrByteOutput(Pointer backing, long size) {
+    private final JnrPtrByteOutputAccessors _accessors;
+
+    public JnrPtrByteOutput(JnrPtrByteOutputAccessors accessors, Pointer backing, long size) {
         _backing = backing;
         _size = size;
         _pos = 0;
+        _accessors = accessors;
     }
 
     @Override
@@ -36,11 +39,22 @@ public class JnrPtrByteOutput extends ByteOutput {
 
     @Override
     public void write(ByteBuffer value) {
-        throw new UnsupportedOperationException();
+        var rem = value.remaining();
+        if (rem + _pos > _size) throw new IndexOutOfBoundsException();
+
+        if (value.isDirect()) {
+            long addr = _accessors.getNioAccess().getBufferAddress(value) + value.position();
+            var out = _backing.address() + _pos;
+            _accessors.getUnsafe().copyMemory(addr, out, rem);
+        } else {
+            throw new UnsupportedOperationException();
+        }
+
+        _pos += rem;
     }
 
     @Override
     public void writeLazy(ByteBuffer value) {
-        throw new UnsupportedOperationException();
+        write(value);
     }
 }
