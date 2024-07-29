@@ -46,6 +46,9 @@ public class DhfsFuse extends FuseStubFS {
     @ConfigProperty(name = "dhfs.fuse.debug")
     Boolean debug;
 
+    @ConfigProperty(name = "dhfs.files.target_chunk_size")
+    int targetChunkSize;
+
     @Inject
     DhfsFileService fileService;
 
@@ -71,10 +74,15 @@ public class DhfsFuse extends FuseStubFS {
     @Override
     public int statfs(String path, Statvfs stbuf) {
         try {
-            stbuf.f_frsize.set(4096);
-            stbuf.f_blocks.set(persistentStore.getTotalSpace() / 4096L); // total data blocks in file system
-            stbuf.f_bfree.set(persistentStore.getFreeSpace() / 4096L);  // free blocks in fs
-            stbuf.f_bavail.set(persistentStore.getUsableSpace() / 4096L); // avail blocks in fs
+            int target = targetChunkSize > 0 ? targetChunkSize : 4096;
+            stbuf.f_frsize.set(target);
+            stbuf.f_bsize.set(target);
+            stbuf.f_blocks.set(persistentStore.getTotalSpace() / target); // total data blocks in file system
+            stbuf.f_bfree.set(persistentStore.getFreeSpace() / target);  // free blocks in fs
+            stbuf.f_bavail.set(persistentStore.getUsableSpace() / target); // avail blocks in fs
+            stbuf.f_files.set(1000); //FIXME:
+            stbuf.f_ffree.set(Integer.MAX_VALUE - 2000); //FIXME:
+            stbuf.f_favail.set(Integer.MAX_VALUE - 2000); //FIXME:
             stbuf.f_namemax.set(2048);
             return super.statfs(path, stbuf);
         } catch (Exception e) {

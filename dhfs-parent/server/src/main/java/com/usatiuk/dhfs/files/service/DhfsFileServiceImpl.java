@@ -32,7 +32,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     JObjectManager jObjectManager;
 
     @ConfigProperty(name = "dhfs.files.target_chunk_size")
-    Integer targetChunkSize;
+    int targetChunkSize;
 
     @ConfigProperty(name = "dhfs.files.write_merge_threshold")
     float writeMergeThreshold;
