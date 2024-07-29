@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.objects.repository.persistence;
 
+import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.Message;
 import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
@@ -17,6 +18,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.annotation.Nonnull;
 import java.io.*;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -32,6 +34,8 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     private final Path metaPath;
     private final Path dataPath;
+
+    private final static long mmapThreshold = 65536;
 
     public FileObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.persistence.files.root") String root) {
         this.root = root;
@@ -108,9 +112,15 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     }
 
     private <T extends Message> T readObjectImpl(T defaultInstance, Path path) {
-        try (var fsb = new FileInputStream(path.toFile())) {
-            var file = fsb.readAllBytes();
-            return (T) defaultInstance.getParserForType().parseFrom(UnsafeByteOperations.unsafeWrap(file));
+        try (var rf = new RandomAccessFile(path.toFile(), "r")) {
+            var len = rf.length();
+            if (len > mmapThreshold)
+                return (T) defaultInstance.getParserForType().parseFrom(UnsafeByteOperations.unsafeWrap(rf.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, len)));
+            else {
+                var arr = new byte[(int) len];
+                rf.readFully(arr, 0, (int) len);
+                return (T) defaultInstance.getParserForType().parseFrom(UnsafeByteOperations.unsafeWrap(arr));
+            }
         } catch (FileNotFoundException | NoSuchFileException fx) {
             throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
         } catch (IOException e) {
@@ -133,6 +143,15 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     private void writeObjectImpl(Path path, Message data) {
         try {
+            var len = data.getSerializedSize();
+            if (len > mmapThreshold)
+                try (var rf = new RandomAccessFile(path.toFile(), "rw")) {
+                    rf.setLength(len);
+                    var mapped = rf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, len);
+                    data.writeTo(CodedOutputStream.newInstance(mapped));
+                    return;
+                }
+
             try (var fsb = new FileOutputStream(path.toFile(), false);
                  var buf = new BufferedOutputStream(fsb, Math.min(65536, data.getSerializedSize()))) {
                 data.writeTo(buf);
