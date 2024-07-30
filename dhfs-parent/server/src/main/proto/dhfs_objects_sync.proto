@@ -10,9 +10,11 @@ package dhfs.objects.sync;
 
 service DhfsObjectSyncGrpc {
   rpc GetObject (GetObjectRequest) returns (GetObjectReply) {}
-  rpc CanDelete (CanDeleteRequest) returns (CanDeleteReply) {}
   rpc GetIndex (GetIndexRequest) returns (GetIndexReply) {}
   rpc IndexUpdate (IndexUpdatePush) returns (IndexUpdateReply) {}
+
+  rpc CanDelete (CanDeleteRequest) returns (CanDeleteReply) {}
+  rpc ConfirmPushedMove (ConfirmPushedMoveRequest) returns (ConfirmPushedMoveReply) {}
 
   rpc Ping (PingRequest) returns (PingReply) {}
 }
@@ -49,12 +51,39 @@ message GetObjectRequest {
   string selfUuid = 10;
 
   string name = 2;
+  bool forConflict = 3;
+}
+
+//FIXME:
+message PushedMove {
+  ObjectHeader parent = 1;
+  string kid = 2;
+}
+
+message PushedMoves {
+  repeated PushedMove pushedMoves = 2;
 }
 
 message GetObjectReply {
   string selfUuid = 10;
 
-  ApiObject object = 1;
+  optional ApiObject object = 1;
+  optional PushedMoves pushedMoves = 2;
+}
+
+message PushedMoveConfirm {
+  string parent = 1;
+  string kid = 2;
+}
+
+message ConfirmPushedMoveRequest {
+  string selfUuid = 10;
+
+  repeated PushedMoveConfirm confirmedMoves = 1;
+}
+
+message ConfirmPushedMoveReply {
+
 }
 
 message CanDeleteRequest {

@@ -7,7 +7,6 @@ import com.usatiuk.dhfs.objects.repository.ObjectHeader;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
-import io.vertx.core.impl.ConcurrentHashSet;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -16,8 +15,6 @@ import java.io.ObjectInputStream;
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.*;
-import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class ObjectMetadata implements Serializable {
@@ -40,9 +37,12 @@ public class ObjectMetadata implements Serializable {
     private Map<UUID, Long> _changelog = new LinkedHashMap<>(4);
     @Getter
     @Setter
-    private Set<String> _savedRefs = Collections.emptySet();
+    private Set<String> _savedRefs = new HashSet<>(4);
     @Getter
     private boolean _locked = false;
+    @Getter
+    @Setter
+    private volatile boolean _isMoveDummy = false;
     @Getter
     @Setter
     private volatile boolean _haveLocalCopy = false;
@@ -118,6 +118,7 @@ public class ObjectMetadata implements Serializable {
     public void addRef(String from) {
         _confirmedDeletes.clear();
         _referrers.add(from);
+        _isMoveDummy = false;
         if (Log.isTraceEnabled())
             Log.trace("Adding ref " + from + " to " + getName());
     }
@@ -184,6 +185,10 @@ public class ObjectMetadata implements Serializable {
         return headerBuilder.build();
     }
 
+    public boolean carefulDeletion() {
+        return _isMoveDummy;
+    }
+
     public int metaHash() {
         int res = Objects.hashCode(_name);
         res = 31 * res + Objects.hashCode(isSeen());
@@ -196,6 +201,7 @@ public class ObjectMetadata implements Serializable {
         res = 31 * res + Objects.hashCode(_remoteCopies);
         res = 31 * res + Objects.hashCode(_savedRefs);
         res = 31 * res + Objects.hashCode(_haveLocalCopy);
+        res = 31 * res + Objects.hashCode(_isMoveDummy);
         return res;
     }
 

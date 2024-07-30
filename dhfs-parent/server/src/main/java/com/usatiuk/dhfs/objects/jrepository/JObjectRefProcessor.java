@@ -173,7 +173,7 @@ public class JObjectRefProcessor {
                         if (m.isLocked()) return null;
                         if (m.isDeleted()) return null;
                         if (!m.isDeletionCandidate()) return null;
-                        if (m.isSeen() && m.getKnownClass().isAnnotationPresent(Movable.class)) {
+                        if (m.isSeen() && m.carefulDeletion()) {
                             if (!processMovable(got))
                                 return null;
                         }
