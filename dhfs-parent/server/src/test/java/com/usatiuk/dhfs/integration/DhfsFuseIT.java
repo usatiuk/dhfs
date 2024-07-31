@@ -323,6 +323,49 @@ public class DhfsFuseIT {
     }
 
     @Test
+    void dirCycleTest() throws IOException, InterruptedException, TimeoutException {
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "mkdir /root/dhfs_default/fuse/a").getExitCode());
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "mkdir /root/dhfs_default/fuse/b").getExitCode());
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo xqr489 >> /root/dhfs_default/fuse/a/testfa").getExitCode());
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo ahinou >> /root/dhfs_default/fuse/b/testfb").getExitCode());
+        Thread.sleep(1000);
+        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls -lavh /root/dhfs_default/fuse").getExitCode());
+        var c2ls = container2.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -type f -exec cat {} \\;");
+        Assertions.assertEquals(0, c2ls.getExitCode());
+        Assertions.assertTrue(c2ls.getStdout().contains("xqr489"));
+        Assertions.assertTrue(c2ls.getStdout().contains("ahinou"));
+        Thread.sleep(1000);
+
+        var client = DockerClientFactory.instance().client();
+        client.pauseContainerCmd(container1.getContainerId()).exec();
+        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "mv /root/dhfs_default/fuse/a /root/dhfs_default/fuse/b").getExitCode());
+        client.pauseContainerCmd(container2.getContainerId()).exec();
+        client.unpauseContainerCmd(container1.getContainerId()).exec();
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "mv /root/dhfs_default/fuse/b /root/dhfs_default/fuse/a").getExitCode());
+        client.unpauseContainerCmd(container2.getContainerId()).exec();
+
+        Thread.sleep(10000);
+        Log.info(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse"));
+        Log.info(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/a"));
+        Log.info(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/b"));
+        Log.info(container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse"));
+        Log.info(container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/a"));
+        Log.info(container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/b"));
+        // FIXME: An infinite cycle can indeed be created
+        var c1ls2 = container1.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -maxdepth 3 -type f -exec cat {} \\;");
+        Log.info(c1ls2);
+        Assertions.assertEquals(0, c1ls2.getExitCode());
+        Assertions.assertTrue(c1ls2.getStdout().contains("xqr489"));
+        Assertions.assertTrue(c1ls2.getStdout().contains("ahinou"));
+        var c2ls2 = container1.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -maxdepth 3 -type f -exec cat {} \\;");
+        Log.info(c2ls2);
+        Assertions.assertEquals(0, c2ls2.getExitCode());
+        Assertions.assertTrue(c2ls2.getStdout().contains("xqr489"));
+        Assertions.assertTrue(c2ls2.getStdout().contains("ahinou"));
+    }
+
+    @Test
     void dirConflictTest2() throws IOException, InterruptedException, TimeoutException {
         Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
         Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
