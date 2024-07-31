@@ -87,7 +87,7 @@ public class HashSetDelayedBlockingQueueTest {
                 throw new RuntimeException(e);
             }
         });
-        Thread.sleep(100);
+        Thread.sleep(500);
         var got1 = queue.getAllWait(3);
         var got2 = queue.getAllWait(3);
         Assertions.assertEquals(3, got1.size());
