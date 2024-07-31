@@ -80,13 +80,22 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
                     continue;
                 }
 
-                builder.addPushedMoves(PushedMove.newBuilder()
-                        .setParent((ObjectHeader) obj.get().runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
-                            if (m.getKnownClass().isAnnotationPresent(PushResolution.class))
-                                throw new NotImplementedException();
+                ObjectHeader header;
 
-                            return m.toRpcHeader();
-                        }))
+                try {
+                    header = obj.get().runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
+                        if (m.getKnownClass().isAnnotationPresent(PushResolution.class))
+                            throw new NotImplementedException();
+
+                        return m.toRpcHeader();
+                    });
+                } catch (DeletedObjectAccessException e) {
+                    it.remove();
+                    continue;
+                }
+
+                builder.addPushedMoves(PushedMove.newBuilder()
+                        .setParent(header)
                         .setKid(next.child())
                         .build());
             }
