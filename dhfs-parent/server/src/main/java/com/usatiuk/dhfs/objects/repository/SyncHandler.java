@@ -80,7 +80,7 @@ public class SyncHandler {
             boolean updatedRemoteVersion = false;
 
             var oldRemoteVer = md.getRemoteCopies().put(from, receivedTotalVer);
-            if (oldRemoteVer != null && !oldRemoteVer.equals(receivedTotalVer)) updatedRemoteVersion = true;
+            if (oldRemoteVer == null || !oldRemoteVer.equals(receivedTotalVer)) updatedRemoteVersion = true;
 
             boolean hasLower = false;
             boolean hasHigher = false;
