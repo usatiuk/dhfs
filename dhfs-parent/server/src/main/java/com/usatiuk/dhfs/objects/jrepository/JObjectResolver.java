@@ -215,7 +215,7 @@ public class JObjectResolver {
                     for (var cb : _writeListeners.get(t))
                         cb.apply((JObject) self);
             }
-        if (externalChanged) {
+        if (externalChanged && hasLocalCopy(self)) {
             invalidationQueueService.pushInvalidationToAll(self.getName());
         }
     }
