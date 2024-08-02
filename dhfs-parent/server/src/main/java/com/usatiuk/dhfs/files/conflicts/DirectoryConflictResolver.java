@@ -26,7 +26,7 @@ public class DirectoryConflictResolver implements ConflictResolver {
     JObjectManager jObjectManager;
 
     @Override
-    public ConflictResolutionResult resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
+    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
         var theirsDir = (Directory) theirsData;
         if (!theirsDir.getClass().equals(Directory.class)) {
             Log.error("Object type mismatch!");
@@ -103,7 +103,5 @@ public class DirectoryConflictResolver implements ConflictResolver {
             m.setChangelog(newChangelog);
             return null;
         });
-
-        return ConflictResolutionResult.RESOLVED;
     }
 }

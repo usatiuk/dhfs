@@ -4,8 +4,6 @@ import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
@@ -140,13 +138,8 @@ public class SyncHandler {
 
             var resolverClass = found.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> found.getConflictResolver());
             var resolver = conflictResolvers.select(resolverClass);
-            var result = resolver.get().resolve(from, theirsHeader, theirsData, found);
-            if (result.equals(ConflictResolver.ConflictResolutionResult.RESOLVED)) {
-                Log.info("Resolved conflict for " + from + " " + header.getName());
-            } else {
-                Log.error("Failed conflict resolution for " + from + " " + header.getName());
-                throw new StatusRuntimeException(Status.ABORTED.withDescription("Conflict resolution failed"));
-            }
+            resolver.get().resolve(from, theirsHeader, theirsData, found);
+            Log.info("Resolved conflict for " + from + " " + header.getName());
         }
     }
 

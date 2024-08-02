@@ -33,14 +33,12 @@ public class FileConflictResolver implements ConflictResolver {
     boolean useHashForChunks;
 
     @Override
-    public ConflictResolutionResult resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
-
+    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
         var theirsFile = (File) theirsData;
         if (!theirsFile.getClass().equals(File.class)) {
             Log.error("Object type mismatch!");
             throw new NotImplementedException();
         }
-
 
         var _oursDir = jObjectManager.get(ours.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
                     if (d == null)
@@ -164,7 +162,5 @@ public class FileConflictResolver implements ConflictResolver {
             });
             return null;
         });
-
-        return ConflictResolutionResult.RESOLVED;
     }
 }

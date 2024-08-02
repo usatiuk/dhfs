@@ -28,7 +28,7 @@ public class PeerDirectoryConflictResolver implements ConflictResolver {
     JObjectManager jObjectManager;
 
     @Override
-    public ConflictResolutionResult resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
+    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
         var theirsDir = (PeerDirectory) theirsData;
         if (!theirsDir.getClass().equals(PeerDirectory.class)) {
             Log.error("Object type mismatch!");
@@ -69,7 +69,5 @@ public class PeerDirectoryConflictResolver implements ConflictResolver {
             m.setChangelog(newChangelog);
             return null;
         });
-
-        return ConflictResolutionResult.RESOLVED;
     }
 }

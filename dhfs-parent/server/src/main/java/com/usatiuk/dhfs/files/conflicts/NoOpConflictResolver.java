@@ -16,7 +16,7 @@ import java.util.UUID;
 @ApplicationScoped
 public class NoOpConflictResolver implements ConflictResolver {
     @Override
-    public ConflictResolutionResult resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
+    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
         ours.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, b, i) -> {
             if (d == null)
                 throw new StatusRuntimeException(Status.ABORTED.withDescription("Conflict but we don't have local copy"));
@@ -40,8 +40,5 @@ public class NoOpConflictResolver implements ConflictResolver {
 
             return null;
         });
-
-        // Maybe check types?
-        return ConflictResolutionResult.RESOLVED;
     }
 }
