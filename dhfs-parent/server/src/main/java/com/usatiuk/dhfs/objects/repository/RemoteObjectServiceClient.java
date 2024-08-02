@@ -6,8 +6,6 @@ import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.jrepository.PushResolution;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
-import com.usatiuk.dhfs.objects.repository.movedummies.MoveDummyEntry;
-import com.usatiuk.dhfs.objects.repository.movedummies.MoveDummyProcessor;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -38,38 +36,11 @@ public class RemoteObjectServiceClient {
     InvalidationQueueService invalidationQueueService;
     @Inject
     ProtoSerializerService protoSerializerService;
-    @Inject
-    MoveDummyProcessor moveDummyProcessor;
 
-    private GetObjectReply getObjectImpl(DhfsObjectSyncGrpcGrpc.DhfsObjectSyncGrpcBlockingStub client, String name) {
-        GetObjectReply reply;
-
-        do {
-            reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).setName(name).build());
-
-            if (!reply.hasObject() && !reply.hasPushedMoves())
-                throw new IllegalStateException("Reply has neither pushed moves nor object!");
-
-            if (reply.hasPushedMoves())
-                moveDummyProcessor.processPushedMoves(UUID.fromString(reply.getSelfUuid()), reply.getPushedMoves());
-        } while (!reply.hasObject());
-        return reply;
-    }
-
-    public Pair<ObjectHeader, JObjectDataP> getSpecificObject(UUID host, String name, boolean forConflict) {
+    public Pair<ObjectHeader, JObjectDataP> getSpecificObject(UUID host, String name) {
         return rpcClientFactory.withObjSyncClient(host, client -> {
-            var reply = getObjectImpl(client, name);
+            var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).setName(name).build());
             return Pair.of(reply.getObject().getHeader(), reply.getObject().getContent());
-        });
-    }
-
-    public void pushConfirmedPushedMoves(UUID host, Collection<MoveDummyEntry> entries) {
-        rpcClientFactory.withObjSyncClient(host, client -> {
-            var builder = ConfirmPushedMoveRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString());
-            for (var e : entries)
-                builder.addConfirmedMoves(PushedMoveConfirm.newBuilder().setParent(e.parent()).setKid(e.child()).build());
-            client.confirmPushedMove(builder.build());
-            return null;
         });
     }
 
@@ -92,7 +63,7 @@ public class RemoteObjectServiceClient {
         Log.info("Downloading object " + jObject.getName() + " from " + targets.stream().map(UUID::toString).collect(Collectors.joining(", ")));
 
         return rpcClientFactory.withObjSyncClient(targets, client -> {
-            var reply = getObjectImpl(client, jObject.getName());
+            var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).setName(jObject.getName()).build());
 
             var receivedMap = new HashMap<UUID, Long>();
             for (var e : reply.getObject().getHeader().getChangelog().getEntriesList()) {

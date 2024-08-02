@@ -10,7 +10,6 @@ import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import com.usatiuk.dhfs.objects.repository.ObjectHeader;
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
-import com.usatiuk.dhfs.objects.repository.movedummies.MoveDummyRegistry;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -29,9 +28,6 @@ public class FileConflictResolver implements ConflictResolver {
 
     @Inject
     JObjectManager jObjectManager;
-
-    @Inject
-    MoveDummyRegistry moveDummyRegistry;
 
     @ConfigProperty(name = "dhfs.files.use_hash_for_chunks")
     boolean useHashForChunks;
@@ -116,7 +112,6 @@ public class FileConflictResolver implements ConflictResolver {
                         oursFile.getChunks().put(e.getLeft(), e.getValue());
                         jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), ChunkData.class, Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
                         jObjectManager.getOrPut(ChunkInfo.getNameFromHash(e.getValue()), ChunkInfo.class, Optional.of(oursFile.getName()));
-                        moveDummyRegistry.registerMovedRef(ours, ChunkInfo.getNameFromHash(e.getValue()));
                     }
                     HashSet<String> oursNew = new HashSet<>(oursFile.getChunks().values());
 
@@ -127,32 +122,30 @@ public class FileConflictResolver implements ConflictResolver {
 
                     newFile.setMtime(second.getMtime());
                     newFile.setCtime(second.getCtime());
-                    var newFileJ = jObjectManager.putLocked(newFile, Optional.of(_oursDir.getName()));
-                    try {
-                        for (var e : secondChunksCopy) {
-                            newFile.getChunks().put(e.getLeft(), e.getValue());
-                            jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), ChunkData.class, Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
-                            jObjectManager.getOrPut(ChunkInfo.getNameFromHash(e.getValue()), ChunkInfo.class, Optional.ofNullable(newFile.getName()));
-                            moveDummyRegistry.registerMovedRef(newFileJ, ChunkInfo.getNameFromHash(e.getValue())); // TODO: This probably could be optimized
-                        }
 
-                        var theName = oursDir.getChildren().entrySet().stream()
-                                .filter(p -> p.getValue().equals(oursFile.getUuid())).findAny()
-                                .orElseThrow(() -> new NotImplementedException("Could not find our file in directory " + oursDir.getName()));
-
-                        int i = 0;
-                        do {
-                            String name = theName.getKey() + ".conflict." + i + "." + otherHostname;
-                            if (oursDir.getChildren().containsKey(name)) {
-                                i++;
-                                continue;
-                            }
-                            oursDir.getChildren().put(name, newFile.getUuid());
-                            break;
-                        } while (true);
-                    } finally {
-                        newFileJ.rwUnlock();
+                    for (var e : secondChunksCopy) {
+                        newFile.getChunks().put(e.getLeft(), e.getValue());
+                        jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), ChunkData.class, Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
+                        jObjectManager.getOrPut(ChunkInfo.getNameFromHash(e.getValue()), ChunkInfo.class, Optional.ofNullable(newFile.getName()));
                     }
+
+                    var theName = oursDir.getChildren().entrySet().stream()
+                            .filter(p -> p.getValue().equals(oursFile.getUuid())).findAny()
+                            .orElseThrow(() -> new NotImplementedException("Could not find our file in directory " + oursDir.getName()));
+
+                    jObjectManager.put(newFile, Optional.of(_oursDir.getName()));
+
+                    int i = 0;
+                    do {
+                        String name = theName.getKey() + ".conflict." + i + "." + otherHostname;
+                        if (oursDir.getChildren().containsKey(name)) {
+                            i++;
+                            continue;
+                        }
+                        oursDir.getChildren().put(name, newFile.getUuid());
+                        break;
+                    } while (true);
+
                     bumpDir.apply();
 
                     for (var cuuid : oursBackup) {

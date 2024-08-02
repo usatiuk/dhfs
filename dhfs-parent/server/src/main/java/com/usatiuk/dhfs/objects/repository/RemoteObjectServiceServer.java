@@ -3,12 +3,9 @@ package com.usatiuk.dhfs.objects.repository;
 import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
-import com.usatiuk.dhfs.objects.jrepository.PushResolution;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.autosync.AutoSyncProcessor;
-import com.usatiuk.dhfs.objects.repository.movedummies.MoveDummyEntry;
-import com.usatiuk.dhfs.objects.repository.movedummies.MoveDummyRegistry;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.grpc.GrpcService;
@@ -17,7 +14,6 @@ import io.smallrye.common.annotation.Blocking;
 import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.UUID;
@@ -47,9 +43,6 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Inject
     ProtoSerializerService protoSerializerService;
 
-    @Inject
-    MoveDummyRegistry moveDummyRegistry;
-
     @Override
     @Blocking
     public Uni<GetObjectReply> getObject(GetObjectRequest request) {
@@ -58,51 +51,6 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
             throw new StatusRuntimeException(Status.UNAUTHENTICATED);
 
         Log.info("<-- getObject: " + request.getName() + " from " + request.getSelfUuid());
-
-        var pushedMoves = request.getForConflict() ? null : moveDummyRegistry.withPendingForHost(UUID.fromString(request.getSelfUuid()), pm -> {
-            if (pm.isEmpty()) return null;
-
-            var builder = PushedMoves.newBuilder();
-
-            // FIXME:
-            int count = 0;
-            var it = pm.iterator();
-            while (it.hasNext()) {
-                count++;
-                if (count > 100) break;
-
-                var next = it.next();
-
-                var obj = jObjectManager.get(next.parent());
-
-                if (obj.isEmpty()) {
-                    it.remove();
-                    continue;
-                }
-
-                builder.addPushedMoves(PushedMove.newBuilder()
-                        .setParent((ObjectHeader) obj.get().runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
-                            if (m.getKnownClass().isAnnotationPresent(PushResolution.class))
-                                throw new NotImplementedException();
-
-                            return m.toRpcHeader();
-                        }))
-                        .setKid(next.child())
-                        .build());
-            }
-
-            return builder.build();
-        });
-
-        var replyBuilder = GetObjectReply.newBuilder()
-                .setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString());
-
-        if (pushedMoves != null) {
-            replyBuilder.setPushedMoves(pushedMoves);
-
-            if (pushedMoves.getPushedMovesCount() >= 100)
-                return Uni.createFrom().item(replyBuilder.build());
-        }
 
         var obj = jObjectManager.get(request.getName()).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
@@ -116,7 +64,9 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         });
         obj.markSeen();
         var replyObj = ApiObject.newBuilder().setHeader(read.getLeft()).setContent(read.getRight()).build();
-        return Uni.createFrom().item(replyBuilder.setObject(replyObj).build());
+        return Uni.createFrom().item(GetObjectReply.newBuilder()
+                .setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString())
+                .setObject(replyObj).build());
     }
 
     @Override
@@ -157,15 +107,6 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
                 autoSyncProcessor.add(rr);
 
         return Uni.createFrom().item(ret);
-    }
-
-    @Override
-    public Uni<ConfirmPushedMoveReply> confirmPushedMove(ConfirmPushedMoveRequest request) {
-        Log.info("<-- confirmPushedMove: from " + request.getSelfUuid());
-        for (var m : request.getConfirmedMovesList())
-            moveDummyRegistry.commitForHost(UUID.fromString(request.getSelfUuid()), new MoveDummyEntry(m.getParent(), m.getKid()));
-
-        return Uni.createFrom().item(ConfirmPushedMoveReply.getDefaultInstance());
     }
 
     @Override

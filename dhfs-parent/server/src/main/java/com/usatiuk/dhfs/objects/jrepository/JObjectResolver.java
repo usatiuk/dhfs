@@ -121,7 +121,7 @@ public class JObjectResolver {
 
             refs.forEach(r -> {
                 Log.trace("Hydrating ref after undelete " + r + " for " + self.getName());
-                jObjectManager.getOrPut(r, self.getData() != null ? self.getData().getRefType() : JObjectData.class, Optional.of(self.getName()));
+                jObjectManager.getOrPut(r, self.getData().getRefType(), Optional.of(self.getName()));
             });
 
         }

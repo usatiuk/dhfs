@@ -6,7 +6,6 @@ import com.usatiuk.dhfs.files.objects.*;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
-import com.usatiuk.dhfs.objects.repository.movedummies.MoveDummyRegistry;
 import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -31,9 +30,6 @@ import java.util.function.Supplier;
 public class DhfsFileServiceImpl implements DhfsFileService {
     @Inject
     JObjectManager jObjectManager;
-
-    @Inject
-    MoveDummyRegistry moveDummyRegistry;
 
     @ConfigProperty(name = "dhfs.files.target_chunk_size")
     int targetChunkSize;
@@ -356,28 +352,24 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 newDent = d;
                 theFile.getMeta().removeRef(dentFrom.getName());
                 theFile.getMeta().addRef(dentTo.getName());
-                moveDummyRegistry.registerMovedRef(dentTo, newDent.getName());
             } else if (theFile.getData() instanceof File f) {
                 var newFile = new File(UUID.randomUUID(), f.getMode(), UUID.fromString(dentTo.getName()), f.isSymlink());
                 newFile.setMtime(f.getMtime());
                 newFile.setCtime(f.getCtime());
                 newFile.getChunks().putAll(f.getChunks());
-                var newFileJ = jObjectManager.putLocked(newFile, Optional.of(dentTo.getName()));
-                try {
-                    for (var c : newFile.getChunks().values()) {
-                        var o = jObjectManager.get(ChunkInfo.getNameFromHash(c))
-                                .orElseThrow(() -> new StatusRuntimeException(Status.DATA_LOSS.withDescription("Could not find chunk " + c + " when moving " + from)));
-                        o.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                            m.addRef(newFile.getName());
-                            moveDummyRegistry.registerMovedRef(newFileJ, m.getName());
-                            return null;
-                        });
-                    }
-                    theFile.getMeta().removeRef(dentFrom.getName());
-                    newDent = newFile;
-                } finally {
-                    newFileJ.rwUnlock();
+
+                for (var c : newFile.getChunks().values()) {
+                    var o = jObjectManager.get(ChunkInfo.getNameFromHash(c))
+                            .orElseThrow(() -> new StatusRuntimeException(Status.DATA_LOSS.withDescription("Could not find chunk " + c + " when moving " + from)));
+                    o.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                        m.addRef(newFile.getName());
+                        return null;
+                    });
                 }
+
+                theFile.getMeta().removeRef(dentFrom.getName());
+                jObjectManager.put(newFile, Optional.of(dentTo.getName()));
+                newDent = newFile;
             } else {
                 throw new StatusRuntimeException(Status.ABORTED.withDescription(theFile.getName() + " is of unknown type"));
             }

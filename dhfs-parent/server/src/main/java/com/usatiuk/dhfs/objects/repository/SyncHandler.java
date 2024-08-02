@@ -133,7 +133,7 @@ public class SyncHandler {
                 theirsHeader = header;
                 theirsData = protoSerializerService.deserialize(header.getPushedData());
             } else {
-                var got = remoteObjectServiceClient.getSpecificObject(from, header.getName(), true);
+                var got = remoteObjectServiceClient.getSpecificObject(from, header.getName());
                 theirsData = protoSerializerService.deserialize(got.getRight());
                 theirsHeader = got.getLeft();
             }
@@ -165,18 +165,6 @@ public class SyncHandler {
         return IndexUpdateReply.getDefaultInstance();
     }
 
-    public static class OutdatedUpdateException extends RuntimeException {
-        OutdatedUpdateException() {
-            super();
-        }
-
-        OutdatedUpdateException(String message) {
-            super(message);
-        }
-
-        @Override
-        public synchronized Throwable fillInStackTrace() {
-            return this;
-        }
+    protected static class OutdatedUpdateException extends RuntimeException {
     }
 }

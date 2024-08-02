@@ -121,7 +121,7 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     @Override
-    public <D extends JObjectData> JObject<D> putLocked(D object, Optional<String> parent) {
+    public <D extends JObjectData> JObject<D> put(D object, Optional<String> parent) {
         while (true) {
             JObject<?> ret;
             JObject<?> newObj = null;
@@ -161,30 +161,20 @@ public class JObjectManagerImpl implements JObjectManager {
                 });
             } finally {
                 if (newObj != null)
-                    newObj.forceInvalidate();
+                    newObj.rwUnlock(true);
             }
-            if (newObj == null) {
+            if (newObj == null)
                 jObjectLRU.notifyAccess(ret);
-                ret.rwLock();
-            }
             return (JObject<D>) ret;
         }
     }
 
     @Override
-    public <D extends JObjectData> JObject<D> put(D object, Optional<String> parent) {
-        var ret = putLocked(object, parent);
-        ret.rwUnlock();
-        return ret;
-    }
-
-    @Override
-    public JObject<?> getOrPutLocked(String name, Class<? extends JObjectData> klass, Optional<String> parent) {
+    public JObject<?> getOrPut(String name, Class<? extends JObjectData> klass, Optional<String> parent) {
         while (true) {
             var got = get(name);
 
             if (got.isPresent()) {
-                got.get().rwLock();
                 got.get().narrowClass(klass);
                 got.get().markSeen();
                 parent.ifPresent(s -> got.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
@@ -200,27 +190,24 @@ public class JObjectManagerImpl implements JObjectManager {
             JObject<?> ret = null;
             var created = new JObject<>(jObjectResolver, new ObjectMetadata(name, false, klass));
             created.rwLock();
-            while (ret == null) {
-                var ref = _map.computeIfAbsent(name, k -> new NamedWeakReference(created, _refQueue));
-                if (ref.get() == null) _map.remove(name, ref);
-                else ret = ref.get();
-            }
-            if (ret != created) continue;
+            try {
+                while (ret == null) {
+                    var ref = _map.computeIfAbsent(name, k -> new NamedWeakReference(created, _refQueue));
+                    if (ref.get() == null) _map.remove(name, ref);
+                    else ret = ref.get();
+                }
+                if (ret != created) continue;
 
-            created.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                parent.ifPresent(m::addRef);
-                m.markSeen();
-                return null;
-            });
+                created.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                    parent.ifPresent(m::addRef);
+                    m.markSeen();
+                    return null;
+                });
+            } finally {
+                created.rwUnlock();
+            }
             return created;
         }
-    }
-
-    @Override
-    public JObject<?> getOrPut(String name, Class<? extends JObjectData> klass, Optional<String> parent) {
-        var obj = getOrPutLocked(name, klass, parent);
-        obj.rwUnlock();
-        return obj;
     }
 
     private static class NamedWeakReference extends WeakReference<JObject<?>> {

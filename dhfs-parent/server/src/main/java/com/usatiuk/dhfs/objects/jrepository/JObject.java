@@ -8,10 +8,7 @@ import io.quarkus.logging.Log;
 import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.NotImplementedException;
 
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -29,7 +26,6 @@ public class JObject<T extends JObjectData> {
         final int metaHash;
         final int externalHash;
         final boolean data;
-        boolean forceInvalidate = false;
         final HashSet<String> oldRefs;
 
         TransactionState() {
@@ -49,7 +45,7 @@ public class JObject<T extends JObjectData> {
             }
         }
 
-        void commit() {
+        void commit(boolean forceInvalidate) {
             _resolver.updateDeletionState(JObject.this);
 
             var newDataHash = _metaPart.dataHash();
@@ -69,10 +65,6 @@ public class JObject<T extends JObjectData> {
             );
 
             verifyRefs(oldRefs);
-        }
-
-        void forceInvalidate() {
-            forceInvalidate = true;
         }
     }
 
@@ -249,15 +241,14 @@ public class JObject<T extends JObjectData> {
         _lock.readLock().unlock();
     }
 
-    protected void forceInvalidate() {
-        assertRWLock();
-        _transactionState.forceInvalidate();
+    public void rwUnlock() {
+        rwUnlock(false);
     }
 
-    public void rwUnlock() {
+    public void rwUnlock(boolean forceInvalidate) {
         try {
             if (_lock.writeLock().getHoldCount() == 1) {
-                _transactionState.commit();
+                _transactionState.commit(forceInvalidate);
                 _transactionState = null;
             }
         } catch (Exception ex) {
@@ -267,12 +258,8 @@ public class JObject<T extends JObjectData> {
         }
     }
 
-    public boolean haveRwLock() {
-        return _lock.isWriteLockedByCurrentThread();
-    }
-
     public void assertRWLock() {
-        if (!haveRwLock())
+        if (!_lock.isWriteLockedByCurrentThread())
             throw new IllegalStateException("Expected to be write-locked there: " + getName() + " " + Thread.currentThread().getName());
     }
 
@@ -341,7 +328,7 @@ public class JObject<T extends JObjectData> {
             throw new IllegalStateException("Expected to be deleted when discarding data");
         _dataPart.set(null);
         _metaPart.setHaveLocalCopy(false);
-        _metaPart.setSavedRefs(new HashSet<>());
+        _metaPart.setSavedRefs(Collections.emptySet());
     }
 
     public enum ResolutionStrategy {
