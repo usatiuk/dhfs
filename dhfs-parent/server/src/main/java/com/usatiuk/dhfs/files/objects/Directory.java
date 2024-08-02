@@ -2,7 +2,6 @@ package com.usatiuk.dhfs.files.objects;
 
 import com.usatiuk.dhfs.files.conflicts.DirectoryConflictResolver;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
-import com.usatiuk.dhfs.objects.jrepository.Movable;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import lombok.Getter;
 import lombok.Setter;
@@ -10,7 +9,6 @@ import lombok.Setter;
 import java.io.Serial;
 import java.util.*;
 
-@Movable // FIXME:
 public class Directory extends FsNode {
     @Serial
     private static final long serialVersionUID = 1;

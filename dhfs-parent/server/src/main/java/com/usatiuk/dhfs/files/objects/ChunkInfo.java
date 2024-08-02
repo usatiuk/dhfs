@@ -3,7 +3,6 @@ package com.usatiuk.dhfs.files.objects;
 import com.usatiuk.dhfs.files.conflicts.NoOpConflictResolver;
 import com.usatiuk.dhfs.objects.jrepository.AssumedUnique;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
-import com.usatiuk.dhfs.objects.jrepository.Movable;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -14,7 +13,6 @@ import java.util.List;
 
 @Getter
 @EqualsAndHashCode(callSuper = false)
-@Movable
 @AssumedUnique
 public class ChunkInfo extends JObjectData {
     @Serial

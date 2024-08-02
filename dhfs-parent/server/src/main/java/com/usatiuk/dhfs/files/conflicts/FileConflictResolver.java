@@ -32,6 +32,8 @@ public class FileConflictResolver implements ConflictResolver {
     @ConfigProperty(name = "dhfs.files.use_hash_for_chunks")
     boolean useHashForChunks;
 
+    // FIXME: There might be a race where node with conflict deletes a file, and we answer that
+    // it can do it as we haven't recorded the received file in the object model yet
     @Override
     public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
         var theirsFile = (File) theirsData;
@@ -101,7 +103,6 @@ public class FileConflictResolver implements ConflictResolver {
 
                     if (useHashForChunks)
                         throw new NotImplementedException();
-
 
                     HashSet<String> oursBackup = new HashSet<>(oursFile.getChunks().values());
                     oursFile.getChunks().clear();
