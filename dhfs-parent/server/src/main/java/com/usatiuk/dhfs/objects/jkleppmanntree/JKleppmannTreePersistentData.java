@@ -1,7 +1,7 @@
-package com.usatiuk.dhfs.objects.jklepmanntree;
+package com.usatiuk.dhfs.objects.jkleppmanntree;
 
-import com.usatiuk.dhfs.objects.jklepmanntree.helpers.OpQueueHelper;
-import com.usatiuk.dhfs.objects.jklepmanntree.structs.JTreeNodeMeta;
+import com.usatiuk.dhfs.objects.jkleppmanntree.helpers.OpQueueHelper;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMeta;
 import com.usatiuk.dhfs.objects.repository.invalidation.OpQueue;
 import com.usatiuk.kleppmanntree.AtomicClock;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;

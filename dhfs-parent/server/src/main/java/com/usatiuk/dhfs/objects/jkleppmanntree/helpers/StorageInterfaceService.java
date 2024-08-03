@@ -1,6 +1,6 @@
-package com.usatiuk.dhfs.objects.jklepmanntree.helpers;
+package com.usatiuk.dhfs.objects.jkleppmanntree.helpers;
 
-import com.usatiuk.dhfs.objects.jklepmanntree.structs.TreeNodeJObjectData;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.TreeNodeJObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;

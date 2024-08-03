@@ -1,7 +1,7 @@
-package com.usatiuk.dhfs.objects.jklepmanntree;
+package com.usatiuk.dhfs.objects.jkleppmanntree;
 
-import com.usatiuk.dhfs.objects.jklepmanntree.structs.JTreeNodeMeta;
-import com.usatiuk.dhfs.objects.jklepmanntree.structs.TreeNodeJObjectData;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMeta;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.TreeNodeJObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.kleppmanntree.TreeNode;
 import com.usatiuk.kleppmanntree.TreeNodeWrapper;

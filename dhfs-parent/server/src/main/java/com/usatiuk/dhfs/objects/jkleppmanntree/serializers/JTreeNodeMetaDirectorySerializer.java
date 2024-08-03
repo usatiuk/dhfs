@@ -1,6 +1,6 @@
-package com.usatiuk.dhfs.objects.jklepmanntree.serializers;
+package com.usatiuk.dhfs.objects.jkleppmanntree.serializers;
 
-import com.usatiuk.dhfs.objects.jklepmanntree.structs.JTreeNodeMetaDirectory;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMetaDirectory;
 import com.usatiuk.dhfs.objects.persistence.TreeNodeMetaDirectoryP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoDeserializer;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializer;

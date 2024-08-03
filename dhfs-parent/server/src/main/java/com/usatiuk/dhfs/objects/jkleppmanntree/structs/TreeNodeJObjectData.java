@@ -1,4 +1,4 @@
-package com.usatiuk.dhfs.objects.jklepmanntree.structs;
+package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.OnlyLocal;

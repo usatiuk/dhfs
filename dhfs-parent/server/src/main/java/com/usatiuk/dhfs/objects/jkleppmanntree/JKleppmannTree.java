@@ -1,7 +1,7 @@
-package com.usatiuk.dhfs.objects.jklepmanntree;
+package com.usatiuk.dhfs.objects.jkleppmanntree;
 
-import com.usatiuk.dhfs.objects.jklepmanntree.helpers.StorageInterfaceService;
-import com.usatiuk.dhfs.objects.jklepmanntree.structs.JTreeNodeMeta;
+import com.usatiuk.dhfs.objects.jkleppmanntree.helpers.StorageInterfaceService;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMeta;
 import com.usatiuk.kleppmanntree.KleppmannTree;
 import com.usatiuk.kleppmanntree.OpMove;
 

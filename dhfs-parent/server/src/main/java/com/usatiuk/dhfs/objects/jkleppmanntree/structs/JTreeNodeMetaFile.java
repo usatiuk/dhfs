@@ -1,4 +1,4 @@
-package com.usatiuk.dhfs.objects.jklepmanntree.structs;
+package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
 import lombok.Getter;
 

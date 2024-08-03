@@ -1,8 +1,8 @@
-package com.usatiuk.dhfs.objects.jklepmanntree;
+package com.usatiuk.dhfs.objects.jkleppmanntree;
 
 import com.usatiuk.dhfs.SerializationHelper;
-import com.usatiuk.dhfs.objects.jklepmanntree.helpers.OpQueueHelper;
-import com.usatiuk.dhfs.objects.jklepmanntree.helpers.StorageInterfaceService;
+import com.usatiuk.dhfs.objects.jkleppmanntree.helpers.OpQueueHelper;
+import com.usatiuk.dhfs.objects.jkleppmanntree.helpers.StorageInterfaceService;
 import com.usatiuk.kleppmanntree.AtomicClock;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;

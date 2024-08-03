@@ -1,4 +1,4 @@
-package com.usatiuk.dhfs.objects.jklepmanntree;
+package com.usatiuk.dhfs.objects.jkleppmanntree;
 
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
 import com.usatiuk.kleppmanntree.PeerInterface;

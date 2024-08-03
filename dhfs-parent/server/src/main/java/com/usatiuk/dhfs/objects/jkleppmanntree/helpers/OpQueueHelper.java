@@ -1,6 +1,6 @@
-package com.usatiuk.dhfs.objects.jklepmanntree.helpers;
+package com.usatiuk.dhfs.objects.jkleppmanntree.helpers;
 
-import com.usatiuk.dhfs.objects.jklepmanntree.JKleppmannTreePersistentData;
+import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreePersistentData;
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.objects.repository.RemoteHostManager;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;

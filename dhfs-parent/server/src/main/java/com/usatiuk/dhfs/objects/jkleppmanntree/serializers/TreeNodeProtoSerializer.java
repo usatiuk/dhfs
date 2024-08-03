@@ -1,9 +1,9 @@
-package com.usatiuk.dhfs.objects.jklepmanntree.serializers;
+package com.usatiuk.dhfs.objects.jkleppmanntree.serializers;
 
-import com.usatiuk.dhfs.objects.jklepmanntree.structs.JTreeNodeMeta;
-import com.usatiuk.dhfs.objects.jklepmanntree.structs.JTreeNodeMetaDirectory;
-import com.usatiuk.dhfs.objects.jklepmanntree.structs.JTreeNodeMetaFile;
-import com.usatiuk.dhfs.objects.jklepmanntree.structs.TreeNodeJObjectData;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMeta;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMetaDirectory;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMetaFile;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.TreeNodeJObjectData;
 import com.usatiuk.dhfs.objects.persistence.TreeNodeMetaDirectoryP;
 import com.usatiuk.dhfs.objects.persistence.TreeNodeMetaFileP;
 import com.usatiuk.dhfs.objects.persistence.TreeNodeP;
