@@ -111,7 +111,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (d instanceof File f) {
                 ret = new GetattrRes(f.getMtime(), f.getCtime(), f.getMode(), f.isSymlink() ? GetattrType.SYMLINK : GetattrType.FILE);
             } else if (d instanceof TreeNodeJObjectData) {
-                ret = new GetattrRes(100, 100, 0777, GetattrType.DIRECTORY);
+                ret = new GetattrRes(100, 100, 0700, GetattrType.DIRECTORY);
             } else {
                 throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + m.getName()));
             }

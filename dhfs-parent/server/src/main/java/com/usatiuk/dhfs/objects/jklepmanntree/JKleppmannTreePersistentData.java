@@ -30,13 +30,17 @@ public class JKleppmannTreePersistentData implements Serializable, OpQueue {
     @Getter
     private final ReentrantReadWriteLock _logLock = new ReentrantReadWriteLock();
 
-    private final OpQueueHelper _helper;
+    private transient OpQueueHelper _helper;
 
     JKleppmannTreePersistentData(OpQueueHelper opQueueHelper, String name, AtomicClock clock) {
         _name = name;
         _clock = clock;
+        _selfUuid = opQueueHelper.getSelfUUid();
+        restoreHelper(opQueueHelper);
+    }
+
+    public void restoreHelper(OpQueueHelper opQueueHelper) {
         _helper = opQueueHelper;
-        _selfUuid = _helper.getSelfUUid();
         _helper.registerOnConnection(this);
     }
 

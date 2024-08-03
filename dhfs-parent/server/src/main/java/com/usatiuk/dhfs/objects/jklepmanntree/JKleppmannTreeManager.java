@@ -74,6 +74,8 @@ public class JKleppmannTreeManager {
     }
 
     private JKleppmannTree createTree(String name) {
-        return new JKleppmannTree(_persistentData.computeIfAbsent(name, n -> new JKleppmannTreePersistentData(opQueueHelper, n, new AtomicClock())), storageInterfaceService, jPeerInterface);
+        var pdata = _persistentData.computeIfAbsent(name, n -> new JKleppmannTreePersistentData(opQueueHelper, n, new AtomicClock()));
+        pdata.restoreHelper(opQueueHelper);
+        return new JKleppmannTree(pdata, storageInterfaceService, jPeerInterface);
     }
 }
