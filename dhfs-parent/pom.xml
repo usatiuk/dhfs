@@ -12,6 +12,7 @@
     <packaging>pom</packaging>
     <modules>
         <module>server</module>
+        <module>kleppmanntree</module>
     </modules>
 
     <properties>
