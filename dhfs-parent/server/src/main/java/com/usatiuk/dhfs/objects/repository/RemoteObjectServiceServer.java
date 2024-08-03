@@ -6,6 +6,7 @@ import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.autosync.AutoSyncProcessor;
+import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.grpc.GrpcService;

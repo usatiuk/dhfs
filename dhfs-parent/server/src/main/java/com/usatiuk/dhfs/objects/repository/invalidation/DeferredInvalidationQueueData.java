@@ -1,4 +1,4 @@
-package com.usatiuk.dhfs.objects.repository;
+package com.usatiuk.dhfs.objects.repository.invalidation;
 
 import lombok.Getter;
 import org.apache.commons.collections4.MultiValuedMap;

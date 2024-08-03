@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.files.service;
 
 import com.google.protobuf.ByteString;
-import com.usatiuk.dhfs.files.objects.FsNode;
 
 import java.util.Optional;
 
@@ -10,15 +9,13 @@ public interface DhfsFileService {
 
     Optional<String> create(String name, long mode);
 
-    Optional<String> mkdir(String name, long mode);
+    void mkdir(String name, long mode);
 
-    Optional<FsNode> getattr(String name);
+    Optional<GetattrRes> getattr(String name);
 
     Boolean chmod(String name, long mode);
 
-    Boolean rmdir(String name);
-
-    Boolean unlink(String name);
+    void unlink(String name);
 
     Boolean rename(String from, String to);
 
@@ -35,6 +32,7 @@ public interface DhfsFileService {
     Boolean truncate(String fileUuid, long length);
 
     String readlink(String uuid);
+
     ByteString readlinkBS(String uuid);
 
     String symlink(String oldpath, String newpath);

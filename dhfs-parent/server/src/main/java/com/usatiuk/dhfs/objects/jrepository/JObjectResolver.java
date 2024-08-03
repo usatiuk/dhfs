@@ -2,7 +2,7 @@ package com.usatiuk.dhfs.objects.jrepository;
 
 import com.google.common.collect.Streams;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
-import com.usatiuk.dhfs.objects.repository.InvalidationQueueService;
+import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
@@ -121,7 +121,7 @@ public class JObjectResolver {
 
             refs.forEach(r -> {
                 Log.trace("Hydrating ref after undelete " + r + " for " + self.getName());
-                jObjectManager.getOrPut(r, self.getData().getRefType(), Optional.of(self.getName()));
+                jObjectManager.getOrPut(r, self.getData() != null ? self.getData().getRefType() : JObjectData.class, Optional.of(self.getName()));
             });
 
         }

@@ -48,7 +48,7 @@ public class RemoteHostManager {
 
         // Note: newly added hosts aren't in _transientPeersState
         // but that's ok as they don't have initialSyncDone set
-        for (var h : persistentRemoteHostsService.getHostsUuid())
+        for (var h : persistentRemoteHostsService.getHostUuids())
             _transientPeersState.runWriteLocked(d -> d.get(h));
 
         _initialized = true;
@@ -62,8 +62,8 @@ public class RemoteHostManager {
     public void tryConnectAll() {
         if (!_initialized) return;
         try {
-            _heartbeatExecutor.invokeAll(persistentRemoteHostsService.getHostsUuid().stream()
-                    .<Callable<Void>>map(host -> () -> {
+            _heartbeatExecutor.invokeAll(persistentRemoteHostsService.getHostUuids().stream()
+                                                                     .<Callable<Void>>map(host -> () -> {
                         try {
                             if (isReachable(host))
                                 Log.trace("Heartbeat: " + host);

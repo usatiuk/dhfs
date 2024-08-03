@@ -19,6 +19,7 @@ public class JObjectDataDeserializer implements ProtoDeserializer<JObjectDataP, 
             case CHUNKDATA -> protoSerializerService.deserialize(message.getChunkData());
             case PEERDIRECTORY -> protoSerializerService.deserialize(message.getPeerDirectory());
             case PERSISTENTPEERINFO -> protoSerializerService.deserialize(message.getPersistentPeerInfo());
+            case TREENODE -> protoSerializerService.deserialize(message.getTreeNode());
             case OBJ_NOT_SET -> throw new IllegalStateException("Type not set when deserializing");
         };
     }

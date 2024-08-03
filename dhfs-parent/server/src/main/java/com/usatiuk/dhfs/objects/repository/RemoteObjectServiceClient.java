@@ -6,6 +6,7 @@ import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.jrepository.PushResolution;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
+import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -54,7 +55,7 @@ public class RemoteObjectServiceClient {
                         .filter(entry -> entry.getValue().equals(ourVersion))
                         .map(Map.Entry::getKey).toList();
             else
-                return persistentRemoteHostsService.getHostsUuid();
+                return persistentRemoteHostsService.getHostUuids();
         });
 
         if (targets.isEmpty())

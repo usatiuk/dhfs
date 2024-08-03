@@ -11,8 +11,8 @@ public class TestStorageInterface implements StorageInterface<Long, Long, String
 
     public TestStorageInterface(long peerId) {
         _peerId = peerId;
-        _nodes.put(getRootId(), new TreeNode<>(getRootId()));
-        _nodes.put(getTrashId(), new TreeNode<>(getTrashId()));
+        _nodes.put(getRootId(), new TreeNode<>(getRootId(), null, null));
+        _nodes.put(getTrashId(), new TreeNode<>(getTrashId(), null, null));
     }
 
     @Override
@@ -37,13 +37,12 @@ public class TestStorageInterface implements StorageInterface<Long, Long, String
     }
 
     @Override
-    public TestNodeWrapper createNewNode(Long id) {
-        if (!_nodes.containsKey(id)) {
-            var newNode = new TreeNode<String, TestNodeMeta, Long>(id);
-            _nodes.put(id, newNode);
-            return new TestNodeWrapper(newNode);
+    public TestNodeWrapper createNewNode(TreeNode<String, TestNodeMeta, Long> node) {
+        if (!_nodes.containsKey(node.getId())) {
+            _nodes.put(node.getId(), node);
+            return new TestNodeWrapper(node);
         }
-        throw new IllegalStateException("Node with id " + id + " already exists");
+        throw new IllegalStateException("Node with id " + node.getId() + " already exists");
     }
 
     @Override
@@ -64,12 +63,22 @@ public class TestStorageInterface implements StorageInterface<Long, Long, String
     }
 
     @Override
-    public void globalLock() {
+    public void globalRwLock() {
 
     }
 
     @Override
-    public void globalUnlock() {
+    public void globalRwUnlock() {
+
+    }
+
+    @Override
+    public void globalRLock() {
+
+    }
+
+    @Override
+    public void globalRUnlock() {
 
     }
 }

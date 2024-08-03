@@ -8,7 +8,10 @@ import io.quarkus.logging.Log;
 import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.NotImplementedException;
 
-import java.util.*;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -26,6 +29,7 @@ public class JObject<T extends JObjectData> {
         final int metaHash;
         final int externalHash;
         final boolean data;
+        boolean forceInvalidate = false;
         final HashSet<String> oldRefs;
 
         TransactionState() {
@@ -45,7 +49,7 @@ public class JObject<T extends JObjectData> {
             }
         }
 
-        void commit(boolean forceInvalidate) {
+        void commit() {
             _resolver.updateDeletionState(JObject.this);
 
             var newDataHash = _metaPart.dataHash();
@@ -62,9 +66,13 @@ public class JObject<T extends JObjectData> {
                     newDataHash != dataHash
                             || newData != data
                             || forceInvalidate
-            );
+                       );
 
             verifyRefs(oldRefs);
+        }
+
+        void forceInvalidate() {
+            forceInvalidate = true;
         }
     }
 
@@ -98,6 +106,10 @@ public class JObject<T extends JObjectData> {
 
     protected void narrowClass(Class<? extends JObjectData> klass) {
         _metaPart.narrowClass(klass);
+    }
+
+    public boolean isOnlyLocal() {
+        return getKnownClass().isAnnotationPresent(OnlyLocal.class);
     }
 
     public String getName() {
@@ -241,14 +253,15 @@ public class JObject<T extends JObjectData> {
         _lock.readLock().unlock();
     }
 
-    public void rwUnlock() {
-        rwUnlock(false);
+    protected void forceInvalidate() {
+        assertRWLock();
+        _transactionState.forceInvalidate();
     }
 
-    public void rwUnlock(boolean forceInvalidate) {
+    public void rwUnlock() {
         try {
             if (_lock.writeLock().getHoldCount() == 1) {
-                _transactionState.commit(forceInvalidate);
+                _transactionState.commit();
                 _transactionState = null;
             }
         } catch (Exception ex) {
@@ -258,8 +271,12 @@ public class JObject<T extends JObjectData> {
         }
     }
 
+    public boolean haveRwLock() {
+        return _lock.isWriteLockedByCurrentThread();
+    }
+
     public void assertRWLock() {
-        if (!_lock.isWriteLockedByCurrentThread())
+        if (!haveRwLock())
             throw new IllegalStateException("Expected to be write-locked there: " + getName() + " " + Thread.currentThread().getName());
     }
 
@@ -328,7 +345,7 @@ public class JObject<T extends JObjectData> {
             throw new IllegalStateException("Expected to be deleted when discarding data");
         _dataPart.set(null);
         _metaPart.setHaveLocalCopy(false);
-        _metaPart.setSavedRefs(Collections.emptySet());
+        _metaPart.setSavedRefs(new HashSet<>());
     }
 
     public enum ResolutionStrategy {

@@ -2,11 +2,9 @@ package com.usatiuk.dhfs.fuse;
 
 import com.google.protobuf.UnsafeByteOperations;
 import com.sun.security.auth.module.UnixSystem;
-import com.usatiuk.dhfs.files.objects.Directory;
-import com.usatiuk.dhfs.files.objects.File;
-import com.usatiuk.dhfs.files.objects.FsNode;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
 import com.usatiuk.dhfs.files.service.DirectoryNotEmptyException;
+import com.usatiuk.dhfs.files.service.GetattrRes;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -64,7 +62,7 @@ public class DhfsFuse extends FuseStubFS {
         var gid = new UnixSystem().getGid();
 
         mount(Paths.get(root), false, debug,
-                new String[]{"-o", "auto_cache", "-o", "uid=" + uid, "-o", "gid=" + gid});
+              new String[]{"-o", "auto_cache", "-o", "uid=" + uid, "-o", "gid=" + gid});
     }
 
     void shutdown(@Observes @Priority(1) ShutdownEvent event) {
@@ -100,30 +98,34 @@ public class DhfsFuse extends FuseStubFS {
             var fileOpt = fileService.open(path);
             if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
             var uuid = fileOpt.get();
-            Optional<FsNode> found = fileService.getattr(uuid);
+            Optional<GetattrRes> found = fileService.getattr(uuid);
             if (found.isEmpty()) {
                 return -ErrorCodes.ENOENT();
             }
-            if (found.get() instanceof File f) {
-                if (f.isSymlink())
-                    stat.st_mode.set(S_IFLNK | 0777); // FIXME?
-                else
-                    stat.st_mode.set(S_IFREG | f.getMode());
-                stat.st_nlink.set(1);
-                stat.st_size.set(fileService.size(uuid));
-            } else if (found.get() instanceof Directory d) {
-                stat.st_mode.set(S_IFDIR | d.getMode());
-                stat.st_nlink.set(2);
+            switch (found.get().type()) {
+                case FILE -> {
+                    stat.st_mode.set(S_IFREG | found.get().mode());
+                    stat.st_nlink.set(1);
+                    stat.st_size.set(fileService.size(uuid));
+                }
+                case DIRECTORY -> {
+                    stat.st_mode.set(S_IFDIR | found.get().mode());
+                    stat.st_nlink.set(2);
+                }
+                case SYMLINK -> {
+                    stat.st_mode.set(S_IFLNK | 0777);
+                    stat.st_nlink.set(1);
+                    stat.st_size.set(fileService.size(uuid));
+                }
             }
-            var foundDent = (FsNode) found.get();
 
             // FIXME: Race?
-            stat.st_ctim.tv_sec.set(foundDent.getCtime() / 1000);
-            stat.st_ctim.tv_nsec.set((foundDent.getCtime() % 1000) * 1000);
-            stat.st_mtim.tv_sec.set(foundDent.getMtime() / 1000);
-            stat.st_mtim.tv_nsec.set((foundDent.getMtime() % 1000) * 1000);
-            stat.st_atim.tv_sec.set(foundDent.getMtime() / 1000);
-            stat.st_atim.tv_nsec.set((foundDent.getMtime() % 1000) * 1000);
+            stat.st_ctim.tv_sec.set(found.get().ctime() / 1000);
+            stat.st_ctim.tv_nsec.set((found.get().ctime() % 1000) * 1000);
+            stat.st_mtim.tv_sec.set(found.get().mtime() / 1000);
+            stat.st_mtim.tv_nsec.set((found.get().mtime() % 1000) * 1000);
+            stat.st_atim.tv_sec.set(found.get().mtime() / 1000);
+            stat.st_atim.tv_nsec.set((found.get().mtime() % 1000) * 1000);
         } catch (Exception e) {
             Log.error("When getattr " + path, e);
             return -ErrorCodes.EIO();
@@ -138,8 +140,8 @@ public class DhfsFuse extends FuseStubFS {
             if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
             var file = fileOpt.get();
             var res = fileService.setTimes(file,
-                    timespec[0].tv_sec.get() * 1000,
-                    timespec[1].tv_sec.get() * 1000);
+                                           timespec[0].tv_sec.get() * 1000,
+                                           timespec[1].tv_sec.get() * 1000);
             if (!res) return -ErrorCodes.EINVAL();
             else return 0;
         } catch (Exception e) {
@@ -208,9 +210,8 @@ public class DhfsFuse extends FuseStubFS {
     @Override
     public int mkdir(String path, long mode) {
         try {
-            var ret = fileService.mkdir(path, mode);
-            if (ret.isEmpty()) return -ErrorCodes.ENOSPC();
-            else return 0;
+            fileService.mkdir(path, mode);
+            return 0;
         } catch (Exception e) {
             Log.error("When creating dir " + path, e);
             return -ErrorCodes.EIO();
@@ -220,9 +221,8 @@ public class DhfsFuse extends FuseStubFS {
     @Override
     public int rmdir(String path) {
         try {
-            var ret = fileService.rmdir(path);
-            if (!ret) return -ErrorCodes.ENOENT();
-            else return 0;
+            fileService.unlink(path);
+            return 0;
         } catch (DirectoryNotEmptyException ex) {
             return -ErrorCodes.ENOTEMPTY();
         } catch (Exception e) {
@@ -247,9 +247,8 @@ public class DhfsFuse extends FuseStubFS {
     @Override
     public int unlink(String path) {
         try {
-            var ret = fileService.unlink(path);
-            if (!ret) return -ErrorCodes.ENOENT();
-            else return 0;
+            fileService.unlink(path);
+            return 0;
         } catch (Exception e) {
             Log.error("When unlinking " + path, e);
             return -ErrorCodes.EIO();
@@ -277,7 +276,9 @@ public class DhfsFuse extends FuseStubFS {
     @Override
     public int chmod(String path, long mode) {
         try {
-            var ret = fileService.chmod(path, mode);
+            var fileOpt = fileService.open(path);
+            if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
+            var ret = fileService.chmod(fileOpt.get(), mode);
             if (ret) return 0;
             else return -ErrorCodes.EINVAL();
         } catch (Exception e) {

@@ -40,11 +40,11 @@ public class ProtoSerializerService {
     void init() {
         for (var s : _protoSerializers) {
             var args = ((ParameterizedType) Arrays.stream(ClientProxy.unwrap(s).getClass().getGenericInterfaces())
-                    .filter(t -> {
-                        if (t instanceof ParameterizedType)
-                            return ((ParameterizedType) t).getRawType().equals(ProtoSerializer.class);
-                        return false;
-                    }).findFirst().orElseThrow(() -> new IllegalArgumentException("ProtoSerializer interface not found on ProtoSerializer?")))
+                                                  .filter(t -> {
+                                                      if (t instanceof ParameterizedType)
+                                                          return ((ParameterizedType) t).getRawType().equals(ProtoSerializer.class);
+                                                      return false;
+                                                  }).findFirst().orElseThrow(() -> new IllegalArgumentException("ProtoSerializer interface not found on ProtoSerializer?")))
                     .getActualTypeArguments(); //FIXME:
             Class<? extends Message> messageClass = (Class<? extends Message>) args[0];
             Class<?> objClass = (Class<?>) args[1];
@@ -57,11 +57,11 @@ public class ProtoSerializerService {
 
         for (var s : _protoDeserializers) {
             var args = ((ParameterizedType) Arrays.stream(ClientProxy.unwrap(s).getClass().getGenericInterfaces())
-                    .filter(t -> {
-                        if (t instanceof ParameterizedType)
-                            return ((ParameterizedType) t).getRawType().equals(ProtoDeserializer.class);
-                        return false;
-                    }).findFirst().orElseThrow(() -> new IllegalArgumentException("ProtoSerializer interface not found on ProtoSerializer?")))
+                                                  .filter(t -> {
+                                                      if (t instanceof ParameterizedType)
+                                                          return ((ParameterizedType) t).getRawType().equals(ProtoDeserializer.class);
+                                                      return false;
+                                                  }).findFirst().orElseThrow(() -> new IllegalArgumentException("ProtoSerializer interface not found on ProtoSerializer?")))
                     .getActualTypeArguments(); //FIXME:
             Class<? extends Message> messageClass = (Class<? extends Message>) args[0];
             Class<?> objClass = (Class<?>) args[1];
@@ -94,6 +94,8 @@ public class ProtoSerializerService {
             return Optional.of(JObjectDataP.newBuilder().setPeerDirectory((PeerDirectoryP) ser).build());
         } else if (ser instanceof PersistentPeerInfoP) {
             return Optional.of(JObjectDataP.newBuilder().setPersistentPeerInfo((PersistentPeerInfoP) ser).build());
+        } else if (ser instanceof TreeNodeP) {
+            return Optional.of(JObjectDataP.newBuilder().setTreeNode((TreeNodeP) ser).build());
         } else {
             return Optional.empty();
         }

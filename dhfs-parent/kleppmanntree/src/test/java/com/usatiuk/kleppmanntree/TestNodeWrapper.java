@@ -26,6 +26,16 @@ public class TestNodeWrapper implements TreeNodeWrapper<String, TestNodeMeta, Lo
     }
 
     @Override
+    public void notifyRef(Long id) {
+
+    }
+
+    @Override
+    public void notifyRmRef(Long id) {
+
+    }
+
+    @Override
     public TreeNode<String, TestNodeMeta, Long> getNode() {
         return _backingNode;
     }

@@ -1,7 +1,11 @@
-package com.usatiuk.dhfs.objects.repository;
+package com.usatiuk.dhfs.objects.repository.invalidation;
 
 import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
+import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
+import com.usatiuk.dhfs.objects.repository.RemoteHostManager;
+import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
@@ -145,7 +149,8 @@ public class InvalidationQueueService {
         Log.info("Invalidation sender exited");
     }
 
-    public void pushInvalidationToAll(String name) {
+    public void pushInvalidationToAll(JObject<?> obj) {
+        if (obj.isOnlyLocal()) return;
         while (true) {
             var queue = _toAllQueue.get();
             if (queue == null) {
@@ -154,17 +159,30 @@ public class InvalidationQueueService {
                 queue = nq;
             }
 
-            queue.add(name);
+            queue.add(obj.getName());
 
             if (_toAllQueue.get() == queue) break;
         }
     }
 
-    public void pushInvalidationToOne(UUID host, String name) {
+    public void pushInvalidationToOne(UUID host, JObject<?> obj) {
+        if (obj.isOnlyLocal()) return;
         if (remoteHostManager.isReachable(host))
-            _queue.add(Pair.of(host, name));
+            _queue.add(Pair.of(host, obj.getName()));
         else
             deferredInvalidationQueueService.returnForHost(host);
+    }
+
+    public void pushInvalidationToAll(String name) {
+        pushInvalidationToAll(jObjectManager.get(name).orElseThrow(() -> new IllegalArgumentException("Object " + name + " not found")));
+    }
+
+    public void pushInvalidationToOne(UUID host, String name) {
+        pushInvalidationToOne(host, jObjectManager.get(name).orElseThrow(() -> new IllegalArgumentException("Object " + name + " not found")));
+    }
+
+    public void pushInvalidationToAll(OpQueue queue) {
+
     }
 
     protected void pushDeferredInvalidations(UUID host, String name) {

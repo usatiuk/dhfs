@@ -30,8 +30,7 @@ message FsNodeP {
 message FileP {
   FsNodeP fsNode = 1;
   map<int64, string> chunks = 2;
-  string parent = 3;
-  bool symlink = 4;
+  bool symlink = 3;
 }
 
 message DirectoryP {
@@ -58,6 +57,25 @@ message PersistentPeerInfoP {
   bytes cert = 2;
 }
 
+message TreeNodeMetaFileP {
+  string name = 1;
+  string fileMirror = 2;
+}
+
+message TreeNodeMetaDirectoryP {
+  string name = 1;
+}
+
+message TreeNodeP {
+  optional string parent = 1;
+  string id = 2;
+  map<string, string> children = 3;
+  oneof meta {
+    TreeNodeMetaFileP file = 4;
+    TreeNodeMetaDirectoryP dir = 5;
+  }
+}
+
 message JObjectDataP {
   oneof obj {
     FileP file = 2;
@@ -66,5 +84,6 @@ message JObjectDataP {
     ChunkDataP chunkData = 5;
     PeerDirectoryP peerDirectory = 6;
     PersistentPeerInfoP persistentPeerInfo = 7;
+    TreeNodeP treeNode = 8;
   }
 }

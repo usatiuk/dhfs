@@ -2,7 +2,16 @@ package com.usatiuk.dhfs.files.service;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
-import com.usatiuk.dhfs.files.objects.*;
+import com.usatiuk.dhfs.files.objects.ChunkData;
+import com.usatiuk.dhfs.files.objects.ChunkInfo;
+import com.usatiuk.dhfs.files.objects.File;
+import com.usatiuk.dhfs.files.objects.FsNode;
+import com.usatiuk.dhfs.objects.jklepmanntree.JKleppmannTree;
+import com.usatiuk.dhfs.objects.jklepmanntree.JKleppmannTreeManager;
+import com.usatiuk.dhfs.objects.jklepmanntree.structs.JTreeNodeMeta;
+import com.usatiuk.dhfs.objects.jklepmanntree.structs.JTreeNodeMetaDirectory;
+import com.usatiuk.dhfs.objects.jklepmanntree.structs.JTreeNodeMetaFile;
+import com.usatiuk.dhfs.objects.jklepmanntree.structs.TreeNodeJObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
@@ -15,16 +24,13 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import org.apache.commons.lang3.NotImplementedException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
+import java.util.stream.StreamSupport;
 
 @ApplicationScoped
 public class DhfsFileServiceImpl implements DhfsFileService {
@@ -60,6 +66,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Inject
     PersistentRemoteHostsService persistentRemoteHostsService;
+    @Inject
+    JKleppmannTreeManager jKleppmannTreeManager;
+
+    private JKleppmannTree _tree;
 
     private ChunkData createChunk(ByteString bytes) {
         if (useHashForChunks) {
@@ -71,76 +81,53 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     void init(@Observes @Priority(500) StartupEvent event) {
         Log.info("Initializing file service");
-        if (jObjectManager.get(new UUID(0, 0).toString()).isEmpty())
-            jObjectManager.put(new Directory(new UUID(0, 0), 0755), Optional.empty());
-        getRoot();
+        _tree = jKleppmannTreeManager.getTree("fs");
     }
 
-    private JObject<? extends FsNode> traverse(JObject<? extends FsNode> from, Path path, int curPos) {
-        Supplier<StatusRuntimeExceptionNoStacktrace> notFound
-                = () -> new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND.withDescription("Not found: " + from.getName() + "/" + path));
-
-        var found = from.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
-            if (d instanceof Directory dir)
-                return dir.getKid(path.getName(curPos).toString());
-            return Optional.empty();
-        }).orElseThrow(notFound);
-
-        Optional<JObject<?>> ref = jObjectManager.get(found.toString());
-
-        if (ref.isEmpty()) {
-            Log.error("File missing when traversing directory " + from.getName() + ": " + found);
-            throw notFound.get();
-        }
-
-        if (refVerification)
-            ref.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
-                if (!(d instanceof FsNode))
-                    throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + m.getName()));
-                return null;
-            });
-
-        if (path.getNameCount() - 1 == curPos) {
-            if (refVerification)
-                ref.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
-                    if (d instanceof File f) {
-                        if (!Objects.equals(f.getParent().toString(), from.getName())) {
-                            throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Parent mismatch for file " + path));
-                        }
-                    }
-                    return null;
-                });
-            return (JObject<? extends FsNode>) ref.get();
-        }
-
-        return traverse((JObject<? extends FsNode>) ref.get(), path, curPos + 1);
+    private JObject<TreeNodeJObjectData> getDirEntry(String name) {
+        var res = _tree.traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
+        if (res == null) throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
+        var ret = jObjectManager.get(res).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
+        if (!ret.getKnownClass().equals(TreeNodeJObjectData.class))
+            throw new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not jObject: " + name));
+        return (JObject<TreeNodeJObjectData>) ret;
     }
 
-    private JObject<? extends FsNode> traverse(JObject<? extends FsNode> from, Path path) {
-        if (path.getNameCount() == 0) return from;
-        return traverse(from, path, 0);
-    }
-
-    private JObject<? extends FsNode> getDirEntry(String name) {
-        return traverse(getRoot(), Path.of(name));
+    private Optional<JObject<TreeNodeJObjectData>> getDirEntryOpt(String name) {
+        var res = _tree.traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
+        if (res == null) return Optional.empty();
+        var ret = jObjectManager.get(res).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
+        if (!ret.getKnownClass().equals(TreeNodeJObjectData.class))
+            throw new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not jObject: " + name));
+        return Optional.of((JObject<TreeNodeJObjectData>) ret);
     }
 
     @Override
-    public Optional<FsNode> getattr(String uuid) {
+    public Optional<GetattrRes> getattr(String uuid) {
         var ref = jObjectManager.get(uuid);
         if (ref.isEmpty()) return Optional.empty();
         return ref.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
-            if (!(d instanceof FsNode))
+            GetattrRes ret;
+            if (d instanceof File f) {
+                ret = new GetattrRes(f.getMtime(), f.getCtime(), f.getMode(), f.isSymlink() ? GetattrType.SYMLINK : GetattrType.FILE);
+            } else if (d instanceof TreeNodeJObjectData) {
+                ret = new GetattrRes(100, 100, 0777, GetattrType.DIRECTORY);
+            } else {
                 throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + m.getName()));
-            //FIXME:
-            return Optional.of((FsNode) d);
+            }
+            return Optional.of(ret);
         });
     }
 
     @Override
     public Optional<String> open(String name) {
         try {
-            return Optional.ofNullable(traverse(getRoot(), Path.of(name)).getName());
+            var ret = getDirEntry(name);
+            return Optional.of(ret.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
+                if (d.getNode().getMeta() instanceof JTreeNodeMetaFile f) return f.getFileIno();
+                else if (d.getNode().getMeta() instanceof JTreeNodeMetaDirectory f) return m.getName();
+                throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + m.getName()));
+            }));
         } catch (StatusRuntimeException e) {
             if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {
                 return Optional.empty();
@@ -149,271 +136,88 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
     }
 
+    private void ensureDir(JObject<TreeNodeJObjectData> entry) {
+        entry.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
+            if (d.getNode().getMeta() instanceof JTreeNodeMetaFile f)
+                throw new StatusRuntimeExceptionNoStacktrace(Status.INVALID_ARGUMENT.withDescription(m.getName() + " is a file, not directory"));
+            else if (d.getNode().getMeta() instanceof JTreeNodeMetaDirectory f) return null;
+            throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + m.getName()));
+        });
+    }
+
     @Override
     public Optional<String> create(String name, long mode) {
-        var parent = traverse(getRoot(), Path.of(name).getParent());
+        Path path = Path.of(name);
+        var parent = getDirEntry(path.getParent().toString());
 
-        String fname = Path.of(name).getFileName().toString();
+        ensureDir(parent);
+
+        String fname = path.getFileName().toString();
 
         var fuuid = UUID.randomUUID();
         Log.debug("Creating file " + fuuid);
-        File f = new File(fuuid, mode, UUID.fromString(parent.getName()), false);
+        File f = new File(fuuid, mode, false);
 
-        if (!parent.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, invalidate) -> {
-            if (!(d instanceof Directory dir))
-                return false;
-
-            if (dir.getKid(fname).isPresent())
-                return false;
-
-            boolean created = dir.putKid(fname, fuuid);
-            if (!created) return false;
-
-            try {
-                jObjectManager.put(f, Optional.of(dir.getName()));
-            } catch (Exception ex) {
-                Log.error("Failed creating file " + fuuid);
-                dir.removeKid(fname);
-            }
-
-            bump.apply();
-            dir.setMtime(System.currentTimeMillis());
-            return true;
-        }))
-            return Optional.empty();
+        var newNodeId = _tree.getNewNodeId();
+        jObjectManager.put(f, Optional.of(newNodeId));
+        _tree.move(parent.getName(), new JTreeNodeMetaFile(fname, f.getName()), newNodeId);
 
         return Optional.of(f.getName());
     }
 
     @Override
-    public Optional<String> mkdir(String name, long mode) {
-        var found = traverse(getRoot(), Path.of(name).getParent());
+    public void mkdir(String name, long mode) {
+        Path path = Path.of(name);
+        var parent = getDirEntry(path.getParent().toString());
+        ensureDir(parent);
 
-        String dname = Path.of(name).getFileName().toString();
+        String dname = path.getFileName().toString();
 
-        var duuid = UUID.randomUUID();
-        Log.debug("Creating dir " + duuid);
-        Directory ndir = new Directory(duuid, mode); //FIXME:
+        Log.debug("Creating directory " + name);
 
-        if (!found.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, invalidate) -> {
-            if (!(d instanceof Directory dir))
-                return false;
-
-            if (dir.getKid(dname).isPresent())
-                return false;
-
-            boolean created = dir.putKid(dname, duuid);
-            if (!created) return false;
-
-            try {
-                jObjectManager.put(ndir, Optional.of(dir.getName()));
-            } catch (Exception ex) {
-                Log.error("Failed creating directory " + dname);
-                dir.removeKid(dname);
-            }
-
-            bump.apply();
-
-            dir.setMtime(System.currentTimeMillis());
-            return true;
-        }))
-            return Optional.empty();
-
-        return Optional.of(ndir.getName());
-    }
-
-    private Boolean rmdent(String name) {
-        var parent = getDirEntry(Path.of(name).getParent().toString());
-
-        Optional<UUID> kidId = parent.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
-            if (!(d instanceof Directory dir))
-                return Optional.empty();
-
-            return dir.getKid(Path.of(name).getFileName().toString());
-        });
-
-        if (kidId.isEmpty())
-            return false;
-
-        var kid = jObjectManager.get(kidId.get().toString());
-
-        if (kid.isEmpty()) return false;
-
-        return parent.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, i) -> {
-            if (!(d instanceof Directory dir))
-                return false;
-
-            String kname = Path.of(name).getFileName().toString();
-
-            if (dir.getKid(kname).isEmpty())
-                return false;
-
-            AtomicBoolean hadRef = new AtomicBoolean(false);
-            AtomicBoolean removedRef = new AtomicBoolean(false);
-
-            try {
-                kid.get().runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m2, d2, bump2, i2) -> {
-                    if (m2.checkRef(m.getName()))
-                        hadRef.set(true);
-
-                    if (d2 == null)
-                        throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Pessimistically not removing unresolved maybe-directory"));
-                    if (!allowRecursiveDelete)
-                        if (d2 instanceof Directory)
-                            if (!((Directory) d2).getChildren().isEmpty())
-                                throw new DirectoryNotEmptyException();
-
-                    m2.removeRef(m.getName());
-                    removedRef.set(true);
-                    return null;
-                });
-            } catch (Exception ex) {
-                Log.error("Failed removing dentry " + name, ex);
-                // If we failed something and removed the ref, try re-adding it
-                if (hadRef.get() && removedRef.get()) {
-                    AtomicBoolean hadRef2 = new AtomicBoolean(false);
-                    AtomicBoolean addedRef = new AtomicBoolean(false);
-                    try {
-                        kid.get().runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m2, d2, bump2, i2) -> {
-                            if (m2.checkRef(m.getName()))
-                                hadRef2.set(true);
-
-                            if (d2 == null)
-                                throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Pessimistically not removing unresolved maybe-directory"));
-                            if (!allowRecursiveDelete)
-                                if (d2 instanceof Directory)
-                                    if (!((Directory) d2).getChildren().isEmpty())
-                                        throw new DirectoryNotEmptyException();
-
-                            m2.addRef(m.getName());
-                            addedRef.set(true);
-                            return null;
-                        });
-                    } catch (Exception e) {
-                        Log.error("Failed fixing up failed-removed dentry " + name, ex);
-                        // If it is not there and we haven't added it, continue removing
-                        if (!(!hadRef2.get() && !addedRef.get())) {
-                            return false;
-                        }
-                    }
-                } else { // Otherwise, we didn't remove anything, go back.
-                    return false;
-                }
-            }
-
-            boolean removed = dir.removeKid(kname);
-            if (removed) {
-                bump.apply();
-                dir.setMtime(System.currentTimeMillis());
-            }
-            return removed;
-        });
+        _tree.move(parent.getName(), new JTreeNodeMetaDirectory(dname), _tree.getNewNodeId());
     }
 
     @Override
-    public Boolean rmdir(String name) {
-        return rmdent(name);
-    }
+    public void unlink(String name) {
+        var node = getDirEntryOpt(name).orElse(null);
+        JTreeNodeMeta meta = node.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
+            if (d.getNode().getMeta() instanceof JTreeNodeMetaDirectory f)
+                if (!d.getNode().getChildren().isEmpty()) throw new DirectoryNotEmptyException();
+            return d.getNode().getMeta();
+        });
 
-    @Override
-    public Boolean unlink(String name) {
-        return rmdent(name);
+        _tree.trash(meta, node.getName());
     }
 
     @Override
     public Boolean rename(String from, String to) {
-        var theFile = getDirEntry(from);
-        var dentFrom = getDirEntry(Paths.get(from).getParent().toString());
-        var dentTo = getDirEntry(Paths.get(to).getParent().toString());
+        var node = getDirEntry(from);
+        JTreeNodeMeta meta = node.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getNode().getMeta());
 
-        UUID cleanup = null;
+        var toPath = Path.of(to);
+        var toDentry = getDirEntry(toPath.getParent().toString());
+        ensureDir(toDentry);
 
-        try {
-            JObject.rwLockAll(List.of(dentFrom, dentTo));
-            theFile.rwLock();
-
-            if (!dentFrom.tryResolve(JObject.ResolutionStrategy.REMOTE))
-                throw new StatusRuntimeException(Status.ABORTED.withDescription(dentFrom.getName() + " could not be resolved"));
-            if (!dentTo.tryResolve(JObject.ResolutionStrategy.REMOTE))
-                throw new StatusRuntimeException(Status.ABORTED.withDescription(dentTo.getName() + " could not be resolved"));
-            if (!theFile.tryResolve(JObject.ResolutionStrategy.REMOTE))
-                throw new StatusRuntimeException(Status.ABORTED.withDescription(theFile.getName() + " could not be resolved"));
-
-            if (!(dentFrom.getData() instanceof Directory dentFromD))
-                throw new StatusRuntimeException(Status.ABORTED.withDescription(dentFrom.getName() + " is not a directory"));
-            if (!(dentTo.getData() instanceof Directory dentToD))
-                throw new StatusRuntimeException(Status.ABORTED.withDescription(dentTo.getName() + " is not a directory"));
-
-            if (dentFromD.getKid(Paths.get(from).getFileName().toString()).isEmpty())
-                throw new NotImplementedException("Race when moving (missing)");
-
-            FsNode newDent;
-            if (theFile.getData() instanceof Directory d) {
-                newDent = d;
-                theFile.getMeta().removeRef(dentFrom.getName());
-                theFile.getMeta().addRef(dentTo.getName());
-            } else if (theFile.getData() instanceof File f) {
-                var newFile = new File(UUID.randomUUID(), f.getMode(), UUID.fromString(dentTo.getName()), f.isSymlink());
-                newFile.setMtime(f.getMtime());
-                newFile.setCtime(f.getCtime());
-                newFile.getChunks().putAll(f.getChunks());
-
-                for (var c : newFile.getChunks().values()) {
-                    var o = jObjectManager.get(ChunkInfo.getNameFromHash(c))
-                            .orElseThrow(() -> new StatusRuntimeException(Status.DATA_LOSS.withDescription("Could not find chunk " + c + " when moving " + from)));
-                    o.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                        m.addRef(newFile.getName());
-                        return null;
-                    });
-                }
-
-                theFile.getMeta().removeRef(dentFrom.getName());
-                jObjectManager.put(newFile, Optional.of(dentTo.getName()));
-                newDent = newFile;
-            } else {
-                throw new StatusRuntimeException(Status.ABORTED.withDescription(theFile.getName() + " is of unknown type"));
-            }
-
-            if (!dentFromD.removeKid(Paths.get(from).getFileName().toString()))
-                throw new NotImplementedException("Should not reach here");
-
-            String toFn = Paths.get(to).getFileName().toString();
-
-            if (dentToD.getChildren().containsKey(toFn)) {
-                cleanup = dentToD.getChildren().get(toFn);
-            }
-
-            dentToD.getChildren().put(toFn, newDent.getUuid());
-            dentToD.setMtime(System.currentTimeMillis());
-
-            dentFrom.bumpVer();
-            dentTo.bumpVer();
-        } finally {
-            dentFrom.rwUnlock();
-            dentTo.rwUnlock();
-            theFile.rwUnlock();
-        }
-
-        if (cleanup != null) {
-            jObjectManager.get(cleanup.toString()).ifPresent(c -> {
-                c.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                    m.removeRef(dentTo.getName());
-                    return null;
-                });
-            });
-        }
+        _tree.move(toDentry.getName(), meta.withName(toPath.getFileName().toString()), node.getName());
 
         return true;
     }
 
     @Override
-    public Boolean chmod(String name, long mode) {
-        var dent = getDirEntry(name);
+    public Boolean chmod(String uuid, long mode) {
+        var dent = jObjectManager.get(uuid).orElseThrow(() -> new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND));
 
         dent.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, i) -> {
-            bump.apply();
-            d.setMtime(System.currentTimeMillis());
-            d.setMode(mode);
+            if (d instanceof TreeNodeJObjectData) {
+                return null;//FIXME:?
+            } else if (d instanceof File f) {
+                bump.apply();
+                f.setMtime(System.currentTimeMillis());
+                f.setMode(mode);
+            } else {
+                throw new IllegalArgumentException(uuid + " is not a file");
+            }
             return null;
         });
 
@@ -425,10 +229,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var found = getDirEntry(name);
 
         return found.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
-            if (!(d instanceof Directory)) {
+            if (!(d instanceof TreeNodeJObjectData) || !(d.getNode().getMeta() instanceof JTreeNodeMetaDirectory)) {
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
             }
-            return ((Directory) d).getChildrenList();
+            return new ArrayList<>(d.getNode().getChildren().keySet());
         });
     }
 
@@ -871,38 +675,28 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Override
     public String symlink(String oldpath, String newpath) {
-        var parent = traverse(getRoot(), Path.of(newpath).getParent());
+        Path path = Path.of(newpath);
+        var parent = getDirEntry(path.getParent().toString());
 
-        String fname = Path.of(newpath).getFileName().toString();
+        ensureDir(parent);
+
+        String fname = path.getFileName().toString();
 
         var fuuid = UUID.randomUUID();
         Log.debug("Creating file " + fuuid);
-        File f = new File(fuuid, 0, UUID.fromString(parent.getName()), true);
+
+        File f = new File(fuuid, 0, true);
+        var newNodeId = _tree.getNewNodeId();
+        _tree.move(parent.getName(), new JTreeNodeMetaFile(fname, f.getName()), newNodeId);
 
         ChunkData newChunkData = createChunk(UnsafeByteOperations.unsafeWrap(oldpath.getBytes(StandardCharsets.UTF_8)));
         ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
 
         f.getChunks().put(0L, newChunkInfo.getHash());
 
-        if (!parent.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, invalidate) -> {
-            if (!(d instanceof Directory dir))
-                return false;
-
-            if (dir.getKid(fname).isPresent())
-                return false;
-
-            bump.apply();
-
-            boolean created = dir.putKid(fname, fuuid);
-            if (!created) return false;
-
-            jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
-            jObjectManager.put(newChunkInfo, Optional.of(f.getName()));
-            jObjectManager.put(f, Optional.of(dir.getName()));
-
-            dir.setMtime(System.currentTimeMillis());
-            return true;
-        })) return null;
+        jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
+        jObjectManager.put(newChunkInfo, Optional.of(f.getName()));
+        jObjectManager.put(f, Optional.of(newNodeId));
 
         return f.getName();
     }
@@ -912,7 +706,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var file = jObjectManager.get(fileUuid).orElseThrow(
                 () -> new StatusRuntimeException(Status.NOT_FOUND.withDescription(
                         "File not found for setTimes: " + fileUuid))
-        );
+                                                           );
 
         file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, fileData, bump, i) -> {
             if (!(fileData instanceof FsNode fd))
@@ -929,7 +723,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Override
     public Long size(String uuid) {
         var read = jObjectManager.get(uuid)
-                .orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
+                                 .orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
         try {
             return read.runReadLocked(JObject.ResolutionStrategy.REMOTE, (fsNodeData, fileData) -> {
@@ -948,13 +742,5 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             Log.error("Error reading file: " + uuid, e);
             return -1L;
         }
-    }
-
-    private JObject<Directory> getRoot() {
-        var read = jObjectManager.get(new UUID(0, 0).toString());
-        if (read.isEmpty()) {
-            Log.error("Root directory not found");
-        }
-        return (JObject<Directory>) read.get();
     }
 }

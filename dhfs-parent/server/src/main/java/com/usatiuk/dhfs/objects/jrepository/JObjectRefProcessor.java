@@ -86,7 +86,7 @@ public class JObjectRefProcessor {
         _movableProcessorExecutorService.submit(() -> {
             boolean delay = false;
             try {
-                var knownHosts = persistentRemoteHostsService.getHostsUuid();
+                var knownHosts = persistentRemoteHostsService.getHostUuids();
                 List<UUID> missing = new ArrayList<>();
 
                 var ourReferrers = obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
@@ -133,7 +133,7 @@ public class JObjectRefProcessor {
 
     private boolean processMovable(JObject<?> obj) {
         obj.assertRWLock();
-        var knownHosts = persistentRemoteHostsService.getHostsUuid();
+        var knownHosts = persistentRemoteHostsService.getHostUuids();
         boolean missing = false;
         for (var x : knownHosts)
             if (!obj.getMeta().getConfirmedDeletes().contains(x)) {

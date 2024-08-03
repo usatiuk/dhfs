@@ -1,5 +1,7 @@
 package com.usatiuk.kleppmanntree;
 
-public interface NodeMeta<NameT> {
+import java.io.Serializable;
+
+public interface NodeMeta<NameT> extends Serializable {
     public NameT getName();
 }

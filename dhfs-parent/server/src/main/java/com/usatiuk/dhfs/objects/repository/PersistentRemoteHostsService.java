@@ -5,6 +5,7 @@ import com.usatiuk.dhfs.ShutdownChecker;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.jrepository.JObjectResolver;
+import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerDirectory;
 import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
 import com.usatiuk.dhfs.objects.repository.peertrust.PeerTrustManager;
@@ -193,7 +194,7 @@ public class PersistentRemoteHostsService {
         return getPeersSnapshot().stream().filter(i -> !i.getUuid().equals(_selfUuid)).toList();
     }
 
-    public List<UUID> getHostsUuid() {
+    public List<UUID> getHostUuids() {
         return getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.getPeers().stream().filter(i -> !i.equals(_selfUuid)).toList());
     }
 

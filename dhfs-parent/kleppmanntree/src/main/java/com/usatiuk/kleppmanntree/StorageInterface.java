@@ -18,7 +18,8 @@ public interface StorageInterface<
 
     WrapperT getById(NodeIdT id);
 
-    WrapperT createNewNode(NodeIdT id);
+    // Creates a node, returned wrapper is RW-locked
+    WrapperT createNewNode(TreeNode<NameT, MetaT, NodeIdT> node);
 
     void removeNode(NodeIdT id);
 
@@ -28,7 +29,12 @@ public interface StorageInterface<
     NavigableMap<CombinedTimestamp<TimestampT, PeerIdT>, LogOpMove<TimestampT, PeerIdT, NameT, ? extends MetaT, NodeIdT>> getLog();
 
     // Locks all the objects from being changed
-    void globalLock();
+    void globalRwLock();
 
-    void globalUnlock();
+    void globalRwUnlock();
+
+    // Locks all the objects from being changed
+    void globalRLock();
+
+    void globalRUnlock();
 }

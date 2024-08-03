@@ -4,6 +4,7 @@ import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
+import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
@@ -51,7 +52,7 @@ public class SyncHandler {
         JObject<?> found = jObjectManager.getOrPut(header.getName(), JObjectData.class, Optional.empty());
 
         var receivedTotalVer = header.getChangelog().getEntriesList()
-                .stream().map(ObjectChangelogEntry::getVersion).reduce(0L, Long::sum);
+                                     .stream().map(ObjectChangelogEntry::getVersion).reduce(0L, Long::sum);
 
         var receivedMap = new HashMap<UUID, Long>();
         for (var e : header.getChangelog().getEntriesList()) {
@@ -61,7 +62,7 @@ public class SyncHandler {
         boolean conflict = found.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (md, data, bump, invalidate) -> {
             if (md.getRemoteCopies().getOrDefault(from, 0L) > receivedTotalVer) {
                 Log.error("Received older index update than was known for host: "
-                        + from + " " + header.getName());
+                                  + from + " " + header.getName());
                 throw new OutdatedUpdateException();
             }
 
@@ -96,7 +97,7 @@ public class SyncHandler {
 
             if (hasLower) {
                 Log.info("Received older index update than known: "
-                        + from + " " + header.getName());
+                                 + from + " " + header.getName());
                 throw new OutdatedUpdateException();
             }
 
@@ -159,5 +160,17 @@ public class SyncHandler {
     }
 
     protected static class OutdatedUpdateException extends RuntimeException {
+        OutdatedUpdateException() {
+            super();
+        }
+
+        OutdatedUpdateException(String message) {
+            super(message);
+        }
+
+        @Override
+        public synchronized Throwable fillInStackTrace() {
+            return this;
+        }
     }
 }

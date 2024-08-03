@@ -17,15 +17,10 @@ public class File extends FsNode {
     @Getter
     private final NavigableMap<Long, String> _chunks = new TreeMap<>();
     @Getter
-    private final UUID _parent;
-    @Getter
     private final boolean _symlink;
 
-    public File(UUID uuid, long mode, UUID parent, boolean symlink) {
+    public File(UUID uuid, long mode, boolean symlink) {
         super(uuid, mode);
-        if (parent == null)
-            throw new IllegalArgumentException("Parent UUID cannot be null");
-        _parent = parent;
         _symlink = symlink;
     }
 
