@@ -2,18 +2,12 @@ package com.usatiuk.kleppmanntree;
 
 import lombok.Getter;
 
-public class TestNodeMetaFile implements NodeMeta<String> {
-    private final String name;
+public class TestNodeMetaFile extends TestNodeMeta {
     @Getter
-    private final long inode;
+    private final long _inode;
 
     public TestNodeMetaFile(String name, long inode) {
-        this.name = name;
-        this.inode = inode;
-    }
-
-    @Override
-    public String getName() {
-        return name;
+        super(name);
+        _inode = inode;
     }
 }

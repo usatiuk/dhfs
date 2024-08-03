@@ -37,6 +37,17 @@ public class KleppmanTreeSimpleTest {
         Assertions.assertIterableEquals(List.of("Test1", "Test2"), testNode1._storageInterface.getById(testNode2._storageInterface.getRootId()).getNode().getChildren().keySet());
         Assertions.assertIterableEquals(List.of("Test1", "Test2"), testNode2._storageInterface.getById(testNode2._storageInterface.getRootId()).getNode().getChildren().keySet());
 
+        var f1id = testNode1._storageInterface.getNewNodeId();
+        var op3 = new OpMove<>(new CombinedTimestamp<>(testNode1._clock.getTimestamp(), 1L),
+                               d2id,
+                               new TestNodeMetaFile("TestFile", 1234),
+                               f1id);
+        testNode1._tree.applyOp(op3);
+        testNode2._tree.applyOp(op3);
+
+        Assertions.assertEquals(f1id, testNode1._tree.traverse(List.of("Test2", "TestFile")));
+        Assertions.assertEquals(f1id, testNode2._tree.traverse(List.of("Test2", "TestFile")));
+
         var cop1 = new OpMove<>(new CombinedTimestamp<>(testNode1._clock.getTimestamp(), 1L),
                                 d1id,
                                 new TestNodeMetaDir("Test2"),
@@ -57,11 +68,18 @@ public class KleppmanTreeSimpleTest {
 
         testNode1._tree.applyOp(cop2);
         testNode2._tree.applyOp(cop1);
-        // First node wins as it has smaller timestamp
-        Assertions.assertIterableEquals(List.of("Test1"), testNode1._storageInterface.getById(testNode2._storageInterface.getRootId()).getNode().getChildren().keySet());
-        Assertions.assertIterableEquals(List.of("Test2"), testNode1._storageInterface.getById(d1id).getNode().getChildren().keySet());
-        Assertions.assertEquals(d1id, testNode1._tree.traverse(List.of("Test1")));
-        Assertions.assertEquals(d2id, testNode1._tree.traverse(List.of("Test1", "Test2")));
+        // Second node wins as it has smaller timestamp
+        Assertions.assertIterableEquals(List.of("Test2"), testNode1._storageInterface.getById(testNode2._storageInterface.getRootId()).getNode().getChildren().keySet());
+        Assertions.assertIterableEquals(List.of("Test1", "TestFile"), testNode1._storageInterface.getById(d2id).getNode().getChildren().keySet());
+        Assertions.assertEquals(d2id, testNode1._tree.traverse(List.of("Test2")));
+        Assertions.assertEquals(d1id, testNode1._tree.traverse(List.of("Test2", "Test1")));
+        Assertions.assertEquals(f1id, testNode1._tree.traverse(List.of("Test2", "TestFile")));
+
+        var f11 = testNode1._storageInterface.getById(f1id);
+        var f12 = testNode2._storageInterface.getById(f1id);
+
+        Assertions.assertEquals(f11.getNode().getMeta(), f12.getNode().getMeta());
+        Assertions.assertInstanceOf(TestNodeMetaFile.class, f11.getNode().getMeta());
     }
 
 }

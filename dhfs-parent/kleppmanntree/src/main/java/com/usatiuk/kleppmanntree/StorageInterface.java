@@ -25,7 +25,7 @@ public interface StorageInterface<
     void lockSet(Collection<WrapperT> nodes);
 
     // It is expected that the map allows concurrent additions at the end
-    NavigableMap<CombinedTimestamp<TimestampT, PeerIdT>, LogOpMove<TimestampT, PeerIdT, NameT, MetaT, NodeIdT>> getLog();
+    NavigableMap<CombinedTimestamp<TimestampT, PeerIdT>, LogOpMove<TimestampT, PeerIdT, NameT, ? extends MetaT, NodeIdT>> getLog();
 
     // Locks all the objects from being changed
     void globalLock();
