@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class JObjectWriteback {
     private class QueueEntry {
         private final JObject<?> _obj;
-        private long _size;
+        private final long _size;
 
         private QueueEntry(JObject<?> obj, long size) {
             _obj = obj;

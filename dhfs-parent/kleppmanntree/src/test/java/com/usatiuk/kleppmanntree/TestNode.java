@@ -6,7 +6,7 @@ public class TestNode {
     protected final TestClock _clock;
     protected final TestPeerInterface _peerInterface;
     protected final TestStorageInterface _storageInterface;
-    protected final KleppmannTree<Long, Long, String, TestNodeMeta, Long, TestNodeWrapper> _tree;
+    protected final KleppmannTree<Long, Long, TestNodeMeta, Long, TestNodeWrapper> _tree;
 
     public TestNode(long id) {
         _id = id;

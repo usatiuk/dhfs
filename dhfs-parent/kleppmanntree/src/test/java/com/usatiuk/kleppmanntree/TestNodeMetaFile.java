@@ -10,4 +10,9 @@ public class TestNodeMetaFile extends TestNodeMeta {
         super(name);
         _inode = inode;
     }
+
+    @Override
+    public NodeMeta withName(String name) {
+        return new TestNodeMetaFile(name, _inode);
+    }
 }

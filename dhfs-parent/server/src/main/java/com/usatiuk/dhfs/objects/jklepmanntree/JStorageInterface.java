@@ -15,7 +15,7 @@ import java.util.Collection;
 import java.util.NavigableMap;
 import java.util.UUID;
 
-public class JStorageInterface implements StorageInterface<Long, UUID, String, JTreeNodeMeta, String, JTreeNodeWrapper> {
+public class JStorageInterface implements StorageInterface<Long, UUID,  JTreeNodeMeta, String, JTreeNodeWrapper> {
     private final JKleppmannTreePersistentData _persistentData;
 
     private final StorageInterfaceService _storageInterfaceService;
@@ -55,7 +55,7 @@ public class JStorageInterface implements StorageInterface<Long, UUID, String, J
     }
 
     @Override
-    public JTreeNodeWrapper createNewNode(TreeNode<String, JTreeNodeMeta, String> node) {
+    public JTreeNodeWrapper createNewNode(TreeNode< JTreeNodeMeta, String> node) {
         return new JTreeNodeWrapper(_storageInterfaceService.putObjectLocked(new TreeNodeJObjectData(node)));
     }
 
@@ -70,7 +70,7 @@ public class JStorageInterface implements StorageInterface<Long, UUID, String, J
     }
 
     @Override
-    public NavigableMap<CombinedTimestamp<Long, UUID>, LogOpMove<Long, UUID, String, ? extends JTreeNodeMeta, String>> getLog() {
+    public NavigableMap<CombinedTimestamp<Long, UUID>, LogOpMove<Long, UUID,  ? extends JTreeNodeMeta, String>> getLog() {
         return _persistentData.getLog();
     }
 

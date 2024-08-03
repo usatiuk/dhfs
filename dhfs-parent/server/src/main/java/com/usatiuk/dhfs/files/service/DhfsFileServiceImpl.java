@@ -380,18 +380,17 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
 
             if (writeLogging) {
-                StringBuffer sb = new StringBuffer();
-                sb.append("Writing to file: ");
-                sb.append(meta.getName());
-                sb.append(" size=");
-                sb.append(size(fileUuid));
-                sb.append(" ");
-                sb.append(offset);
-                sb.append(" ");
-                sb.append(data.length);
-                sb.append(" ");
-                sb.append(Arrays.toString(data));
-                Log.info(sb.toString());
+                String sb = "Writing to file: " +
+                        meta.getName() +
+                        " size=" +
+                        size(fileUuid) +
+                        " " +
+                        offset +
+                        " " +
+                        data.length +
+                        " " +
+                        Arrays.toString(data);
+                Log.info(sb);
             }
 
             if (size(fileUuid) < offset)

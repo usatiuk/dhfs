@@ -4,12 +4,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT extends Comparable<PeerIdT>, NameT, MetaT extends NodeMeta<NameT>, NodeIdT, WrapperT extends TreeNodeWrapper<NameT, MetaT, NodeIdT>> {
-    private final StorageInterface<TimestampT, PeerIdT, NameT, MetaT, NodeIdT, WrapperT> _storage;
+public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT extends Comparable<PeerIdT>, MetaT extends NodeMeta, NodeIdT, WrapperT extends TreeNodeWrapper<MetaT, NodeIdT>> {
+    private final StorageInterface<TimestampT, PeerIdT, MetaT, NodeIdT, WrapperT> _storage;
     private final PeerInterface<PeerIdT> _peers;
     private final Clock<TimestampT> _clock;
 
-    public KleppmannTree(StorageInterface<TimestampT, PeerIdT, NameT, MetaT, NodeIdT, WrapperT> storage,
+    public KleppmannTree(StorageInterface<TimestampT, PeerIdT, MetaT, NodeIdT, WrapperT> storage,
                          PeerInterface<PeerIdT> peers,
                          Clock<TimestampT> clock) {
         _storage = storage;
@@ -18,7 +18,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
 
-    public NodeIdT traverse(NodeIdT fromId, List<NameT> names) {
+    public NodeIdT traverse(NodeIdT fromId, List<String> names) {
         if (names.isEmpty()) return fromId;
 
         var from = _storage.getById(fromId);
@@ -36,7 +36,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         return traverse(childId, names.subList(1, names.size()));
     }
 
-    public NodeIdT traverse(List<NameT> names) {
+    public NodeIdT traverse(List<String> names) {
         _storage.globalRLock();
         try {
             return traverse(_storage.getRootId(), names);
@@ -45,7 +45,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         }
     }
 
-    private void undoOp(LogOpMove<TimestampT, PeerIdT, NameT, ? extends MetaT, NodeIdT> op) {
+    private void undoOp(LogOpMove<TimestampT, PeerIdT, ? extends MetaT, NodeIdT> op) {
         if (op.oldInfo() != null) {
             var node = _storage.getById(op.op().childId());
             var oldParent = _storage.getById(op.oldInfo().oldParent());
@@ -83,11 +83,11 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         }
     }
 
-    private void redoOp(Map.Entry<CombinedTimestamp<TimestampT, PeerIdT>, LogOpMove<TimestampT, PeerIdT, NameT, ? extends MetaT, NodeIdT>> entry) {
+    private void redoOp(Map.Entry<CombinedTimestamp<TimestampT, PeerIdT>, LogOpMove<TimestampT, PeerIdT, ? extends MetaT, NodeIdT>> entry) {
         entry.setValue(doOp(entry.getValue().op()));
     }
 
-    public <LocalMetaT extends MetaT> void applyOp(OpMove<TimestampT, PeerIdT, NameT, LocalMetaT, NodeIdT> op) {
+    public <LocalMetaT extends MetaT> void applyOp(OpMove<TimestampT, PeerIdT, LocalMetaT, NodeIdT> op) {
         _clock.updateTimestamp(op.timestamp().timestamp());
         var log = _storage.getLog();
 
@@ -127,7 +127,15 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         }
     }
 
-    private <LocalMetaT extends MetaT> LogOpMove<TimestampT, PeerIdT, NameT, LocalMetaT, NodeIdT> doOp(OpMove<TimestampT, PeerIdT, NameT, LocalMetaT, NodeIdT> op) {
+    public CombinedTimestamp<TimestampT, PeerIdT> getTimestamp() {
+        return new CombinedTimestamp<>(_clock.getTimestamp(), _peers.getSelfId());
+    }
+
+    public OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> createMove(NodeIdT newParent, MetaT newMeta, NodeIdT node) {
+        return new OpMove<>(getTimestamp(), newParent, newMeta, node);
+    }
+
+    private <LocalMetaT extends MetaT> LogOpMove<TimestampT, PeerIdT, LocalMetaT, NodeIdT> doOp(OpMove<TimestampT, PeerIdT, LocalMetaT, NodeIdT> op) {
         var node = _storage.getById(op.childId());
 
         var oldParent = (node != null && node.getNode().getParent() != null) ? _storage.getById(node.getNode().getParent()) : null;
@@ -159,6 +167,8 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             if (op.childId() == op.newParentId() || isAncestor(op.childId(), op.newParentId()))
                 return new LogOpMove<>(null, op);
 
+            var trash = _storage.getById(_storage.getTrashId());
+            trash.rwLock();
             newParent.rwLock();
             oldParent.rwLock();
             node.rwLock();
@@ -170,6 +180,11 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                     throw new IllegalArgumentException("Class mismatch for meta for node " + node.getNode().getId());
                 node.getNode().setMeta(op.newMeta());
                 node.getNode().setParent(newParent.getNode().getId());
+                var old = newParent.getNode().getChildren().get(op.newMeta().getName());
+                if (old != null) {
+                    var oldNode = _storage.getById(old);
+                    applyOp(createMove(_storage.getTrashId(), (MetaT) oldNode.getNode().getMeta().withName(oldNode.getNode().getId().toString()), oldNode.getNode().getId()));
+                }
                 newParent.getNode().getChildren().put(op.newMeta().getName(), node.getNode().getId());
                 node.notifyRmRef(oldParent.getNode().getId());
                 node.notifyRef(newParent.getNode().getId());
@@ -178,6 +193,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 node.rwUnlock();
                 oldParent.rwUnlock();
                 newParent.rwUnlock();
+                trash.rwUnlock();
             }
         } finally {
             _storage.globalRwUnlock();

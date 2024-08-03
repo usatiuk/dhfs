@@ -178,12 +178,11 @@ public class PersistentRemoteHostsService {
     }
 
     public String getUniqueId() {
-        StringBuilder sb = new StringBuilder(64);
-        sb.append(_selfUuid);
-        sb.append(_persistentData.getData().getIrregularShutdownCounter());
-        sb.append("_");
-        sb.append(_persistentData.getData().getSelfCounter().addAndGet(1));
-        return sb.toString();
+        String sb = String.valueOf(_selfUuid) +
+                _persistentData.getData().getIrregularShutdownCounter() +
+                "_" +
+                _persistentData.getData().getSelfCounter().addAndGet(1);
+        return sb;
     }
 
     public PersistentPeerInfo getInfo(UUID name) {

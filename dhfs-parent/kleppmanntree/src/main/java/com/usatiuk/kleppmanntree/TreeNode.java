@@ -9,11 +9,11 @@ import java.util.Map;
 
 @Getter
 @Setter
-public class TreeNode<NameT, MetaT extends NodeMeta<NameT>, NodeIdT> implements Serializable {
+public class TreeNode<MetaT extends NodeMeta, NodeIdT> implements Serializable {
     private NodeIdT _parent = null;
     private final NodeIdT _id;
     private MetaT _meta = null;
-    private Map<NameT, NodeIdT> _children = new HashMap<>();
+    private Map<String, NodeIdT> _children = new HashMap<>();
 
     public TreeNode(NodeIdT id, NodeIdT parent, MetaT meta) {
         _id = id;

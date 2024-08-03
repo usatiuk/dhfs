@@ -2,5 +2,5 @@ package com.usatiuk.kleppmanntree;
 
 import java.io.Serializable;
 
-public record LogOpMoveOld<NameT, MetaT extends NodeMeta<NameT>, NodeIdT>
+public record LogOpMoveOld<MetaT extends NodeMeta, NodeIdT>
         (NodeIdT oldParent, MetaT oldMeta) implements Serializable {}

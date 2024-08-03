@@ -14,9 +14,9 @@ import java.util.List;
 @OnlyLocal
 public class TreeNodeJObjectData extends JObjectData {
     @Getter
-    final TreeNode<String, JTreeNodeMeta, String> _node;
+    final TreeNode<JTreeNodeMeta, String> _node;
 
-    public TreeNodeJObjectData(TreeNode<String, JTreeNodeMeta, String> node) {
+    public TreeNodeJObjectData(TreeNode<JTreeNodeMeta, String> node) {
         _node = node;
     }
 

@@ -1,6 +1,6 @@
 package com.usatiuk.kleppmanntree;
 
-public interface TreeNodeWrapper<NameT, MetaT extends NodeMeta<NameT>, NodeIdT> {
+public interface TreeNodeWrapper<MetaT extends NodeMeta, NodeIdT> {
     void rLock();
 
     void rUnlock();
@@ -13,5 +13,5 @@ public interface TreeNodeWrapper<NameT, MetaT extends NodeMeta<NameT>, NodeIdT> 
 
     void notifyRmRef(NodeIdT id);
 
-    TreeNode<NameT, MetaT, NodeIdT> getNode();
+    TreeNode<MetaT, NodeIdT> getNode();
 }

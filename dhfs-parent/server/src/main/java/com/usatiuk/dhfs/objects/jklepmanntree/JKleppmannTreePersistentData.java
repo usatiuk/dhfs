@@ -24,9 +24,9 @@ public class JKleppmannTreePersistentData implements Serializable, OpQueue {
     @Getter
     private final UUID _selfUuid;
     @Getter
-    private final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<OpMove<Long, UUID, String, JTreeNodeMeta, String>>> _queues = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<OpMove<Long, UUID, JTreeNodeMeta, String>>> _queues = new ConcurrentHashMap<>();
     @Getter
-    private final ConcurrentSkipListMap<CombinedTimestamp<Long, UUID>, LogOpMove<Long, UUID, String, ? extends JTreeNodeMeta, String>> _log = new ConcurrentSkipListMap<>();
+    private final ConcurrentSkipListMap<CombinedTimestamp<Long, UUID>, LogOpMove<Long, UUID, ? extends JTreeNodeMeta, String>> _log = new ConcurrentSkipListMap<>();
     @Getter
     private final ReentrantReadWriteLock _logLock = new ReentrantReadWriteLock();
 
@@ -52,7 +52,7 @@ public class JKleppmannTreePersistentData implements Serializable, OpQueue {
         return null;
     }
 
-    void recordOp(OpMove<Long, UUID, String, JTreeNodeMeta, String> opMove) {
+    void recordOp(OpMove<Long, UUID, JTreeNodeMeta, String> opMove) {
         for (var u : _helper.getHostList()) {
             _queues.computeIfAbsent(u, h -> new ConcurrentLinkedQueue<>());
             _queues.get(u).add(opMove);

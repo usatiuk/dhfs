@@ -4,7 +4,7 @@ import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class AtomicClock implements Clock<Long>, Serializable {
-    private AtomicLong _max = new AtomicLong(0L);
+    private final AtomicLong _max = new AtomicLong(0L);
 
     @Override
     public Long getTimestamp() {

@@ -196,6 +196,28 @@ public class DhfsFileServiceSimpleTestImpl {
     }
 
     @Test
+    void moveOverTest() {
+        var ret = fileService.create("/moveOverTest1", 777);
+        Assertions.assertTrue(ret.isPresent());
+        var uuid = ret.get();
+        var ret2 = fileService.create("/moveOverTest2", 777);
+        Assertions.assertTrue(ret2.isPresent());
+        var uuid2 = ret2.get();
+
+        fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+        fileService.write(uuid2, 0, new byte[]{11, 12, 13, 14, 15, 16, 17, 18, 19, 29});
+        Assertions.assertArrayEquals(new byte[]{11, 12, 13, 14, 15, 16, 17, 18, 19, 29}, fileService.read(uuid2, 0, 10).get().toByteArray());
+
+        Assertions.assertTrue(fileService.rename("/moveOverTest1", "/moveOverTest2"));
+        Assertions.assertFalse(fileService.open("/moveOverTest1").isPresent());
+        Assertions.assertTrue(fileService.open("/moveOverTest2").isPresent());
+
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+                                     fileService.read(fileService.open("/moveOverTest2").get(), 0, 10).get().toByteArray());
+    }
+
+    @Test
     void readOverSizeTest() {
         var ret = fileService.create("/readOverSizeTest", 777);
         Assertions.assertTrue(ret.isPresent());

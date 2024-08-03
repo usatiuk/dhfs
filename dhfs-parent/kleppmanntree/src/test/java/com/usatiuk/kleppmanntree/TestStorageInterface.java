@@ -2,12 +2,12 @@ package com.usatiuk.kleppmanntree;
 
 import java.util.*;
 
-public class TestStorageInterface implements StorageInterface<Long, Long, String, TestNodeMeta, Long, TestNodeWrapper> {
+public class TestStorageInterface implements StorageInterface<Long, Long, TestNodeMeta, Long, TestNodeWrapper> {
     private long _curId = 1;
     private final long _peerId;
 
-    private final Map<Long, TreeNode<String, TestNodeMeta, Long>> _nodes = new HashMap<>();
-    private final NavigableMap<CombinedTimestamp<Long, Long>, LogOpMove<Long, Long, String, ? extends TestNodeMeta, Long>> _log = new TreeMap<>();
+    private final Map<Long, TreeNode<TestNodeMeta, Long>> _nodes = new HashMap<>();
+    private final NavigableMap<CombinedTimestamp<Long, Long>, LogOpMove<Long, Long, ? extends TestNodeMeta, Long>> _log = new TreeMap<>();
 
     public TestStorageInterface(long peerId) {
         _peerId = peerId;
@@ -37,7 +37,7 @@ public class TestStorageInterface implements StorageInterface<Long, Long, String
     }
 
     @Override
-    public TestNodeWrapper createNewNode(TreeNode<String, TestNodeMeta, Long> node) {
+    public TestNodeWrapper createNewNode(TreeNode<TestNodeMeta, Long> node) {
         if (!_nodes.containsKey(node.getId())) {
             _nodes.put(node.getId(), node);
             return new TestNodeWrapper(node);
@@ -58,7 +58,7 @@ public class TestStorageInterface implements StorageInterface<Long, Long, String
     }
 
     @Override
-    public NavigableMap<CombinedTimestamp<Long, Long>, LogOpMove<Long, Long, String, ? extends TestNodeMeta, Long>> getLog() {
+    public NavigableMap<CombinedTimestamp<Long, Long>, LogOpMove<Long, Long, ? extends TestNodeMeta, Long>> getLog() {
         return _log;
     }
 
