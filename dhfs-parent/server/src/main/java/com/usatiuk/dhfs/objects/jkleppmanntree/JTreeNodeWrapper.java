@@ -44,7 +44,7 @@ public class JTreeNodeWrapper implements TreeNodeWrapper<JTreeNodeMeta, String> 
 
     @Override
     public TreeNode<JTreeNodeMeta, String> getNode() {
-        _backing.tryResolve(JObject.ResolutionStrategy.REMOTE);
+        _backing.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
         if (_backing.getData() == null) throw new IllegalStateException("Node " + _backing.getName() + " data lost!");
         return _backing.getData().getNode();
     }

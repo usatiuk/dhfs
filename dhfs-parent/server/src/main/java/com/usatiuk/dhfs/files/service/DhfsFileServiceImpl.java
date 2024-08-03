@@ -686,8 +686,6 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         File f = new File(fuuid, 0, true);
         var newNodeId = _tree.getNewNodeId();
-        _tree.move(parent.getName(), new JTreeNodeMetaFile(fname, f.getName()), newNodeId);
-
         ChunkData newChunkData = createChunk(UnsafeByteOperations.unsafeWrap(oldpath.getBytes(StandardCharsets.UTF_8)));
         ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
 
@@ -697,6 +695,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         jObjectManager.put(newChunkInfo, Optional.of(f.getName()));
         jObjectManager.put(f, Optional.of(newNodeId));
 
+        _tree.move(parent.getName(), new JTreeNodeMetaFile(fname, f.getName()), newNodeId);
         return f.getName();
     }
 
