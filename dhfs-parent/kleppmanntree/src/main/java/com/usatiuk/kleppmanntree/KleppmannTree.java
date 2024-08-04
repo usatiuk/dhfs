@@ -125,11 +125,13 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
 
             Set<NodeIdT> inTrash = new HashSet<>();
 
-            for (var e : canTrim.values()) {
-                if (Objects.equals(e.op().newParentId(), _storage.getTrashId())) {
-                    inTrash.add(e.op().childId());
-                } else {
-                    inTrash.remove(e.op().childId());
+            for (var le : canTrim.values()) {
+                for (var e : le.effects()) {
+                    if (Objects.equals(e.newParentId(), _storage.getTrashId())) {
+                        inTrash.add(e.childId());
+                    } else {
+                        inTrash.remove(e.childId());
+                    }
                 }
             }
 
@@ -348,6 +350,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                     oldNode.notifyRmRef(newParent.getNode().getId());
                     oldNode.notifyRef(trash.getNode().getId());
                     oldNode.getNode().setMeta((MetaT) oldNode.getNode().getMeta().withName(oldNode.getNode().getId().toString()));
+                    oldNode.getNode().setParent(_storage.getTrashId());
                     effects.add(new LogEffect<>(new LogEffectOld<>(newParent.getNode().getId(), (LocalMetaT) oldOldMeta), trash.getNode().getId(), (LocalMetaT) oldNode.getNode().getMeta(), oldNode.getNode().getId()));
                 } finally {
                     oldNode.rwUnlock();

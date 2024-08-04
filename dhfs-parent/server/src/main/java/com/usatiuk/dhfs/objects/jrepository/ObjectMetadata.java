@@ -94,6 +94,11 @@ public class ObjectMetadata implements Serializable {
         _written = true;
     }
 
+    // FIXME:? a better way?
+    public void markUnWritten() {
+        _written = false;
+    }
+
     public boolean isReferred() {
         return !_referrers.isEmpty();
     }

@@ -87,8 +87,8 @@ public class JObjectWriteback {
                     Thread.sleep(1000);
                     if (_currentSize.get() > 0)
                         Log.info("Writeback status: size="
-                                + _currentSize.get() / 1024 / 1024 + "MB"
-                                + " watermark=" + (_watermarkReached.get() ? "reached" : "not reached"));
+                                         + _currentSize.get() / 1024 / 1024 + "MB"
+                                         + " watermark=" + (_watermarkReached.get() ? "reached" : "not reached"));
                 }
             } catch (InterruptedException ignored) {
             }
@@ -166,6 +166,7 @@ public class JObjectWriteback {
             // FIXME: assert Rw lock here?
             Log.debug("Deleting from persistent storage " + m.getName());
             objectPersistentStore.deleteObject(m.getName());
+            m.markUnWritten();
             return;
         }
         objectPersistentStore.writeObjectMeta(m.getName(), protoSerializerService.serialize(m));

@@ -20,6 +20,6 @@ public class JPeerInterface implements PeerInterface<UUID> {
 
     @Override
     public Collection<UUID> getAllPeers() {
-        return persistentRemoteHostsService.getHostUuids();
+        return persistentRemoteHostsService.getHostUuidsAndSelf();
     }
 }
