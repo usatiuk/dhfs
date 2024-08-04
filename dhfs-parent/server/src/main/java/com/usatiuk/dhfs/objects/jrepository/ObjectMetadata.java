@@ -123,10 +123,6 @@ public class ObjectMetadata implements Serializable {
     }
 
     public void removeRef(String from) {
-        if (isLocked()) {
-            unlock();
-            Log.error("Object " + getName() + " is locked, but we removed a reference to it, unlocking!");
-        }
         if (Log.isTraceEnabled())
             Log.trace("Removing ref " + from + " from " + getName());
         _referrers.remove(from);

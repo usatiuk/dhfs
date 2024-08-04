@@ -33,6 +33,22 @@ public class JTreeNodeWrapper implements TreeNodeWrapper<JTreeNodeMeta, String> 
     }
 
     @Override
+    public void lock() {
+        _backing.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
+            m.lock();
+            return null;
+        });
+    }
+
+    @Override
+    public void unlock() {
+        _backing.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
+            m.unlock();
+            return null;
+        });
+    }
+
+    @Override
     public void notifyRef(String id) {
         _backing.getMeta().addRef(id);
     }

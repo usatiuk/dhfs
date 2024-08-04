@@ -12,10 +12,10 @@ import com.usatiuk.kleppmanntree.OpMove;
 import lombok.Getter;
 
 import java.io.Serializable;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class JKleppmannTreePersistentData implements Serializable, OpQueue {
@@ -27,7 +27,7 @@ public class JKleppmannTreePersistentData implements Serializable, OpQueue {
     @Getter
     private final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<OpMove<Long, UUID, ? extends JTreeNodeMeta, String>>> _queues = new ConcurrentHashMap<>();
     @Getter
-    private final ConcurrentSkipListMap<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, ? extends JTreeNodeMeta, String>> _log = new ConcurrentSkipListMap<>();
+    private final TreeMap<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, ? extends JTreeNodeMeta, String>> _log = new TreeMap<>();
     @Getter
     private final ConcurrentHashMap<UUID, AtomicReference<Long>> _peerTimestampLog = new ConcurrentHashMap<>();
 

@@ -26,6 +26,16 @@ public class TestNodeWrapper implements TreeNodeWrapper<TestNodeMeta, Long> {
     }
 
     @Override
+    public void lock() {
+
+    }
+
+    @Override
+    public void unlock() {
+
+    }
+
+    @Override
     public void notifyRef(Long id) {
 
     }

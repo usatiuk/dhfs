@@ -9,6 +9,10 @@ public interface TreeNodeWrapper<MetaT extends NodeMeta, NodeIdT> {
 
     void rwUnlock();
 
+    void lock();
+
+    void unlock();
+
     void notifyRef(NodeIdT id);
 
     void notifyRmRef(NodeIdT id);

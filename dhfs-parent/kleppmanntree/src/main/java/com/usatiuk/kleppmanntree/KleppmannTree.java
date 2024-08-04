@@ -2,12 +2,15 @@ package com.usatiuk.kleppmanntree;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT extends Comparable<PeerIdT>, MetaT extends NodeMeta, NodeIdT, WrapperT extends TreeNodeWrapper<MetaT, NodeIdT>> {
     private final StorageInterface<TimestampT, PeerIdT, MetaT, NodeIdT, WrapperT> _storage;
     private final PeerInterface<PeerIdT> _peers;
     private final Clock<TimestampT> _clock;
     private final OpRecorder<TimestampT, PeerIdT, MetaT, NodeIdT> _opRecorder;
+    private static final Logger LOGGER = Logger.getLogger(KleppmannTree.class.getName());
 
     public KleppmannTree(StorageInterface<TimestampT, PeerIdT, MetaT, NodeIdT, WrapperT> storage,
                          PeerInterface<PeerIdT> peers,
@@ -42,6 +45,8 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         return traverse(_storage.getRootId(), names);
     }
 
+    private HashMap<NodeIdT, WrapperT> _undoCtx = null;
+
     private void undoEffect(LogEffect<? extends MetaT, NodeIdT> effect) {
         if (effect.oldInfo() != null) {
             var node = _storage.getById(effect.childId());
@@ -71,8 +76,10 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             node.rwLock();
             try {
                 curParent.getNode().getChildren().remove(node.getNode().getMeta().getName());
+                node.lock();
+                node.getNode().setParent(null);
                 node.notifyRmRef(curParent.getNode().getId());
-                _storage.removeNode(node.getNode().getId());
+                _undoCtx.put(node.getNode().getId(), node);
             } finally {
                 node.rwUnlock();
                 curParent.rwUnlock();
@@ -141,6 +148,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                         } finally {
                             node.rwUnlock();
                         }
+                        _storage.removeNode(n);
                     }
                 } finally {
                     trash.rwUnlock();
@@ -195,6 +203,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 try {
                     if (log.containsKey(op.timestamp())) return;
                     var toUndo = log.tailMap(op.timestamp(), false);
+                    _undoCtx = new HashMap<>();
                     for (var entry : toUndo.reversed().entrySet()) {
                         undoOp(entry.getValue());
                     }
@@ -202,6 +211,15 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                     for (var entry : toUndo.entrySet()) {
                         redoOp(entry);
                     }
+
+                    if (!_undoCtx.isEmpty()) {
+                        for (var e : _undoCtx.entrySet()) {
+                            LOGGER.log(Level.FINE, "Dropping node " + e.getKey());
+                            e.getValue().unlock();
+                            _storage.removeNode(e.getKey());
+                        }
+                    }
+                    _undoCtx = null;
                 } finally {
                     tryTrimLog();
                 }
@@ -220,6 +238,35 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         return new OpMove<>(getTimestamp(), newParent, newMeta, node);
     }
 
+    private WrapperT getNode(TreeNode<MetaT, NodeIdT> desired) {
+        if (_undoCtx != null) {
+            var node = _undoCtx.get(desired.getId());
+            if (node != null) {
+                node.rwLock();
+                try {
+                    if (!node.getNode().getChildren().isEmpty()) {
+                        LOGGER.log(Level.WARNING, "Not empty children for undone node " + desired.getId());
+                        assert node.getNode().getChildren().isEmpty();
+                        node.getNode().getChildren().clear();
+                    }
+                    node.getNode().setParent(desired.getParent());
+                    node.notifyRef(desired.getParent());
+                    node.getNode().setMeta(desired.getMeta());
+                    node.unlock();
+                } catch (Exception e) {
+                    LOGGER.log(Level.SEVERE, "Error while fixing up node " + desired.getId(), e);
+                    node.rwUnlock();
+                    node = null;
+                }
+            }
+            if (node != null) {
+                _undoCtx.remove(desired.getId());
+                return node;
+            }
+        }
+        return _storage.createNewNode(desired);
+    }
+
     private <LocalMetaT extends MetaT> LogRecord<TimestampT, PeerIdT, LocalMetaT, NodeIdT> doOp(PeerIdT from, OpMove<TimestampT, PeerIdT, LocalMetaT, NodeIdT> op, boolean record) {
         var node = _storage.getById(op.childId());
 
@@ -233,7 +280,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         if (oldParent == null) {
             newParent.rwLock();
             try {
-                node = _storage.createNewNode(new TreeNode<>(op.childId(), op.newParentId(), op.newMeta()));
+                node = getNode(new TreeNode<>(op.childId(), op.newParentId(), op.newMeta()));
                 try {
                     var old = newParent.getNode().getChildren().get(node.getNode().getMeta().getName());
 
