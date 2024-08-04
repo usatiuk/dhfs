@@ -13,6 +13,7 @@ public class JKleppmannTree {
     private final JKleppmannTreePersistentData _persistentData;
     private final JStorageInterface _storageInterface;
     private final KleppmannTree<Long, UUID, JTreeNodeMeta, String, JTreeNodeWrapper> _tree;
+    private final JPeerInterface _peerInterface;
 
     private class JOpRecorder implements OpRecorder<Long, UUID, JTreeNodeMeta, String> {
         @Override
@@ -26,6 +27,7 @@ public class JKleppmannTree {
         var si = new JStorageInterface(persistentData, storageInterfaceService);
         _storageInterface = si;
         si.ensureRootCreated();
+        _peerInterface = peerInterface;
         _tree = new KleppmannTree<>(si, peerInterface, _persistentData.getClock(), new JOpRecorder());
     }
 
@@ -38,15 +40,15 @@ public class JKleppmannTree {
     }
 
     public void move(String newParent, JTreeNodeMeta newMeta, String node) {
-        _tree.applyOp(_tree.createMove(newParent, newMeta, node));
+        _tree.applyOp(_peerInterface.getSelfId(), _tree.createMove(newParent, newMeta, node));
     }
 
     public void trash(JTreeNodeMeta newMeta, String node) {
-        _tree.applyOp(_tree.createMove(_storageInterface.getTrashId(), newMeta.withName(node), node));
+        _tree.applyOp(_peerInterface.getSelfId(), _tree.createMove(_storageInterface.getTrashId(), newMeta.withName(node), node));
     }
 
-    void applyOp(OpMove<Long, UUID, ? extends JTreeNodeMeta, String> op) {
-        _tree.applyOp(op);
+    void applyExternalOp(UUID from, OpMove<Long, UUID, ? extends JTreeNodeMeta, String> op) {
+        _tree.applyOp(from, op);
     }
 }
 

@@ -113,9 +113,9 @@ public class JObjectManagerImpl implements JObjectManager {
     @Override
     public Collection<String> findAll() {
         var out = _map.values().stream().map(WeakReference::get)
-                .filter(Objects::nonNull)
-                .map(JObject::getName)
-                .collect(Collectors.toCollection((Supplier<LinkedHashSet<String>>) LinkedHashSet::new));
+                      .filter(Objects::nonNull)
+                      .map(JObject::getName)
+                      .collect(Collectors.toCollection((Supplier<LinkedHashSet<String>>) LinkedHashSet::new));
         out.addAll(objectPersistentStore.findAllObjects());
         return out;
     }
@@ -193,7 +193,6 @@ public class JObjectManagerImpl implements JObjectManager {
                     m.addRef(s);
                     return true;
                 }));
-                jObjectLRU.notifyAccess(got.get());
                 return got.get();
             }
 

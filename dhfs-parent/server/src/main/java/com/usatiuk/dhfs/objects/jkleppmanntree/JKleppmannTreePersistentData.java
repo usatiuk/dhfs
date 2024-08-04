@@ -16,6 +16,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class JKleppmannTreePersistentData implements Serializable, OpQueue {
     private final String _name;
@@ -27,6 +28,8 @@ public class JKleppmannTreePersistentData implements Serializable, OpQueue {
     private final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<OpMove<Long, UUID, ? extends JTreeNodeMeta, String>>> _queues = new ConcurrentHashMap<>();
     @Getter
     private final ConcurrentSkipListMap<CombinedTimestamp<Long, UUID>, LogOpMove<Long, UUID, ? extends JTreeNodeMeta, String>> _log = new ConcurrentSkipListMap<>();
+    @Getter
+    private final ConcurrentHashMap<UUID, AtomicReference<Long>> _peerTimestampLog = new ConcurrentHashMap<>();
 
     private transient OpQueueHelper _helper;
 

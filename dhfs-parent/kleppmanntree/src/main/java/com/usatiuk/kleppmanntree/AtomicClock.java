@@ -14,11 +14,11 @@ public class AtomicClock implements Clock<Long>, Serializable {
     @Override
     public void updateTimestamp(Long receivedTimestamp) {
         long exp = _max.get();
-        long set = Math.max(exp, receivedTimestamp);
+        long set = Math.max(exp, receivedTimestamp) + 1;
         // TODO: What is correct memory ordering?
         while (!_max.weakCompareAndSetVolatile(exp, set)) {
             exp = _max.get();
-            set = Math.max(exp, set);
+            set = Math.max(exp, set) + 1;
         }
     }
 }

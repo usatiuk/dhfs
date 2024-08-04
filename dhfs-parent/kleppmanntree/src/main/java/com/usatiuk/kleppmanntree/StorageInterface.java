@@ -1,7 +1,9 @@
 package com.usatiuk.kleppmanntree;
 
 import java.util.Collection;
+import java.util.Map;
 import java.util.NavigableMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 public interface StorageInterface<
         TimestampT extends Comparable<TimestampT>,
@@ -26,4 +28,6 @@ public interface StorageInterface<
 
     // It is expected that the map allows concurrent additions at the end
     NavigableMap<CombinedTimestamp<TimestampT, PeerIdT>, LogOpMove<TimestampT, PeerIdT, ? extends MetaT, NodeIdT>> getLog();
+
+    Map<PeerIdT, AtomicReference<TimestampT>> getPeerTimestampLog();
 }

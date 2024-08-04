@@ -15,6 +15,6 @@ public class TestPeerInterface implements PeerInterface<Long> {
 
     @Override
     public Collection<Long> getAllPeers() {
-        return List.of(1L, 2L, 3L, 4L);
+        return List.of(1L, 2L);
     }
 }

@@ -40,23 +40,23 @@ public class DhfsFuseIT {
         Network network = Network.newNetwork();
         var image = new ImageFromDockerfile()
                 .withDockerfileFromBuilder(builder ->
-                        builder
-                                .from("azul/zulu-openjdk-debian:21-jre-latest")
-                                .run("apt update && apt install -y libfuse2 curl")
-                                .copy("/app", "/app")
-                                .cmd("java", "-ea", "-Xmx128M", "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
-                                        "--add-exports", "java.base/jdk.internal.access=ALL-UNNAMED",
-                                        "-Ddhfs.objects.peerdiscovery.interval=100",
-                                        "-Ddhfs.objects.invalidation.delay=100",
-                                        "-Ddhfs.objects.ref_verification=true",
-                                        "-Ddhfs.objects.deletion.delay=0",
-                                        "-Ddhfs.objects.write_log=true",
-                                        "-Ddhfs.objects.sync.timeout=20",
-                                        "-Ddhfs.objects.sync.ping.timeout=20",
-                                        "-Ddhfs.objects.reconnect_interval=1s",
-                                        "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
-                                        "-jar", "/app/quarkus-run.jar")
-                                .build())
+                                                   builder
+                                                           .from("azul/zulu-openjdk-debian:21-jre-latest")
+                                                           .run("apt update && apt install -y libfuse2 curl")
+                                                           .copy("/app", "/app")
+                                                           .cmd("java", "-ea", "-Xmx128M", "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
+                                                                "--add-exports", "java.base/jdk.internal.access=ALL-UNNAMED",
+                                                                "-Ddhfs.objects.peerdiscovery.interval=100",
+                                                                "-Ddhfs.objects.invalidation.delay=100",
+                                                                "-Ddhfs.objects.ref_verification=true",
+                                                                "-Ddhfs.objects.deletion.delay=0",
+                                                                "-Ddhfs.objects.write_log=true",
+                                                                "-Ddhfs.objects.sync.timeout=20",
+                                                                "-Ddhfs.objects.sync.ping.timeout=20",
+                                                                "-Ddhfs.objects.reconnect_interval=1s",
+                                                                "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
+                                                                "-jar", "/app/quarkus-run.jar")
+                                                           .build())
                 .withFileFromPath("/app", Paths.get(buildPath, "quarkus-app"));
         container1 = new GenericContainer<>(image)
                 .withPrivilegedMode(true)
@@ -86,16 +86,16 @@ public class DhfsFuseIT {
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Ignoring new address"), 60, TimeUnit.SECONDS);
 
         var c1curl = container1.execInContainer("/bin/sh", "-c",
-                "curl --header \"Content-Type: application/json\" " +
-                        "  --request PUT " +
-                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
-                        "  http://localhost:8080/objects-manage/known-peers");
+                                                "curl --header \"Content-Type: application/json\" " +
+                                                        "  --request PUT " +
+                                                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
+                                                        "  http://localhost:8080/objects-manage/known-peers");
 
         var c2curl = container2.execInContainer("/bin/sh", "-c",
-                "curl --header \"Content-Type: application/json\" " +
-                        "  --request PUT " +
-                        "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
-                        "  http://localhost:8080/objects-manage/known-peers");
+                                                "curl --header \"Content-Type: application/json\" " +
+                                                        "  --request PUT " +
+                                                        "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
+                                                        "  http://localhost:8080/objects-manage/known-peers");
 
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
@@ -271,10 +271,10 @@ public class DhfsFuseIT {
         Assertions.assertEquals("tesempty\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
 
         var c2curl = container2.execInContainer("/bin/sh", "-c",
-                "curl --header \"Content-Type: application/json\" " +
-                        "  --request DELETE " +
-                        "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
-                        "  http://localhost:8080/objects-manage/known-peers");
+                                                "curl --header \"Content-Type: application/json\" " +
+                                                        "  --request DELETE " +
+                                                        "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
+                                                        "  http://localhost:8080/objects-manage/known-peers");
 
         Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "echo rewritten > /root/dhfs_default/fuse/testf1").getExitCode());
         Thread.sleep(1000);
@@ -283,10 +283,10 @@ public class DhfsFuseIT {
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS);
 
         container2.execInContainer("/bin/sh", "-c",
-                "curl --header \"Content-Type: application/json\" " +
-                        "  --request PUT " +
-                        "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
-                        "  http://localhost:8080/objects-manage/known-peers");
+                                   "curl --header \"Content-Type: application/json\" " +
+                                           "  --request PUT " +
+                                           "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
+                                           "  http://localhost:8080/objects-manage/known-peers");
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
 
@@ -301,7 +301,7 @@ public class DhfsFuseIT {
         Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
         Thread.sleep(1000);
         boolean createFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_default/fuse/testf"),
-                Pair.of(container2, "echo test2 >> /root/dhfs_default/fuse/testf")).parallel().map(p -> {
+                                       Pair.of(container2, "echo test2 >> /root/dhfs_default/fuse/testf")).parallel().map(p -> {
             try {
                 return p.getLeft().execInContainer("/bin/sh", "-c", p.getRight()).getExitCode();
             } catch (Exception e) {
@@ -367,7 +367,7 @@ public class DhfsFuseIT {
         Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
         Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
         boolean createFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_default/fuse/testf"),
-                Pair.of(container2, "echo test2 >> /root/dhfs_default/fuse/testf")).parallel().map(p -> {
+                                       Pair.of(container2, "echo test2 >> /root/dhfs_default/fuse/testf")).parallel().map(p -> {
             try {
                 return p.getLeft().execInContainer("/bin/sh", "-c", p.getRight()).getExitCode();
             } catch (Exception e) {
@@ -387,7 +387,7 @@ public class DhfsFuseIT {
     @Test
     void dirConflictTest3() throws IOException, InterruptedException, TimeoutException {
         boolean createFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_default/fuse/testf"),
-                Pair.of(container2, "echo test2 >> /root/dhfs_default/fuse/testf")).parallel().map(p -> {
+                                       Pair.of(container2, "echo test2 >> /root/dhfs_default/fuse/testf")).parallel().map(p -> {
             try {
                 return p.getLeft().execInContainer("/bin/sh", "-c", p.getRight()).getExitCode();
             } catch (Exception e) {

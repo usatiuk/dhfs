@@ -9,6 +9,10 @@ public record CombinedTimestamp<TimestampT extends Comparable<TimestampT>, PeerI
 
     @Override
     public int compareTo(CombinedTimestamp<TimestampT, PeerIdT> o) {
+        if (nodeId == null || o.nodeId == null) {
+            return Comparator.comparing((CombinedTimestamp<TimestampT, PeerIdT> t) -> t.timestamp)
+                             .compare(this, o);
+        }
         return Comparator.comparing((CombinedTimestamp<TimestampT, PeerIdT> t) -> t.timestamp)
                          .thenComparing((CombinedTimestamp<TimestampT, PeerIdT> t) -> t.nodeId)
                          .compare(this, o);
