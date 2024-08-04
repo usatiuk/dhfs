@@ -34,12 +34,12 @@ public class JStorageInterface implements StorageInterface<Long, UUID,  JTreeNod
 
     @Override
     public String getRootId() {
-        return _persistentData.getName() + "_jt_root";
+        return _persistentData.getId() + "_jt_root";
     }
 
     @Override
     public String getTrashId() {
-        return _persistentData.getName() + "_jt_trash";
+        return _persistentData.getId() + "_jt_trash";
     }
 
     @Override
@@ -72,25 +72,5 @@ public class JStorageInterface implements StorageInterface<Long, UUID,  JTreeNod
     @Override
     public NavigableMap<CombinedTimestamp<Long, UUID>, LogOpMove<Long, UUID,  ? extends JTreeNodeMeta, String>> getLog() {
         return _persistentData.getLog();
-    }
-
-    @Override
-    public void globalRwLock() {
-        _persistentData.getLogLock().writeLock().lock();
-    }
-
-    @Override
-    public void globalRwUnlock() {
-        _persistentData.getLogLock().writeLock().unlock();
-    }
-
-    @Override
-    public void globalRLock() {
-        _persistentData.getLogLock().readLock().lock();
-    }
-
-    @Override
-    public void globalRUnlock() {
-        _persistentData.getLogLock().readLock().unlock();
     }
 }

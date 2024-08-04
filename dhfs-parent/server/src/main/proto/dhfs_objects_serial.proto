@@ -66,14 +66,18 @@ message TreeNodeMetaDirectoryP {
   string name = 1;
 }
 
+message TreeNodeMetaP {
+  oneof meta {
+    TreeNodeMetaFileP file = 1;
+    TreeNodeMetaDirectoryP dir = 2;
+  }
+}
+
 message TreeNodeP {
   optional string parent = 1;
   string id = 2;
   map<string, string> children = 3;
-  oneof meta {
-    TreeNodeMetaFileP file = 4;
-    TreeNodeMetaDirectoryP dir = 5;
-  }
+  optional TreeNodeMetaP meta = 4;
 }
 
 message JObjectDataP {

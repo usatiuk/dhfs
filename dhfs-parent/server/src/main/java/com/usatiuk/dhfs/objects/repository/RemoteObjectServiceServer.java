@@ -7,6 +7,7 @@ import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.autosync.AutoSyncProcessor;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
+import com.usatiuk.dhfs.objects.repository.invalidation.OpListenerDispatcher;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.grpc.GrpcService;
@@ -44,6 +45,9 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Inject
     ProtoSerializerService protoSerializerService;
 
+    @Inject
+    OpListenerDispatcher opListenerDispatcher;
+
     @Override
     @Blocking
     public Uni<GetObjectReply> getObject(GetObjectRequest request) {
@@ -66,8 +70,8 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         obj.markSeen();
         var replyObj = ApiObject.newBuilder().setHeader(read.getLeft()).setContent(read.getRight()).build();
         return Uni.createFrom().item(GetObjectReply.newBuilder()
-                .setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString())
-                .setObject(replyObj).build());
+                                                   .setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString())
+                                                   .setObject(replyObj).build());
     }
 
     @Override
@@ -140,6 +144,16 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
 //        Log.info("<-- indexUpdate: " + request.getHeader().getName());
         return Uni.createFrom().item(syncHandler.handleRemoteUpdate(request));
+    }
+
+    @Override
+    public Uni<OpPushReply> opPush(OpPushMsg request) {
+        if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+        if (!persistentRemoteHostsService.existsHost(UUID.fromString(request.getSelfUuid())))
+            throw new StatusRuntimeException(Status.UNAUTHENTICATED);
+
+        opListenerDispatcher.accept(request.getQueueId(), UUID.fromString(request.getSelfUuid()), protoSerializerService.deserialize(request.getMsg()));
+        return Uni.createFrom().item(OpPushReply.getDefaultInstance());
     }
 
     @Override

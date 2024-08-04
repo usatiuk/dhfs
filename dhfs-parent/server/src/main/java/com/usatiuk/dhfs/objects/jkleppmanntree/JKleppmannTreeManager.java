@@ -1,8 +1,12 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree;
 
 import com.usatiuk.dhfs.SerializationHelper;
+import com.usatiuk.dhfs.objects.jkleppmanntree.helpers.JOpWrapper;
 import com.usatiuk.dhfs.objects.jkleppmanntree.helpers.OpQueueHelper;
 import com.usatiuk.dhfs.objects.jkleppmanntree.helpers.StorageInterfaceService;
+import com.usatiuk.dhfs.objects.repository.invalidation.IncomingOpListener;
+import com.usatiuk.dhfs.objects.repository.invalidation.Op;
+import com.usatiuk.dhfs.objects.repository.invalidation.OpListenerDispatcher;
 import com.usatiuk.kleppmanntree.AtomicClock;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
@@ -17,6 +21,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
@@ -29,6 +34,8 @@ public class JKleppmannTreeManager {
     StorageInterfaceService storageInterfaceService;
     @Inject
     OpQueueHelper opQueueHelper;
+    @Inject
+    OpListenerDispatcher opListenerDispatcher;
 
     @ConfigProperty(name = "dhfs.objects.root")
     String dataRoot;
@@ -76,6 +83,15 @@ public class JKleppmannTreeManager {
     private JKleppmannTree createTree(String name) {
         var pdata = _persistentData.computeIfAbsent(name, n -> new JKleppmannTreePersistentData(opQueueHelper, n, new AtomicClock()));
         pdata.restoreHelper(opQueueHelper);
-        return new JKleppmannTree(pdata, storageInterfaceService, jPeerInterface);
+        var tree = new JKleppmannTree(pdata, storageInterfaceService, jPeerInterface);
+        opListenerDispatcher.registerListener(pdata.getId(), new IncomingOpListener() {
+            @Override
+            public void accept(UUID incomingPeer, Op op) {
+                if (!(op instanceof JOpWrapper jop))
+                    throw new IllegalArgumentException("Invalid incoming op type for JKleppmannTree: " + op.getClass() + " " + name);
+                tree.applyOp(jop.getOp());
+            }
+        });
+        return tree;
     }
 }

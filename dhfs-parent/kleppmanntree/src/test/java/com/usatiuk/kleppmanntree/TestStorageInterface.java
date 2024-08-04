@@ -61,24 +61,4 @@ public class TestStorageInterface implements StorageInterface<Long, Long, TestNo
     public NavigableMap<CombinedTimestamp<Long, Long>, LogOpMove<Long, Long, ? extends TestNodeMeta, Long>> getLog() {
         return _log;
     }
-
-    @Override
-    public void globalRwLock() {
-
-    }
-
-    @Override
-    public void globalRwUnlock() {
-
-    }
-
-    @Override
-    public void globalRLock() {
-
-    }
-
-    @Override
-    public void globalRUnlock() {
-
-    }
 }

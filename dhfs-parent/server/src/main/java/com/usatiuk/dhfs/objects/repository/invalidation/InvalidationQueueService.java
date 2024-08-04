@@ -181,10 +181,6 @@ public class InvalidationQueueService {
         pushInvalidationToOne(host, jObjectManager.get(name).orElseThrow(() -> new IllegalArgumentException("Object " + name + " not found")));
     }
 
-    public void pushInvalidationToAll(OpQueue queue) {
-
-    }
-
     protected void pushDeferredInvalidations(UUID host, String name) {
         _queue.add(Pair.of(host, name));
     }

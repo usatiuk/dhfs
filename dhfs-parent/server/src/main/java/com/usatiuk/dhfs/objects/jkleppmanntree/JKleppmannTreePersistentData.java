@@ -1,7 +1,9 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree;
 
+import com.usatiuk.dhfs.objects.jkleppmanntree.helpers.JOpWrapper;
 import com.usatiuk.dhfs.objects.jkleppmanntree.helpers.OpQueueHelper;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMeta;
+import com.usatiuk.dhfs.objects.repository.invalidation.Op;
 import com.usatiuk.dhfs.objects.repository.invalidation.OpQueue;
 import com.usatiuk.kleppmanntree.AtomicClock;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
@@ -14,21 +16,17 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class JKleppmannTreePersistentData implements Serializable, OpQueue {
-    @Getter
     private final String _name;
     @Getter
     private final AtomicClock _clock;
     @Getter
     private final UUID _selfUuid;
     @Getter
-    private final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<OpMove<Long, UUID, JTreeNodeMeta, String>>> _queues = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<OpMove<Long, UUID, ? extends JTreeNodeMeta, String>>> _queues = new ConcurrentHashMap<>();
     @Getter
     private final ConcurrentSkipListMap<CombinedTimestamp<Long, UUID>, LogOpMove<Long, UUID, ? extends JTreeNodeMeta, String>> _log = new ConcurrentSkipListMap<>();
-    @Getter
-    private final ReentrantReadWriteLock _logLock = new ReentrantReadWriteLock();
 
     private transient OpQueueHelper _helper;
 
@@ -41,18 +39,34 @@ public class JKleppmannTreePersistentData implements Serializable, OpQueue {
 
     public void restoreHelper(OpQueueHelper opQueueHelper) {
         _helper = opQueueHelper;
-        _helper.registerOnConnection(this);
+        _helper.onRestore(this);
     }
 
     @Override
-    public Object getForHost(UUID host) {
+    public Op getForHost(UUID host) {
         if (_queues.containsKey(host)) {
-            return _queues.get(host).poll();
+            var peeked = _queues.get(host).peek();
+            return peeked != null ? new JOpWrapper(_queues.get(host).peek()) : null;
         }
         return null;
     }
 
-    void recordOp(OpMove<Long, UUID, JTreeNodeMeta, String> opMove) {
+    @Override
+    public String getId() {
+        return _name;
+    }
+
+    @Override
+    public void commitOneForHost(UUID host, Op op) {
+        var got = _queues.get(host).poll();
+        if (!(op instanceof JOpWrapper jw))
+            throw new IllegalArgumentException("Unexpected type for commitOneForHost: " + op.getClass().getName());
+        if (jw.getOp() != got) {
+            throw new IllegalArgumentException("Committed op push was not the oldest");
+        }
+    }
+
+    void recordOp(OpMove<Long, UUID, ? extends JTreeNodeMeta, String> opMove) {
         for (var u : _helper.getHostList()) {
             _queues.computeIfAbsent(u, h -> new ConcurrentLinkedQueue<>());
             _queues.get(u).add(opMove);
@@ -61,5 +75,6 @@ public class JKleppmannTreePersistentData implements Serializable, OpQueue {
     }
 
     protected void notifyInvQueue() {
+        _helper.notifyOpSender(this);
     }
 }

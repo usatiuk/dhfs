@@ -26,14 +26,4 @@ public interface StorageInterface<
 
     // It is expected that the map allows concurrent additions at the end
     NavigableMap<CombinedTimestamp<TimestampT, PeerIdT>, LogOpMove<TimestampT, PeerIdT, ? extends MetaT, NodeIdT>> getLog();
-
-    // Locks all the objects from being changed
-    void globalRwLock();
-
-    void globalRwUnlock();
-
-    // Locks all the objects from being changed
-    void globalRLock();
-
-    void globalRUnlock();
 }

@@ -1,11 +1,7 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.serializers;
 
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMeta;
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMetaDirectory;
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMetaFile;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.TreeNodeJObjectData;
-import com.usatiuk.dhfs.objects.persistence.TreeNodeMetaDirectoryP;
-import com.usatiuk.dhfs.objects.persistence.TreeNodeMetaFileP;
 import com.usatiuk.dhfs.objects.persistence.TreeNodeP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoDeserializer;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializer;
@@ -21,15 +17,10 @@ public class TreeNodeProtoSerializer implements ProtoDeserializer<TreeNodeP, Tre
 
     @Override
     public TreeNodeJObjectData deserialize(TreeNodeP message) {
-        JTreeNodeMeta meta = switch (message.getMetaCase()) {
-            case FILE -> (JTreeNodeMetaFile) protoSerializerService.deserialize(message.getFile());
-            case DIR -> (JTreeNodeMetaDirectory) protoSerializerService.deserialize(message.getDir());
-            case META_NOT_SET -> null;
-        };
         var node = new TreeNode<>(
                 message.getId(),
                 message.hasParent() ? message.getParent() : null,
-                meta
+                message.hasMeta() ? (JTreeNodeMeta) protoSerializerService.deserialize(message.getMeta()) : null
         );
         node.getChildren().putAll(message.getChildrenMap());
         return new TreeNodeJObjectData(node);
@@ -40,13 +31,8 @@ public class TreeNodeProtoSerializer implements ProtoDeserializer<TreeNodeP, Tre
         var builder = TreeNodeP.newBuilder().setId(object.getNode().getId()).putAllChildren(object.getNode().getChildren());
         if (object.getNode().getParent() != null)
             builder.setParent(object.getNode().getParent());
-        switch (object.getNode().getMeta()) {
-            case JTreeNodeMetaFile jTreeNodeMetaFile ->
-                    builder.setFile((TreeNodeMetaFileP) protoSerializerService.serialize(jTreeNodeMetaFile));
-            case JTreeNodeMetaDirectory jTreeNodeMetaDirectory ->
-                    builder.setDir((TreeNodeMetaDirectoryP) protoSerializerService.serialize(jTreeNodeMetaDirectory));
-            case null, default -> {
-            }
+        if (object.getNode().getMeta() != null) {
+            builder.setMeta(protoSerializerService.serializeToTreeNodeMetaP(object.getNode().getMeta()));
         }
         return builder.build();
     }

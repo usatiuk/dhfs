@@ -1,7 +1,11 @@
 package com.usatiuk.dhfs.objects.protoserializer;
 
 import com.google.protobuf.Message;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMeta;
 import com.usatiuk.dhfs.objects.persistence.*;
+import com.usatiuk.dhfs.objects.repository.OpPushJKleppmannTree;
+import com.usatiuk.dhfs.objects.repository.OpPushPayload;
+import com.usatiuk.dhfs.objects.repository.invalidation.Op;
 import io.quarkus.arc.ClientProxy;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -106,6 +110,30 @@ public class ProtoSerializerService {
         if (object == null) throw new IllegalArgumentException("Object to serialize shouldn't be null");
 
         return serializeToJObjectDataPInternal(object).orElseThrow(() -> new IllegalStateException("Unknown JObjectDataP type: " + object.getClass()));
+    }
+
+    // FIXME: This is annoying
+    public <O extends JTreeNodeMeta> TreeNodeMetaP serializeToTreeNodeMetaP(O object) {
+        if (object == null) throw new IllegalArgumentException("Object to serialize shouldn't be null");
+        var ser = serialize(object);
+        if (ser instanceof TreeNodeMetaDirectoryP) {
+            return TreeNodeMetaP.newBuilder().setDir((TreeNodeMetaDirectoryP) ser).build();
+        } else if (ser instanceof TreeNodeMetaFileP) {
+            return TreeNodeMetaP.newBuilder().setFile((TreeNodeMetaFileP) ser).build();
+        } else {
+            throw new IllegalArgumentException("Unexpected object type on input to serializeToTreeNodeMetaP: " + object.getClass());
+        }
+    }
+
+    // FIXME: This is annoying
+    public <O extends Op> OpPushPayload serializeToOpPushPayload(O object) {
+        if (object == null) throw new IllegalArgumentException("Object to serialize shouldn't be null");
+        var ser = serialize(object);
+        if (ser instanceof OpPushJKleppmannTree) {
+            return OpPushPayload.newBuilder().setJKleppmannTreeOp((OpPushJKleppmannTree) ser).build();
+        } else {
+            throw new IllegalArgumentException("Unexpected object type on input to serializeToTreeNodeMetaP: " + object.getClass());
+        }
     }
 
     public <M extends Message, O> O deserialize(M message) {
