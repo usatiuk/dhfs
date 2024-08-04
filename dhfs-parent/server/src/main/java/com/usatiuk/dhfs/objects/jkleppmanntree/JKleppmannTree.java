@@ -40,15 +40,15 @@ public class JKleppmannTree {
     }
 
     public void move(String newParent, JTreeNodeMeta newMeta, String node) {
-        _tree.applyOp(_peerInterface.getSelfId(), _tree.createMove(newParent, newMeta, node));
+        _tree.move(newParent, newMeta, node);
     }
 
     public void trash(JTreeNodeMeta newMeta, String node) {
-        _tree.applyOp(_peerInterface.getSelfId(), _tree.createMove(_storageInterface.getTrashId(), newMeta.withName(node), node));
+        _tree.move(_storageInterface.getTrashId(), newMeta, node);
     }
 
     void applyExternalOp(UUID from, OpMove<Long, UUID, ? extends JTreeNodeMeta, String> op) {
-        _tree.applyOp(from, op);
+        _tree.applyExternalOp(from, op);
     }
 }
 

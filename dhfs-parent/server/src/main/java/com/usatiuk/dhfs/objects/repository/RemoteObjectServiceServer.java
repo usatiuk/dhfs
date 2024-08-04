@@ -152,7 +152,12 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         if (!persistentRemoteHostsService.existsHost(UUID.fromString(request.getSelfUuid())))
             throw new StatusRuntimeException(Status.UNAUTHENTICATED);
 
-        opListenerDispatcher.accept(request.getQueueId(), UUID.fromString(request.getSelfUuid()), protoSerializerService.deserialize(request.getMsg()));
+        try {
+            opListenerDispatcher.accept(request.getQueueId(), UUID.fromString(request.getSelfUuid()), protoSerializerService.deserialize(request.getMsg()));
+        } catch (Exception e) {
+            Log.error(e, e);
+            throw e;
+        }
         return Uni.createFrom().item(OpPushReply.getDefaultInstance());
     }
 

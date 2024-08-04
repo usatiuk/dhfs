@@ -7,7 +7,7 @@ import com.usatiuk.dhfs.objects.repository.invalidation.Op;
 import com.usatiuk.dhfs.objects.repository.invalidation.OpQueue;
 import com.usatiuk.kleppmanntree.AtomicClock;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
-import com.usatiuk.kleppmanntree.LogOpMove;
+import com.usatiuk.kleppmanntree.LogRecord;
 import com.usatiuk.kleppmanntree.OpMove;
 import lombok.Getter;
 
@@ -27,7 +27,7 @@ public class JKleppmannTreePersistentData implements Serializable, OpQueue {
     @Getter
     private final ConcurrentHashMap<UUID, ConcurrentLinkedQueue<OpMove<Long, UUID, ? extends JTreeNodeMeta, String>>> _queues = new ConcurrentHashMap<>();
     @Getter
-    private final ConcurrentSkipListMap<CombinedTimestamp<Long, UUID>, LogOpMove<Long, UUID, ? extends JTreeNodeMeta, String>> _log = new ConcurrentSkipListMap<>();
+    private final ConcurrentSkipListMap<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, ? extends JTreeNodeMeta, String>> _log = new ConcurrentSkipListMap<>();
     @Getter
     private final ConcurrentHashMap<UUID, AtomicReference<Long>> _peerTimestampLog = new ConcurrentHashMap<>();
 

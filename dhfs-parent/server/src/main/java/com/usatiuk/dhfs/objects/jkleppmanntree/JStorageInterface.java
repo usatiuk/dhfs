@@ -6,7 +6,7 @@ import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMetaDirectory;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.TreeNodeJObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
-import com.usatiuk.kleppmanntree.LogOpMove;
+import com.usatiuk.kleppmanntree.LogRecord;
 import com.usatiuk.kleppmanntree.StorageInterface;
 import com.usatiuk.kleppmanntree.TreeNode;
 import org.apache.commons.lang3.NotImplementedException;
@@ -72,7 +72,7 @@ public class JStorageInterface implements StorageInterface<Long, UUID, JTreeNode
     }
 
     @Override
-    public NavigableMap<CombinedTimestamp<Long, UUID>, LogOpMove<Long, UUID, ? extends JTreeNodeMeta, String>> getLog() {
+    public NavigableMap<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, ? extends JTreeNodeMeta, String>> getLog() {
         return _persistentData.getLog();
     }
 

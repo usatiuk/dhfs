@@ -36,4 +36,9 @@ public class TreeNodeJObjectData extends JObjectData {
             return List.of(((JTreeNodeMetaFile) _node.getMeta()).getFileIno());
         return Collections.unmodifiableCollection(_node.getChildren().values());
     }
+
+    @Override
+    public Class<? extends JObjectData> getRefType() {
+        return JObjectData.class;
+    }
 }

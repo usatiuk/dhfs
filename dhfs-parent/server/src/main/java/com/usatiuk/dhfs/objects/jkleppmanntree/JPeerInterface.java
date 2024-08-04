@@ -4,7 +4,6 @@ import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
 import com.usatiuk.kleppmanntree.PeerInterface;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import org.apache.commons.lang3.NotImplementedException;
 
 import java.util.Collection;
 import java.util.UUID;
@@ -21,6 +20,6 @@ public class JPeerInterface implements PeerInterface<UUID> {
 
     @Override
     public Collection<UUID> getAllPeers() {
-        throw new NotImplementedException();
+        return persistentRemoteHostsService.getHostUuids();
     }
 }
