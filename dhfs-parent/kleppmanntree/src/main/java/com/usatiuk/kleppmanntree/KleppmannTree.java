@@ -2,6 +2,7 @@ package com.usatiuk.kleppmanntree;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -11,6 +12,12 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     private final Clock<TimestampT> _clock;
     private final OpRecorder<TimestampT, PeerIdT, MetaT, NodeIdT> _opRecorder;
     private static final Logger LOGGER = Logger.getLogger(KleppmannTree.class.getName());
+
+    private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
+
+    private void assertRwLock() {
+        assert _lock.isWriteLockedByCurrentThread();
+    }
 
     public KleppmannTree(StorageInterface<TimestampT, PeerIdT, MetaT, NodeIdT, WrapperT> storage,
                          PeerInterface<PeerIdT> peers,
@@ -22,8 +29,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         _opRecorder = opRecorder;
     }
 
-
-    public NodeIdT traverse(NodeIdT fromId, List<String> names) {
+    private NodeIdT traverseImpl(NodeIdT fromId, List<String> names) {
         if (names.isEmpty()) return fromId;
 
         var from = _storage.getById(fromId);
@@ -38,16 +44,31 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         if (childId == null)
             return null;
 
-        return traverse(childId, names.subList(1, names.size()));
+        return traverseImpl(childId, names.subList(1, names.size()));
+    }
+
+    public NodeIdT traverse(NodeIdT fromId, List<String> names) {
+        _lock.readLock().lock();
+        try {
+            return traverseImpl(fromId, names.subList(1, names.size()));
+        } finally {
+            _lock.readLock().unlock();
+        }
     }
 
     public NodeIdT traverse(List<String> names) {
-        return traverse(_storage.getRootId(), names);
+        _lock.readLock().lock();
+        try {
+            return traverseImpl(_storage.getRootId(), names);
+        } finally {
+            _lock.readLock().unlock();
+        }
     }
 
     private HashMap<NodeIdT, WrapperT> _undoCtx = null;
 
     private void undoEffect(LogEffect<? extends MetaT, NodeIdT> effect) {
+        assertRwLock();
         if (effect.oldInfo() != null) {
             var node = _storage.getById(effect.childId());
             var oldParent = _storage.getById(effect.oldInfo().oldParent());
@@ -93,13 +114,13 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     private void redoOp(Map.Entry<CombinedTimestamp<TimestampT, PeerIdT>, LogRecord<TimestampT, PeerIdT, ? extends MetaT, NodeIdT>> entry) {
-        entry.setValue(doOp(null, entry.getValue().op(), false));
+        entry.setValue(doOp(entry.getValue().op()));
     }
 
-    private <LocalMetaT extends MetaT> void doAndPut(PeerIdT from, OpMove<TimestampT, PeerIdT, LocalMetaT, NodeIdT> op) {
-        var res = doOp(from, op, true);
-        var log = _storage.getLog();
-        log.put(res.op().timestamp(), res);
+    private <LocalMetaT extends MetaT> void doAndPut(OpMove<TimestampT, PeerIdT, LocalMetaT, NodeIdT> op) {
+        assertRwLock();
+        var res = doOp(op);
+        _storage.getLog().put(res.op().timestamp(), res);
     }
 
     private void tryTrimLog() {
@@ -159,26 +180,30 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         }
     }
 
-    private void maybeRecord(PeerIdT from, OpMove<TimestampT, PeerIdT, ? extends MetaT, NodeIdT> op) {
-        if (Objects.equals(from, _peers.getSelfId())) {
-            if (!_storage.getLog().containsKey(op.timestamp()))
-                _opRecorder.recordOp(op);
-        }
-    }
-
     public <LocalMetaT extends MetaT> void move(NodeIdT newParent, LocalMetaT newMeta, NodeIdT child) {
-        synchronized (this) {
-            applyOp(_peers.getSelfId(), createMove(newParent, newMeta, child));
+        _lock.writeLock().lock();
+        try {
+            var createdMove = createMove(newParent, newMeta, child);
+            _opRecorder.recordOp(createdMove);
+            applyOp(_peers.getSelfId(), createdMove);
+        } finally {
+            _lock.writeLock().unlock();
         }
     }
 
     public void applyExternalOp(PeerIdT from, OpMove<TimestampT, PeerIdT, ? extends MetaT, NodeIdT> op) {
-        applyOp(from, op);
+        _lock.writeLock().lock();
+        try {
+            _clock.updateTimestamp(op.timestamp().timestamp());
+            applyOp(from, op);
+        } finally {
+            _lock.writeLock().unlock();
+        }
     }
 
     private void applyOp(PeerIdT from, OpMove<TimestampT, PeerIdT, ? extends MetaT, NodeIdT> op) {
+        assertRwLock();
         synchronized (this) {
-            _clock.updateTimestamp(op.timestamp().timestamp());
             var ref = _storage.getPeerTimestampLog().computeIfAbsent(from, f -> new AtomicReference<>());
 
             // TODO: I guess it's not actually needed since one peer can't handle concurrent updates?
@@ -209,7 +234,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                     for (var entry : toUndo.reversed().entrySet()) {
                         undoOp(entry.getValue());
                     }
-                    doAndPut(from, op);
+                    doAndPut(op);
                     for (var entry : toUndo.entrySet()) {
                         redoOp(entry);
                     }
@@ -226,21 +251,38 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                     tryTrimLog();
                 }
             } else {
-                doAndPut(from, op);
+                doAndPut(op);
                 tryTrimLog();
             }
         }
     }
 
     private CombinedTimestamp<TimestampT, PeerIdT> getTimestamp() {
+        assertRwLock();
         return new CombinedTimestamp<>(_clock.getTimestamp(), _peers.getSelfId());
     }
 
     private <LocalMetaT extends MetaT> OpMove<TimestampT, PeerIdT, LocalMetaT, NodeIdT> createMove(NodeIdT newParent, LocalMetaT newMeta, NodeIdT node) {
+        assertRwLock();
         return new OpMove<>(getTimestamp(), newParent, newMeta, node);
     }
 
-    private WrapperT getNode(TreeNode<MetaT, NodeIdT> desired) {
+    private LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> doOp(OpMove<TimestampT, PeerIdT, ? extends MetaT, NodeIdT> op) {
+        LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> computed;
+        try {
+            computed = computeEffects(op);
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Error computing effects for op" + op.toString(), e);
+            computed = new LogRecord<>(op, null);
+        }
+
+        if (computed.effects() != null)
+            applyEffects(computed.effects());
+        return computed;
+    }
+
+    private WrapperT getNewNode(TreeNode<MetaT, NodeIdT> desired) {
+        assertRwLock();
         if (_undoCtx != null) {
             var node = _undoCtx.get(desired.getId());
             if (node != null) {
@@ -269,111 +311,132 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         return _storage.createNewNode(desired);
     }
 
-    private <LocalMetaT extends MetaT> LogRecord<TimestampT, PeerIdT, LocalMetaT, NodeIdT> doOp(PeerIdT from, OpMove<TimestampT, PeerIdT, LocalMetaT, NodeIdT> op, boolean record) {
-        var node = _storage.getById(op.childId());
+    private void applyEffects(List<LogEffect<? extends MetaT, NodeIdT>> effects) {
+        assertRwLock();
+        for (var effect : effects) {
+            WrapperT oldParentNode = null;
+            WrapperT newParentNode;
+            WrapperT node;
 
-        var oldParent = (node != null && node.getNode().getParent() != null) ? _storage.getById(node.getNode().getParent()) : null;
-        var newParent = _storage.getById(op.newParentId());
-
-        if (newParent == null) {
-            throw new IllegalArgumentException("New parent not found");
-        }
-
-        if (oldParent == null) {
-            newParent.rwLock();
+            newParentNode = _storage.getById(effect.newParentId());
+            newParentNode.rwLock();
             try {
-                node = getNode(new TreeNode<>(op.childId(), op.newParentId(), op.newMeta()));
+                if (effect.oldInfo() != null) {
+                    oldParentNode = _storage.getById(effect.oldInfo().oldParent());
+                    oldParentNode.rwLock();
+                }
                 try {
-                    var old = newParent.getNode().getChildren().get(node.getNode().getMeta().getName());
-
-                    var effects = new ArrayList<LogEffect<LocalMetaT, NodeIdT>>(2);
-
-                    if (old != null) {
-                        var oldN = _storage.getById(old);
-                        oldN.rwLock();
-                        try {
-                            var oldMeta = oldN.getNode().getMeta();
-                            oldN.getNode().setMeta((MetaT) oldN.getNode().getMeta().withName(oldN.getNode().getMeta().getName() + ".conflict." + oldN.getNode().getId()));
-                            node.getNode().setMeta((MetaT) node.getNode().getMeta().withName(node.getNode().getMeta().getName() + ".conflict." + node.getNode().getId()));
-                            newParent.getNode().getChildren().remove(node.getNode().getMeta().getName());
-                            newParent.getNode().getChildren().put(oldN.getNode().getMeta().getName(), oldN.getNode().getId());
-                            effects.add(new LogEffect<>(new LogEffectOld<>(newParent.getNode().getId(), (LocalMetaT) oldMeta), op.newParentId(), (LocalMetaT) oldN.getNode().getMeta(), oldN.getNode().getId()));
-                            effects.add(new LogEffect<>(null, op.newParentId(), (LocalMetaT) node.getNode().getMeta(), op.childId()));
-                        } finally {
-                            oldN.rwUnlock();
-                        }
+                    if (oldParentNode == null) {
+                        node = getNewNode(new TreeNode<>(effect.childId(), effect.newParentId(), effect.newMeta()));
                     } else {
-                        effects.add(new LogEffect<>(null, op.newParentId(), (LocalMetaT) node.getNode().getMeta(), op.childId()));
+                        node = _storage.getById(effect.childId());
+                        node.rwLock();
                     }
+                    try {
 
-                    newParent.getNode().getChildren().put(node.getNode().getMeta().getName(), node.getNode().getId());
-                    node.notifyRef(newParent.getNode().getId());
-                    if (record)
-                        maybeRecord(from, op);
-                    return new LogRecord<>(op, Collections.unmodifiableList(effects));
+                        if (oldParentNode != null) {
+                            oldParentNode.getNode().getChildren().remove(effect.oldInfo().oldMeta().getName());
+                            node.notifyRmRef(effect.oldInfo().oldParent());
+                        }
+
+                        newParentNode.getNode().getChildren().put(effect.newMeta().getName(), effect.childId());
+                        node.getNode().setParent(effect.newParentId());
+                        node.getNode().setMeta(effect.newMeta());
+                        node.notifyRef(effect.newParentId());
+
+                    } finally {
+                        node.rwUnlock();
+                    }
                 } finally {
-                    node.rwUnlock();
+                    if (oldParentNode != null)
+                        oldParentNode.rwUnlock();
                 }
             } finally {
-                newParent.rwUnlock();
+                newParentNode.rwUnlock();
+            }
+        }
+    }
+
+    private <LocalMetaT extends MetaT> LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> computeEffects(OpMove<TimestampT, PeerIdT, LocalMetaT, NodeIdT> op) {
+        assertRwLock();
+        var node = _storage.getById(op.childId());
+
+        NodeIdT oldParentId = (node != null && node.getNode().getParent() != null) ? node.getNode().getParent() : null;
+        NodeIdT newParentId = op.newParentId();
+        WrapperT newParent = _storage.getById(newParentId);
+
+        if (newParent == null) {
+            LOGGER.log(Level.SEVERE, "New parent not found " + op.newMeta().getName() + " " + op.childId());
+            return new LogRecord<>(op, null);
+        }
+
+        if (oldParentId == null) {
+            newParent.rLock();
+            try {
+                var conflictNodeId = newParent.getNode().getChildren().get(op.newMeta().getName());
+
+                if (conflictNodeId != null) {
+                    var conflictNode = _storage.getById(conflictNodeId);
+                    conflictNode.rLock();
+                    try {
+                        MetaT conflictNodeMeta = conflictNode.getNode().getMeta();
+                        String newConflictNodeName = conflictNodeMeta.getName() + ".conflict." + conflictNode.getNode().getId();
+                        String newOursName = op.newMeta().getName() + ".conflict." + op.childId();
+                        return new LogRecord<>(op, List.of(
+                                new LogEffect<>(new LogEffectOld<>(newParentId, conflictNodeMeta), newParentId, (MetaT) conflictNodeMeta.withName(newConflictNodeName), conflictNodeId),
+                                new LogEffect<>(null, op.newParentId(), (MetaT) op.newMeta().withName(newOursName), op.childId())
+                                                          ));
+                    } finally {
+                        conflictNode.rUnlock();
+                    }
+                } else {
+                    return new LogRecord<>(op, List.of(
+                            new LogEffect<>(null, newParentId, op.newMeta(), op.childId())
+                                                      ));
+                }
+            } finally {
+                newParent.rUnlock();
             }
         }
 
         if (Objects.equals(op.childId(), op.newParentId()) || isAncestor(op.childId(), op.newParentId())) {
-            if (record)
-                maybeRecord(from, op);
             return new LogRecord<>(op, null);
         }
 
-        var trash = _storage.getById(_storage.getTrashId());
-        trash.rwLock();
-        newParent.rwLock();
-        oldParent.rwLock();
-        node.rwLock();
-
+        node.rLock();
+        newParent.rLock();
         try {
-            oldParent.getNode().getChildren().remove(node.getNode().getMeta().getName());
-            var oldMeta = node.getNode().getMeta();
-            if (!node.getNode().getMeta().getClass().equals(op.newMeta().getClass()))
-                throw new IllegalArgumentException("Class mismatch for meta for node " + node.getNode().getId());
-            node.getNode().setMeta(op.newMeta());
-            node.getNode().setParent(newParent.getNode().getId());
-            var old = newParent.getNode().getChildren().get(op.newMeta().getName());
-            // TODO: somehow detect when this might be a conflict? (2 devices move two different files into one)
-            var effects = new ArrayList<LogEffect<LocalMetaT, NodeIdT>>(2);
-            if (old != null) {
-                var oldNode = _storage.getById(old);
+            MetaT oldMeta = node.getNode().getMeta();
+            if (!oldMeta.getClass().equals(op.newMeta().getClass())) {
+                LOGGER.log(Level.SEVERE, "Class mismatch for meta for node " + node.getNode().getId());
+                return new LogRecord<>(op, null);
+            }
+            var replaceNodeId = newParent.getNode().getChildren().get(op.newMeta().getName());
+            if (replaceNodeId != null) {
+                var replaceNode = _storage.getById(replaceNodeId);
                 try {
-                    oldNode.rwLock();
-                    trash.getNode().getChildren().put(oldNode.getNode().getId().toString(), oldNode.getNode().getId());
-                    var oldOldMeta = oldNode.getNode().getMeta();
-                    oldNode.notifyRmRef(newParent.getNode().getId());
-                    oldNode.notifyRef(trash.getNode().getId());
-                    oldNode.getNode().setMeta((MetaT) oldNode.getNode().getMeta().withName(oldNode.getNode().getId().toString()));
-                    oldNode.getNode().setParent(_storage.getTrashId());
-                    effects.add(new LogEffect<>(new LogEffectOld<>(newParent.getNode().getId(), (LocalMetaT) oldOldMeta), trash.getNode().getId(), (LocalMetaT) oldNode.getNode().getMeta(), oldNode.getNode().getId()));
+                    replaceNode.rLock();
+                    var replaceNodeMeta = replaceNode.getNode().getMeta();
+                    return new LogRecord<>(op, List.of(
+                            new LogEffect<>(new LogEffectOld<>(newParentId, replaceNodeMeta), _storage.getTrashId(), (MetaT) replaceNodeMeta.withName(replaceNodeId.toString()), replaceNodeId),
+                            new LogEffect<>(new LogEffectOld<>(oldParentId, oldMeta), op.newParentId(), op.newMeta(), op.childId())
+                                                      ));
                 } finally {
-                    oldNode.rwUnlock();
+                    replaceNode.rUnlock();
                 }
             }
-            newParent.getNode().getChildren().put(op.newMeta().getName(), node.getNode().getId());
-            node.notifyRmRef(oldParent.getNode().getId());
-            node.notifyRef(newParent.getNode().getId());
-            if (record)
-                maybeRecord(from, op);
-            effects.add(new LogEffect<>(new LogEffectOld<>(oldParent.getNode().getId(), (LocalMetaT) oldMeta), op.newParentId(), (LocalMetaT) node.getNode().getMeta(), node.getNode().getId()));
-            return new LogRecord<>(op, Collections.unmodifiableList(effects));
+            return new LogRecord<>(op, List.of(
+                    new LogEffect<>(new LogEffectOld<>(oldParentId, oldMeta), op.newParentId(), op.newMeta(), op.childId())
+                                              ));
         } finally {
-            node.rwUnlock();
-            oldParent.rwUnlock();
-            newParent.rwUnlock();
-            trash.rwUnlock();
+            newParent.rUnlock();
+            node.rUnlock();
         }
     }
 
     private boolean isAncestor(NodeIdT child, NodeIdT parent) {
         var node = _storage.getById(parent);
-        NodeIdT curParent = null;
+        NodeIdT curParent;
         while ((curParent = node.getNode().getParent()) != null) {
             if (Objects.equals(child, curParent)) return true;
             node = _storage.getById(curParent);
