@@ -7,7 +7,7 @@ public class TestStorageInterface implements StorageInterface<Long, Long, TestNo
     private long _curId = 1;
     private final long _peerId;
 
-    private final Map<Long, TreeNode<TestNodeMeta, Long>> _nodes = new HashMap<>();
+    private final Map<Long, TreeNode<Long, Long, TestNodeMeta, Long>> _nodes = new HashMap<>();
     private final NavigableMap<CombinedTimestamp<Long, Long>, LogRecord<Long, Long, ? extends TestNodeMeta, Long>> _log = new TreeMap<>();
     private final Map<Long, AtomicReference<Long>> _peerTimestampLog = new HashMap<>();
 
@@ -39,7 +39,7 @@ public class TestStorageInterface implements StorageInterface<Long, Long, TestNo
     }
 
     @Override
-    public TestNodeWrapper createNewNode(TreeNode<TestNodeMeta, Long> node) {
+    public TestNodeWrapper createNewNode(TreeNode<Long, Long, TestNodeMeta, Long> node) {
         if (!_nodes.containsKey(node.getId())) {
             _nodes.put(node.getId(), node);
             return new TestNodeWrapper(node);

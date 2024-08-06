@@ -73,11 +73,17 @@ message TreeNodeMetaP {
   }
 }
 
+message TreeNodeTimestampP {
+  int64 clock = 1;
+  string uuid = 2;
+}
+
 message TreeNodeP {
   optional string parent = 1;
   string id = 2;
   map<string, string> children = 3;
   optional TreeNodeMetaP meta = 4;
+  TreeNodeTimestampP lastMoveTimestamp = 5;
 }
 
 message JObjectDataP {

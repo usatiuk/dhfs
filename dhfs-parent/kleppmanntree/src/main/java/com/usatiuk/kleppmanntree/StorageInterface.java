@@ -10,7 +10,7 @@ public interface StorageInterface<
         PeerIdT extends Comparable<PeerIdT>,
         MetaT extends NodeMeta,
         NodeIdT,
-        WrapperT extends TreeNodeWrapper<MetaT, NodeIdT>> {
+        WrapperT extends TreeNodeWrapper<TimestampT, PeerIdT, MetaT, NodeIdT>> {
     NodeIdT getRootId();
 
     NodeIdT getTrashId();
@@ -20,7 +20,7 @@ public interface StorageInterface<
     WrapperT getById(NodeIdT id);
 
     // Creates a node, returned wrapper is RW-locked
-    WrapperT createNewNode(TreeNode<MetaT, NodeIdT> node);
+    WrapperT createNewNode(TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> node);
 
     void removeNode(NodeIdT id);
 

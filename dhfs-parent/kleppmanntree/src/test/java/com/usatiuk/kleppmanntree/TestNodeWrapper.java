@@ -1,9 +1,9 @@
 package com.usatiuk.kleppmanntree;
 
-public class TestNodeWrapper implements TreeNodeWrapper<TestNodeMeta, Long> {
-    private final TreeNode<TestNodeMeta, Long> _backingNode;
+public class TestNodeWrapper implements TreeNodeWrapper<Long, Long, TestNodeMeta, Long> {
+    private final TreeNode<Long, Long, TestNodeMeta, Long> _backingNode;
 
-    public TestNodeWrapper(TreeNode<TestNodeMeta, Long> backingNode) {_backingNode = backingNode;}
+    public TestNodeWrapper(TreeNode<Long, Long, TestNodeMeta, Long> backingNode) {_backingNode = backingNode;}
 
     @Override
     public void rLock() {
@@ -46,7 +46,7 @@ public class TestNodeWrapper implements TreeNodeWrapper<TestNodeMeta, Long> {
     }
 
     @Override
-    public TreeNode<TestNodeMeta, Long> getNode() {
+    public TreeNode<Long, Long, TestNodeMeta, Long> getNode() {
         return _backingNode;
     }
 }

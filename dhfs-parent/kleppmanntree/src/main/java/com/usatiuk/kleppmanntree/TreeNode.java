@@ -9,9 +9,10 @@ import java.util.Map;
 
 @Getter
 @Setter
-public class TreeNode<MetaT extends NodeMeta, NodeIdT> implements Serializable {
+public class TreeNode<TimestampT extends Comparable<TimestampT>, PeerIdT extends Comparable<PeerIdT>, MetaT extends NodeMeta, NodeIdT> implements Serializable {
     private NodeIdT _parent = null;
     private final NodeIdT _id;
+    private CombinedTimestamp<TimestampT, PeerIdT> _lastMoveTimestamp = null;
     private MetaT _meta = null;
     private Map<String, NodeIdT> _children = new HashMap<>();
 

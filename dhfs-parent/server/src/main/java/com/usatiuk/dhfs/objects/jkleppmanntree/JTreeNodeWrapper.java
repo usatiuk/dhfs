@@ -6,7 +6,9 @@ import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.kleppmanntree.TreeNode;
 import com.usatiuk.kleppmanntree.TreeNodeWrapper;
 
-public class JTreeNodeWrapper implements TreeNodeWrapper<JTreeNodeMeta, String> {
+import java.util.UUID;
+
+public class JTreeNodeWrapper implements TreeNodeWrapper<Long, UUID, JTreeNodeMeta, String> {
     private final JObject<TreeNodeJObjectData> _backing;
 
     public JTreeNodeWrapper(JObject<TreeNodeJObjectData> backing) {_backing = backing;}
@@ -59,7 +61,7 @@ public class JTreeNodeWrapper implements TreeNodeWrapper<JTreeNodeMeta, String> 
     }
 
     @Override
-    public TreeNode<JTreeNodeMeta, String> getNode() {
+    public TreeNode<Long, UUID, JTreeNodeMeta, String> getNode() {
         _backing.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
         if (_backing.getData() == null) throw new IllegalStateException("Node " + _backing.getName() + " data lost!");
         return _backing.getData().getNode();

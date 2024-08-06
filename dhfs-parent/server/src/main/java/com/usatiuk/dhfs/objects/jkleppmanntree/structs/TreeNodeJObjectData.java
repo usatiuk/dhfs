@@ -9,14 +9,15 @@ import lombok.Getter;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 // FIXME: Ideally this is two classes?
 @OnlyLocal
 public class TreeNodeJObjectData extends JObjectData {
     @Getter
-    final TreeNode<JTreeNodeMeta, String> _node;
+    final TreeNode<Long, UUID, JTreeNodeMeta, String> _node;
 
-    public TreeNodeJObjectData(TreeNode<JTreeNodeMeta, String> node) {
+    public TreeNodeJObjectData(TreeNode<Long, UUID, JTreeNodeMeta, String> node) {
         _node = node;
     }
 

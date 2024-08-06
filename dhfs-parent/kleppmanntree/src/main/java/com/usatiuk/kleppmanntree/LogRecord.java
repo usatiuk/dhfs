@@ -5,4 +5,4 @@ import java.util.List;
 
 public record LogRecord<TimestampT extends Comparable<TimestampT>, PeerIdT extends Comparable<PeerIdT>, MetaT extends NodeMeta, NodeIdT>
         (OpMove<TimestampT, PeerIdT, ? extends MetaT, NodeIdT> op,
-         List<LogEffect<? extends MetaT, NodeIdT>> effects) implements Serializable {}
+         List<LogEffect<TimestampT, PeerIdT, ? extends MetaT, NodeIdT>> effects) implements Serializable {}

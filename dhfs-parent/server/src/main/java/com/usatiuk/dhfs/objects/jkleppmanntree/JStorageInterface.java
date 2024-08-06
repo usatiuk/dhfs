@@ -57,7 +57,7 @@ public class JStorageInterface implements StorageInterface<Long, UUID, JTreeNode
     }
 
     @Override
-    public JTreeNodeWrapper createNewNode(TreeNode<JTreeNodeMeta, String> node) {
+    public JTreeNodeWrapper createNewNode(TreeNode<Long, UUID, JTreeNodeMeta, String> node) {
         return new JTreeNodeWrapper(_storageInterfaceService.putObjectLocked(new TreeNodeJObjectData(node)));
     }
 
