@@ -27,7 +27,8 @@ public class TreeNodeProtoSerializer implements ProtoDeserializer<TreeNodeP, Tre
                 message.hasMeta() ? protoSerializerService.deserialize(message.getMeta()) : null
         );
         node.getChildren().putAll(message.getChildrenMap());
-        node.setLastMoveTimestamp(new CombinedTimestamp<>(message.getLastMoveTimestamp().getClock(), UUID.fromString(message.getLastMoveTimestamp().getUuid())));
+        if (message.hasLastMoveTimestamp())
+            node.setLastMoveTimestamp(new CombinedTimestamp<>(message.getLastMoveTimestamp().getClock(), UUID.fromString(message.getLastMoveTimestamp().getUuid())));
         return new TreeNodeJObjectData(node);
     }
 
@@ -39,12 +40,13 @@ public class TreeNodeProtoSerializer implements ProtoDeserializer<TreeNodeP, Tre
         if (object.getNode().getMeta() != null) {
             builder.setMeta(protoSerializerService.serializeToTreeNodeMetaP(object.getNode().getMeta()));
         }
-        builder.setLastMoveTimestamp(
-                TreeNodeTimestampP.newBuilder()
-                                  .setClock(object.getNode().getLastMoveTimestamp().timestamp())
-                                  .setUuid(object.getNode().getLastMoveTimestamp().nodeId().toString())
-                                  .build()
-                                    );
+        if (object.getNode().getLastMoveTimestamp() != null)
+            builder.setLastMoveTimestamp(
+                    TreeNodeTimestampP.newBuilder()
+                                      .setClock(object.getNode().getLastMoveTimestamp().timestamp())
+                                      .setUuid(object.getNode().getLastMoveTimestamp().nodeId().toString())
+                                      .build()
+                                        );
         return builder.build();
     }
 }

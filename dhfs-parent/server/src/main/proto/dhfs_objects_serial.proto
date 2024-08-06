@@ -83,7 +83,7 @@ message TreeNodeP {
   string id = 2;
   map<string, string> children = 3;
   optional TreeNodeMetaP meta = 4;
-  TreeNodeTimestampP lastMoveTimestamp = 5;
+  optional TreeNodeTimestampP lastMoveTimestamp = 5;
 }
 
 message JObjectDataP {
