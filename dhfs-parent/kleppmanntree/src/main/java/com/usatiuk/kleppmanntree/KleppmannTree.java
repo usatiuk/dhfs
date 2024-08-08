@@ -116,12 +116,12 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     private void redoOp(Map.Entry<CombinedTimestamp<TimestampT, PeerIdT>, LogRecord<TimestampT, PeerIdT, ? extends MetaT, NodeIdT>> entry) {
-        entry.setValue(doOp(entry.getValue().op()));
+        entry.setValue(doOp(entry.getValue().op(), false));
     }
 
-    private <LocalMetaT extends MetaT> void doAndPut(OpMove<TimestampT, PeerIdT, LocalMetaT, NodeIdT> op) {
+    private <LocalMetaT extends MetaT> void doAndPut(OpMove<TimestampT, PeerIdT, LocalMetaT, NodeIdT> op, boolean failIfExists) {
         assertRwLock();
-        var res = doOp(op);
+        var res = doOp(op, failIfExists);
         _storage.getLog().put(res.op().timestamp(), res);
     }
 
@@ -183,11 +183,15 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     public <LocalMetaT extends MetaT> void move(NodeIdT newParent, LocalMetaT newMeta, NodeIdT child) {
+        move(newParent, newMeta, child, true);
+    }
+
+    public <LocalMetaT extends MetaT> void move(NodeIdT newParent, LocalMetaT newMeta, NodeIdT child, boolean failIfExists) {
         _lock.writeLock().lock();
         try {
             var createdMove = createMove(newParent, newMeta, child);
             _opRecorder.recordOp(createdMove);
-            applyOp(_peers.getSelfId(), createdMove);
+            applyOp(_peers.getSelfId(), createdMove, failIfExists);
         } finally {
             _lock.writeLock().unlock();
         }
@@ -197,13 +201,13 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         _lock.writeLock().lock();
         try {
             _clock.updateTimestamp(op.timestamp().timestamp());
-            applyOp(from, op);
+            applyOp(from, op, false);
         } finally {
             _lock.writeLock().unlock();
         }
     }
 
-    private void applyOp(PeerIdT from, OpMove<TimestampT, PeerIdT, ? extends MetaT, NodeIdT> op) {
+    private void applyOp(PeerIdT from, OpMove<TimestampT, PeerIdT, ? extends MetaT, NodeIdT> op, boolean failIfExists) {
         assertRwLock();
         synchronized (this) {
             var ref = _storage.getPeerTimestampLog().computeIfAbsent(from, f -> new AtomicReference<>());
@@ -236,24 +240,27 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                     for (var entry : toUndo.reversed().entrySet()) {
                         undoOp(entry.getValue());
                     }
-                    doAndPut(op);
-                    for (var entry : toUndo.entrySet()) {
-                        redoOp(entry);
-                    }
-
-                    if (!_undoCtx.isEmpty()) {
-                        for (var e : _undoCtx.entrySet()) {
-                            LOGGER.log(Level.FINE, "Dropping node " + e.getKey());
-                            e.getValue().unlock();
-                            _storage.removeNode(e.getKey());
+                    try {
+                        doAndPut(op, failIfExists);
+                    } finally {
+                        for (var entry : toUndo.entrySet()) {
+                            redoOp(entry);
                         }
+
+                        if (!_undoCtx.isEmpty()) {
+                            for (var e : _undoCtx.entrySet()) {
+                                LOGGER.log(Level.FINE, "Dropping node " + e.getKey());
+                                e.getValue().unlock();
+                                _storage.removeNode(e.getKey());
+                            }
+                        }
+                        _undoCtx = null;
                     }
-                    _undoCtx = null;
                 } finally {
                     tryTrimLog();
                 }
             } else {
-                doAndPut(op);
+                doAndPut(op, failIfExists);
                 tryTrimLog();
             }
         }
@@ -269,10 +276,12 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         return new OpMove<>(getTimestamp(), newParent, newMeta, node);
     }
 
-    private LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> doOp(OpMove<TimestampT, PeerIdT, ? extends MetaT, NodeIdT> op) {
+    private LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> doOp(OpMove<TimestampT, PeerIdT, ? extends MetaT, NodeIdT> op, boolean failIfExists) {
         LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> computed;
         try {
-            computed = computeEffects(op);
+            computed = computeEffects(op, failIfExists);
+        } catch (AlreadyExistsException aex) {
+            throw aex;
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Error computing effects for op" + op.toString(), e);
             computed = new LogRecord<>(op, null);
@@ -360,7 +369,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         }
     }
 
-    private <LocalMetaT extends MetaT> LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> computeEffects(OpMove<TimestampT, PeerIdT, LocalMetaT, NodeIdT> op) {
+    private <LocalMetaT extends MetaT> LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> computeEffects(OpMove<TimestampT, PeerIdT, LocalMetaT, NodeIdT> op, boolean failIfExists) {
         assertRwLock();
         var node = _storage.getById(op.childId());
 
@@ -379,6 +388,9 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 var conflictNodeId = newParent.getNode().getChildren().get(op.newMeta().getName());
 
                 if (conflictNodeId != null) {
+                    if (failIfExists)
+                        throw new AlreadyExistsException("Already exists: " + op.newMeta().getName() + ": " + conflictNodeId);
+
                     var conflictNode = _storage.getById(conflictNodeId);
                     conflictNode.rLock();
                     try {

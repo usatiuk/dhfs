@@ -7,6 +7,7 @@ import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
+import com.usatiuk.kleppmanntree.AlreadyExistsException;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
@@ -99,6 +100,12 @@ public class DhfsFileServiceSimpleTestImpl {
                 }
             }
         }
+    }
+
+    @Test
+    void dontMkdirTwiceTest() {
+        Assertions.assertDoesNotThrow(() -> fileService.mkdir("/dontMkdirTwiceTest", 777));
+        Assertions.assertThrows(AlreadyExistsException.class, () -> fileService.mkdir("/dontMkdirTwiceTest", 777));
     }
 
     @Test

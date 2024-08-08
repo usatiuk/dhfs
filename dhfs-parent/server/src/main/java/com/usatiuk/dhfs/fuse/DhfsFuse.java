@@ -6,6 +6,7 @@ import com.usatiuk.dhfs.files.service.DhfsFileService;
 import com.usatiuk.dhfs.files.service.DirectoryNotEmptyException;
 import com.usatiuk.dhfs.files.service.GetattrRes;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
+import com.usatiuk.kleppmanntree.AlreadyExistsException;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -212,6 +213,8 @@ public class DhfsFuse extends FuseStubFS {
         try {
             fileService.mkdir(path, mode);
             return 0;
+        } catch (AlreadyExistsException aex) {
+            return -ErrorCodes.EEXIST();
         } catch (Exception e) {
             Log.error("When creating dir " + path, e);
             return -ErrorCodes.EIO();

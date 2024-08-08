@@ -159,9 +159,15 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         File f = new File(fuuid, mode, false);
 
         var newNodeId = _tree.getNewNodeId();
-        jObjectManager.put(f, Optional.of(newNodeId));
-        _tree.move(parent.getName(), new JTreeNodeMetaFile(fname, f.getName()), newNodeId);
-
+        var fobj = jObjectManager.putLocked(f, Optional.of(newNodeId));
+        try {
+            _tree.move(parent.getName(), new JTreeNodeMetaFile(fname, f.getName()), newNodeId);
+        } catch (Exception e) {
+            fobj.getMeta().removeRef(newNodeId);
+            throw e;
+        } finally {
+            fobj.rwUnlock();
+        }
         return Optional.of(f.getName());
     }
 
