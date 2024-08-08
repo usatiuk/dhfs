@@ -29,7 +29,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.StreamSupport;
 
 @ApplicationScoped
@@ -256,65 +255,61 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
         var file = fileOpt.get();
 
-        AtomicReference<List<Map.Entry<Long, String>>> chunksList = new AtomicReference<>();
-
         try {
-            file.runReadLocked(JObject.ResolutionStrategy.REMOTE, (md, fileData) -> {
+            return file.runReadLocked(JObject.ResolutionStrategy.REMOTE, (md, fileData) -> {
                 if (!(fileData instanceof File)) {
                     throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
                 }
                 var chunksAll = ((File) fileData).getChunks();
                 if (chunksAll.isEmpty()) {
-                    chunksList.set(new ArrayList<>());
-                    return null;
+                    return Optional.of(ByteString.empty());
                 }
-                chunksList.set(chunksAll.tailMap(chunksAll.floorKey(offset)).entrySet().stream().toList());
-                return null;
+                var chunksList = chunksAll.tailMap(chunksAll.floorKey(offset)).entrySet();
+
+                if (chunksList.isEmpty()) {
+                    return Optional.of(ByteString.empty());
+                }
+
+                var chunks = chunksList.iterator();
+                ByteString buf = ByteString.empty();
+
+                long curPos = offset;
+                var chunk = chunks.next();
+
+                while (curPos < offset + length) {
+                    var chunkPos = chunk.getKey();
+
+                    long offInChunk = curPos - chunkPos;
+
+                    long toReadInChunk = (offset + length) - curPos;
+
+                    var chunkBytes = readChunk(chunk.getValue());
+
+                    long readableLen = chunkBytes.size() - offInChunk;
+
+                    var toReadReally = Math.min(readableLen, toReadInChunk);
+
+                    if (toReadReally < 0) break;
+
+                    buf = buf.concat(chunkBytes.substring((int) offInChunk, (int) (offInChunk + toReadReally)));
+
+                    curPos += toReadReally;
+
+                    if (readableLen > toReadInChunk)
+                        break;
+
+                    if (!chunks.hasNext()) break;
+
+                    chunk = chunks.next();
+                }
+
+                // FIXME:
+                return Optional.of(buf);
             });
         } catch (Exception e) {
             Log.error("Error reading file: " + fileUuid, e);
             return Optional.empty();
         }
-
-        if (chunksList.get().isEmpty()) {
-            return Optional.of(ByteString.empty());
-        }
-
-        var chunks = chunksList.get().iterator();
-        ByteString buf = ByteString.empty();
-
-        long curPos = offset;
-        var chunk = chunks.next();
-
-        while (curPos < offset + length) {
-            var chunkPos = chunk.getKey();
-
-            long offInChunk = curPos - chunkPos;
-
-            long toReadInChunk = (offset + length) - curPos;
-
-            var chunkBytes = readChunk(chunk.getValue());
-
-            long readableLen = chunkBytes.size() - offInChunk;
-
-            var toReadReally = Math.min(readableLen, toReadInChunk);
-
-            if (toReadReally < 0) break;
-
-            buf = buf.concat(chunkBytes.substring((int) offInChunk, (int) (offInChunk + toReadReally)));
-
-            curPos += toReadReally;
-
-            if (readableLen > toReadInChunk)
-                break;
-
-            if (!chunks.hasNext()) break;
-
-            chunk = chunks.next();
-        }
-
-        // FIXME:
-        return Optional.of(buf);
     }
 
     private Integer getChunkSize(String uuid) {
@@ -713,6 +708,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                                                            );
 
         file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, fileData, bump, i) -> {
+            if (fileData instanceof TreeNodeJObjectData) return null; // FIXME:
             if (!(fileData instanceof FsNode fd))
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
 
