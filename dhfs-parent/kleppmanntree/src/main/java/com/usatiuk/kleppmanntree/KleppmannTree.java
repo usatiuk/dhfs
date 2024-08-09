@@ -68,7 +68,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
 
     private HashMap<NodeIdT, WrapperT> _undoCtx = null;
 
-    private void undoEffect(LogEffect<TimestampT, PeerIdT, ? extends MetaT, NodeIdT> effect) {
+    private void undoEffect(LogEffect<TimestampT, PeerIdT, MetaT, NodeIdT> effect) {
         assertRwLock();
         if (effect.oldInfo() != null) {
             var node = _storage.getById(effect.childId());
@@ -86,7 +86,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 oldParent.getNode().getChildren().put(node.getNode().getMeta().getName(), node.getNode().getId());
                 node.notifyRmRef(curParent.getNode().getId());
                 node.notifyRef(oldParent.getNode().getId());
-                node.getNode().setLastMoveTimestamp(effect.oldInfo().oldTimestamp());
+                node.getNode().setLastEffectiveOp(effect.oldInfo().oldEffectiveMove());
             } finally {
                 node.rwUnlock();
                 oldParent.rwUnlock();
@@ -101,7 +101,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 curParent.getNode().getChildren().remove(node.getNode().getMeta().getName());
                 node.lock();
                 node.getNode().setParent(null);
-                node.getNode().setLastMoveTimestamp(null);
+                node.getNode().setLastEffectiveOp(null);
                 node.notifyRmRef(curParent.getNode().getId());
                 _undoCtx.put(node.getNode().getId(), node);
             } finally {
@@ -111,7 +111,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         }
     }
 
-    private void undoOp(LogRecord<TimestampT, PeerIdT, ? extends MetaT, NodeIdT> op) {
+    private void undoOp(LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> op) {
         for (var e : op.effects().reversed())
             undoEffect(e);
     }
@@ -218,8 +218,10 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             TimestampT newRef;
             do {
                 oldRef = ref.get();
-                if (oldRef != null && oldRef.compareTo(op.timestamp().timestamp()) >= 0)
-                    throw new IllegalArgumentException("Wrong op order: received older than known from " + from.toString());
+                if (oldRef != null && oldRef.compareTo(op.timestamp().timestamp()) > 0) { // FIXME?
+                    LOGGER.warning("Wrong op order: received older than known from " + from.toString());
+                    return;
+                }
                 newRef = op.timestamp().timestamp();
             } while (!ref.compareAndSet(oldRef, newRef));
 
@@ -289,7 +291,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         }
 
         if (computed.effects() != null)
-            applyEffects(op.timestamp(), computed.effects());
+            applyEffects(op, computed.effects());
         return computed;
     }
 
@@ -302,8 +304,6 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 try {
                     if (!node.getNode().getChildren().isEmpty()) {
                         LOGGER.log(Level.WARNING, "Not empty children for undone node " + desired.getId());
-                        assert node.getNode().getChildren().isEmpty();
-                        node.getNode().getChildren().clear();
                     }
                     node.getNode().setParent(desired.getParent());
                     node.notifyRef(desired.getParent());
@@ -323,7 +323,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         return _storage.createNewNode(desired);
     }
 
-    private void applyEffects(CombinedTimestamp<TimestampT, PeerIdT> opTimestamp, List<LogEffect<TimestampT, PeerIdT, MetaT, NodeIdT>> effects) {
+    private void applyEffects(OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> sourceOp, List<LogEffect<TimestampT, PeerIdT, MetaT, NodeIdT>> effects) {
         assertRwLock();
         for (var effect : effects) {
             WrapperT oldParentNode = null;
@@ -354,7 +354,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                         newParentNode.getNode().getChildren().put(effect.newMeta().getName(), effect.childId());
                         node.getNode().setParent(effect.newParentId());
                         node.getNode().setMeta(effect.newMeta());
-                        node.getNode().setLastMoveTimestamp(opTimestamp);
+                        node.getNode().setLastEffectiveOp(effect.effectiveOp());
                         node.notifyRef(effect.newParentId());
 
                     } finally {
@@ -399,15 +399,15 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                         String newConflictNodeName = conflictNodeMeta.getName() + ".conflict." + conflictNode.getNode().getId();
                         String newOursName = op.newMeta().getName() + ".conflict." + op.childId();
                         return new LogRecord<>(op, List.of(
-                                new LogEffect<>(new LogEffectOld<>(conflictNode.getNode().getLastMoveTimestamp(), newParentId, conflictNodeMeta), newParentId, (MetaT) conflictNodeMeta.withName(newConflictNodeName), conflictNodeId),
-                                new LogEffect<>(null, op.newParentId(), (MetaT) op.newMeta().withName(newOursName), op.childId())
+                                new LogEffect<>(new LogEffectOld<>(conflictNode.getNode().getLastEffectiveOp(), newParentId, conflictNodeMeta), conflictNode.getNode().getLastEffectiveOp(), newParentId, (MetaT) conflictNodeMeta.withName(newConflictNodeName), conflictNodeId),
+                                new LogEffect<>(null, op, op.newParentId(), (MetaT) op.newMeta().withName(newOursName), op.childId())
                         ));
                     } finally {
                         conflictNode.rUnlock();
                     }
                 } else {
                     return new LogRecord<>(op, List.of(
-                            new LogEffect<>(null, newParentId, op.newMeta(), op.childId())
+                            new LogEffect<>(null, op, newParentId, op.newMeta(), op.childId())
                     ));
                 }
             } finally {
@@ -434,15 +434,15 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                     replaceNode.rLock();
                     var replaceNodeMeta = replaceNode.getNode().getMeta();
                     return new LogRecord<>(op, List.of(
-                            new LogEffect<>(new LogEffectOld<>(replaceNode.getNode().getLastMoveTimestamp(), newParentId, replaceNodeMeta), _storage.getTrashId(), (MetaT) replaceNodeMeta.withName(replaceNodeId.toString()), replaceNodeId),
-                            new LogEffect<>(new LogEffectOld<>(node.getNode().getLastMoveTimestamp(), oldParentId, oldMeta), op.newParentId(), op.newMeta(), op.childId())
+                            new LogEffect<>(new LogEffectOld<>(replaceNode.getNode().getLastEffectiveOp(), newParentId, replaceNodeMeta), replaceNode.getNode().getLastEffectiveOp(), _storage.getTrashId(), (MetaT) replaceNodeMeta.withName(replaceNodeId.toString()), replaceNodeId),
+                            new LogEffect<>(new LogEffectOld<>(node.getNode().getLastEffectiveOp(), oldParentId, oldMeta), op, op.newParentId(), op.newMeta(), op.childId())
                     ));
                 } finally {
                     replaceNode.rUnlock();
                 }
             }
             return new LogRecord<>(op, List.of(
-                    new LogEffect<>(new LogEffectOld<>(node.getNode().getLastMoveTimestamp(), oldParentId, oldMeta), op.newParentId(), op.newMeta(), op.childId())
+                    new LogEffect<>(new LogEffectOld<>(node.getNode().getLastEffectiveOp(), oldParentId, oldMeta), op, op.newParentId(), op.newMeta(), op.childId())
             ));
         } finally {
             newParent.rUnlock();
@@ -489,20 +489,20 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         _lock.writeLock().lock();
         try {
             walkTree(node -> {
-                if (node.getNode().getLastMoveTimestamp() == null) return;
-                result.put(node.getNode().getLastMoveTimestamp(), new OpMove<>(
-                        node.getNode().getLastMoveTimestamp(),
-                        node.getNode().getParent(),
-                        node.getNode().getMeta(),
-                        node.getNode().getId()
-                ));
+                var op = node.getNode().getLastEffectiveOp();
+                if (node.getNode().getLastEffectiveOp() == null) return;
+                LOGGER.fine("visited bootstrap op for " + host + ": " + op.timestamp().toString() + " " + op.newMeta().getName() + " " + op.childId() + "->" + op.newParentId());
+                result.put(node.getNode().getLastEffectiveOp().timestamp(), node.getNode().getLastEffectiveOp());
             });
 
             for (var le : _storage.getLog().entrySet()) {
+                var op = le.getValue().op();
+                LOGGER.fine("bootstrap op from log for " + host + ": " + op.timestamp().toString() + " " + op.newMeta().getName() + " " + op.childId() + "->" + op.newParentId());
                 result.put(le.getKey(), le.getValue().op());
             }
 
             for (var op : result.values()) {
+                LOGGER.fine("Recording bootstrap op for " + host + ": " + op.timestamp().toString() + " " + op.newMeta().getName() + " " + op.childId() + "->" + op.newParentId());
                 _opRecorder.recordOpForPeer(host, op);
             }
         } finally {

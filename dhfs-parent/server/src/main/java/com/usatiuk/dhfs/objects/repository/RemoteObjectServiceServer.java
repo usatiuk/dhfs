@@ -70,8 +70,8 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         obj.markSeen();
         var replyObj = ApiObject.newBuilder().setHeader(read.getLeft()).setContent(read.getRight()).build();
         return Uni.createFrom().item(GetObjectReply.newBuilder()
-                                                   .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
-                                                   .setObject(replyObj).build());
+                .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
+                .setObject(replyObj).build());
     }
 
     @Override
@@ -123,14 +123,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
         Log.info("<-- getIndex: from " + request.getSelfUuid());
 
-        var objs = jObjectManager.findAll();
-
-        var reqUuid = UUID.fromString(request.getSelfUuid());
-
-        for (var obj : objs) {
-            Log.trace("GI: " + obj + " to " + reqUuid);
-            invalidationQueueService.pushInvalidationToOne(reqUuid, obj);
-        }
+        syncHandler.pushInitialSyncData(UUID.fromString(request.getSelfUuid()));
 
         return Uni.createFrom().item(GetIndexReply.getDefaultInstance());
     }

@@ -112,7 +112,7 @@ public class JKleppmannTree implements OpObject<JKleppmannTreeOpWrapper> {
         }
 
         if (Log.isTraceEnabled())
-            Log.trace("Received op from " + from + ": " + jop.getOp().timestamp().timestamp() + " " + jop.getOp().childId() + "->" + jop.getOp().newParentId());
+            Log.trace("Received op from " + from + ": " + jop.getOp().timestamp().timestamp() + " " + jop.getOp().childId() + "->" + jop.getOp().newParentId() + " as " + jop.getOp().newMeta().getName());
 
         _tree.applyExternalOp(from, jop.getOp());
     }

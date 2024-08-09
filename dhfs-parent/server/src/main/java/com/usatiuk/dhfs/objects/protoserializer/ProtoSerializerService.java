@@ -3,7 +3,6 @@ package com.usatiuk.dhfs.objects.protoserializer;
 import com.google.protobuf.Message;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.objects.persistence.*;
-import com.usatiuk.dhfs.objects.repository.JKleppmannTreeOpP;
 import com.usatiuk.dhfs.objects.repository.OpPushPayload;
 import com.usatiuk.dhfs.objects.repository.opsupport.Op;
 import io.quarkus.arc.ClientProxy;

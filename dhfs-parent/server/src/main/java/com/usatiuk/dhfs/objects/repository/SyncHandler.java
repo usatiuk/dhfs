@@ -41,6 +41,10 @@ public class SyncHandler {
         Log.info("Doing initial resync for " + host);
 
         remoteObjectServiceClient.getIndex(host);
+        pushInitialSyncData(host);
+    }
+
+    public void pushInitialSyncData(UUID host) {
         // Push our index to the other peer too, as they might not request it if
         // they didn't thing we were disconnected
         var objs = jObjectManager.findAll();
@@ -57,7 +61,7 @@ public class SyncHandler {
         JObject<?> found = jObjectManager.getOrPut(header.getName(), JObjectData.class, Optional.empty());
 
         var receivedTotalVer = header.getChangelog().getEntriesList()
-                                     .stream().map(ObjectChangelogEntry::getVersion).reduce(0L, Long::sum);
+                .stream().map(ObjectChangelogEntry::getVersion).reduce(0L, Long::sum);
 
         var receivedMap = new HashMap<UUID, Long>();
         for (var e : header.getChangelog().getEntriesList()) {
@@ -67,7 +71,7 @@ public class SyncHandler {
         boolean conflict = found.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (md, data, bump, invalidate) -> {
             if (md.getRemoteCopies().getOrDefault(from, 0L) > receivedTotalVer) {
                 Log.error("Received older index update than was known for host: "
-                                  + from + " " + header.getName());
+                        + from + " " + header.getName());
                 throw new OutdatedUpdateException();
             }
 
@@ -102,7 +106,7 @@ public class SyncHandler {
 
             if (hasLower) {
                 Log.info("Received older index update than known: "
-                                 + from + " " + header.getName());
+                        + from + " " + header.getName());
                 throw new OutdatedUpdateException();
             }
 

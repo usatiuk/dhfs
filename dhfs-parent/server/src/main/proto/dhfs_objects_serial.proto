@@ -78,12 +78,20 @@ message JKleppmannTreeNodeTimestampP {
   string uuid = 2;
 }
 
+message JKleppmannTreeOpP {
+  int64 timestamp = 1;
+  string peer = 2;
+  string newParentId = 3;
+  JKleppmannTreeNodeMetaP meta = 4;
+  string child = 5;
+}
+
 message JKleppmannTreeNodeP {
   optional string parent = 1;
   string id = 2;
   map<string, string> children = 3;
   optional JKleppmannTreeNodeMetaP meta = 4;
-  optional JKleppmannTreeNodeTimestampP lastMoveTimestamp = 5;
+  optional JKleppmannTreeOpP lastEffectiveOp = 5;
 }
 
 message JObjectDataP {

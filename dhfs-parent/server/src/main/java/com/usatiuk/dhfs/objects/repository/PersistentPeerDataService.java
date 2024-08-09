@@ -238,9 +238,10 @@ public class PersistentPeerDataService {
     public boolean removeHost(UUID host) {
         boolean removed = getPeerDirectory().runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
             boolean removedInner = d.getPeers().remove(host);
+            Log.info("Removing host: " + host + (removedInner ? " removed" : " did not exists"));
             if (removedInner) {
                 _persistentData.runWriteLocked(pd -> pd.getInitialSyncDone().remove(host));
-                getPeer(host).runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (mp, dp, bp, vp) -> {
+                getPeer(host).runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mp, dp, bp, vp) -> {
                     mp.removeRef(m.getName());
                     return null;
                 });
@@ -271,6 +272,8 @@ public class PersistentPeerDataService {
     }
 
     public PersistentPeerInfo getHost(UUID uuid) {
+        if (!existsHost(uuid))
+            throw new StatusRuntimeException(Status.NOT_FOUND);
         return getPeer(uuid).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d);
     }
 

@@ -45,23 +45,24 @@ public class DhfsFusex3IT {
         Network network = Network.newNetwork();
         var image = new ImageFromDockerfile()
                 .withDockerfileFromBuilder(builder ->
-                                                   builder
-                                                           .from("azul/zulu-openjdk-debian:21-jre-latest")
-                                                           .run("apt update && apt install -y libfuse2 curl gcc")
-                                                           .copy("/app", "/app")
-                                                           .cmd("java", "-ea", "-Xmx128M", "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
-                                                                "--add-exports", "java.base/jdk.internal.access=ALL-UNNAMED",
-                                                                "-Ddhfs.objects.peerdiscovery.interval=100",
-                                                                "-Ddhfs.objects.invalidation.delay=100",
-                                                                "-Ddhfs.objects.deletion.delay=0",
-                                                                "-Ddhfs.objects.ref_verification=true",
-                                                                "-Ddhfs.objects.write_log=true",
-                                                                "-Ddhfs.objects.sync.timeout=10",
-                                                                "-Ddhfs.objects.sync.ping.timeout=5",
-                                                                "-Ddhfs.objects.reconnect_interval=1s",
-                                                                "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
-                                                                "-jar", "/app/quarkus-run.jar")
-                                                           .build())
+                        builder
+                                .from("azul/zulu-openjdk-debian:21-jre-latest")
+                                .run("apt update && apt install -y libfuse2 curl gcc")
+                                .copy("/app", "/app")
+                                .cmd("java", "-ea", "-Xmx128M", "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
+                                        "--add-exports", "java.base/jdk.internal.access=ALL-UNNAMED",
+                                        "-Ddhfs.objects.peerdiscovery.interval=100",
+                                        "-Ddhfs.objects.invalidation.delay=100",
+                                        "-Ddhfs.objects.deletion.delay=0",
+                                        "-Ddhfs.objects.ref_verification=true",
+                                        "-Ddhfs.objects.write_log=true",
+                                        "-Ddhfs.objects.sync.timeout=10",
+                                        "-Ddhfs.objects.sync.ping.timeout=5",
+                                        "-Ddhfs.objects.reconnect_interval=1s",
+                                        "-Dquarkus.log.category.\"com.usatiuk\".level=TRACE",
+                                        "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
+                                        "-jar", "/app/quarkus-run.jar")
+                                .build())
                 .withFileFromPath("/app", Paths.get(buildPath, "quarkus-app"));
         container1 = new GenericContainer<>(image)
                 .withPrivilegedMode(true)
@@ -105,28 +106,28 @@ public class DhfsFusex3IT {
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Ignoring new address"), 60, TimeUnit.SECONDS, 2);
 
         var c1curl = container1.execInContainer("/bin/sh", "-c",
-                                                "curl --header \"Content-Type: application/json\" " +
-                                                        "  --request PUT " +
-                                                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
-                                                        "  http://localhost:8080/objects-manage/known-peers");
+                "curl --header \"Content-Type: application/json\" " +
+                        "  --request PUT " +
+                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
+                        "  http://localhost:8080/objects-manage/known-peers");
 
         var c2curl1 = container2.execInContainer("/bin/sh", "-c",
-                                                 "curl --header \"Content-Type: application/json\" " +
-                                                         "  --request PUT " +
-                                                         "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
-                                                         "  http://localhost:8080/objects-manage/known-peers");
+                "curl --header \"Content-Type: application/json\" " +
+                        "  --request PUT " +
+                        "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
+                        "  http://localhost:8080/objects-manage/known-peers");
 
         var c2curl3 = container2.execInContainer("/bin/sh", "-c",
-                                                 "curl --header \"Content-Type: application/json\" " +
-                                                         "  --request PUT " +
-                                                         "  --data '{\"uuid\":\"" + c3uuid + "\"}' " +
-                                                         "  http://localhost:8080/objects-manage/known-peers");
+                "curl --header \"Content-Type: application/json\" " +
+                        "  --request PUT " +
+                        "  --data '{\"uuid\":\"" + c3uuid + "\"}' " +
+                        "  http://localhost:8080/objects-manage/known-peers");
 
         var c3curl = container3.execInContainer("/bin/sh", "-c",
-                                                "curl --header \"Content-Type: application/json\" " +
-                                                        "  --request PUT " +
-                                                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
-                                                        "  http://localhost:8080/objects-manage/known-peers");
+                "curl --header \"Content-Type: application/json\" " +
+                        "  --request PUT " +
+                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
+                        "  http://localhost:8080/objects-manage/known-peers");
 
         waitingConsumer3.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
@@ -175,10 +176,10 @@ public class DhfsFusex3IT {
         Assertions.assertEquals("tesempty\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
 
         var c3curl = container3.execInContainer("/bin/sh", "-c",
-                                                "curl --header \"Content-Type: application/json\" " +
-                                                        "  --request DELETE " +
-                                                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
-                                                        "  http://localhost:8080/objects-manage/known-peers");
+                "curl --header \"Content-Type: application/json\" " +
+                        "  --request DELETE " +
+                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
+                        "  http://localhost:8080/objects-manage/known-peers");
 
         Thread.sleep(2000);
         Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "echo rewritten > /root/dhfs_default/fuse/testf1").getExitCode());
@@ -221,13 +222,13 @@ public class DhfsFusex3IT {
             Assertions.assertTrue(cat.getStdout().contains("test3"));
         }
         Assertions.assertEquals(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout(),
-                                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout());
+                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout());
         Assertions.assertEquals(container3.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout(),
-                                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout());
+                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout());
         Assertions.assertEquals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout(),
-                                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout());
+                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout());
         Assertions.assertEquals(container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout(),
-                                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout());
+                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout());
     }
 
 
@@ -240,8 +241,8 @@ public class DhfsFusex3IT {
         Assertions.assertEquals("tesempty\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
 
         boolean writeFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_default/fuse/testf1"),
-                                      Pair.of(container2, "echo test2 >> /root/dhfs_default/fuse/testf1"),
-                                      Pair.of(container3, "echo test3 >> /root/dhfs_default/fuse/testf1")).parallel().map(p -> {
+                Pair.of(container2, "echo test2 >> /root/dhfs_default/fuse/testf1"),
+                Pair.of(container3, "echo test3 >> /root/dhfs_default/fuse/testf1")).parallel().map(p -> {
             try {
                 return p.getLeft().execInContainer("/bin/sh", "-c", p.getRight()).getExitCode();
             } catch (Exception e) {
@@ -266,13 +267,13 @@ public class DhfsFusex3IT {
             Assertions.assertTrue(cat.getStdout().contains("test3"));
         }
         Assertions.assertEquals(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout(),
-                                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout());
+                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout());
         Assertions.assertEquals(container3.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout(),
-                                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout());
+                container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout());
         Assertions.assertEquals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout(),
-                                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout());
+                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout());
         Assertions.assertEquals(container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout(),
-                                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout());
+                container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout());
     }
 
 }

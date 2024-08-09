@@ -1,10 +1,10 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.serializers;
 
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeOpWrapper;
+import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeOpP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoDeserializer;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializer;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
-import com.usatiuk.dhfs.objects.repository.JKleppmannTreeOpP;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
 import com.usatiuk.kleppmanntree.OpMove;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -30,9 +30,9 @@ public class JKleppmannTreeOpProtoSerializer implements ProtoDeserializer<JKlepp
     public JKleppmannTreeOpP serialize(JKleppmannTreeOpWrapper object) {
         var builder = JKleppmannTreeOpP.newBuilder();
         builder.setTimestamp(object.getOp().timestamp().timestamp())
-               .setPeer(object.getOp().timestamp().nodeId().toString())
-               .setNewParentId(object.getOp().newParentId())
-               .setChild(object.getOp().childId());
+                .setPeer(object.getOp().timestamp().nodeId().toString())
+                .setNewParentId(object.getOp().newParentId())
+                .setChild(object.getOp().childId());
         if (object.getOp().newMeta() != null)
             builder.setMeta(protoSerializerService.serializeToTreeNodeMetaP(object.getOp().newMeta()));
         return builder.build();
