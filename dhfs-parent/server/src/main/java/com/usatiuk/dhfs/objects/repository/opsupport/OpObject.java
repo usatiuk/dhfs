@@ -10,7 +10,7 @@ public interface OpObject<OpT extends Op> {
 
     void commitOpForHost(UUID host, OpT op);
 
-    List<OpT> getBootstrap();
+    void pushBootstrap(UUID host);
 
     void acceptExternalOp(UUID from, OpT op);
 }

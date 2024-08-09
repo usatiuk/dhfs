@@ -35,4 +35,10 @@ public class OpObjectRegistry {
     private <OpLocalT extends Op> void dispatchOp(OpObject<OpLocalT> obj, UUID from, Op op) {
         obj.acceptExternalOp(from, (OpLocalT) op);
     }
+
+    public void pushBootstrapData(UUID host) {
+        for (var o : _objects.values()) {
+            o.pushBootstrap(host);
+        }
+    }
 }

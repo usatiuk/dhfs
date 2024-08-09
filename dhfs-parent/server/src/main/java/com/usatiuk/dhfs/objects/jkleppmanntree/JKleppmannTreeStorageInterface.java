@@ -75,7 +75,7 @@ public class JKleppmannTreeStorageInterface implements StorageInterface<Long, UU
     }
 
     @Override
-    public NavigableMap<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, ? extends JKleppmannTreeNodeMeta, String>> getLog() {
+    public NavigableMap<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, String>> getLog() {
         return _persistentData.getLog();
     }
 

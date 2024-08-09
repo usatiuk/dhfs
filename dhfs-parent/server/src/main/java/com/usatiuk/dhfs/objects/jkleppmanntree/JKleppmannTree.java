@@ -30,8 +30,14 @@ public class JKleppmannTree implements OpObject<JKleppmannTreeOpWrapper> {
 
     private class JOpRecorder implements OpRecorder<Long, UUID, JKleppmannTreeNodeMeta, String> {
         @Override
-        public void recordOp(OpMove<Long, UUID, ? extends JKleppmannTreeNodeMeta, String> op) {
+        public void recordOp(OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> op) {
             _persistentData.recordOp(_persistentPeerDataService.getHostUuids(), op);
+            _opSender.push(JKleppmannTree.this);
+        }
+
+        @Override
+        public void recordOpForPeer(UUID peer, OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> op) {
+            _persistentData.recordOp(peer, op);
             _opSender.push(JKleppmannTree.this);
         }
     }
@@ -71,8 +77,8 @@ public class JKleppmannTree implements OpObject<JKleppmannTreeOpWrapper> {
     @Override
     public JKleppmannTreeOpWrapper getPendingOpForHost(UUID host) {
         if (_persistentData.getQueues().containsKey(host)) {
-            var peeked = _persistentData.getQueues().get(host).peek();
-            return peeked != null ? new JKleppmannTreeOpWrapper(_persistentData.getQueues().get(host).peek()) : null;
+            var peeked = _persistentData.getQueues().get(host).firstEntry();
+            return peeked != null ? new JKleppmannTreeOpWrapper(_persistentData.getQueues().get(host).firstEntry().getValue()) : null;
         }
         return null;
     }
@@ -84,15 +90,15 @@ public class JKleppmannTree implements OpObject<JKleppmannTreeOpWrapper> {
 
     @Override
     public void commitOpForHost(UUID host, JKleppmannTreeOpWrapper op) {
-        var got = _persistentData.getQueues().get(host).poll();
+        var got = _persistentData.getQueues().get(host).pollFirstEntry().getValue();
         if (op.getOp() != got) {
             throw new IllegalArgumentException("Committed op push was not the oldest");
         }
     }
 
     @Override
-    public List<JKleppmannTreeOpWrapper> getBootstrap() {
-        return List.of();
+    public void pushBootstrap(UUID host) {
+        _tree.recordBoostrapFor(host);
     }
 
     @Override

@@ -8,7 +8,7 @@ public class TestStorageInterface implements StorageInterface<Long, Long, TestNo
     private final long _peerId;
 
     private final Map<Long, TreeNode<Long, Long, TestNodeMeta, Long>> _nodes = new HashMap<>();
-    private final NavigableMap<CombinedTimestamp<Long, Long>, LogRecord<Long, Long, ? extends TestNodeMeta, Long>> _log = new TreeMap<>();
+    private final NavigableMap<CombinedTimestamp<Long, Long>, LogRecord<Long, Long, TestNodeMeta, Long>> _log = new TreeMap<>();
     private final Map<Long, AtomicReference<Long>> _peerTimestampLog = new HashMap<>();
 
     public TestStorageInterface(long peerId) {
@@ -60,7 +60,7 @@ public class TestStorageInterface implements StorageInterface<Long, Long, TestNo
     }
 
     @Override
-    public NavigableMap<CombinedTimestamp<Long, Long>, LogRecord<Long, Long, ? extends TestNodeMeta, Long>> getLog() {
+    public NavigableMap<CombinedTimestamp<Long, Long>, LogRecord<Long, Long, TestNodeMeta, Long>> getLog() {
         return _log;
     }
 

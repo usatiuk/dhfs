@@ -8,7 +8,10 @@ import com.usatiuk.kleppmanntree.OpMove;
 import lombok.Getter;
 
 import java.io.Serializable;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.TreeMap;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class JKleppmannTreePersistentData implements Serializable {
@@ -17,9 +20,9 @@ public class JKleppmannTreePersistentData implements Serializable {
     @Getter
     private final AtomicClock _clock;
     @Getter
-    private final HashMap<UUID, Queue<OpMove<Long, UUID, ? extends JKleppmannTreeNodeMeta, String>>> _queues = new HashMap<>();
+    private final HashMap<UUID, TreeMap<CombinedTimestamp<Long, UUID>, OpMove<Long, UUID, JKleppmannTreeNodeMeta, String>>> _queues = new HashMap<>();
     @Getter
-    private final TreeMap<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, ? extends JKleppmannTreeNodeMeta, String>> _log = new TreeMap<>();
+    private final TreeMap<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, String>> _log = new TreeMap<>();
     @Getter
     private final HashMap<UUID, AtomicReference<Long>> _peerTimestampLog = new HashMap<>();
 
@@ -28,10 +31,14 @@ public class JKleppmannTreePersistentData implements Serializable {
         _clock = clock;
     }
 
-    public void recordOp(Collection<UUID> hosts, OpMove<Long, UUID, ? extends JKleppmannTreeNodeMeta, String> opMove) {
+    public void recordOp(UUID host, OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> opMove) {
+        _queues.computeIfAbsent(host, h -> new TreeMap<>());
+        _queues.get(host).put(opMove.timestamp(), opMove);
+    }
+
+    public void recordOp(Collection<UUID> hosts, OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> opMove) {
         for (var u : hosts) {
-            _queues.computeIfAbsent(u, h -> new LinkedList<>());
-            _queues.get(u).add(opMove);
+            recordOp(u, opMove);
         }
     }
 }

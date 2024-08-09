@@ -12,11 +12,16 @@ public class TestNode {
     protected final KleppmannTree<Long, Long, TestNodeMeta, Long, TestNodeWrapper> _tree;
 
     private class TestOpRecorder implements OpRecorder<Long, Long, TestNodeMeta, Long> {
-        ArrayList<OpMove<Long, Long, ? extends TestNodeMeta, Long>> ops = new ArrayList<>();
+        ArrayList<OpMove<Long, Long, TestNodeMeta, Long>> ops = new ArrayList<>();
 
         @Override
-        public void recordOp(OpMove<Long, Long, ? extends TestNodeMeta, Long> op) {
+        public void recordOp(OpMove<Long, Long, TestNodeMeta, Long> op) {
             ops.add(op);
+        }
+
+        @Override
+        public void recordOpForPeer(Long peer, OpMove<Long, Long, TestNodeMeta, Long> op) {
+
         }
     }
 
@@ -31,7 +36,7 @@ public class TestNode {
         _tree = new KleppmannTree<>(_storageInterface, _peerInterface, _clock, _recorder);
     }
 
-    List<OpMove<Long, Long, ? extends TestNodeMeta, Long>> getRecorded() {
+    List<OpMove<Long, Long, TestNodeMeta, Long>> getRecorded() {
         var ret = _recorder.ops;
         _recorder.ops = new ArrayList<>();
         return ret;

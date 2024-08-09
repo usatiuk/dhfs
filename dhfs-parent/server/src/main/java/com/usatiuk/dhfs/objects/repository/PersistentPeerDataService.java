@@ -89,6 +89,7 @@ public class PersistentPeerDataService {
 
         if (!shutdownChecker.lastShutdownClean()) {
             _persistentData.getData().getIrregularShutdownCounter().addAndGet(1);
+            _persistentData.getData().getInitialSyncDone().clear();
         }
 
         jObjectResolver.registerWriteListener(PersistentPeerInfo.class, this::pushPeerUpdates);
@@ -161,14 +162,14 @@ public class PersistentPeerDataService {
 
     private List<PersistentPeerInfo> getPeersSnapshot() {
         return getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY,
-                                                (m, d) -> d.getPeers().stream().map(u -> {
-                                                    try {
-                                                        return getPeer(u).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m2, d2) -> d2);
-                                                    } catch (Exception e) {
-                                                        Log.warn("Error making snapshot of peer " + u, e);
-                                                        return null;
-                                                    }
-                                                }).filter(Objects::nonNull).toList());
+                (m, d) -> d.getPeers().stream().map(u -> {
+                    try {
+                        return getPeer(u).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m2, d2) -> d2);
+                    } catch (Exception e) {
+                        Log.warn("Error making snapshot of peer " + u, e);
+                        return null;
+                    }
+                }).filter(Objects::nonNull).toList());
     }
 
     public UUID getSelfUuid() {
@@ -206,9 +207,9 @@ public class PersistentPeerDataService {
             try {
                 return getPeerDirectory()
                         .runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY,
-                                       (m, d) -> d.getPeers().stream()
-                                                  .map(u -> getPeer(u).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m2, d2) -> d2))
-                                                  .filter(e -> !e.getUuid().equals(_selfUuid)).toList());
+                                (m, d) -> d.getPeers().stream()
+                                        .map(u -> getPeer(u).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m2, d2) -> d2))
+                                        .filter(e -> !e.getUuid().equals(_selfUuid)).toList());
             } catch (Exception e) {
                 Log.warn("Error when making snapshot of hosts ", e);
                 try {

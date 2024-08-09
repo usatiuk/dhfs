@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.objects.repository;
 
-import com.usatiuk.dhfs.ShutdownChecker;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerSyncApiClientDynamic;
 import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
 import com.usatiuk.dhfs.objects.repository.webapi.AvailablePeerInfo;
@@ -13,6 +12,7 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import lombok.Getter;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
@@ -35,15 +35,14 @@ public class PeerManager {
     RpcClientFactory rpcClientFactory;
     @Inject
     PeerSyncApiClientDynamic peerSyncApiClient;
-    @Inject
-    ShutdownChecker shutdownChecker;
     @ConfigProperty(name = "dhfs.objects.sync.ping.timeout")
     long pingTimeout;
     private ExecutorService _heartbeatExecutor;
-    boolean _initialized = false;
+    @Getter
+    private boolean _ready = false;
 
     // Note: keep priority updated with below
-    void init(@Observes @Priority(350) StartupEvent event) throws IOException {
+    void init(@Observes @Priority(600) StartupEvent event) throws IOException {
         _heartbeatExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
         // Note: newly added hosts aren't in _transientPeersState
@@ -51,16 +50,17 @@ public class PeerManager {
         for (var h : persistentPeerDataService.getHostUuids())
             _transientPeersState.runWriteLocked(d -> d.get(h));
 
-        _initialized = true;
+        _ready = true;
     }
 
-    void shutdown(@Observes @Priority(250) ShutdownEvent event) throws IOException {
+    void shutdown(@Observes @Priority(50) ShutdownEvent event) throws IOException {
+        _ready = false;
     }
 
     @Scheduled(every = "${dhfs.objects.reconnect_interval}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     @Blocking
     public void tryConnectAll() {
-        if (!_initialized) return;
+        if (!_ready) return;
         try {
             _heartbeatExecutor.invokeAll(persistentPeerDataService.getHostUuids()
                     .stream()
@@ -89,21 +89,25 @@ public class PeerManager {
         void apply(UUID host);
     }
 
-    // Note: registrations should be completed with Priority < 350
+    // Note: registrations should be completed with Priority < 600
     public void registerConnectEventListener(ConnectionEventListener listener) {
+        if (_ready) throw new IllegalStateException("Already initialized");
         synchronized (_connectedListeners) {
             _connectedListeners.add(listener);
         }
     }
 
-    // Note: registrations should be completed with Priority < 350
+    // Note: registrations should be completed with Priority < 600
     public void registerDisconnectEventListener(ConnectionEventListener listener) {
+        if (_ready) throw new IllegalStateException("Already initialized");
         synchronized (_disconnectedListeners) {
             _disconnectedListeners.add(listener);
         }
     }
 
     public void handleConnectionSuccess(UUID host) {
+        if (!_ready) return;
+
         boolean wasReachable = isReachable(host);
 
         _transientPeersState.runWriteLocked(d -> {
@@ -119,9 +123,7 @@ public class PeerManager {
 
         Log.info("Connected to " + host);
 
-        if (persistentPeerDataService.markInitialSyncDone(host) || !shutdownChecker.lastShutdownClean()) {
-            if (!shutdownChecker.lastShutdownClean())
-                Log.info("Resyncing with " + host + " as last shutdown wasn't clean");
+        if (persistentPeerDataService.markInitialSyncDone(host)) {
             syncHandler.doInitialResync(host);
         }
     }

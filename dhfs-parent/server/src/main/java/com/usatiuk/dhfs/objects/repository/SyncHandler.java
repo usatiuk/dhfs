@@ -5,6 +5,7 @@ import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
+import com.usatiuk.dhfs.objects.repository.opsupport.OpObjectRegistry;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
@@ -33,6 +34,8 @@ public class SyncHandler {
     PersistentPeerDataService persistentPeerDataService;
     @Inject
     ProtoSerializerService protoSerializerService;
+    @Inject
+    OpObjectRegistry opObjectRegistry;
 
     public void doInitialResync(UUID host) {
         Log.info("Doing initial resync for " + host);
@@ -46,6 +49,8 @@ public class SyncHandler {
             Log.trace("IS: " + obj + " to " + host);
             invalidationQueueService.pushInvalidationToOne(host, obj);
         }
+
+        opObjectRegistry.pushBootstrapData(host);
     }
 
     public void handleOneUpdate(UUID from, ObjectHeader header) {
