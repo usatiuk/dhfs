@@ -4,6 +4,7 @@ import com.google.protobuf.ByteOutput;
 import jnr.ffi.Pointer;
 
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 
 public class JnrPtrByteOutput extends ByteOutput {
     private final Pointer _backing;
@@ -43,6 +44,9 @@ public class JnrPtrByteOutput extends ByteOutput {
         if (rem + _pos > _size) throw new IndexOutOfBoundsException();
 
         if (value.isDirect()) {
+            if (value instanceof MappedByteBuffer mb) {
+                mb.load();
+            }
             long addr = _accessors.getNioAccess().getBufferAddress(value) + value.position();
             var out = _backing.address() + _pos;
             _accessors.getUnsafe().copyMemory(addr, out, rem);
