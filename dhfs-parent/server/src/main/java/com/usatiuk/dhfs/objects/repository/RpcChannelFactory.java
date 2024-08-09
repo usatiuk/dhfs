@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 @ApplicationScoped
 public class RpcChannelFactory {
     @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
+    PersistentPeerDataService persistentPeerDataService;
     @Inject
     PeerTrustManager peerTrustManager;
     private ConcurrentMap<SecureChannelKey, ManagedChannel> _secureChannelCache = new ConcurrentHashMap<>();
@@ -36,7 +36,7 @@ public class RpcChannelFactory {
             KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
             ks.load(null, null);
 
-            ks.setKeyEntry("clientkey", persistentRemoteHostsService.getSelfKeypair().getPrivate(), null, new Certificate[]{persistentRemoteHostsService.getSelfCertificate()});
+            ks.setKeyEntry("clientkey", persistentPeerDataService.getSelfKeypair().getPrivate(), null, new Certificate[]{persistentPeerDataService.getSelfCertificate()});
 
             KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
             keyManagerFactory.init(ks, null);

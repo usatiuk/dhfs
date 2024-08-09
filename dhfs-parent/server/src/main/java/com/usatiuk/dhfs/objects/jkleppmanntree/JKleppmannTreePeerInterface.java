@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree;
 
-import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
+import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.kleppmanntree.PeerInterface;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -9,17 +9,17 @@ import java.util.Collection;
 import java.util.UUID;
 
 @Singleton
-public class JPeerInterface implements PeerInterface<UUID> {
+public class JKleppmannTreePeerInterface implements PeerInterface<UUID> {
     @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
+    PersistentPeerDataService persistentPeerDataService;
 
     @Override
     public UUID getSelfId() {
-        return persistentRemoteHostsService.getSelfUuid();
+        return persistentPeerDataService.getSelfUuid();
     }
 
     @Override
     public Collection<UUID> getAllPeers() {
-        return persistentRemoteHostsService.getHostUuidsAndSelf();
+        return persistentPeerDataService.getHostUuidsAndSelf();
     }
 }

@@ -21,14 +21,14 @@ import java.util.*;
 import java.util.concurrent.*;
 
 @ApplicationScoped
-public class RemoteHostManager {
+public class PeerManager {
     private final TransientPeersState _transientPeersState = new TransientPeersState();
-    private final ConcurrentMap<UUID, TransientPeerState> _seenHostsButNotAdded = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, TransientPeerState> _seenButNotAdded = new ConcurrentHashMap<>();
     // FIXME: Ideally not call them on every ping
     private final ArrayList<ConnectionEventListener> _connectedListeners = new ArrayList<>();
     private final ArrayList<ConnectionEventListener> _disconnectedListeners = new ArrayList<>();
     @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
+    PersistentPeerDataService persistentPeerDataService;
     @Inject
     SyncHandler syncHandler;
     @Inject
@@ -48,7 +48,7 @@ public class RemoteHostManager {
 
         // Note: newly added hosts aren't in _transientPeersState
         // but that's ok as they don't have initialSyncDone set
-        for (var h : persistentRemoteHostsService.getHostUuids())
+        for (var h : persistentPeerDataService.getHostUuids())
             _transientPeersState.runWriteLocked(d -> d.get(h));
 
         _initialized = true;
@@ -62,8 +62,9 @@ public class RemoteHostManager {
     public void tryConnectAll() {
         if (!_initialized) return;
         try {
-            _heartbeatExecutor.invokeAll(persistentRemoteHostsService.getHostUuids().stream()
-                                                                     .<Callable<Void>>map(host -> () -> {
+            _heartbeatExecutor.invokeAll(persistentPeerDataService.getHostUuids()
+                    .stream()
+                    .<Callable<Void>>map(host -> () -> {
                         try {
                             if (isReachable(host))
                                 Log.trace("Heartbeat: " + host);
@@ -118,7 +119,7 @@ public class RemoteHostManager {
 
         Log.info("Connected to " + host);
 
-        if (persistentRemoteHostsService.markInitialSyncDone(host) || !shutdownChecker.lastShutdownClean()) {
+        if (persistentPeerDataService.markInitialSyncDone(host) || !shutdownChecker.lastShutdownClean()) {
             if (!shutdownChecker.lastShutdownClean())
                 Log.info("Resyncing with " + host + " as last shutdown wasn't clean");
             syncHandler.doInitialResync(host);
@@ -147,7 +148,7 @@ public class RemoteHostManager {
 
         try {
             return rpcClientFactory.withObjSyncClient(host.toString(), state.getAddr(), state.getSecurePort(), pingTimeout, c -> {
-                var ret = c.ping(PingRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).build());
+                var ret = c.ping(PingRequest.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString()).build());
                 if (!UUID.fromString(ret.getSelfUuid()).equals(host)) {
                     throw new IllegalStateException("Ping selfUuid returned " + ret.getSelfUuid() + " but expected " + host);
                 }
@@ -199,7 +200,7 @@ public class RemoteHostManager {
     }
 
     public void notifyAddr(UUID host, String addr, Integer port, Integer securePort) {
-        if (host.equals(persistentRemoteHostsService.getSelfUuid())) {
+        if (host.equals(persistentPeerDataService.getSelfUuid())) {
             return;
         }
 
@@ -208,14 +209,14 @@ public class RemoteHostManager {
         state.setPort(port);
         state.setSecurePort(securePort);
 
-        if (!persistentRemoteHostsService.existsHost(host)) {
-            var prev = _seenHostsButNotAdded.put(host, state);
+        if (!persistentPeerDataService.existsHost(host)) {
+            var prev = _seenButNotAdded.put(host, state);
             // Needed for tests
             if (prev == null)
                 Log.debug("Ignoring new address from unknown host " + ": addr=" + addr + " port=" + port);
             return;
         } else {
-            _seenHostsButNotAdded.remove(host);
+            _seenButNotAdded.remove(host);
         }
 
         _transientPeersState.runWriteLocked(d -> {
@@ -228,7 +229,7 @@ public class RemoteHostManager {
     }
 
     public void removeRemoteHost(UUID host) {
-        persistentRemoteHostsService.removeHost(host);
+        persistentPeerDataService.removeHost(host);
         // Race?
         _transientPeersState.runWriteLocked(d -> {
             d.getStates().remove(host);
@@ -237,21 +238,21 @@ public class RemoteHostManager {
     }
 
     public void addRemoteHost(UUID host) {
-        if (!_seenHostsButNotAdded.containsKey(host)) {
+        if (!_seenButNotAdded.containsKey(host)) {
             throw new IllegalStateException("Host " + host + " is not seen");
         }
-        if (persistentRemoteHostsService.existsHost(host)) {
+        if (persistentPeerDataService.existsHost(host)) {
             throw new IllegalStateException("Host " + host + " is already added");
         }
 
-        var state = _seenHostsButNotAdded.get(host);
+        var state = _seenButNotAdded.get(host);
 
         // FIXME: race?
 
         var info = peerSyncApiClient.getSelfInfo(state.getAddr(), state.getPort());
 
         try {
-            persistentRemoteHostsService.addHost(
+            persistentPeerDataService.addHost(
                     new PersistentPeerInfo(UUID.fromString(info.selfUuid()),
                             CertificateTools.certFromBytes(Base64.getDecoder().decode(info.cert()))));
             Log.info("Added host: " + host.toString());
@@ -261,8 +262,8 @@ public class RemoteHostManager {
     }
 
     public Collection<AvailablePeerInfo> getSeenButNotAddedHosts() {
-        return _seenHostsButNotAdded.entrySet().stream()
-                .filter(e -> !persistentRemoteHostsService.existsHost(e.getKey()))
+        return _seenButNotAdded.entrySet().stream()
+                .filter(e -> !persistentPeerDataService.existsHost(e.getKey()))
                 .map(e -> new AvailablePeerInfo(e.getKey().toString(), e.getValue().getAddr(), e.getValue().getPort()))
                 .toList();
     }

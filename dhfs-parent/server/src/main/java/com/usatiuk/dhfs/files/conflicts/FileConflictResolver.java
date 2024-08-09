@@ -1,22 +1,16 @@
 package com.usatiuk.dhfs.files.conflicts;
 
-import com.usatiuk.dhfs.files.objects.ChunkData;
-import com.usatiuk.dhfs.files.objects.ChunkInfo;
-import com.usatiuk.dhfs.files.objects.Directory;
 import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import com.usatiuk.dhfs.objects.repository.ObjectHeader;
-import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
+import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.NotImplementedException;
-import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.*;
@@ -24,7 +18,7 @@ import java.util.*;
 @ApplicationScoped
 public class FileConflictResolver implements ConflictResolver {
     @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
+    PersistentPeerDataService persistentPeerDataService;
 
     @Inject
     JObjectManager jObjectManager;

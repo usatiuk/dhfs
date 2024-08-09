@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
-import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
+import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.objects.repository.autosync.AutoSyncProcessor;
 import com.usatiuk.utils.HashSetDelayedBlockingQueue;
@@ -25,7 +25,7 @@ public class JObjectRefProcessor {
     @Inject
     JObjectManager jObjectManager;
     @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
+    PersistentPeerDataService persistentPeerDataService;
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
     @Inject
@@ -86,7 +86,7 @@ public class JObjectRefProcessor {
         _movableProcessorExecutorService.submit(() -> {
             boolean delay = false;
             try {
-                var knownHosts = persistentRemoteHostsService.getHostUuids();
+                var knownHosts = persistentPeerDataService.getHostUuids();
                 List<UUID> missing = new ArrayList<>();
 
                 var ourReferrers = obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
@@ -133,7 +133,7 @@ public class JObjectRefProcessor {
 
     private boolean processMovable(JObject<?> obj) {
         obj.assertRWLock();
-        var knownHosts = persistentRemoteHostsService.getHostUuids();
+        var knownHosts = persistentPeerDataService.getHostUuids();
         boolean missing = false;
         for (var x : knownHosts)
             if (!obj.getMeta().getConfirmedDeletes().contains(x)) {

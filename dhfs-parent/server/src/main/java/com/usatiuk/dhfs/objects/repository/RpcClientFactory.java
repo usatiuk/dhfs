@@ -22,7 +22,7 @@ public class RpcClientFactory {
     long syncTimeout;
 
     @Inject
-    RemoteHostManager remoteHostManager;
+    PeerManager remoteHostManager;
 
     @Inject
     RpcChannelFactory rpcChannelFactory;

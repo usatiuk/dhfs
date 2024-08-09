@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.objects.repository.peerdiscovery;
 
-import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
+import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.Startup;
@@ -16,7 +16,7 @@ import java.net.*;
 public class LocalPeerDiscoveryBroadcaster {
 
     @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
+    PersistentPeerDataService persistentPeerDataService;
 
     @ConfigProperty(name = "quarkus.http.port")
     Integer ourPort;
@@ -62,7 +62,7 @@ public class LocalPeerDiscoveryBroadcaster {
 
                 try {
                     var sendData = PeerDiscoveryInfo.newBuilder()
-                            .setUuid(persistentRemoteHostsService.getSelfUuid().toString())
+                            .setUuid(persistentPeerDataService.getSelfUuid().toString())
                             .setPort(ourPort)
                             .setSecurePort(ourSecurePort)
                             .build();

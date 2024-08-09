@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.objects.repository.peertrust;
 
-import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
+import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import io.quarkus.logging.Log;
 import io.quarkus.security.credential.CertificateCredential;
 import io.quarkus.security.identity.AuthenticationRequestContext;
@@ -17,7 +17,7 @@ import java.util.function.Supplier;
 @ApplicationScoped
 public class PeerRolesAugmentor implements SecurityIdentityAugmentor {
     @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
+    PersistentPeerDataService persistentPeerDataService;
 
     @Override
     public Uni<SecurityIdentity> augment(SecurityIdentity identity, AuthenticationRequestContext context) {
@@ -33,7 +33,7 @@ public class PeerRolesAugmentor implements SecurityIdentityAugmentor {
             var uuid = identity.getPrincipal().getName().substring(3);
 
             try {
-                var entry = persistentRemoteHostsService.getHost(UUID.fromString(uuid));
+                var entry = persistentPeerDataService.getHost(UUID.fromString(uuid));
 
                 if (!entry.getCertificate().equals(identity.getCredential(CertificateCredential.class).getCertificate())) {
                     Log.error("Certificate mismatch for " + uuid);

@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects.repository.webapi;
 
-import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
-import com.usatiuk.dhfs.objects.repository.RemoteHostManager;
+import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
+import com.usatiuk.dhfs.objects.repository.PeerManager;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
@@ -15,15 +15,15 @@ import java.util.UUID;
 @Path("/objects-manage")
 public class ManagementApi {
     @Inject
-    RemoteHostManager remoteHostManager;
+    PeerManager remoteHostManager;
 
     @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
+    PersistentPeerDataService persistentPeerDataService;
 
     @Path("known-peers")
     @GET
     public List<KnownPeerInfo> knownPeers() {
-        return persistentRemoteHostsService.getHostsNoNulls().stream().map(h -> new KnownPeerInfo(h.getUuid().toString())).toList();
+        return persistentPeerDataService.getHostsNoNulls().stream().map(h -> new KnownPeerInfo(h.getUuid().toString())).toList();
     }
 
     @Path("known-peers")

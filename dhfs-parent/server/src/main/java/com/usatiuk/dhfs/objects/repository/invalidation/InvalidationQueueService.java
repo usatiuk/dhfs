@@ -3,8 +3,8 @@ package com.usatiuk.dhfs.objects.repository.invalidation;
 import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
-import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
-import com.usatiuk.dhfs.objects.repository.RemoteHostManager;
+import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
+import com.usatiuk.dhfs.objects.repository.PeerManager;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @ApplicationScoped
 public class InvalidationQueueService {
     @Inject
-    RemoteHostManager remoteHostManager;
+    PeerManager remoteHostManager;
 
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
@@ -37,7 +37,7 @@ public class InvalidationQueueService {
     JObjectManager jObjectManager;
 
     @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
+    PersistentPeerDataService persistentPeerDataService;
 
     @Inject
     DeferredInvalidationQueueService deferredInvalidationQueueService;
@@ -109,7 +109,7 @@ public class InvalidationQueueService {
                     long success = 0;
 
                     for (var e : data) {
-                        if (!persistentRemoteHostsService.existsHost(e.getLeft())) continue;
+                        if (!persistentPeerDataService.existsHost(e.getLeft())) continue;
 
                         if (!remoteHostManager.isReachable(e.getLeft())) {
                             deferredInvalidationQueueService.defer(e.getLeft(), e.getRight());

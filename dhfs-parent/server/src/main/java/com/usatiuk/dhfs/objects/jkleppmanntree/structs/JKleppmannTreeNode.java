@@ -13,11 +13,11 @@ import java.util.UUID;
 
 // FIXME: Ideally this is two classes?
 @OnlyLocal
-public class TreeNodeJObjectData extends JObjectData {
+public class JKleppmannTreeNode extends JObjectData {
     @Getter
-    final TreeNode<Long, UUID, JTreeNodeMeta, String> _node;
+    final TreeNode<Long, UUID, JKleppmannTreeNodeMeta, String> _node;
 
-    public TreeNodeJObjectData(TreeNode<Long, UUID, JTreeNodeMeta, String> node) {
+    public JKleppmannTreeNode(TreeNode<Long, UUID, JKleppmannTreeNodeMeta, String> node) {
         _node = node;
     }
 
@@ -33,8 +33,8 @@ public class TreeNodeJObjectData extends JObjectData {
 
     @Override
     public Collection<String> extractRefs() {
-        if (_node.getMeta() instanceof JTreeNodeMetaFile)
-            return List.of(((JTreeNodeMetaFile) _node.getMeta()).getFileIno());
+        if (_node.getMeta() instanceof JKleppmannTreeNodeMetaFile)
+            return List.of(((JKleppmannTreeNodeMetaFile) _node.getMeta()).getFileIno());
         return Collections.unmodifiableCollection(_node.getChildren().values());
     }
 

@@ -36,7 +36,7 @@ import java.util.concurrent.ExecutorService;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
 @ApplicationScoped
-public class PersistentRemoteHostsService {
+public class PersistentPeerDataService {
     final String dataFileName = "hosts";
     @ConfigProperty(name = "dhfs.objects.root")
     String dataRoot;

@@ -57,33 +57,33 @@ message PersistentPeerInfoP {
   bytes cert = 2;
 }
 
-message TreeNodeMetaFileP {
+message JKleppmannTreeNodeMetaFileP {
   string name = 1;
   string fileMirror = 2;
 }
 
-message TreeNodeMetaDirectoryP {
+message JKleppmannTreeNodeMetaDirectoryP {
   string name = 1;
 }
 
-message TreeNodeMetaP {
+message JKleppmannTreeNodeMetaP {
   oneof meta {
-    TreeNodeMetaFileP file = 1;
-    TreeNodeMetaDirectoryP dir = 2;
+    JKleppmannTreeNodeMetaFileP file = 1;
+    JKleppmannTreeNodeMetaDirectoryP dir = 2;
   }
 }
 
-message TreeNodeTimestampP {
+message JKleppmannTreeNodeTimestampP {
   int64 clock = 1;
   string uuid = 2;
 }
 
-message TreeNodeP {
+message JKleppmannTreeNodeP {
   optional string parent = 1;
   string id = 2;
   map<string, string> children = 3;
-  optional TreeNodeMetaP meta = 4;
-  optional TreeNodeTimestampP lastMoveTimestamp = 5;
+  optional JKleppmannTreeNodeMetaP meta = 4;
+  optional JKleppmannTreeNodeTimestampP lastMoveTimestamp = 5;
 }
 
 message JObjectDataP {
@@ -94,6 +94,6 @@ message JObjectDataP {
     ChunkDataP chunkData = 5;
     PeerDirectoryP peerDirectory = 6;
     PersistentPeerInfoP persistentPeerInfo = 7;
-    TreeNodeP treeNode = 8;
+    JKleppmannTreeNodeP treeNode = 8;
   }
 }

@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects.repository.peertrust;
 
 
-import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
+import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import io.quarkus.vertx.http.HttpServerOptionsCustomizer;
 import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.net.KeyCertOptions;
@@ -20,7 +20,7 @@ public class PeerTrustServerCustomizer implements HttpServerOptionsCustomizer {
     PeerTrustManager peerTrustManager;
 
     @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
+    PersistentPeerDataService persistentPeerDataService;
 
     @Override
     public void customizeHttpsServer(HttpServerOptions options) {
@@ -29,8 +29,8 @@ public class PeerTrustServerCustomizer implements HttpServerOptionsCustomizer {
             ks.load(null, null);
 
             ks.setKeyEntry("sslkey",
-                    persistentRemoteHostsService.getSelfKeypair().getPrivate(), null,
-                    new Certificate[]{persistentRemoteHostsService.getSelfCertificate()});
+                           persistentPeerDataService.getSelfKeypair().getPrivate(), null,
+                           new Certificate[]{persistentPeerDataService.getSelfCertificate()});
 
             KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
             keyManagerFactory.init(ks, null);

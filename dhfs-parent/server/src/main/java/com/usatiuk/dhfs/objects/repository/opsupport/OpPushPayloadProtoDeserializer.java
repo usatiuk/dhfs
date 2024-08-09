@@ -1,6 +1,6 @@
-package com.usatiuk.dhfs.objects.repository.invalidation;
+package com.usatiuk.dhfs.objects.repository.opsupport;
 
-import com.usatiuk.dhfs.objects.jkleppmanntree.helpers.JOpWrapper;
+import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeOpWrapper;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoDeserializer;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.OpPushPayload;
@@ -8,7 +8,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 @ApplicationScoped
-public class OpPushPayloadDeserializer implements ProtoDeserializer<OpPushPayload, Op> {
+public class OpPushPayloadProtoDeserializer implements ProtoDeserializer<OpPushPayload, Op> {
 
     @Inject
     ProtoSerializerService protoSerializerService;
@@ -16,7 +16,8 @@ public class OpPushPayloadDeserializer implements ProtoDeserializer<OpPushPayloa
     @Override
     public Op deserialize(OpPushPayload message) {
         return switch (message.getPayloadCase()) {
-            case JKLEPPMANNTREEOP -> (JOpWrapper) protoSerializerService.deserialize(message.getJKleppmannTreeOp());
+            case JKLEPPMANNTREEOP ->
+                    (JKleppmannTreeOpWrapper) protoSerializerService.deserialize(message.getJKleppmannTreeOp());
             case PAYLOAD_NOT_SET -> throw new IllegalArgumentException("OpPushPayload is null");
         };
     }

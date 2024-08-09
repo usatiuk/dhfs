@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects.repository.invalidation;
 
 import com.usatiuk.dhfs.SerializationHelper;
-import com.usatiuk.dhfs.objects.repository.RemoteHostManager;
+import com.usatiuk.dhfs.objects.repository.PeerManager;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -22,7 +22,7 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 @ApplicationScoped
 public class DeferredInvalidationQueueService {
     @Inject
-    RemoteHostManager remoteHostManager;
+    PeerManager remoteHostManager;
     @Inject
     InvalidationQueueService invalidationQueueService;
     @ConfigProperty(name = "dhfs.objects.root")

@@ -1,17 +1,17 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree;
 
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMeta;
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.TreeNodeJObjectData;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.kleppmanntree.TreeNode;
 import com.usatiuk.kleppmanntree.TreeNodeWrapper;
 
 import java.util.UUID;
 
-public class JTreeNodeWrapper implements TreeNodeWrapper<Long, UUID, JTreeNodeMeta, String> {
-    private final JObject<TreeNodeJObjectData> _backing;
+public class JKleppmannTreeNodeWrapper implements TreeNodeWrapper<Long, UUID, JKleppmannTreeNodeMeta, String> {
+    private final JObject<JKleppmannTreeNode> _backing;
 
-    public JTreeNodeWrapper(JObject<TreeNodeJObjectData> backing) {_backing = backing;}
+    public JKleppmannTreeNodeWrapper(JObject<JKleppmannTreeNode> backing) {_backing = backing;}
 
     @Override
     public void rLock() {
@@ -61,7 +61,7 @@ public class JTreeNodeWrapper implements TreeNodeWrapper<Long, UUID, JTreeNodeMe
     }
 
     @Override
-    public TreeNode<Long, UUID, JTreeNodeMeta, String> getNode() {
+    public TreeNode<Long, UUID, JKleppmannTreeNodeMeta, String> getNode() {
         _backing.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
         if (_backing.getData() == null) throw new IllegalStateException("Node " + _backing.getName() + " data lost!");
         return _backing.getData().getNode();

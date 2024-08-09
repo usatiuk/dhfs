@@ -7,7 +7,7 @@ import com.usatiuk.dhfs.objects.jrepository.PushResolution;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
-import com.usatiuk.dhfs.objects.repository.invalidation.Op;
+import com.usatiuk.dhfs.objects.repository.opsupport.Op;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 @ApplicationScoped
 public class RemoteObjectServiceClient {
     @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
+    PersistentPeerDataService persistentPeerDataService;
 
     @Inject
     RpcClientFactory rpcClientFactory;
@@ -41,7 +41,7 @@ public class RemoteObjectServiceClient {
 
     public Pair<ObjectHeader, JObjectDataP> getSpecificObject(UUID host, String name) {
         return rpcClientFactory.withObjSyncClient(host, client -> {
-            var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).setName(name).build());
+            var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString()).setName(name).build());
             return Pair.of(reply.getObject().getHeader(), reply.getObject().getContent());
         });
     }
@@ -56,7 +56,7 @@ public class RemoteObjectServiceClient {
                          .filter(entry -> entry.getValue().equals(ourVersion))
                          .map(Map.Entry::getKey).toList();
             else
-                return persistentRemoteHostsService.getHostUuids();
+                return persistentPeerDataService.getHostUuids();
         });
 
         if (targets.isEmpty())
@@ -65,7 +65,7 @@ public class RemoteObjectServiceClient {
         Log.info("Downloading object " + jObject.getName() + " from " + targets.stream().map(UUID::toString).collect(Collectors.joining(", ")));
 
         return rpcClientFactory.withObjSyncClient(targets, client -> {
-            var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).setName(jObject.getName()).build());
+            var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString()).setName(jObject.getName()).build());
 
             var receivedMap = new HashMap<UUID, Long>();
             for (var e : reply.getObject().getHeader().getChangelog().getEntriesList()) {
@@ -98,13 +98,13 @@ public class RemoteObjectServiceClient {
 
     public GetIndexReply getIndex(UUID host) {
         return rpcClientFactory.withObjSyncClient(host, client -> {
-            var req = GetIndexRequest.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).build();
+            var req = GetIndexRequest.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString()).build();
             return client.getIndex(req);
         });
     }
 
     public IndexUpdateReply notifyUpdate(JObject<?> obj, UUID host) {
-        var builder = IndexUpdatePush.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString());
+        var builder = IndexUpdatePush.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString());
 
         var header = obj
                 .runReadLocked(
@@ -129,7 +129,7 @@ public class RemoteObjectServiceClient {
 
     public OpPushReply pushOp(Op op, String queueName, UUID host) {
         var msg = OpPushMsg.newBuilder()
-                           .setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString())
+                           .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
                            .setQueueId(queueName)
                            .setMsg(protoSerializerService.serializeToOpPushPayload(op))
                            .build();
@@ -144,7 +144,7 @@ public class RemoteObjectServiceClient {
                 executor.invokeAll(targets.stream().<Callable<Void>>map(h -> () -> {
                     try {
                         var req = CanDeleteRequest.newBuilder()
-                                                  .setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString())
+                                                  .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
                                                   .setName(object);
                         req.addAllOurReferrers(ourReferrers);
                         var res = rpcClientFactory.withObjSyncClient(h, client -> client.canDelete(req.build()));

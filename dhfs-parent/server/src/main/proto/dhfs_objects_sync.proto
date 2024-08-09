@@ -86,17 +86,17 @@ message IndexUpdatePush {
 
 message IndexUpdateReply {}
 
-message OpPushJKleppmannTree {
+message JKleppmannTreeOpP {
   int64 timestamp = 1;
   string peer = 2;
   string newParentId = 3;
-  dhfs.objects.persistence.TreeNodeMetaP meta = 4;
+  dhfs.objects.persistence.JKleppmannTreeNodeMetaP meta = 4;
   string child = 5;
 }
 
 message OpPushPayload {
   oneof payload {
-    OpPushJKleppmannTree jKleppmannTreeOp = 1;
+    JKleppmannTreeOpP jKleppmannTreeOp = 1;
   }
 }
 

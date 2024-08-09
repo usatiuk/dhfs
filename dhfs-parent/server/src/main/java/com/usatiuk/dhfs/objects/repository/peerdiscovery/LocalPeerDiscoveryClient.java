@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects.repository.peerdiscovery;
 
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.usatiuk.dhfs.objects.repository.RemoteHostManager;
+import com.usatiuk.dhfs.objects.repository.PeerManager;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.Startup;
@@ -18,7 +18,7 @@ import java.util.UUID;
 public class LocalPeerDiscoveryClient {
 
     @Inject
-    RemoteHostManager remoteHostManager;
+    PeerManager remoteHostManager;
 
     private Thread _clientThread;
 

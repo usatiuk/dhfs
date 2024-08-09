@@ -5,7 +5,7 @@ import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import com.usatiuk.dhfs.objects.repository.ObjectHeader;
-import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
+import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -19,7 +19,7 @@ import java.util.*;
 @ApplicationScoped
 public class PeerDirectoryConflictResolver implements ConflictResolver {
     @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
+    PersistentPeerDataService persistentPeerDataService;
 
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
@@ -55,7 +55,7 @@ public class PeerDirectoryConflictResolver implements ConflictResolver {
                 throw new StatusRuntimeException(Status.ABORTED.withDescription("Race when conflict resolving"));
 
             if (wasChanged) {
-                newChangelog.merge(persistentRemoteHostsService.getSelfUuid(), 1L, Long::sum);
+                newChangelog.merge(persistentPeerDataService.getSelfUuid(), 1L, Long::sum);
 
                 for (var child : mergedChildren) {
                     if (!oursPD.getPeers().contains(child)) {

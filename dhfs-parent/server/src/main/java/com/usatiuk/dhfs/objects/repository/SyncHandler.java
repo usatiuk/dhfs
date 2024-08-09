@@ -22,7 +22,7 @@ public class SyncHandler {
     @Inject
     JObjectManager jObjectManager;
     @Inject
-    RemoteHostManager remoteHostManager;
+    PeerManager remoteHostManager;
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
     @Inject
@@ -30,7 +30,7 @@ public class SyncHandler {
     @Inject
     Instance<ConflictResolver> conflictResolvers;
     @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
+    PersistentPeerDataService persistentPeerDataService;
     @Inject
     ProtoSerializerService protoSerializerService;
 
@@ -105,7 +105,7 @@ public class SyncHandler {
                 invalidate.apply();
                 md.getChangelog().clear();
                 md.getChangelog().putAll(receivedMap);
-                md.getChangelog().putIfAbsent(persistentRemoteHostsService.getSelfUuid(), 0L);
+                md.getChangelog().putIfAbsent(persistentPeerDataService.getSelfUuid(), 0L);
                 if (header.hasPushedData())
                     found.externalResolution(protoSerializerService.deserialize(header.getPushedData()));
                 return false;

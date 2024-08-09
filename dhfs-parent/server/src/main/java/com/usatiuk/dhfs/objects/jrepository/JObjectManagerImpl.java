@@ -2,7 +2,7 @@ package com.usatiuk.dhfs.objects.jrepository;
 
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
-import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
+import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -32,7 +32,7 @@ public class JObjectManagerImpl implements JObjectManager {
     @Inject
     JObjectResolver jObjectResolver;
     @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
+    PersistentPeerDataService persistentPeerDataService;
     @Inject
     ProtoSerializerService protoSerializerService;
     @Inject
@@ -131,7 +131,7 @@ public class JObjectManagerImpl implements JObjectManager {
                     if (!object.getClass().isAnnotationPresent(AssumedUnique.class))
                         throw new IllegalArgumentException("Trying to insert different object with same key");
                 } else {
-                    newObj = new JObject<D>(jObjectResolver, object.getName(), persistentRemoteHostsService.getSelfUuid(), object);
+                    newObj = new JObject<D>(jObjectResolver, object.getName(), persistentPeerDataService.getSelfUuid(), object);
                     newObj.rwLock();
                     while (ret == null) {
                         JObject<?> finalNewObj = newObj;

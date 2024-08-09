@@ -1,15 +1,10 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree;
 
 import com.usatiuk.dhfs.SerializationHelper;
-import com.usatiuk.dhfs.files.objects.File;
-import com.usatiuk.dhfs.objects.jkleppmanntree.helpers.JOpWrapper;
-import com.usatiuk.dhfs.objects.jkleppmanntree.helpers.OpQueueHelper;
-import com.usatiuk.dhfs.objects.jkleppmanntree.helpers.StorageInterfaceService;
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMetaFile;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
-import com.usatiuk.dhfs.objects.repository.invalidation.IncomingOpListener;
-import com.usatiuk.dhfs.objects.repository.invalidation.Op;
-import com.usatiuk.dhfs.objects.repository.invalidation.OpListenerDispatcher;
+import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
+import com.usatiuk.dhfs.objects.repository.opsupport.OpObjectRegistry;
+import com.usatiuk.dhfs.objects.repository.opsupport.OpSender;
 import com.usatiuk.kleppmanntree.AtomicClock;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
@@ -24,8 +19,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
@@ -33,18 +26,19 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 @ApplicationScoped
 public class JKleppmannTreeManager {
     @Inject
-    JPeerInterface jPeerInterface;
+    JKleppmannTreePeerInterface jKleppmannTreePeerInterface;
     @Inject
-    StorageInterfaceService storageInterfaceService;
+    OpSender opSender;
     @Inject
-    OpQueueHelper opQueueHelper;
-    @Inject
-    OpListenerDispatcher opListenerDispatcher;
+    OpObjectRegistry opObjectRegistry;
     @Inject
     JObjectManager jObjectManager;
+    @Inject
+    PersistentPeerDataService persistentPeerDataService;
 
     @ConfigProperty(name = "dhfs.objects.root")
     String dataRoot;
+
     private static final String dataFileName = "trees";
 
     // FIXME: There should be something smarter...
@@ -87,26 +81,9 @@ public class JKleppmannTreeManager {
     }
 
     private JKleppmannTree createTree(String name) {
-        var pdata = _persistentData.computeIfAbsent(name, n -> new JKleppmannTreePersistentData(opQueueHelper, n, new AtomicClock()));
-        pdata.restoreHelper(opQueueHelper);
-        var tree = new JKleppmannTree(pdata, storageInterfaceService, jPeerInterface);
-        opListenerDispatcher.registerListener(pdata.getId(), new IncomingOpListener() {
-            @Override
-            public void accept(UUID incomingPeer, Op op) {
-                if (!(op instanceof JOpWrapper jop))
-                    throw new IllegalArgumentException("Invalid incoming op type for JKleppmannTree: " + op.getClass() + " " + name);
-
-                if (jop.getOp().newMeta() instanceof JTreeNodeMetaFile f) {
-                    var fino = f.getFileIno();
-                    jObjectManager.getOrPut(fino, File.class, Optional.of(jop.getOp().childId()));
-                }
-
-                if (Log.isTraceEnabled())
-                    Log.trace("Received op from " + incomingPeer + ": " + jop.getOp().timestamp().timestamp() + " " + jop.getOp().childId() + "->" + jop.getOp().newParentId());
-
-                tree.applyExternalOp(incomingPeer, jop.getOp());
-            }
-        });
+        var pdata = _persistentData.computeIfAbsent(name, n -> new JKleppmannTreePersistentData(n, new AtomicClock()));
+        var tree = new JKleppmannTree(pdata, jKleppmannTreePeerInterface, jObjectManager, persistentPeerDataService, opSender);
+        opObjectRegistry.registerObject(tree);
         return tree;
     }
 }

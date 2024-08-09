@@ -1,6 +1,6 @@
-package com.usatiuk.dhfs.objects.repository.invalidation;
+package com.usatiuk.dhfs.objects.repository.opsupport;
 
-import com.usatiuk.dhfs.objects.repository.RemoteHostManager;
+import com.usatiuk.dhfs.objects.repository.PeerManager;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
@@ -11,13 +11,14 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public class OpSender {
     @Inject
-    RemoteHostManager remoteHostManager;
+    PeerManager remoteHostManager;
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
 
@@ -25,7 +26,7 @@ public class OpSender {
     private ExecutorService _executor;
     private volatile boolean _shutdown = false;
 
-    private final HashSetDelayedBlockingQueue<OpQueue> _queue = new HashSetDelayedBlockingQueue<>(0); // FIXME:
+    private final HashSetDelayedBlockingQueue<OpObject<?>> _queue = new HashSetDelayedBlockingQueue<>(0); // FIXME:
 
     @Startup
     void init() {
@@ -53,23 +54,27 @@ public class OpSender {
             try {
                 var got = _queue.get();
                 for (var h : remoteHostManager.getAvailableHosts()) {
-                    Op op;
-                    while ((op = got.getForHost(h)) != null) {
-                        try {
-                            remoteObjectServiceClient.pushOp(op, got.getId(), h);
-                            got.commitOneForHost(h, op);
-                        } catch (Exception e) {
-                            Log.info("Error sending op to " + h, e);
-                            break;
-                        }
-                    }
+                    sendForHost(got, h);
                 }
             } catch (InterruptedException ignored) {
             }
         }
     }
 
-    public void push(OpQueue queue) {
+    private <OpLocal extends Op> void sendForHost(OpObject<OpLocal> queue, UUID host) {
+        OpLocal op;
+        while ((op = queue.getPendingOpForHost(host)) != null) {
+            try {
+                remoteObjectServiceClient.pushOp(op, queue.getId(), host);
+                queue.commitOpForHost(host, op);
+            } catch (Exception e) {
+                Log.info("Error sending op to " + host, e);
+                break;
+            }
+        }
+    }
+
+    public void push(OpObject<?> queue) {
         _queue.readd(queue);
     }
 }

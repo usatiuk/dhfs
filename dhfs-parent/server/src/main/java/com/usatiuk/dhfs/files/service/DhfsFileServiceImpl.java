@@ -8,13 +8,13 @@ import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.objects.FsNode;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTree;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeManager;
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMeta;
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMetaDirectory;
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JTreeNodeMetaFile;
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.TreeNodeJObjectData;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaDirectory;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaFile;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
-import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
+import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -64,7 +64,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     boolean writeLogging;
 
     @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
+    PersistentPeerDataService persistentPeerDataService;
     @Inject
     JKleppmannTreeManager jKleppmannTreeManager;
 
@@ -74,7 +74,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         if (useHashForChunks) {
             return new ChunkData(bytes);
         } else {
-            return new ChunkData(bytes, persistentRemoteHostsService.getUniqueId());
+            return new ChunkData(bytes, persistentPeerDataService.getUniqueId());
         }
     }
 
@@ -83,22 +83,22 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         _tree = jKleppmannTreeManager.getTree("fs");
     }
 
-    private JObject<TreeNodeJObjectData> getDirEntry(String name) {
+    private JObject<JKleppmannTreeNode> getDirEntry(String name) {
         var res = _tree.traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
         if (res == null) throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
         var ret = jObjectManager.get(res).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
-        if (!ret.getKnownClass().equals(TreeNodeJObjectData.class))
+        if (!ret.getKnownClass().equals(JKleppmannTreeNode.class))
             throw new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not jObject: " + name));
-        return (JObject<TreeNodeJObjectData>) ret;
+        return (JObject<JKleppmannTreeNode>) ret;
     }
 
-    private Optional<JObject<TreeNodeJObjectData>> getDirEntryOpt(String name) {
+    private Optional<JObject<JKleppmannTreeNode>> getDirEntryOpt(String name) {
         var res = _tree.traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
         if (res == null) return Optional.empty();
         var ret = jObjectManager.get(res).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
-        if (!ret.getKnownClass().equals(TreeNodeJObjectData.class))
+        if (!ret.getKnownClass().equals(JKleppmannTreeNode.class))
             throw new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not jObject: " + name));
-        return Optional.of((JObject<TreeNodeJObjectData>) ret);
+        return Optional.of((JObject<JKleppmannTreeNode>) ret);
     }
 
     @Override
@@ -109,7 +109,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             GetattrRes ret;
             if (d instanceof File f) {
                 ret = new GetattrRes(f.getMtime(), f.getCtime(), f.getMode(), f.isSymlink() ? GetattrType.SYMLINK : GetattrType.FILE);
-            } else if (d instanceof TreeNodeJObjectData) {
+            } else if (d instanceof JKleppmannTreeNode) {
                 ret = new GetattrRes(100, 100, 0700, GetattrType.DIRECTORY);
             } else {
                 throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + m.getName()));
@@ -123,8 +123,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         try {
             var ret = getDirEntry(name);
             return Optional.of(ret.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
-                if (d.getNode().getMeta() instanceof JTreeNodeMetaFile f) return f.getFileIno();
-                else if (d.getNode().getMeta() instanceof JTreeNodeMetaDirectory f) return m.getName();
+                if (d.getNode().getMeta() instanceof JKleppmannTreeNodeMetaFile f) return f.getFileIno();
+                else if (d.getNode().getMeta() instanceof JKleppmannTreeNodeMetaDirectory f) return m.getName();
                 throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + m.getName()));
             }));
         } catch (StatusRuntimeException e) {
@@ -135,11 +135,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
     }
 
-    private void ensureDir(JObject<TreeNodeJObjectData> entry) {
+    private void ensureDir(JObject<JKleppmannTreeNode> entry) {
         entry.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
-            if (d.getNode().getMeta() instanceof JTreeNodeMetaFile f)
+            if (d.getNode().getMeta() instanceof JKleppmannTreeNodeMetaFile f)
                 throw new StatusRuntimeExceptionNoStacktrace(Status.INVALID_ARGUMENT.withDescription(m.getName() + " is a file, not directory"));
-            else if (d.getNode().getMeta() instanceof JTreeNodeMetaDirectory f) return null;
+            else if (d.getNode().getMeta() instanceof JKleppmannTreeNodeMetaDirectory f) return null;
             throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + m.getName()));
         });
     }
@@ -160,7 +160,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var newNodeId = _tree.getNewNodeId();
         var fobj = jObjectManager.putLocked(f, Optional.of(newNodeId));
         try {
-            _tree.move(parent.getName(), new JTreeNodeMetaFile(fname, f.getName()), newNodeId);
+            _tree.move(parent.getName(), new JKleppmannTreeNodeMetaFile(fname, f.getName()), newNodeId);
         } catch (Exception e) {
             fobj.getMeta().removeRef(newNodeId);
             throw e;
@@ -180,14 +180,14 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
         Log.debug("Creating directory " + name);
 
-        _tree.move(parent.getName(), new JTreeNodeMetaDirectory(dname), _tree.getNewNodeId());
+        _tree.move(parent.getName(), new JKleppmannTreeNodeMetaDirectory(dname), _tree.getNewNodeId());
     }
 
     @Override
     public void unlink(String name) {
         var node = getDirEntryOpt(name).orElse(null);
-        JTreeNodeMeta meta = node.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
-            if (d.getNode().getMeta() instanceof JTreeNodeMetaDirectory f)
+        JKleppmannTreeNodeMeta meta = node.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
+            if (d.getNode().getMeta() instanceof JKleppmannTreeNodeMetaDirectory f)
                 if (!d.getNode().getChildren().isEmpty()) throw new DirectoryNotEmptyException();
             return d.getNode().getMeta();
         });
@@ -198,7 +198,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Override
     public Boolean rename(String from, String to) {
         var node = getDirEntry(from);
-        JTreeNodeMeta meta = node.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getNode().getMeta());
+        JKleppmannTreeNodeMeta meta = node.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> d.getNode().getMeta());
 
         var toPath = Path.of(to);
         var toDentry = getDirEntry(toPath.getParent().toString());
@@ -214,7 +214,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var dent = jObjectManager.get(uuid).orElseThrow(() -> new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND));
 
         dent.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, d, bump, i) -> {
-            if (d instanceof TreeNodeJObjectData) {
+            if (d instanceof JKleppmannTreeNode) {
                 return null;//FIXME:?
             } else if (d instanceof File f) {
                 bump.apply();
@@ -234,7 +234,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var found = getDirEntry(name);
 
         return found.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
-            if (!(d instanceof TreeNodeJObjectData) || !(d.getNode().getMeta() instanceof JTreeNodeMetaDirectory)) {
+            if (!(d instanceof JKleppmannTreeNode) || !(d.getNode().getMeta() instanceof JKleppmannTreeNodeMetaDirectory)) {
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
             }
             return new ArrayList<>(d.getNode().getChildren().keySet());
@@ -696,7 +696,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         jObjectManager.put(newChunkInfo, Optional.of(f.getName()));
         jObjectManager.put(f, Optional.of(newNodeId));
 
-        _tree.move(parent.getName(), new JTreeNodeMetaFile(fname, f.getName()), newNodeId);
+        _tree.move(parent.getName(), new JKleppmannTreeNodeMetaFile(fname, f.getName()), newNodeId);
         return f.getName();
     }
 
@@ -705,10 +705,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         var file = jObjectManager.get(fileUuid).orElseThrow(
                 () -> new StatusRuntimeException(Status.NOT_FOUND.withDescription(
                         "File not found for setTimes: " + fileUuid))
-                                                           );
+        );
 
         file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (m, fileData, bump, i) -> {
-            if (fileData instanceof TreeNodeJObjectData) return null; // FIXME:
+            if (fileData instanceof JKleppmannTreeNode) return null; // FIXME:
             if (!(fileData instanceof FsNode fd))
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
 
@@ -723,7 +723,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Override
     public Long size(String uuid) {
         var read = jObjectManager.get(uuid)
-                                 .orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
+                .orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
         try {
             return read.runReadLocked(JObject.ResolutionStrategy.REMOTE, (fsNodeData, fileData) -> {

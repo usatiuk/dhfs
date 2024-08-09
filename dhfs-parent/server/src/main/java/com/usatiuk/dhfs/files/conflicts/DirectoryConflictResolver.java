@@ -7,7 +7,7 @@ import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import com.usatiuk.dhfs.objects.repository.ObjectHeader;
-import com.usatiuk.dhfs.objects.repository.PersistentRemoteHostsService;
+import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -20,7 +20,7 @@ import java.util.*;
 @ApplicationScoped
 public class DirectoryConflictResolver implements ConflictResolver {
     @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
+    PersistentPeerDataService persistentPeerDataService;
 
     @Inject
     JObjectManager jObjectManager;
@@ -50,7 +50,7 @@ public class DirectoryConflictResolver implements ConflictResolver {
             } else {
                 second = oursDir;
                 first = theirsDir;
-                otherHostname = persistentRemoteHostsService.getSelfUuid();
+                otherHostname = persistentPeerDataService.getSelfUuid();
             }
 
             LinkedHashMap<String, UUID> mergedChildren = new LinkedHashMap<>(first.getChildren());
@@ -86,7 +86,7 @@ public class DirectoryConflictResolver implements ConflictResolver {
                 throw new StatusRuntimeException(Status.ABORTED.withDescription("Race when conflict resolving"));
 
             if (wasChanged) {
-                newChangelog.merge(persistentRemoteHostsService.getSelfUuid(), 1L, Long::sum);
+                newChangelog.merge(persistentPeerDataService.getSelfUuid(), 1L, Long::sum);
 
                 for (var child : mergedChildren.values()) {
                     if (!(new HashSet<>(oursDir.getChildren().values()).contains(child))) {

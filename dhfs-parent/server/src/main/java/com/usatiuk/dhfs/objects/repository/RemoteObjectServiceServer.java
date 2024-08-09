@@ -7,7 +7,7 @@ import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.autosync.AutoSyncProcessor;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
-import com.usatiuk.dhfs.objects.repository.invalidation.OpListenerDispatcher;
+import com.usatiuk.dhfs.objects.repository.opsupport.OpObjectRegistry;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.grpc.GrpcService;
@@ -31,13 +31,13 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     JObjectManager jObjectManager;
 
     @Inject
-    RemoteHostManager remoteHostManager;
+    PeerManager remoteHostManager;
 
     @Inject
     AutoSyncProcessor autoSyncProcessor;
 
     @Inject
-    PersistentRemoteHostsService persistentRemoteHostsService;
+    PersistentPeerDataService persistentPeerDataService;
 
     @Inject
     InvalidationQueueService invalidationQueueService;
@@ -46,13 +46,13 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     ProtoSerializerService protoSerializerService;
 
     @Inject
-    OpListenerDispatcher opListenerDispatcher;
+    OpObjectRegistry opObjectRegistry;
 
     @Override
     @Blocking
     public Uni<GetObjectReply> getObject(GetObjectRequest request) {
         if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-        if (!persistentRemoteHostsService.existsHost(UUID.fromString(request.getSelfUuid())))
+        if (!persistentPeerDataService.existsHost(UUID.fromString(request.getSelfUuid())))
             throw new StatusRuntimeException(Status.UNAUTHENTICATED);
 
         Log.info("<-- getObject: " + request.getName() + " from " + request.getSelfUuid());
@@ -70,7 +70,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         obj.markSeen();
         var replyObj = ApiObject.newBuilder().setHeader(read.getLeft()).setContent(read.getRight()).build();
         return Uni.createFrom().item(GetObjectReply.newBuilder()
-                                                   .setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString())
+                                                   .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
                                                    .setObject(replyObj).build());
     }
 
@@ -78,7 +78,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Blocking
     public Uni<CanDeleteReply> canDelete(CanDeleteRequest request) {
         if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-        if (!persistentRemoteHostsService.existsHost(UUID.fromString(request.getSelfUuid())))
+        if (!persistentPeerDataService.existsHost(UUID.fromString(request.getSelfUuid())))
             throw new StatusRuntimeException(Status.UNAUTHENTICATED);
 
         Log.info("<-- canDelete: " + request.getName() + " from " + request.getSelfUuid());
@@ -87,7 +87,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
         var obj = jObjectManager.get(request.getName());
 
-        builder.setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString());
+        builder.setSelfUuid(persistentPeerDataService.getSelfUuid().toString());
         builder.setObjName(request.getName());
 
         if (obj.isPresent()) try {
@@ -118,7 +118,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Blocking
     public Uni<GetIndexReply> getIndex(GetIndexRequest request) {
         if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-        if (!persistentRemoteHostsService.existsHost(UUID.fromString(request.getSelfUuid())))
+        if (!persistentPeerDataService.existsHost(UUID.fromString(request.getSelfUuid())))
             throw new StatusRuntimeException(Status.UNAUTHENTICATED);
 
         Log.info("<-- getIndex: from " + request.getSelfUuid());
@@ -139,7 +139,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Blocking
     public Uni<IndexUpdateReply> indexUpdate(IndexUpdatePush request) {
         if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-        if (!persistentRemoteHostsService.existsHost(UUID.fromString(request.getSelfUuid())))
+        if (!persistentPeerDataService.existsHost(UUID.fromString(request.getSelfUuid())))
             throw new StatusRuntimeException(Status.UNAUTHENTICATED);
 
 //        Log.info("<-- indexUpdate: " + request.getHeader().getName());
@@ -149,11 +149,11 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Override
     public Uni<OpPushReply> opPush(OpPushMsg request) {
         if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-        if (!persistentRemoteHostsService.existsHost(UUID.fromString(request.getSelfUuid())))
+        if (!persistentPeerDataService.existsHost(UUID.fromString(request.getSelfUuid())))
             throw new StatusRuntimeException(Status.UNAUTHENTICATED);
 
         try {
-            opListenerDispatcher.accept(request.getQueueId(), UUID.fromString(request.getSelfUuid()), protoSerializerService.deserialize(request.getMsg()));
+            opObjectRegistry.acceptExternalOp(request.getQueueId(), UUID.fromString(request.getSelfUuid()), protoSerializerService.deserialize(request.getMsg()));
         } catch (Exception e) {
             Log.error(e, e);
             throw e;
@@ -166,6 +166,6 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     public Uni<PingReply> ping(PingRequest request) {
         if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
 
-        return Uni.createFrom().item(PingReply.newBuilder().setSelfUuid(persistentRemoteHostsService.getSelfUuid().toString()).build());
+        return Uni.createFrom().item(PingReply.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString()).build());
     }
 }
