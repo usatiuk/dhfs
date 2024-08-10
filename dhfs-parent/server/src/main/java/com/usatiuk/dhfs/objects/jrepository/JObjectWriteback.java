@@ -87,8 +87,8 @@ public class JObjectWriteback {
                     Thread.sleep(1000);
                     if (_currentSize.get() > 0)
                         Log.info("Writeback status: size="
-                                         + _currentSize.get() / 1024 / 1024 + "MB"
-                                         + " watermark=" + (_watermarkReached.get() ? "reached" : "not reached"));
+                                + _currentSize.get() / 1024 / 1024 + "MB"
+                                + " watermark=" + (_watermarkReached.get() ? "reached" : "not reached"));
                 }
             } catch (InterruptedException ignored) {
             }
@@ -209,7 +209,7 @@ public class JObjectWriteback {
             while (!finished && System.currentTimeMillis() - started < timeout) {
                 synchronized (this) {
                     try {
-                        this.wait();
+                        this.wait(timeout);
                         finished = true;
                     } catch (InterruptedException ignored) {
                     }
