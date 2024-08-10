@@ -2,7 +2,6 @@ package com.usatiuk.dhfs.integration;
 
 import com.github.dockerjava.api.model.Device;
 import io.quarkus.logging.Log;
-import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.*;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
@@ -231,32 +230,35 @@ public class DhfsFusex3IT {
                 container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout());
     }
 
-
     @Test
-    @Disabled
-    void fileConflictTest2() throws IOException, InterruptedException, TimeoutException {
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
+    void fileConflictTest() throws IOException, InterruptedException, TimeoutException {
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf").getExitCode());
         Thread.sleep(2000);
-        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
-        Assertions.assertEquals("tesempty\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
+        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf").getStdout());
+        Assertions.assertEquals("tesempty\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf").getStdout());
+        Thread.sleep(1000);
 
-        boolean writeFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_default/fuse/testf1"),
-                Pair.of(container2, "echo test2 >> /root/dhfs_default/fuse/testf1"),
-                Pair.of(container3, "echo test3 >> /root/dhfs_default/fuse/testf1")).parallel().map(p -> {
-            try {
-                return p.getLeft().execInContainer("/bin/sh", "-c", p.getRight()).getExitCode();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }).anyMatch(r -> r != 0);
-        Assumptions.assumeTrue(!writeFail, "Failed creating one or more files");
+        var client = DockerClientFactory.instance().client();
+        client.pauseContainerCmd(container1.getContainerId()).exec();
+        client.pauseContainerCmd(container2.getContainerId()).exec();
+        // Pauses needed as otherwise docker buffers some incoming packets
+        waitingConsumer3.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS, 2);
+        Assertions.assertEquals(0, container3.execInContainer("/bin/sh", "-c", "echo test3 >> /root/dhfs_default/fuse/testf").getExitCode());
+        client.pauseContainerCmd(container3.getContainerId()).exec();
+        client.unpauseContainerCmd(container2.getContainerId()).exec();
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS, 2);
+        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "echo test2 >> /root/dhfs_default/fuse/testf").getExitCode());
+        client.pauseContainerCmd(container2.getContainerId()).exec();
+        client.unpauseContainerCmd(container1.getContainerId()).exec();
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS, 2);
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo test1 >> /root/dhfs_default/fuse/testf").getExitCode());
+        client.unpauseContainerCmd(container2.getContainerId()).exec();
+        client.unpauseContainerCmd(container3.getContainerId()).exec();
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
+        waitingConsumer3.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
+
         Thread.sleep(2000);
-        for (var c : List.of(container1, container2, container3)) {
-            var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
-            var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
-            Log.info("fileConflictTest2: " + ls);
-            Log.info("fileConflictTest2: " + cat);
-        }
         for (var c : List.of(container1, container2, container3)) {
             var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
             var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");

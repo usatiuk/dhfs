@@ -11,10 +11,12 @@ import com.usatiuk.kleppmanntree.KleppmannTree;
 import com.usatiuk.kleppmanntree.OpMove;
 import com.usatiuk.kleppmanntree.OpRecorder;
 import io.quarkus.logging.Log;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 
 public class JKleppmannTree implements OpObject<JKleppmannTreeOpWrapper> {
     private final KleppmannTree<Long, UUID, JKleppmannTreeNodeMeta, String, JKleppmannTreeNodeWrapper> _tree;
@@ -99,6 +101,10 @@ public class JKleppmannTree implements OpObject<JKleppmannTreeOpWrapper> {
     @Override
     public void pushBootstrap(UUID host) {
         _tree.recordBoostrapFor(host);
+    }
+
+    public Pair<String, String> findParent(Function<JKleppmannTreeNodeWrapper, Boolean> predicate) {
+        return _tree.findParent(predicate);
     }
 
     @Override

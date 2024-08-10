@@ -7,7 +7,6 @@ import com.usatiuk.dhfs.objects.repository.ObjectHeader;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
-import io.vertx.core.impl.ConcurrentHashSet;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -16,8 +15,6 @@ import java.io.ObjectInputStream;
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.*;
-import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class ObjectMetadata implements Serializable {
@@ -137,7 +134,7 @@ public class ObjectMetadata implements Serializable {
         return _referrers.stream().toList();
     }
 
-    protected Collection<String> getReferrersMutable() {
+    public Collection<String> getReferrersMutable() {
         return _referrers;
     }
 

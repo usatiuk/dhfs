@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.files.service;
 
 import com.google.protobuf.ByteString;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.Optional;
 
@@ -8,6 +9,8 @@ public interface DhfsFileService {
     Optional<String> open(String name);
 
     Optional<String> create(String name, long mode);
+
+    Pair<String, String> inoToParent(String ino);
 
     void mkdir(String name, long mode);
 

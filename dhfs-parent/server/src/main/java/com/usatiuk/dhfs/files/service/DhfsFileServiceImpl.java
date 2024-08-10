@@ -24,6 +24,7 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.nio.charset.StandardCharsets;
@@ -168,6 +169,17 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             fobj.rwUnlock();
         }
         return Optional.of(f.getName());
+    }
+
+    //FIXME: Slow..
+    @Override
+    public Pair<String, String> inoToParent(String ino) {
+        return _tree.findParent(w -> {
+            if (w.getNode().getMeta() instanceof JKleppmannTreeNodeMetaFile f)
+                if (f.getFileIno().equals(ino))
+                    return true;
+            return false;
+        });
     }
 
     @Override

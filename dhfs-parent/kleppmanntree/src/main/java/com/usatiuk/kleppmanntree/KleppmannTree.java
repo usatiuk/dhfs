@@ -1,9 +1,12 @@
 package com.usatiuk.kleppmanntree;
 
+import org.apache.commons.lang3.tuple.Pair;
+
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -460,7 +463,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         return false;
     }
 
-    private void walkTree(Consumer<WrapperT> consumer) {
+    public void walkTree(Consumer<WrapperT> consumer) {
         _lock.readLock().lock();
         try {
             ArrayDeque<NodeIdT> queue = new ArrayDeque<>();
@@ -481,6 +484,36 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         } finally {
             _lock.readLock().unlock();
         }
+    }
+
+    public Pair<String, NodeIdT> findParent(Function<WrapperT, Boolean> kidPredicate) {
+        _lock.readLock().lock();
+        try {
+            ArrayDeque<NodeIdT> queue = new ArrayDeque<>();
+            queue.push(_storage.getRootId());
+
+            while (!queue.isEmpty()) {
+                var id = queue.pop();
+                var node = _storage.getById(id);
+                if (node == null) continue;
+                node.rLock();
+                try {
+                    var children = node.getNode().getChildren();
+                    for (var childEntry : children.entrySet()) {
+                        var child = _storage.getById(childEntry.getValue());
+                        if (kidPredicate.apply(child)) {
+                            return Pair.of(childEntry.getKey(), node.getNode().getId());
+                        }
+                    }
+                    queue.addAll(children.values());
+                } finally {
+                    node.rUnlock();
+                }
+            }
+        } finally {
+            _lock.readLock().unlock();
+        }
+        return null;
     }
 
     public void recordBoostrapFor(PeerIdT host) {
