@@ -21,30 +21,10 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Singleton
 public class JObjectWriteback {
-    private class QueueEntry {
-        private final JObject<?> _obj;
-        private final long _size;
-
-        private QueueEntry(JObject<?> obj, long size) {
-            _obj = obj;
-            _size = size;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            QueueEntry that = (QueueEntry) o;
-            return Objects.equals(_obj, that._obj);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hashCode(_obj);
-        }
-    }
-
     private final HashSetDelayedBlockingQueue<QueueEntry> _writeQueue;
+    private final AtomicLong _currentSize = new AtomicLong(0);
+    private final AtomicBoolean _watermarkReached = new AtomicBoolean(false);
+    private final AtomicBoolean _shutdown = new AtomicBoolean(false);
     @Inject
     ObjectPersistentStore objectPersistentStore;
     @Inject
@@ -61,14 +41,8 @@ public class JObjectWriteback {
     int writebackThreads;
     @ConfigProperty(name = "dhfs.objects.writeback.delay")
     long promotionDelay;
-
-    private final AtomicLong _currentSize = new AtomicLong(0);
-    private final AtomicBoolean _watermarkReached = new AtomicBoolean(false);
-    private final AtomicBoolean _shutdown = new AtomicBoolean(false);
-
     private ExecutorService _writebackExecutor;
     private ExecutorService _statusExecutor;
-
     public JObjectWriteback(@ConfigProperty(name = "dhfs.objects.writeback.delay") long promotionDelay) {
         _writeQueue = new HashSetDelayedBlockingQueue<>(promotionDelay);
     }
@@ -239,5 +213,28 @@ public class JObjectWriteback {
             _currentSize.addAndGet(size - old._size);
         else
             _currentSize.addAndGet(size);
+    }
+
+    private class QueueEntry {
+        private final JObject<?> _obj;
+        private final long _size;
+
+        private QueueEntry(JObject<?> obj, long size) {
+            _obj = obj;
+            _size = size;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            QueueEntry that = (QueueEntry) o;
+            return Objects.equals(_obj, that._obj);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(_obj);
+        }
     }
 }

@@ -25,6 +25,8 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
 @ApplicationScoped
 public class JKleppmannTreeManager {
+    private static final String dataFileName = "trees";
+    private final ConcurrentHashMap<String, JKleppmannTree> _trees = new ConcurrentHashMap<>();
     @Inject
     JKleppmannTreePeerInterface jKleppmannTreePeerInterface;
     @Inject
@@ -35,15 +37,10 @@ public class JKleppmannTreeManager {
     JObjectManager jObjectManager;
     @Inject
     PersistentPeerDataService persistentPeerDataService;
-
     @ConfigProperty(name = "dhfs.objects.root")
     String dataRoot;
-
-    private static final String dataFileName = "trees";
-
     // FIXME: There should be something smarter...
     private ConcurrentHashMap<String, JKleppmannTreePersistentData> _persistentData = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, JKleppmannTree> _trees = new ConcurrentHashMap<>();
 
     void init(@Observes @Priority(300) StartupEvent event) throws IOException {
         Paths.get(dataRoot).toFile().mkdirs();

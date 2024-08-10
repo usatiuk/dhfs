@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.objects.repository.opsupport;
 
 import com.usatiuk.dhfs.objects.repository.PeerManager;
-import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.scheduler.Scheduled;
@@ -14,12 +13,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @ApplicationScoped
 public class OpObjectRegistry {
+    private final ConcurrentHashMap<String, OpObject> _objects = new ConcurrentHashMap<>();
     @Inject
     OpSender opSender;
     @Inject
     PeerManager remoteHostManager;
-
-    private final ConcurrentHashMap<String, OpObject> _objects = new ConcurrentHashMap<>();
 
     public void registerObject(OpObject obj) {
         _objects.put(obj.getId(), obj);

@@ -199,7 +199,7 @@ public class DhfsFileServiceSimpleTestImpl {
         Assertions.assertTrue(fileService.open("/movedTest").isPresent());
 
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-                                     fileService.read(fileService.open("/movedTest").get(), 0, 10).get().toByteArray());
+                fileService.read(fileService.open("/movedTest").get(), 0, 10).get().toByteArray());
     }
 
     @Test
@@ -221,7 +221,7 @@ public class DhfsFileServiceSimpleTestImpl {
         Assertions.assertTrue(fileService.open("/moveOverTest2").isPresent());
 
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-                                     fileService.read(fileService.open("/moveOverTest2").get(), 0, 10).get().toByteArray());
+                fileService.read(fileService.open("/moveOverTest2").get(), 0, 10).get().toByteArray());
     }
 
     @Test
@@ -274,7 +274,7 @@ public class DhfsFileServiceSimpleTestImpl {
         Assertions.assertTrue(fileService.open("/movedTest2").isPresent());
 
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-                                     fileService.read(fileService.open("/movedTest2").get(), 0, 10).get().toByteArray());
+                fileService.read(fileService.open("/movedTest2").get(), 0, 10).get().toByteArray());
 
         var newfile = fileService.open("/movedTest2").get();
 

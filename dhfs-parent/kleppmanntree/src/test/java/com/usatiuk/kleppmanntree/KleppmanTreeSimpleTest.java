@@ -48,15 +48,15 @@ public class KleppmanTreeSimpleTest {
         Assertions.assertEquals(f1id, testNode2._tree.traverse(List.of("Test2", "TestFile")));
 
         var cop1 = new OpMove<>(new CombinedTimestamp<>(testNode1._clock.getTimestamp(), 1L),
-                                d1id,
-                                new TestNodeMetaDir("Test2"),
-                                d2id);
+                d1id,
+                new TestNodeMetaDir("Test2"),
+                d2id);
         testNode1._tree.move(d1id, new TestNodeMetaDir("Test2"), d2id);
         Assertions.assertEquals(d1id, testNode1._tree.traverse(List.of("Test1")));
         Assertions.assertEquals(d2id, testNode1._tree.traverse(List.of("Test1", "Test2")));
         Assertions.assertIterableEquals(List.of("Test1"), testNode1._storageInterface.getById(testNode2._storageInterface.getRootId()).getNode().getChildren().keySet());
 
-        testNode2._tree.move(d2id,new TestNodeMetaDir("Test1"),d1id);
+        testNode2._tree.move(d2id, new TestNodeMetaDir("Test1"), d1id);
         Assertions.assertIterableEquals(List.of("Test2"), testNode2._storageInterface.getById(testNode2._storageInterface.getRootId()).getNode().getChildren().keySet());
         Assertions.assertEquals(d2id, testNode2._tree.traverse(List.of("Test2")));
         Assertions.assertEquals(d1id, testNode2._tree.traverse(List.of("Test2", "Test1")));

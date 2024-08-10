@@ -22,15 +22,15 @@ public class FileSerializer implements ProtoSerializer<FileP, File>, ProtoDeseri
     @Override
     public FileP serialize(File object) {
         var ret = FileP.newBuilder()
-                       .setFsNode(FsNodeP.newBuilder()
-                                         .setCtime(object.getCtime())
-                                         .setMtime(object.getMtime())
-                                         .setMode(object.getMode())
-                                         .setUuid(object.getUuid().toString())
-                                         .build())
-                       .putAllChunks(object.getChunks())
-                       .setSymlink(object.isSymlink())
-                       .build();
+                .setFsNode(FsNodeP.newBuilder()
+                        .setCtime(object.getCtime())
+                        .setMtime(object.getMtime())
+                        .setMode(object.getMode())
+                        .setUuid(object.getUuid().toString())
+                        .build())
+                .putAllChunks(object.getChunks())
+                .setSymlink(object.isSymlink())
+                .build();
         return ret;
     }
 }

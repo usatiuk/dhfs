@@ -20,23 +20,11 @@ import java.util.Optional;
 @ApplicationScoped
 public class ProtoSerializerService {
 
-    @FunctionalInterface
-    public interface SerializationFn<M extends Message, O> {
-        M apply(O obj);
-    }
-
-    @FunctionalInterface
-    public interface DeserializationFn<M extends Message, O> {
-        O apply(M message);
-    }
-
     private final HashMap<Class<?>, SerializationFn<? extends Message, ?>> _serializers = new HashMap<>();
     private final HashMap<Class<? extends Message>, DeserializationFn<? extends Message, ?>> _deserializers = new HashMap<>();
-
     // Needed as otherwise they are removed
     @Inject
     Instance<ProtoSerializer<?, ?>> _protoSerializers;
-
     @Inject
     Instance<ProtoDeserializer<?, ?>> _protoDeserializers;
 
@@ -142,5 +130,15 @@ public class ProtoSerializerService {
         if (!_deserializers.containsKey(message.getClass()))
             throw new IllegalStateException("Deserializer not registered: " + message.getClass());
         return ((DeserializationFn<M, O>) _deserializers.get(message.getClass())).apply(message);
+    }
+
+    @FunctionalInterface
+    public interface SerializationFn<M extends Message, O> {
+        M apply(O obj);
+    }
+
+    @FunctionalInterface
+    public interface DeserializationFn<M extends Message, O> {
+        O apply(M message);
     }
 }

@@ -8,17 +8,12 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 
 public class HashSetDelayedBlockingQueue<T> {
-    private record SetElement<T>(T el, long time) {
-    }
-
     private final LinkedHashMap<T, SetElement<T>> _set = new LinkedHashMap<>();
-
+    private final Object _sleepSynchronizer = new Object();
     @Getter
     private long _delay;
 
     private boolean _closed = false;
-
-    private final Object _sleepSynchronizer = new Object();
 
     public HashSetDelayedBlockingQueue(long delay) {
         _delay = delay;
@@ -238,5 +233,8 @@ public class HashSetDelayedBlockingQueue<T> {
             _delay = delay;
             _sleepSynchronizer.notifyAll();
         }
+    }
+
+    private record SetElement<T>(T el, long time) {
     }
 }

@@ -12,7 +12,7 @@ public class JKleppmannTreeNodeMetaFile extends JKleppmannTreeNodeMeta {
     }
 
     @Override
-   public JKleppmannTreeNodeMeta withName(String name) {
+    public JKleppmannTreeNodeMeta withName(String name) {
         return new JKleppmannTreeNodeMetaFile(name, _fileIno);
     }
 }

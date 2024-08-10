@@ -3,8 +3,8 @@ package com.usatiuk.dhfs.objects.repository.invalidation;
 import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
-import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.objects.repository.PeerManager;
+import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
@@ -27,26 +27,20 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @ApplicationScoped
 public class InvalidationQueueService {
-    @Inject
-    PeerManager remoteHostManager;
-
-    @Inject
-    RemoteObjectServiceClient remoteObjectServiceClient;
-
-    @Inject
-    JObjectManager jObjectManager;
-
-    @Inject
-    PersistentPeerDataService persistentPeerDataService;
-
-    @Inject
-    DeferredInvalidationQueueService deferredInvalidationQueueService;
-
-    @ConfigProperty(name = "dhfs.objects.invalidation.threads")
-    int threads;
-
     private final HashSetDelayedBlockingQueue<Pair<UUID, String>> _queue;
     private final AtomicReference<ConcurrentHashSet<String>> _toAllQueue = new AtomicReference<>(new ConcurrentHashSet<>());
+    @Inject
+    PeerManager remoteHostManager;
+    @Inject
+    RemoteObjectServiceClient remoteObjectServiceClient;
+    @Inject
+    JObjectManager jObjectManager;
+    @Inject
+    PersistentPeerDataService persistentPeerDataService;
+    @Inject
+    DeferredInvalidationQueueService deferredInvalidationQueueService;
+    @ConfigProperty(name = "dhfs.objects.invalidation.threads")
+    int threads;
     private ExecutorService _executor;
     private volatile boolean _shutdown = false;
 

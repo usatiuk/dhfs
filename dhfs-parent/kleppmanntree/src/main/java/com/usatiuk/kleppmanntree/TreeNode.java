@@ -10,8 +10,8 @@ import java.util.Map;
 @Getter
 @Setter
 public class TreeNode<TimestampT extends Comparable<TimestampT>, PeerIdT extends Comparable<PeerIdT>, MetaT extends NodeMeta, NodeIdT> implements Serializable {
-    private NodeIdT _parent = null;
     private final NodeIdT _id;
+    private NodeIdT _parent = null;
     private OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> _lastEffectiveOp = null;
     private MetaT _meta = null;
     private Map<String, NodeIdT> _children = new HashMap<>();

@@ -29,8 +29,8 @@ public class PeerTrustServerCustomizer implements HttpServerOptionsCustomizer {
             ks.load(null, null);
 
             ks.setKeyEntry("sslkey",
-                           persistentPeerDataService.getSelfKeypair().getPrivate(), null,
-                           new Certificate[]{persistentPeerDataService.getSelfCertificate()});
+                    persistentPeerDataService.getSelfKeypair().getPrivate(), null,
+                    new Certificate[]{persistentPeerDataService.getSelfCertificate()});
 
             KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
             keyManagerFactory.init(ks, null);

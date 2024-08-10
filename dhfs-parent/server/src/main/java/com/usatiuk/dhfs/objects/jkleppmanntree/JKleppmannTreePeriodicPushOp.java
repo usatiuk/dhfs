@@ -1,8 +1,6 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree;
 
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.objects.repository.opsupport.Op;
-import com.usatiuk.kleppmanntree.OpMove;
 import lombok.Getter;
 
 import java.util.Collection;

@@ -17,16 +17,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public class OpSender {
+    private static final int _threads = 1;
+    private final HashSetDelayedBlockingQueue<OpObject> _queue = new HashSetDelayedBlockingQueue<>(0); // FIXME:
     @Inject
     PeerManager remoteHostManager;
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
-
-    private static final int _threads = 1;
     private ExecutorService _executor;
     private volatile boolean _shutdown = false;
-
-    private final HashSetDelayedBlockingQueue<OpObject> _queue = new HashSetDelayedBlockingQueue<>(0); // FIXME:
 
     @Startup
     void init() {

@@ -4,12 +4,11 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class TestStorageInterface implements StorageInterface<Long, Long, TestNodeMeta, Long, TestNodeWrapper> {
-    private long _curId = 1;
     private final long _peerId;
-
     private final Map<Long, TreeNode<Long, Long, TestNodeMeta, Long>> _nodes = new HashMap<>();
     private final NavigableMap<CombinedTimestamp<Long, Long>, LogRecord<Long, Long, TestNodeMeta, Long>> _log = new TreeMap<>();
     private final Map<Long, AtomicReference<Long>> _peerTimestampLog = new HashMap<>();
+    private long _curId = 1;
 
     public TestStorageInterface(long peerId) {
         _peerId = peerId;

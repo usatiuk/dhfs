@@ -31,20 +31,6 @@ public class JKleppmannTree implements OpObject {
     private final PersistentPeerDataService _persistentPeerDataService;
     private final OpSender _opSender;
 
-    private class JOpRecorder implements OpRecorder<Long, UUID, JKleppmannTreeNodeMeta, String> {
-        @Override
-        public void recordOp(OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> op) {
-            _persistentData.recordOp(_persistentPeerDataService.getHostUuids(), op);
-            _opSender.push(JKleppmannTree.this);
-        }
-
-        @Override
-        public void recordOpForPeer(UUID peer, OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> op) {
-            _persistentData.recordOp(peer, op);
-            _opSender.push(JKleppmannTree.this);
-        }
-    }
-
     JKleppmannTree(JKleppmannTreePersistentData persistentData,
                    JKleppmannTreePeerInterface peerInterface,
                    JObjectManager jObjectManager,
@@ -135,6 +121,20 @@ public class JKleppmannTree implements OpObject {
     @Override
     public Op getPeriodicPushOp() {
         return new JKleppmannTreePeriodicPushOp(_persistentPeerDataService.getSelfUuid(), _persistentData.getClock().peekTimestamp());
+    }
+
+    private class JOpRecorder implements OpRecorder<Long, UUID, JKleppmannTreeNodeMeta, String> {
+        @Override
+        public void recordOp(OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> op) {
+            _persistentData.recordOp(_persistentPeerDataService.getHostUuids(), op);
+            _opSender.push(JKleppmannTree.this);
+        }
+
+        @Override
+        public void recordOpForPeer(UUID peer, OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> op) {
+            _persistentData.recordOp(peer, op);
+            _opSender.push(JKleppmannTree.this);
+        }
     }
 }
 

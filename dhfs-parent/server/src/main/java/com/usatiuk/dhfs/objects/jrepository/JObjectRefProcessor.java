@@ -36,11 +36,10 @@ public class JObjectRefProcessor {
     int refProcessorThreads;
     @ConfigProperty(name = "dhfs.objects.deletion.can-delete-retry-delay")
     long canDeleteRetryDelay;
-    private ExecutorService _movableProcessorExecutorService;
-    private ExecutorService _refProcessorExecutorService;
-
     @Inject
     ExecutorService executorService;
+    private ExecutorService _movableProcessorExecutorService;
+    private ExecutorService _refProcessorExecutorService;
 
     public JObjectRefProcessor(@ConfigProperty(name = "dhfs.objects.deletion.delay") long deletionDelay,
                                @ConfigProperty(name = "dhfs.objects.deletion.can-delete-retry-delay") long canDeleteRetryDelay) {

@@ -18,7 +18,7 @@ public class PeerSyncApi {
     public PeerInfo getSelfInfo() {
         try {
             return new PeerInfo(persistentPeerDataService.getSelfUuid().toString(),
-                                Base64.getEncoder().encodeToString(persistentPeerDataService.getSelfCertificate().getEncoded()));
+                    Base64.getEncoder().encodeToString(persistentPeerDataService.getSelfCertificate().getEncoded()));
         } catch (CertificateEncodingException e) {
             throw new RuntimeException(e);
         }

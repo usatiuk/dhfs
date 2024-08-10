@@ -49,16 +49,16 @@ public class ChunkData extends JObjectData {
         _data = chunkDataP;
     }
 
+    public static String getNameFromHash(String hash) {
+        return "data_" + hash;
+    }
+
     public String getHash() {
         return _data.getName();
     }
 
     public ByteString getBytes() {
         return _data.getData();
-    }
-
-    public static String getNameFromHash(String hash) {
-        return "data_" + hash;
     }
 
     @Override

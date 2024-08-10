@@ -32,6 +32,8 @@ public interface ObjectPersistentStore {
     void deleteObject(String name);
 
     long getTotalSpace();
+
     long getFreeSpace();
+
     long getUsableSpace();
 }

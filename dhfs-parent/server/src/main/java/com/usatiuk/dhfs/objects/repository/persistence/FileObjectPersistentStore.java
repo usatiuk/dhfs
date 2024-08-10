@@ -30,12 +30,10 @@ import java.util.Objects;
 
 @ApplicationScoped
 public class FileObjectPersistentStore implements ObjectPersistentStore {
+    private final static long mmapThreshold = 65536;
     private final String root;
-
     private final Path metaPath;
     private final Path dataPath;
-
-    private final static long mmapThreshold = 65536;
 
     public FileObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.persistence.files.root") String root) {
         this.root = root;

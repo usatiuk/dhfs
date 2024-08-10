@@ -13,17 +13,15 @@ import java.util.concurrent.Executors;
 
 @ApplicationScoped
 public class JObjectLRU {
+    private final LinkedHashMap<JObject<?>, Long> _cache = new LinkedHashMap<>();
     @Inject
     JObjectSizeEstimator jObjectSizeEstimator;
     @ConfigProperty(name = "dhfs.objects.lru.limit")
     long sizeLimit;
     @ConfigProperty(name = "dhfs.objects.lru.print-stats")
     boolean printStats;
-
     private long _curSize = 0;
     private long _evict = 0;
-
-    private final LinkedHashMap<JObject<?>, Long> _cache = new LinkedHashMap<>();
     private ExecutorService _statusExecutor = null;
 
     @Startup

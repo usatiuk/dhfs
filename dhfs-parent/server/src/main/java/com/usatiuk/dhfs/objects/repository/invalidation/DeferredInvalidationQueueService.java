@@ -21,14 +21,13 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
 @ApplicationScoped
 public class DeferredInvalidationQueueService {
+    private static final String dataFileName = "invqueue";
     @Inject
     PeerManager remoteHostManager;
     @Inject
     InvalidationQueueService invalidationQueueService;
     @ConfigProperty(name = "dhfs.objects.root")
     String dataRoot;
-    private static final String dataFileName = "invqueue";
-
     // FIXME: DB when?
     private DeferredInvalidationQueueData _persistentData = new DeferredInvalidationQueueData();
 

@@ -84,11 +84,6 @@ public class PeerManager {
         }
     }
 
-    @FunctionalInterface
-    public interface ConnectionEventListener {
-        void apply(UUID host);
-    }
-
     // Note: registrations should be completed with Priority < 600
     public void registerConnectEventListener(ConnectionEventListener listener) {
         if (_ready) throw new IllegalStateException("Already initialized");
@@ -182,9 +177,6 @@ public class PeerManager {
                 .map(Map.Entry::getKey).toList());
     }
 
-    public record HostStateSnapshot(List<UUID> available, List<UUID> unavailable) {
-    }
-
     public HostStateSnapshot getHostStateSnapshot() {
         ArrayList<UUID> available = new ArrayList<>();
         ArrayList<UUID> unavailable = new ArrayList<>();
@@ -268,6 +260,14 @@ public class PeerManager {
                 .filter(e -> !persistentPeerDataService.existsHost(e.getKey()))
                 .map(e -> new AvailablePeerInfo(e.getKey().toString(), e.getValue().getAddr(), e.getValue().getPort()))
                 .toList();
+    }
+
+    @FunctionalInterface
+    public interface ConnectionEventListener {
+        void apply(UUID host);
+    }
+
+    public record HostStateSnapshot(List<UUID> available, List<UUID> unavailable) {
     }
 
 }

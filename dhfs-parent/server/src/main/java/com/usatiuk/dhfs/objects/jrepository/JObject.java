@@ -18,64 +18,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 
 public class JObject<T extends JObjectData> {
+    private static final int lockTimeoutSecs = 15;
     private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
     private final ObjectMetadata _metaPart;
     private final JObjectResolver _resolver;
     private final AtomicReference<T> _dataPart = new AtomicReference<>();
-    private static final int lockTimeoutSecs = 15;
-
-    private class TransactionState {
-        final int dataHash;
-        final int metaHash;
-        final int externalHash;
-        final boolean data;
-        boolean forceInvalidate = false;
-        final HashSet<String> oldRefs;
-
-        TransactionState() {
-            this.dataHash = _metaPart.dataHash();
-            this.metaHash = _metaPart.metaHash();
-            this.externalHash = _metaPart.externalHash();
-            this.data = _dataPart.get() != null || hasLocalCopy();
-
-            if (_resolver.refVerification) {
-                tryLocalResolve();
-                if (_dataPart.get() != null)
-                    oldRefs = new HashSet<>(_dataPart.get().extractRefs());
-                else
-                    oldRefs = null;
-            } else {
-                oldRefs = null;
-            }
-        }
-
-        void commit() {
-            _resolver.updateDeletionState(JObject.this);
-
-            var newDataHash = _metaPart.dataHash();
-            var newMetaHash = _metaPart.metaHash();
-            var newExternalHash = _metaPart.externalHash();
-            var newData = _dataPart.get() != null || hasLocalCopy();
-
-            if (_dataPart.get() != null)
-                _metaPart.narrowClass(_dataPart.get().getClass());
-
-            notifyWrite(
-                    newMetaHash != metaHash || forceInvalidate,
-                    newExternalHash != externalHash || forceInvalidate,
-                    newDataHash != dataHash
-                            || newData != data
-                            || forceInvalidate
-                       );
-
-            verifyRefs(oldRefs);
-        }
-
-        void forceInvalidate() {
-            forceInvalidate = true;
-        }
-    }
-
     private TransactionState _transactionState = null;
 
     // Create a new object
@@ -338,7 +285,6 @@ public class JObject<T extends JObjectData> {
         _resolver.bumpVersionSelf(this);
     }
 
-
     public void discardData() {
         assertRWLock();
         if (!isDeleted())
@@ -347,6 +293,7 @@ public class JObject<T extends JObjectData> {
         _metaPart.setHaveLocalCopy(false);
         _metaPart.setSavedRefs(new HashSet<>());
     }
+
 
     public enum ResolutionStrategy {
         NO_RESOLUTION,
@@ -362,5 +309,57 @@ public class JObject<T extends JObjectData> {
     @FunctionalInterface
     public interface ObjectFnWrite<T, R> {
         R apply(ObjectMetadata indexData, @Nullable T data, VoidFn bump, VoidFn invalidate);
+    }
+
+    private class TransactionState {
+        final int dataHash;
+        final int metaHash;
+        final int externalHash;
+        final boolean data;
+        final HashSet<String> oldRefs;
+        boolean forceInvalidate = false;
+
+        TransactionState() {
+            this.dataHash = _metaPart.dataHash();
+            this.metaHash = _metaPart.metaHash();
+            this.externalHash = _metaPart.externalHash();
+            this.data = _dataPart.get() != null || hasLocalCopy();
+
+            if (_resolver.refVerification) {
+                tryLocalResolve();
+                if (_dataPart.get() != null)
+                    oldRefs = new HashSet<>(_dataPart.get().extractRefs());
+                else
+                    oldRefs = null;
+            } else {
+                oldRefs = null;
+            }
+        }
+
+        void commit() {
+            _resolver.updateDeletionState(JObject.this);
+
+            var newDataHash = _metaPart.dataHash();
+            var newMetaHash = _metaPart.metaHash();
+            var newExternalHash = _metaPart.externalHash();
+            var newData = _dataPart.get() != null || hasLocalCopy();
+
+            if (_dataPart.get() != null)
+                _metaPart.narrowClass(_dataPart.get().getClass());
+
+            notifyWrite(
+                    newMetaHash != metaHash || forceInvalidate,
+                    newExternalHash != externalHash || forceInvalidate,
+                    newDataHash != dataHash
+                            || newData != data
+                            || forceInvalidate
+            );
+
+            verifyRefs(oldRefs);
+        }
+
+        void forceInvalidate() {
+            forceInvalidate = true;
+        }
     }
 }

@@ -63,7 +63,7 @@ public class DhfsFuse extends FuseStubFS {
         var gid = new UnixSystem().getGid();
 
         mount(Paths.get(root), false, debug,
-              new String[]{"-o", "auto_cache", "-o", "uid=" + uid, "-o", "gid=" + gid});
+                new String[]{"-o", "auto_cache", "-o", "uid=" + uid, "-o", "gid=" + gid});
     }
 
     void shutdown(@Observes @Priority(1) ShutdownEvent event) {
@@ -141,8 +141,8 @@ public class DhfsFuse extends FuseStubFS {
             if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
             var file = fileOpt.get();
             var res = fileService.setTimes(file,
-                                           timespec[0].tv_sec.get() * 1000,
-                                           timespec[1].tv_sec.get() * 1000);
+                    timespec[0].tv_sec.get() * 1000,
+                    timespec[1].tv_sec.get() * 1000);
             if (!res) return -ErrorCodes.EINVAL();
             else return 0;
         } catch (Exception e) {

@@ -11,17 +11,13 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT extends Comparable<PeerIdT>, MetaT extends NodeMeta, NodeIdT, WrapperT extends TreeNodeWrapper<TimestampT, PeerIdT, MetaT, NodeIdT>> {
+    private static final Logger LOGGER = Logger.getLogger(KleppmannTree.class.getName());
     private final StorageInterface<TimestampT, PeerIdT, MetaT, NodeIdT, WrapperT> _storage;
     private final PeerInterface<PeerIdT> _peers;
     private final Clock<TimestampT> _clock;
     private final OpRecorder<TimestampT, PeerIdT, MetaT, NodeIdT> _opRecorder;
-    private static final Logger LOGGER = Logger.getLogger(KleppmannTree.class.getName());
-
     private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
-
-    private void assertRwLock() {
-        assert _lock.isWriteLockedByCurrentThread();
-    }
+    private HashMap<NodeIdT, WrapperT> _undoCtx = null;
 
     public KleppmannTree(StorageInterface<TimestampT, PeerIdT, MetaT, NodeIdT, WrapperT> storage,
                          PeerInterface<PeerIdT> peers,
@@ -31,6 +27,10 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         _peers = peers;
         _clock = clock;
         _opRecorder = opRecorder;
+    }
+
+    private void assertRwLock() {
+        assert _lock.isWriteLockedByCurrentThread();
     }
 
     private NodeIdT traverseImpl(NodeIdT fromId, List<String> names) {
@@ -68,8 +68,6 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             _lock.readLock().unlock();
         }
     }
-
-    private HashMap<NodeIdT, WrapperT> _undoCtx = null;
 
     private void undoEffect(LogEffect<TimestampT, PeerIdT, MetaT, NodeIdT> effect) {
         assertRwLock();

@@ -9,8 +9,8 @@ import java.nio.MappedByteBuffer;
 public class JnrPtrByteOutput extends ByteOutput {
     private final Pointer _backing;
     private final long _size;
-    private long _pos;
     private final JnrPtrByteOutputAccessors _accessors;
+    private long _pos;
 
     public JnrPtrByteOutput(JnrPtrByteOutputAccessors accessors, Pointer backing, long size) {
         _backing = backing;

@@ -2,9 +2,9 @@ package com.usatiuk.dhfs.objects.jrepository;
 
 import com.google.common.collect.Streams;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
-import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
+import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;

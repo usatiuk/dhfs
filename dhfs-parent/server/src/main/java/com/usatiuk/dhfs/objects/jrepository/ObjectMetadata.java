@@ -26,12 +26,12 @@ public class ObjectMetadata implements Serializable {
     private final Map<UUID, Long> _remoteCopies = new LinkedHashMap<>();
     private final AtomicReference<Class<? extends JObjectData>> _knownClass = new AtomicReference<>();
     @Getter
+    private final HashSet<UUID> _confirmedDeletes = new LinkedHashSet<>();
+    private final Set<String> _referrers = new LinkedHashSet<>();
+    @Getter
     private volatile boolean _seen = false;
     @Getter
     private volatile boolean _deleted = false;
-    @Getter
-    private final HashSet<UUID> _confirmedDeletes = new LinkedHashSet<>();
-    private final Set<String> _referrers = new LinkedHashSet<>();
     @Getter
     @Setter
     private Map<UUID, Long> _changelog = new LinkedHashMap<>(4);
