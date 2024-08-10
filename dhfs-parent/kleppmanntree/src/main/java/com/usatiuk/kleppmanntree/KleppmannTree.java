@@ -153,13 +153,14 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             Set<NodeIdT> inTrash = new HashSet<>();
 
             for (var le : canTrim.values()) {
-                for (var e : le.effects()) {
-                    if (Objects.equals(e.newParentId(), _storage.getTrashId())) {
-                        inTrash.add(e.childId());
-                    } else {
-                        inTrash.remove(e.childId());
+                if (le.effects() != null)
+                    for (var e : le.effects()) {
+                        if (Objects.equals(e.newParentId(), _storage.getTrashId())) {
+                            inTrash.add(e.childId());
+                        } else {
+                            inTrash.remove(e.childId());
+                        }
                     }
-                }
             }
 
             canTrim.clear();
