@@ -61,16 +61,34 @@ public class OpSender {
         }
     }
 
-    void sendForHost(OpObject queue, UUID host) {
+    void sendForHost(OpObject obj, UUID host) {
+        // Must be peeked before getPendingOpForHost
+        var periodicPushOp = obj.getPeriodicPushOp();
+
+        long sendCount = 0;
         Op op;
-        while ((op = queue.getPendingOpForHost(host)) != null) {
+
+        while ((op = obj.getPendingOpForHost(host)) != null) {
             try {
-                remoteObjectServiceClient.pushOp(op, queue.getId(), host);
-                queue.commitOpForHost(host, op);
+                remoteObjectServiceClient.pushOp(op, obj.getId(), host);
+                obj.commitOpForHost(host, op);
+                sendCount++;
             } catch (Exception e) {
-                Log.info("Error sending op to " + host, e);
+                Log.warn("Error sending op to " + host, e);
                 break;
             }
+        }
+
+        if (sendCount == 0) {
+            if (periodicPushOp == null) return;
+            try {
+                remoteObjectServiceClient.pushOp(periodicPushOp, obj.getId(), host);
+                Log.debug("Sent periodic op update to " + host + "of" + obj.getId());
+            } catch (Exception e) {
+                Log.warn("Error pushing periodic op for " + host + " of " + obj.getId(), e);
+            }
+        } else {
+            Log.debug("Sent " + sendCount + " op updates to " + host + "of" + obj.getId());
         }
     }
 

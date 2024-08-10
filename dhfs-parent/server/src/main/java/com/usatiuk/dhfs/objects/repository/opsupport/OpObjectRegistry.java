@@ -4,7 +4,6 @@ import com.usatiuk.dhfs.objects.repository.PeerManager;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import io.quarkus.logging.Log;
 import io.quarkus.scheduler.Scheduled;
 import io.smallrye.common.annotation.Blocking;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -19,8 +18,6 @@ public class OpObjectRegistry {
     OpSender opSender;
     @Inject
     PeerManager remoteHostManager;
-    @Inject
-    RemoteObjectServiceClient remoteObjectServiceClient;
 
     private final ConcurrentHashMap<String, OpObject> _objects = new ConcurrentHashMap<>();
 
@@ -49,15 +46,7 @@ public class OpObjectRegistry {
     @Blocking
     void periodicPush() {
         for (var obj : _objects.values()) {
-            var periodicPushOp = obj.getPeriodicPushOp();
-            if (periodicPushOp == null) continue;
-            for (var h : remoteHostManager.getAvailableHosts()) {
-                try {
-                    remoteObjectServiceClient.pushOp(periodicPushOp, obj.getId(), h);
-                } catch (Exception e) {
-                    Log.warn("Error pushing periodic op for " + h + " of " + obj.getId(), e);
-                }
-            }
+            opSender.push(obj);
         }
     }
 }
