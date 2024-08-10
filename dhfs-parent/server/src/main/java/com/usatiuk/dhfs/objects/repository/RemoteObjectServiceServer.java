@@ -91,13 +91,16 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         builder.setObjName(request.getName());
 
         if (obj.isPresent()) try {
-            obj.get().runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
+            boolean tryUpdate = obj.get().runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
                 if (m.isDeleted() && !m.isDeletionCandidate())
                     throw new IllegalStateException("Object " + m.getName() + " is deleted but not a deletion candidate");
                 builder.setDeletionCandidate(m.isDeletionCandidate());
                 builder.addAllReferrers(m.getReferrers());
-                return null;
+                return m.isDeletionCandidate() && !m.isDeleted();
             });
+            if (tryUpdate) {
+                obj.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {return null;});
+            }
         } catch (DeletedObjectAccessException dox) {
             builder.setDeletionCandidate(true);
         }
