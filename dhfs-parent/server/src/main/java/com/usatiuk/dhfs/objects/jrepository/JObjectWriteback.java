@@ -140,6 +140,8 @@ public class JObjectWriteback {
                     }
                 }
             } catch (InterruptedException ignored) {
+            } catch (Exception e) {
+                Log.error("Uncaught exception in writeback", e);
             }
         }
         Log.info("Writeback thread exiting");
