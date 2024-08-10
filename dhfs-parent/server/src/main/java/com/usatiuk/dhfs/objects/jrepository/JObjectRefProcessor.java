@@ -77,13 +77,15 @@ public class JObjectRefProcessor {
         }
     }
 
-    private void asyncProcessMovable(JObject<?> obj) {
+    private void asyncProcessMovable(String objName) {
         synchronized (_movablesInProcessing) {
-            if (_movablesInProcessing.contains(obj.getName())) return;
-            _movablesInProcessing.add(obj.getName());
+            if (_movablesInProcessing.contains(objName)) return;
+            _movablesInProcessing.add(objName);
         }
 
         _movableProcessorExecutorService.submit(() -> {
+            var obj = jObjectManager.get(objName).orElse(null);
+            if (obj == null || obj.isDeleted()) return;
             boolean delay = false;
             try {
                 var knownHosts = persistentPeerDataService.getHostUuids();
@@ -142,7 +144,7 @@ public class JObjectRefProcessor {
             }
 
         if (!missing) return true;
-        asyncProcessMovable(obj);
+        asyncProcessMovable(obj.getName());
         return false;
     }
 
