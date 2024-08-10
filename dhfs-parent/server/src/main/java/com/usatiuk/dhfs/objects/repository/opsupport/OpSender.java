@@ -26,7 +26,7 @@ public class OpSender {
     private ExecutorService _executor;
     private volatile boolean _shutdown = false;
 
-    private final HashSetDelayedBlockingQueue<OpObject<?>> _queue = new HashSetDelayedBlockingQueue<>(0); // FIXME:
+    private final HashSetDelayedBlockingQueue<OpObject> _queue = new HashSetDelayedBlockingQueue<>(0); // FIXME:
 
     @Startup
     void init() {
@@ -61,8 +61,8 @@ public class OpSender {
         }
     }
 
-    private <OpLocal extends Op> void sendForHost(OpObject<OpLocal> queue, UUID host) {
-        OpLocal op;
+    void sendForHost(OpObject queue, UUID host) {
+        Op op;
         while ((op = queue.getPendingOpForHost(host)) != null) {
             try {
                 remoteObjectServiceClient.pushOp(op, queue.getId(), host);
@@ -74,7 +74,7 @@ public class OpSender {
         }
     }
 
-    public void push(OpObject<?> queue) {
+    public void push(OpObject queue) {
         _queue.readd(queue);
     }
 }

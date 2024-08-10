@@ -86,9 +86,15 @@ message IndexUpdatePush {
 
 message IndexUpdateReply {}
 
+message JKleppmannTreePeriodicPushOpP {
+  string fromUuid = 1;
+  int64 timestamp = 2;
+}
+
 message OpPushPayload {
   oneof payload {
     dhfs.objects.persistence.JKleppmannTreeOpP jKleppmannTreeOp = 1;
+    JKleppmannTreePeriodicPushOpP jKleppmannTreePeriodicPushOp = 2;
   }
 }
 

@@ -211,64 +211,79 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         }
     }
 
+    // Returns true if the timestamp is newer than what's seen, false otherwise
+    private boolean updateTimestampImpl(PeerIdT from, TimestampT newTimestamp) {
+        assertRwLock();
+        var ref = _storage.getPeerTimestampLog().computeIfAbsent(from, f -> new AtomicReference<>());
+        TimestampT oldRef;
+        TimestampT newRef;
+        do {
+            oldRef = ref.get();
+            if (oldRef != null && oldRef.compareTo(newTimestamp) > 0) { // FIXME?
+                LOGGER.warning("Wrong op order: received older than known from " + from.toString());
+                return false;
+            }
+            newRef = newTimestamp;
+        } while (!ref.compareAndSet(oldRef, newRef));
+        return true;
+    }
+
+    public void updateExternalTimestamp(PeerIdT from, TimestampT timestamp) {
+        _lock.writeLock().lock();
+        try {
+            updateTimestampImpl(_peers.getSelfId(), _clock.peekTimestamp()); // FIXME:? Kind of a hack?
+            updateTimestampImpl(from, timestamp);
+            tryTrimLog();
+        } finally {
+            _lock.writeLock().unlock();
+        }
+    }
+
     private void applyOp(PeerIdT from, OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> op, boolean failCreatingIfExists) {
         assertRwLock();
-        synchronized (this) {
-            var ref = _storage.getPeerTimestampLog().computeIfAbsent(from, f -> new AtomicReference<>());
 
-            // TODO: I guess it's not actually needed since one peer can't handle concurrent updates?
-            TimestampT oldRef;
-            TimestampT newRef;
-            do {
-                oldRef = ref.get();
-                if (oldRef != null && oldRef.compareTo(op.timestamp().timestamp()) > 0) { // FIXME?
-                    LOGGER.warning("Wrong op order: received older than known from " + from.toString());
-                    return;
+        if (!updateTimestampImpl(from, op.timestamp().timestamp())) return;
+
+        var log = _storage.getLog();
+
+        // FIXME: hack?
+        int cmp = log.isEmpty() ? 1 : op.timestamp().compareTo(log.lastEntry().getKey());
+
+        if (log.containsKey(op.timestamp())) {
+            tryTrimLog();
+            return;
+        }
+        assert cmp != 0;
+        if (cmp < 0) {
+            try {
+                if (log.containsKey(op.timestamp())) return;
+                var toUndo = log.tailMap(op.timestamp(), false);
+                _undoCtx = new HashMap<>();
+                for (var entry : toUndo.reversed().entrySet()) {
+                    undoOp(entry.getValue());
                 }
-                newRef = op.timestamp().timestamp();
-            } while (!ref.compareAndSet(oldRef, newRef));
-
-            var log = _storage.getLog();
-
-            // FIXME: hack?
-            int cmp = log.isEmpty() ? 1 : op.timestamp().compareTo(log.lastEntry().getKey());
-
-            if (log.containsKey(op.timestamp())) {
-                tryTrimLog();
-                return;
-            }
-            assert cmp != 0;
-            if (cmp < 0) {
                 try {
-                    if (log.containsKey(op.timestamp())) return;
-                    var toUndo = log.tailMap(op.timestamp(), false);
-                    _undoCtx = new HashMap<>();
-                    for (var entry : toUndo.reversed().entrySet()) {
-                        undoOp(entry.getValue());
-                    }
-                    try {
-                        doAndPut(op, failCreatingIfExists);
-                    } finally {
-                        for (var entry : toUndo.entrySet()) {
-                            redoOp(entry);
-                        }
-
-                        if (!_undoCtx.isEmpty()) {
-                            for (var e : _undoCtx.entrySet()) {
-                                LOGGER.log(Level.FINE, "Dropping node " + e.getKey());
-                                e.getValue().unlock();
-                                _storage.removeNode(e.getKey());
-                            }
-                        }
-                        _undoCtx = null;
-                    }
+                    doAndPut(op, failCreatingIfExists);
                 } finally {
-                    tryTrimLog();
+                    for (var entry : toUndo.entrySet()) {
+                        redoOp(entry);
+                    }
+
+                    if (!_undoCtx.isEmpty()) {
+                        for (var e : _undoCtx.entrySet()) {
+                            LOGGER.log(Level.FINE, "Dropping node " + e.getKey());
+                            e.getValue().unlock();
+                            _storage.removeNode(e.getKey());
+                        }
+                    }
+                    _undoCtx = null;
                 }
-            } else {
-                doAndPut(op, failCreatingIfExists);
+            } finally {
                 tryTrimLog();
             }
+        } else {
+            doAndPut(op, failCreatingIfExists);
+            tryTrimLog();
         }
     }
 

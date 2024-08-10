@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.objects.protoserializer;
 import com.google.protobuf.Message;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.objects.persistence.*;
+import com.usatiuk.dhfs.objects.repository.JKleppmannTreePeriodicPushOpP;
 import com.usatiuk.dhfs.objects.repository.OpPushPayload;
 import com.usatiuk.dhfs.objects.repository.opsupport.Op;
 import io.quarkus.arc.ClientProxy;
@@ -43,11 +44,11 @@ public class ProtoSerializerService {
     void init() {
         for (var s : _protoSerializers) {
             var args = ((ParameterizedType) Arrays.stream(ClientProxy.unwrap(s).getClass().getGenericInterfaces())
-                                                  .filter(t -> {
-                                                      if (t instanceof ParameterizedType)
-                                                          return ((ParameterizedType) t).getRawType().equals(ProtoSerializer.class);
-                                                      return false;
-                                                  }).findFirst().orElseThrow(() -> new IllegalArgumentException("ProtoSerializer interface not found on ProtoSerializer?")))
+                    .filter(t -> {
+                        if (t instanceof ParameterizedType)
+                            return ((ParameterizedType) t).getRawType().equals(ProtoSerializer.class);
+                        return false;
+                    }).findFirst().orElseThrow(() -> new IllegalArgumentException("ProtoSerializer interface not found on ProtoSerializer?")))
                     .getActualTypeArguments(); //FIXME:
             Class<? extends Message> messageClass = (Class<? extends Message>) args[0];
             Class<?> objClass = (Class<?>) args[1];
@@ -60,11 +61,11 @@ public class ProtoSerializerService {
 
         for (var s : _protoDeserializers) {
             var args = ((ParameterizedType) Arrays.stream(ClientProxy.unwrap(s).getClass().getGenericInterfaces())
-                                                  .filter(t -> {
-                                                      if (t instanceof ParameterizedType)
-                                                          return ((ParameterizedType) t).getRawType().equals(ProtoDeserializer.class);
-                                                      return false;
-                                                  }).findFirst().orElseThrow(() -> new IllegalArgumentException("ProtoSerializer interface not found on ProtoSerializer?")))
+                    .filter(t -> {
+                        if (t instanceof ParameterizedType)
+                            return ((ParameterizedType) t).getRawType().equals(ProtoDeserializer.class);
+                        return false;
+                    }).findFirst().orElseThrow(() -> new IllegalArgumentException("ProtoSerializer interface not found on ProtoSerializer?")))
                     .getActualTypeArguments(); //FIXME:
             Class<? extends Message> messageClass = (Class<? extends Message>) args[0];
             Class<?> objClass = (Class<?>) args[1];
@@ -130,6 +131,8 @@ public class ProtoSerializerService {
         var ser = serialize(object);
         if (ser instanceof JKleppmannTreeOpP) {
             return OpPushPayload.newBuilder().setJKleppmannTreeOp((JKleppmannTreeOpP) ser).build();
+        } else if (ser instanceof JKleppmannTreePeriodicPushOpP) {
+            return OpPushPayload.newBuilder().setJKleppmannTreePeriodicPushOp((JKleppmannTreePeriodicPushOpP) ser).build();
         } else {
             throw new IllegalArgumentException("Unexpected object type on input to serializeToTreeNodeMetaP: " + object.getClass());
         }

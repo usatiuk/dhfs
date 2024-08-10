@@ -143,6 +143,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     }
 
     @Override
+    @Blocking
     public Uni<OpPushReply> opPush(OpPushMsg request) {
         if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
         if (!persistentPeerDataService.existsHost(UUID.fromString(request.getSelfUuid())))

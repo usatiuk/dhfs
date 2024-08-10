@@ -9,6 +9,11 @@ public class TestClock implements Clock<Long> {
     }
 
     @Override
+    public Long peekTimestamp() {
+        return max;
+    }
+
+    @Override
     public void updateTimestamp(Long receivedTimestamp) {
         max = Math.max(max, receivedTimestamp) + 1;
     }

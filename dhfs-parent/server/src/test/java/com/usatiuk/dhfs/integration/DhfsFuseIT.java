@@ -217,10 +217,6 @@ public class DhfsFuseIT {
         Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
         Thread.sleep(500);
 
-        // Motivate the log a little
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty2 > /root/dhfs_default/fuse/testf2").getExitCode());
-        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "echo tesempty3 > /root/dhfs_default/fuse/testf3").getExitCode());
-
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Deleting from persistent"), 60, TimeUnit.SECONDS, 3);
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Deleting from persistent"), 60, TimeUnit.SECONDS, 3);
 

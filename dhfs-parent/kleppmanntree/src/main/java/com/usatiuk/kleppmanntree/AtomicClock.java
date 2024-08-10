@@ -12,6 +12,11 @@ public class AtomicClock implements Clock<Long>, Serializable {
     }
 
     @Override
+    public Long peekTimestamp() {
+        return _max.get();
+    }
+
+    @Override
     public void updateTimestamp(Long receivedTimestamp) {
         long exp = _max.get();
         long set = Math.max(exp, receivedTimestamp) + 1;

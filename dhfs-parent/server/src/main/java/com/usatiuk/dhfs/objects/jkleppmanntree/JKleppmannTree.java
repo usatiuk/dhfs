@@ -5,6 +5,7 @@ import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaFile;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
+import com.usatiuk.dhfs.objects.repository.opsupport.Op;
 import com.usatiuk.dhfs.objects.repository.opsupport.OpObject;
 import com.usatiuk.dhfs.objects.repository.opsupport.OpSender;
 import com.usatiuk.kleppmanntree.KleppmannTree;
@@ -18,7 +19,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 
-public class JKleppmannTree implements OpObject<JKleppmannTreeOpWrapper> {
+public class JKleppmannTree implements OpObject {
     private final KleppmannTree<Long, UUID, JKleppmannTreeNodeMeta, String, JKleppmannTreeNodeWrapper> _tree;
 
     private final JKleppmannTreePersistentData _persistentData;
@@ -77,7 +78,7 @@ public class JKleppmannTree implements OpObject<JKleppmannTreeOpWrapper> {
     }
 
     @Override
-    public JKleppmannTreeOpWrapper getPendingOpForHost(UUID host) {
+    public Op getPendingOpForHost(UUID host) {
         if (_persistentData.getQueues().containsKey(host)) {
             var peeked = _persistentData.getQueues().get(host).firstEntry();
             return peeked != null ? new JKleppmannTreeOpWrapper(_persistentData.getQueues().get(host).firstEntry().getValue()) : null;
@@ -91,9 +92,12 @@ public class JKleppmannTree implements OpObject<JKleppmannTreeOpWrapper> {
     }
 
     @Override
-    public void commitOpForHost(UUID host, JKleppmannTreeOpWrapper op) {
+    public void commitOpForHost(UUID host, Op op) {
+        if (!(op instanceof JKleppmannTreeOpWrapper jop))
+            throw new IllegalArgumentException("Invalid incoming op type for JKleppmannTree: " + op.getClass() + " " + getId());
+
         var got = _persistentData.getQueues().get(host).pollFirstEntry().getValue();
-        if (op.getOp() != got) {
+        if (jop.getOp() != got) {
             throw new IllegalArgumentException("Committed op push was not the oldest");
         }
     }
@@ -108,7 +112,12 @@ public class JKleppmannTree implements OpObject<JKleppmannTreeOpWrapper> {
     }
 
     @Override
-    public void acceptExternalOp(UUID from, JKleppmannTreeOpWrapper op) {
+    public void acceptExternalOp(UUID from, Op op) {
+        if (op instanceof JKleppmannTreePeriodicPushOp pushOp) {
+            _tree.updateExternalTimestamp(pushOp.getFrom(), pushOp.getTimestamp());
+            return;
+        }
+
         if (!(op instanceof JKleppmannTreeOpWrapper jop))
             throw new IllegalArgumentException("Invalid incoming op type for JKleppmannTree: " + op.getClass() + " " + getId());
 
@@ -121,6 +130,11 @@ public class JKleppmannTree implements OpObject<JKleppmannTreeOpWrapper> {
             Log.trace("Received op from " + from + ": " + jop.getOp().timestamp().timestamp() + " " + jop.getOp().childId() + "->" + jop.getOp().newParentId() + " as " + jop.getOp().newMeta().getName());
 
         _tree.applyExternalOp(from, jop.getOp());
+    }
+
+    @Override
+    public Op getPeriodicPushOp() {
+        return new JKleppmannTreePeriodicPushOp(_persistentPeerDataService.getSelfUuid(), _persistentData.getClock().peekTimestamp());
     }
 }
 
