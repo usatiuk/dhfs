@@ -39,6 +39,9 @@ public class JObjectRefProcessor {
     private ExecutorService _movableProcessorExecutorService;
     private ExecutorService _refProcessorExecutorService;
 
+    @Inject
+    ExecutorService executorService;
+
     public JObjectRefProcessor(@ConfigProperty(name = "dhfs.objects.deletion.delay") long deletionDelay,
                                @ConfigProperty(name = "dhfs.objects.deletion.can-delete-retry-delay") long canDeleteRetryDelay) {
         _candidates = new HashSetDelayedBlockingQueue<>(deletionDelay);
@@ -59,6 +62,14 @@ public class JObjectRefProcessor {
         for (int i = 0; i < refProcessorThreads; i++) {
             _refProcessorExecutorService.submit(this::refProcessor);
         }
+
+        // Continue GC from last shutdown
+        executorService.submit(() ->
+                jObjectManager.findAll().forEach(n -> {
+                    jObjectManager.get(n).ifPresent(o -> o.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
+                        return null;
+                    }));
+                }));
     }
 
     @Shutdown
