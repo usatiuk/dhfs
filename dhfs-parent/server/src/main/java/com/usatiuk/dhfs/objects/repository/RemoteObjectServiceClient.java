@@ -53,8 +53,8 @@ public class RemoteObjectServiceClient {
             var ourVersion = md.getOurVersion();
             if (ourVersion >= 1)
                 return md.getRemoteCopies().entrySet().stream()
-                         .filter(entry -> entry.getValue().equals(ourVersion))
-                         .map(Map.Entry::getKey).toList();
+                        .filter(entry -> entry.getValue().equals(ourVersion))
+                        .map(Map.Entry::getKey).toList();
             else
                 return persistentPeerDataService.getHostUuids();
         });
@@ -86,7 +86,7 @@ public class RemoteObjectServiceClient {
                         throw new StatusRuntimeException(Status.ABORTED.withDescription("Received outdated object version"));
                     } catch (Exception e) {
                         Log.error("Received unexpected object version from " + reply.getSelfUuid()
-                                          + " for " + reply.getObject().getHeader().getName() + " and conflict resolution failed", e);
+                                + " for " + reply.getObject().getHeader().getName() + " and conflict resolution failed", e);
                         throw new StatusRuntimeException(Status.ABORTED.withDescription("Received unexpected object version"));
                     }
                 }
@@ -109,8 +109,8 @@ public class RemoteObjectServiceClient {
         var header = obj
                 .runReadLocked(
                         obj.getKnownClass().isAnnotationPresent(PushResolution.class)
-                        ? JObject.ResolutionStrategy.LOCAL_ONLY
-                        : JObject.ResolutionStrategy.NO_RESOLUTION,
+                                ? JObject.ResolutionStrategy.LOCAL_ONLY
+                                : JObject.ResolutionStrategy.NO_RESOLUTION,
                         (m, d) -> {
                             if (m.getKnownClass().isAnnotationPresent(PushResolution.class) && d == null)
                                 Log.warn("Object " + m.getName() + " is marked as PushResolution but no resolution found");
@@ -128,11 +128,19 @@ public class RemoteObjectServiceClient {
     }
 
     public OpPushReply pushOp(Op op, String queueName, UUID host) {
+        for (var ref : op.getEscapedRefs()) {
+            jObjectManager.get(ref)
+                    .ifPresent(o -> o.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
+                        m.markSeen();
+                        return null;
+                    }));
+        }
+
         var msg = OpPushMsg.newBuilder()
-                           .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
-                           .setQueueId(queueName)
-                           .setMsg(protoSerializerService.serializeToOpPushPayload(op))
-                           .build();
+                .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
+                .setQueueId(queueName)
+                .setMsg(protoSerializerService.serializeToOpPushPayload(op))
+                .build();
         return rpcClientFactory.withObjSyncClient(host, client -> client.opPush(msg));
     }
 
@@ -144,8 +152,8 @@ public class RemoteObjectServiceClient {
                 executor.invokeAll(targets.stream().<Callable<Void>>map(h -> () -> {
                     try {
                         var req = CanDeleteRequest.newBuilder()
-                                                  .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
-                                                  .setName(object);
+                                .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
+                                .setName(object);
                         req.addAllOurReferrers(ourReferrers);
                         var res = rpcClientFactory.withObjSyncClient(h, client -> client.canDelete(req.build()));
                         if (res != null)

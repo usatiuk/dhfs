@@ -5,6 +5,8 @@ import com.usatiuk.dhfs.objects.repository.opsupport.Op;
 import com.usatiuk.kleppmanntree.OpMove;
 import lombok.Getter;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 public class JKleppmannTreePeriodicPushOp implements Op {
@@ -16,5 +18,10 @@ public class JKleppmannTreePeriodicPushOp implements Op {
     public JKleppmannTreePeriodicPushOp(UUID from, long timestamp) {
         _from = from;
         _timestamp = timestamp;
+    }
+
+    @Override
+    public Collection<String> getEscapedRefs() {
+        return List.of();
     }
 }
