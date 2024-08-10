@@ -93,9 +93,6 @@ public class AutoSyncProcessor {
 
                 try {
                     jObjectManager.get(name).ifPresent(obj -> {
-                        // FIXME: does this double lock make sense?
-                        if (obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> d != null || m.isDeleted() || obj.hasLocalCopy()))
-                            return;
                         boolean ok = obj.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, i, v) -> {
                             if (obj.hasLocalCopy()) return true;
                             return obj.tryResolve(JObject.ResolutionStrategy.REMOTE);
