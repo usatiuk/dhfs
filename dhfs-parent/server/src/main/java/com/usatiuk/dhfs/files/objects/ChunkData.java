@@ -7,23 +7,17 @@ import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.Leaf;
 import com.usatiuk.dhfs.objects.persistence.ChunkDataP;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
-import lombok.Getter;
 import net.openhft.hashing.LongTupleHashFunction;
 
-import java.io.Serial;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-@Getter
 @AssumedUnique
 @Leaf
 public class ChunkData extends JObjectData {
-    @Serial
-    private static final long serialVersionUID = 1;
-
     final ChunkDataP _data;
 
     public ChunkData(ByteString bytes) {
@@ -49,16 +43,16 @@ public class ChunkData extends JObjectData {
         _data = chunkDataP;
     }
 
-    public static String getNameFromHash(String hash) {
-        return "data_" + hash;
-    }
-
-    public String getHash() {
-        return _data.getName();
+    ChunkDataP getData() {
+        return _data;
     }
 
     public ByteString getBytes() {
         return _data.getData();
+    }
+
+    public int getSize() {
+        return _data.getData().size();
     }
 
     @Override
@@ -66,17 +60,17 @@ public class ChunkData extends JObjectData {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ChunkData chunkData = (ChunkData) o;
-        return Objects.equals(_data.getName(), chunkData.getData().getName());
+        return Objects.equals(getName(), chunkData.getName());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(_data.getName());
+        return Objects.hashCode(getName());
     }
 
     @Override
     public String getName() {
-        return getNameFromHash(_data.getName());
+        return _data.getName();
     }
 
     @Override

@@ -78,8 +78,6 @@ public class ProtoSerializerService {
             return Optional.of(JObjectDataP.newBuilder().setFile((FileP) ser).build());
         } else if (ser instanceof DirectoryP) {
             return Optional.of(JObjectDataP.newBuilder().setDirectory((DirectoryP) ser).build());
-        } else if (ser instanceof ChunkInfoP) {
-            return Optional.of(JObjectDataP.newBuilder().setChunkInfo((ChunkInfoP) ser).build());
         } else if (ser instanceof ChunkDataP) {
             return Optional.of(JObjectDataP.newBuilder().setChunkData((ChunkDataP) ser).build());
         } else if (ser instanceof PeerDirectoryP) {

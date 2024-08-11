@@ -2,7 +2,6 @@ package com.usatiuk.dhfs.files;
 
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.files.objects.ChunkData;
-import com.usatiuk.dhfs.files.objects.ChunkInfo;
 import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
@@ -60,33 +59,24 @@ public class DhfsFileServiceSimpleTestImpl {
         var fuuid = UUID.randomUUID();
         {
             ChunkData c1 = new ChunkData(ByteString.copyFrom("12345".getBytes()));
-            ChunkInfo c1i = new ChunkInfo(c1.getHash(), c1.getBytes().size());
             ChunkData c2 = new ChunkData(ByteString.copyFrom("678".getBytes()));
-            ChunkInfo c2i = new ChunkInfo(c2.getHash(), c2.getBytes().size());
             ChunkData c3 = new ChunkData(ByteString.copyFrom("91011".getBytes()));
-            ChunkInfo c3i = new ChunkInfo(c3.getHash(), c3.getBytes().size());
             File f = new File(fuuid, 777, false);
-            f.getChunks().put(0L, c1.getHash());
-            f.getChunks().put((long) c1.getBytes().size(), c2.getHash());
-            f.getChunks().put((long) c1.getBytes().size() + c2.getBytes().size(), c3.getHash());
+            f.getChunks().put(0L, c1.getName());
+            f.getChunks().put((long) c1.getBytes().size(), c2.getName());
+            f.getChunks().put((long) c1.getBytes().size() + c2.getBytes().size(), c3.getName());
 
             // FIXME: dhfs_files
 
-            var c1o = jObjectManager.put(c1, Optional.of(c1i.getName()));
-            var c2o = jObjectManager.put(c2, Optional.of(c2i.getName()));
-            var c3o = jObjectManager.put(c3, Optional.of(c3i.getName()));
-            var c1io = jObjectManager.put(c1i, Optional.of(f.getName()));
-            var c2io = jObjectManager.put(c2i, Optional.of(f.getName()));
-            var c3io = jObjectManager.put(c3i, Optional.of(f.getName()));
+            var c1o = jObjectManager.put(c1, Optional.of(f.getName()));
+            var c2o = jObjectManager.put(c2, Optional.of(f.getName()));
+            var c3o = jObjectManager.put(c3, Optional.of(f.getName()));
             var fo = jObjectManager.put(f, Optional.empty());
 
             var all = jObjectManager.findAll();
             Assertions.assertTrue(all.contains(c1o.getName()));
             Assertions.assertTrue(all.contains(c2o.getName()));
             Assertions.assertTrue(all.contains(c3o.getName()));
-            Assertions.assertTrue(all.contains(c1io.getName()));
-            Assertions.assertTrue(all.contains(c2io.getName()));
-            Assertions.assertTrue(all.contains(c3io.getName()));
             Assertions.assertTrue(all.contains(fo.getName()));
         }
 

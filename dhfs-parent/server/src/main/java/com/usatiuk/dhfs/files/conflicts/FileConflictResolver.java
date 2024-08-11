@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.files.conflicts;
 
 import com.usatiuk.dhfs.files.objects.ChunkData;
-import com.usatiuk.dhfs.files.objects.ChunkInfo;
 import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeManager;
@@ -98,8 +97,7 @@ public class FileConflictResolver implements ConflictResolver {
 
                 for (var e : firstChunksCopy) {
                     oursFile.getChunks().put(e.getLeft(), e.getValue());
-                    jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), ChunkData.class, Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
-                    jObjectManager.getOrPut(ChunkInfo.getNameFromHash(e.getValue()), ChunkInfo.class, Optional.of(oursFile.getName()));
+                    jObjectManager.getOrPut(e.getValue(), ChunkData.class, Optional.of(oursFile.getName()));
                 }
                 HashSet<String> oursNew = new HashSet<>(oursFile.getChunks().values());
 
@@ -113,17 +111,20 @@ public class FileConflictResolver implements ConflictResolver {
 
                 for (var e : secondChunksCopy) {
                     newFile.getChunks().put(e.getLeft(), e.getValue());
-                    jObjectManager.getOrPut(ChunkData.getNameFromHash(e.getValue()), ChunkData.class, Optional.of(ChunkInfo.getNameFromHash(e.getValue())));
-                    jObjectManager.getOrPut(ChunkInfo.getNameFromHash(e.getValue()), ChunkInfo.class, Optional.ofNullable(newFile.getName()));
+                    jObjectManager.getOrPut(e.getValue(), ChunkData.class, Optional.of(newFile.getName()));
                 }
 
+                fileService.updateFileSize((JObject<File>) ours);
+
                 var ret = jObjectManager.putLocked(newFile, Optional.empty());
+
+                fileService.updateFileSize((JObject<File>) ret);
 
                 try {
                     for (var cuuid : oursBackup) {
                         if (!oursNew.contains(cuuid))
                             jObjectManager
-                                    .get(ChunkInfo.getNameFromHash(cuuid))
+                                    .get(cuuid)
                                     .ifPresent(jObject -> jObject.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, d, b, v) -> {
                                         mc.removeRef(oursFile.getName());
                                         return null;

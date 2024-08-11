@@ -15,7 +15,6 @@ public class JObjectDataDeserializer implements ProtoDeserializer<JObjectDataP, 
         return switch (message.getObjCase()) {
             case FILE -> protoSerializerService.deserialize(message.getFile());
             case DIRECTORY -> protoSerializerService.deserialize(message.getDirectory());
-            case CHUNKINFO -> protoSerializerService.deserialize(message.getChunkInfo());
             case CHUNKDATA -> protoSerializerService.deserialize(message.getChunkData());
             case PEERDIRECTORY -> protoSerializerService.deserialize(message.getPeerDirectory());
             case PERSISTENTPEERINFO -> protoSerializerService.deserialize(message.getPersistentPeerInfo());

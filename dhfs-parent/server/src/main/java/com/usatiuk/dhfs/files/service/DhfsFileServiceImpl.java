@@ -3,7 +3,6 @@ package com.usatiuk.dhfs.files.service;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.files.objects.ChunkData;
-import com.usatiuk.dhfs.files.objects.ChunkInfo;
 import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.objects.FsNode;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTree;
@@ -324,36 +323,23 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         }
     }
 
-    private Integer getChunkSize(String uuid) {
-        var chunkRead = jObjectManager.get(ChunkInfo.getNameFromHash(uuid));
+    private ByteString readChunk(String uuid) {
+        var chunkRead = jObjectManager.get(uuid).orElse(null);
 
-        if (chunkRead.isEmpty()) {
+        if (chunkRead == null) {
             Log.error("Chunk requested not found: " + uuid);
             throw new StatusRuntimeException(Status.NOT_FOUND);
         }
 
-        return chunkRead.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
-            if (!(d instanceof ChunkInfo))
+        return chunkRead.runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
+            if (!(d instanceof ChunkData cd))
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-            return ((ChunkInfo) d).getSize();
+            return cd.getBytes();
         });
     }
 
-    private ByteString readChunk(String uuid) {
-        getChunkSize(uuid); // FIXME: This uncovers an ugly truth that ChunkData has truly the file as a parent, not ChunkInfo
-
-        var chunkRead = jObjectManager.get(ChunkData.getNameFromHash(uuid));
-
-        if (chunkRead.isEmpty()) {
-            Log.error("Chunk requested not found: " + uuid);
-            throw new StatusRuntimeException(Status.NOT_FOUND);
-        }
-
-        return chunkRead.get().runReadLocked(JObject.ResolutionStrategy.REMOTE, (m, d) -> {
-            if (!(d instanceof ChunkData))
-                throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-            return ((ChunkData) d).getBytes();
-        });
+    private int getChunkSize(String uuid) {
+        return readChunk(uuid).size();
     }
 
     private void cleanupChunks(File f, Collection<String> uuids) {
@@ -362,13 +348,12 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         for (var cuuid : uuids) {
             try {
                 if (inFile.contains(cuuid)) continue;
-                var ci = jObjectManager.get(ChunkInfo.getNameFromHash(cuuid));
-                if (ci.isPresent()) {
-                    ci.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
-                        m.removeRef(f.getName());
-                        return null;
-                    });
-                }
+                jObjectManager.get(cuuid)
+                        .ifPresent(jObject -> jObject.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION,
+                                (m, d, b, v) -> {
+                                    m.removeRef(f.getName());
+                                    return null;
+                                }));
             } catch (Exception e) {
                 Log.error("Error when cleaning chunk " + cuuid, e);
             }
@@ -380,12 +365,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         if (offset < 0)
             throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Offset should be more than zero: " + offset));
 
-        var fileOpt = jObjectManager.get(fileUuid);
-        if (fileOpt.isEmpty()) {
+        var file = jObjectManager.get(fileUuid).orElse(null);
+        if (file == null) {
             Log.error("File not found when trying to read: " + fileUuid);
             return -1L;
         }
-        var file = fileOpt.get();
 
         // FIXME:
         file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (meta, fDataU, bump, i) -> {
@@ -393,17 +377,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
 
             if (writeLogging) {
-                String sb = "Writing to file: " +
-                        meta.getName() +
-                        " size=" +
-                        size(fileUuid) +
-                        " " +
-                        offset +
-                        " " +
-                        data.length +
-                        " " +
-                        Arrays.toString(data);
-                Log.info(sb);
+                Log.info("Writing to file: " + meta.getName() + " size=" + size(fileUuid) + " "
+                        + offset + " " + data.length + " " + Arrays.toString(data));
             }
 
             if (size(fileUuid) < offset)
@@ -412,7 +387,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             var chunksAll = fData.getChunks();
             var first = chunksAll.floorEntry(offset);
             var last = chunksAll.lowerEntry(offset + data.length);
-            TreeSet<String> removedChunks = new TreeSet<>();
+            HashSet<String> removedChunks = new HashSet<>();
+
             try {
                 long start = 0;
 
@@ -523,11 +499,9 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                         var thisChunk = pendingWrites.substring(cur, end);
 
                         ChunkData newChunkData = createChunk(thisChunk);
-                        ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
                         //FIXME:
-                        jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
-                        jObjectManager.put(newChunkInfo, Optional.of(meta.getName()));
-                        chunksAll.put(start, newChunkInfo.getHash());
+                        jObjectManager.put(newChunkData, Optional.of(meta.getName()));
+                        chunksAll.put(start, newChunkData.getName());
 
                         start += thisChunk.size();
                         cur = end;
@@ -538,6 +512,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 fData.setMtime(System.currentTimeMillis());
             } finally {
                 cleanupChunks(fData, removedChunks);
+                updateFileSize((JObject<File>) file);
             }
             return null;
         });
@@ -551,12 +526,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         if (length < 0)
             throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Length should be more than zero: " + length));
 
-        var fileOpt = jObjectManager.get(fileUuid);
-        if (fileOpt.isEmpty()) {
+        var file = jObjectManager.get(fileUuid).orElse(null);
+        if (file == null) {
             Log.error("File not found when trying to read: " + fileUuid);
             return false;
         }
-        var file = fileOpt.get();
 
         if (length == 0) {
             try {
@@ -568,6 +542,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                     f.getChunks().clear();
                     f.setMtime(System.currentTimeMillis());
                     cleanupChunks(f, oldChunks);
+                    updateFileSize((JObject<File>) file);
                     return null;
                 });
             } catch (Exception e) {
@@ -618,13 +593,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                                     zeroCache.put(end - cur, UnsafeByteOperations.unsafeWrap(new byte[Math.toIntExact(end - cur)]));
 
                                 ChunkData newChunkData = createChunk(zeroCache.get(end - cur));
-                                ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
                                 //FIXME:
-                                jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
-                                jObjectManager.put(newChunkInfo, Optional.of(m.getName()));
-                                chunksAll.put(start, newChunkInfo.getHash());
+                                jObjectManager.put(newChunkData, Optional.of(m.getName()));
+                                chunksAll.put(start, newChunkData.getName());
 
-                                start += newChunkInfo.getSize();
+                                start += newChunkData.getSize();
                                 cur = end;
                             }
                         }
@@ -642,11 +615,9 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                         removedChunks.add(tail.getValue());
 
                         ChunkData newChunkData = createChunk(newChunk);
-                        ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
                         //FIXME:
-                        jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
-                        jObjectManager.put(newChunkInfo, Optional.of(m.getName()));
-                        chunksAll.put(tail.getKey(), newChunkInfo.getHash());
+                        jObjectManager.put(newChunkData, Optional.of(m.getName()));
+                        chunksAll.put(tail.getKey(), newChunkData.getName());
                     }
 
                     bump.apply();
@@ -654,6 +625,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 } finally {
                     cleanupChunks(fData, removedChunks);
                 }
+
+                updateFileSize((JObject<File>) file);
 
                 return null;
             });
@@ -700,13 +673,16 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         File f = new File(fuuid, 0, true);
         var newNodeId = _tree.getNewNodeId();
         ChunkData newChunkData = createChunk(UnsafeByteOperations.unsafeWrap(oldpath.getBytes(StandardCharsets.UTF_8)));
-        ChunkInfo newChunkInfo = new ChunkInfo(newChunkData.getHash(), newChunkData.getBytes().size());
 
-        f.getChunks().put(0L, newChunkInfo.getHash());
+        f.getChunks().put(0L, newChunkData.getName());
 
-        jObjectManager.put(newChunkData, Optional.of(newChunkInfo.getName()));
-        jObjectManager.put(newChunkInfo, Optional.of(f.getName()));
-        jObjectManager.put(f, Optional.of(newNodeId));
+        jObjectManager.put(newChunkData, Optional.of(f.getName()));
+        var newFile = jObjectManager.putLocked(f, Optional.of(newNodeId));
+        try {
+            updateFileSize(newFile);
+        } finally {
+            newFile.rwUnlock();
+        }
 
         _tree.move(parent.getName(), new JKleppmannTreeNodeMetaFile(fname, f.getName()), newNodeId);
         return f.getName();
@@ -733,6 +709,32 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     }
 
     @Override
+    public void updateFileSize(JObject<File> file) {
+        try {
+            file.runWriteLocked(JObject.ResolutionStrategy.REMOTE, (fsNodeData, fileData, bump, inv) -> {
+                if (!(fileData instanceof File fd))
+                    throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+
+                long realSize = 0;
+
+                var last = fd.getChunks().lastEntry();
+                if (last != null) {
+                    var lastSize = getChunkSize(last.getValue());
+                    realSize = last.getKey() + lastSize;
+                }
+
+                if (realSize != fd.getSize()) {
+                    fd.setSize(realSize);
+                    bump.apply();
+                }
+                return null;
+            });
+        } catch (Exception e) {
+            Log.error("Error updating file size: " + file.getName(), e);
+        }
+    }
+
+    @Override
     public Long size(String uuid) {
         var read = jObjectManager.get(uuid)
                 .orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
@@ -742,13 +744,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 if (!(fileData instanceof File fd))
                     throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
 
-                var last = fd.getChunks().lastEntry();
-
-                if (last == null)
-                    return 0L;
-
-                var lastSize = getChunkSize(last.getValue());
-                return last.getKey() + lastSize;
+                return fd.getSize();
             });
         } catch (Exception e) {
             Log.error("Error reading file: " + uuid, e);

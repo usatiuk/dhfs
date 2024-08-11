@@ -31,16 +31,12 @@ message FileP {
   FsNodeP fsNode = 1;
   map<int64, string> chunks = 2;
   bool symlink = 3;
+  int64 size = 4;
 }
 
 message DirectoryP {
   FsNodeP fsNode = 1;
   map<string, string> children = 2;
-}
-
-message ChunkInfoP {
-  string name = 1;
-  int32 size = 2;
 }
 
 message ChunkDataP {
@@ -98,7 +94,6 @@ message JObjectDataP {
   oneof obj {
     FileP file = 2;
     DirectoryP directory = 3;
-    ChunkInfoP chunkInfo = 4;
     ChunkDataP chunkData = 5;
     PeerDirectoryP peerDirectory = 6;
     PersistentPeerInfoP persistentPeerInfo = 7;

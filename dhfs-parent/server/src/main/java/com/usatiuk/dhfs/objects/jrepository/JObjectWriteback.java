@@ -43,6 +43,7 @@ public class JObjectWriteback {
     long promotionDelay;
     private ExecutorService _writebackExecutor;
     private ExecutorService _statusExecutor;
+
     public JObjectWriteback(@ConfigProperty(name = "dhfs.objects.writeback.delay") long promotionDelay) {
         _writeQueue = new HashSetDelayedBlockingQueue<>(promotionDelay);
     }

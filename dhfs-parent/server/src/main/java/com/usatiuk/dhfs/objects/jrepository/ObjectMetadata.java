@@ -118,6 +118,8 @@ public class ObjectMetadata implements Serializable {
     }
 
     public void addRef(String from) {
+        if (from.equals(getName()))
+            throw new IllegalArgumentException("Trying to make object refer to itself: " + getName());
         _confirmedDeletes.clear();
         _referrers.add(from);
         if (Log.isTraceEnabled())

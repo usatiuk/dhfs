@@ -16,6 +16,7 @@ public class FileSerializer implements ProtoSerializer<FileP, File>, ProtoDeseri
         ret.setMtime(message.getFsNode().getMtime());
         ret.setCtime(message.getFsNode().getCtime());
         ret.getChunks().putAll(message.getChunksMap());
+        ret.setSize(message.getSize());
         return ret;
     }
 
@@ -30,6 +31,7 @@ public class FileSerializer implements ProtoSerializer<FileP, File>, ProtoDeseri
                         .build())
                 .putAllChunks(object.getChunks())
                 .setSymlink(object.isSymlink())
+                .setSize(object.getSize())
                 .build();
         return ret;
     }
