@@ -105,6 +105,11 @@ public class PeerManager {
 
         boolean wasReachable = isReachable(host);
 
+        boolean shouldSync = persistentPeerDataService.markInitialSyncDone(host);
+
+        if (shouldSync)
+            syncHandler.pushInitialResync(host);
+
         _transientPeersState.runWriteLocked(d -> {
             d.get(host).setReachable(true);
             return null;
@@ -118,9 +123,8 @@ public class PeerManager {
 
         Log.info("Connected to " + host);
 
-        if (persistentPeerDataService.markInitialSyncDone(host)) {
-            syncHandler.doInitialResync(host);
-        }
+        if (shouldSync)
+            syncHandler.requestInitialResync(host);
     }
 
     public void handleConnectionError(UUID host) {
