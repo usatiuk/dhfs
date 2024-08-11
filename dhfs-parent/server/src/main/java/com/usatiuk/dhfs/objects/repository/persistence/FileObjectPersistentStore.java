@@ -1,7 +1,5 @@
 package com.usatiuk.dhfs.objects.repository.persistence;
 
-import com.google.protobuf.CodedOutputStream;
-import com.google.protobuf.Message;
 import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
@@ -13,44 +11,42 @@ import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.NotImplementedException;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.annotation.Nonnull;
 import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
 
+// File format:
+//   64-bit offset of metadata (if 8 then file has no data)
+//   data (encoded as JObjectDataP)
+//   metadata (encoded as ObjectMetadataP)
+
 @ApplicationScoped
 public class FileObjectPersistentStore implements ObjectPersistentStore {
     private final static long mmapThreshold = 65536;
-    private final String root;
-    private final Path metaPath;
-    private final Path dataPath;
+    private final Path root;
 
     public FileObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.persistence.files.root") String root) {
-        this.root = root;
-        this.metaPath = Paths.get(root, "meta");
-        this.dataPath = Paths.get(root, "data");
+        this.root = Path.of(root).resolve("objects");
     }
 
     void init(@Observes @Priority(200) StartupEvent event) {
-        if (!metaPath.toFile().exists()) {
+        if (!root.toFile().exists()) {
             Log.info("Initializing with root " + root);
-            metaPath.toFile().mkdirs();
-            dataPath.toFile().mkdirs();
+            root.toFile().mkdirs();
             for (int i = 0; i < 256; i++) {
-                for (int j = 0; j < 16; j++) {
-                    metaPath.resolve(String.valueOf(i)).resolve(String.valueOf(j)).toFile().mkdirs();
-                    dataPath.resolve(String.valueOf(i)).resolve(String.valueOf(j)).toFile().mkdirs();
-                }
+                root.resolve(String.valueOf(i)).toFile().mkdirs();
             }
         }
     }
@@ -59,21 +55,10 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         Log.info("Shutdown");
     }
 
-    private Pair<String, String> getDirPathComponents(@Nonnull String obj) {
+    private Path getObjPath(@Nonnull String obj) {
         int h = Objects.hash(obj);
         int p1 = h & 0b00000000_00000000_11111111_00000000;
-        int p2 = h & 0b00000000_00000000_00000000_00001111;
-        return Pair.ofNonNull(String.valueOf(p1 >> 8), String.valueOf(p2));
-    }
-
-    private Path getMetaPath(@Nonnull String obj) {
-        var components = getDirPathComponents(obj);
-        return metaPath.resolve(components.getLeft()).resolve(components.getRight()).resolve(obj);
-    }
-
-    private Path getDataPath(@Nonnull String obj) {
-        var components = getDirPathComponents(obj);
-        return dataPath.resolve(components.getLeft()).resolve(components.getRight()).resolve(obj);
+        return root.resolve(String.valueOf(p1 >> 8)).resolve(obj);
     }
 
     private void findAllObjectsImpl(Collection<String> out, Path path) {
@@ -93,36 +78,50 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     @Override
     public Collection<String> findAllObjects() {
         ArrayList<String> out = new ArrayList<>();
-        findAllObjectsImpl(out, metaPath);
+        findAllObjectsImpl(out, root);
         return Collections.unmodifiableCollection(out);
     }
 
     @Nonnull
     @Override
     public Boolean existsObject(String name) {
-        return getMetaPath(name).toFile().isFile();
+        throw new NotImplementedException();
     }
 
     @Nonnull
     @Override
     public Boolean existsObjectData(String name) {
-        return getDataPath(name).toFile().isFile();
+        throw new NotImplementedException();
     }
 
-    private <T extends Message> T readObjectImpl(T defaultInstance, Path path) {
+    @Nonnull
+    @Override
+    public JObjectDataP readObject(String name) {
+        var path = getObjPath(name);
         try (var rf = new RandomAccessFile(path.toFile(), "r")) {
             var len = rf.length();
+            var longBuf = new byte[8];
+            {
+                var read = rf.read(longBuf);
+                if (read != 8)
+                    throw new NotImplementedException();
+            }
+
+            var metaOff = bytesToLong(longBuf);
+
+            int toRead = (int) (metaOff - 8);
+
             if (len > mmapThreshold) {
-                var bs = UnsafeByteOperations.unsafeWrap(rf.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, len));
+                var bs = UnsafeByteOperations.unsafeWrap(rf.getChannel().map(FileChannel.MapMode.READ_ONLY, 8, toRead));
                 // This way, the input will be considered "immutable" which would allow avoiding copies
                 // when parsing byte arrays
                 var ch = bs.newCodedInput();
                 ch.enableAliasing(true);
-                return (T) defaultInstance.getParserForType().parseFrom(ch);
+                return JObjectDataP.parseFrom(ch);
             } else {
-                var arr = new byte[(int) len];
-                rf.readFully(arr, 0, (int) len);
-                return (T) defaultInstance.getParserForType().parseFrom(UnsafeByteOperations.unsafeWrap(arr));
+                var arr = new byte[(int) toRead];
+                rf.readFully(arr, 0, toRead);
+                return JObjectDataP.parseFrom(UnsafeByteOperations.unsafeWrap(arr));
             }
         } catch (FileNotFoundException | NoSuchFileException fx) {
             throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
@@ -134,45 +133,83 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     @Nonnull
     @Override
-    public JObjectDataP readObject(String name) {
-        return readObjectImpl(JObjectDataP.getDefaultInstance(), getDataPath(name));
-    }
-
-    @Nonnull
-    @Override
     public ObjectMetadataP readObjectMeta(String name) {
-        return readObjectImpl(ObjectMetadataP.getDefaultInstance(), getMetaPath(name));
+        var path = getObjPath(name);
+        try (var rf = new RandomAccessFile(path.toFile(), "r")) {
+            var len = rf.length();
+            var longBuf = new byte[8];
+            {
+                var read = rf.read(longBuf);
+                if (read != 8)
+                    throw new NotImplementedException();
+            }
+
+            var metaOff = bytesToLong(longBuf);
+
+            int toRead = (int) (len - metaOff);
+
+            var arr = new byte[(int) toRead];
+            rf.seek(metaOff);
+            rf.readFully(arr, 0, toRead);
+            return ObjectMetadataP.parseFrom(UnsafeByteOperations.unsafeWrap(arr));
+        } catch (FileNotFoundException | NoSuchFileException fx) {
+            throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
+        } catch (IOException e) {
+            Log.error("Error reading file " + path, e);
+            throw new StatusRuntimeExceptionNoStacktrace(Status.INTERNAL);
+        }
     }
 
-    private void writeObjectImpl(Path path, Message data) {
-        try {
-            var len = data.getSerializedSize();
-            if (len > mmapThreshold)
-                try (var rf = new RandomAccessFile(path.toFile(), "rw")) {
-                    rf.setLength(len);
-                    var mapped = rf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, len);
-                    data.writeTo(CodedOutputStream.newInstance(mapped));
-                    return;
-                }
+    //FIXME: Could be more optimal...
+    private byte[] longToBytes(long val) {
+        return ByteBuffer.wrap(new byte[8]).putLong(val).array();
+    }
 
+    private long bytesToLong(byte[] bytes) {
+        return ByteBuffer.wrap(bytes).getLong();
+    }
+
+    @Override
+    public void writeObject(String name, ObjectMetadataP meta, JObjectDataP data) {
+        try {
+            var path = getObjPath(name);
             try (var fsb = new FileOutputStream(path.toFile(), false);
                  var buf = new BufferedOutputStream(fsb, Math.min(65536, data.getSerializedSize()))) {
+                var dataSize = data.getSerializedSize();
+                buf.write(longToBytes(dataSize + 8));
                 data.writeTo(buf);
+                meta.writeTo(buf);
             }
         } catch (IOException e) {
-            Log.error("Error writing file " + path, e);
+            Log.error("Error writing file " + name, e);
             throw new StatusRuntimeExceptionNoStacktrace(Status.INTERNAL);
         }
     }
 
     @Override
-    public void writeObject(String name, JObjectDataP data) {
-        writeObjectImpl(getDataPath(name), data);
-    }
+    public void writeObjectMeta(String name, ObjectMetadataP meta) {
+        try {
+            var path = getObjPath(name);
+            try (var rf = new RandomAccessFile(path.toFile(), "rw");
+                 var ch = rf.getChannel()) {
+                var longBuf = ByteBuffer.allocateDirect(8);
+                {
+                    var read = ch.read(longBuf);
+                    if (read != 8)
+                        throw new NotImplementedException();
+                }
 
-    @Override
-    public void writeObjectMeta(String name, ObjectMetadataP data) {
-        writeObjectImpl(getMetaPath(name), data);
+                var metaOff = longBuf.getLong();
+
+                ch.truncate(metaOff + meta.getSerializedSize());
+                ch.position(metaOff);
+
+                meta.writeTo(new BufferedOutputStream(Channels.newOutputStream(ch), Math.min(65536, meta.getSerializedSize())));
+            }
+        } catch (IOException e) {
+            Log.error("Error writing file " + name, e);
+            throw new StatusRuntimeExceptionNoStacktrace(Status.INTERNAL);
+        }
     }
 
     private void deleteImpl(Path path) {
@@ -186,30 +223,23 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     }
 
     @Override
-    public void deleteObjectData(String name) {
-        deleteImpl(getDataPath(name));
-    }
-
-    @Override
     public void deleteObject(String name) {
-        deleteImpl(getDataPath(name));
-        // FIXME: Race?
-        deleteImpl(getMetaPath(name));
+        deleteImpl(getObjPath(name));
     }
 
     @Override
     public long getTotalSpace() {
-        return dataPath.toFile().getTotalSpace();
+        return root.toFile().getTotalSpace();
     }
 
     @Override
     public long getFreeSpace() {
-        return dataPath.toFile().getFreeSpace();
+        return root.toFile().getFreeSpace();
     }
 
     @Override
     public long getUsableSpace() {
-        return dataPath.toFile().getUsableSpace();
+        return root.toFile().getUsableSpace();
     }
 
 }

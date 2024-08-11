@@ -73,10 +73,6 @@ public class JObject<T extends JObjectData> {
         return _metaPart;
     }
 
-    protected boolean hasLocalCopyMd() {
-        return _metaPart.isHaveLocalCopy();
-    }
-
     public Class<? extends ConflictResolver> getConflictResolver() {
         if (_dataPart.get() == null) throw new NotImplementedException("Data part not found!");
         return _dataPart.get().getConflictResolver();
@@ -131,14 +127,20 @@ public class JObject<T extends JObjectData> {
             rLock();
             try {
                 if (_dataPart.get() == null) {
-                    var res = _resolver.resolveDataLocal(this);
-                    if (res.isEmpty()) return;
+                    if (!hasLocalCopy()) return;
+                    JObjectData res;
+                    try {
+                        res = _resolver.resolveDataLocal(this);
+                    } catch (Exception e) {
+                        Log.error("Object " + getName() + " data couldn't be read but it should exist locally!", e);
+                        return;
+                    }
 
                     if (_metaPart.getSavedRefs() != null && !_metaPart.getSavedRefs().isEmpty())
                         throw new IllegalStateException("Object " + getName() + " has non-hydrated refs when written locally");
 
-                    _metaPart.narrowClass(res.get().getClass());
-                    if (_dataPart.compareAndSet(null, res.get()))
+                    _metaPart.narrowClass(res.getClass());
+                    if (_dataPart.compareAndSet(null, (T) res))
                         _resolver.onResolution(this);
                 } // _dataPart.get() == null
             } finally {
@@ -148,8 +150,7 @@ public class JObject<T extends JObjectData> {
     }
 
     public boolean hasLocalCopy() {
-        // FIXME: Read/write lock assert?
-        return _resolver.hasLocalCopy(this);
+        return _metaPart.isHaveLocalCopy();
     }
 
     public void externalResolution(T data) {

@@ -146,9 +146,12 @@ public class JObjectWriteback {
             m.markUnWritten();
             return;
         }
-        objectPersistentStore.writeObjectMeta(m.getName(), protoSerializerService.serialize(m));
-        if (data != null)
-            objectPersistentStore.writeObject(m.getName(), protoSerializerService.serializeToJObjectDataP(data));
+        if (m.isHaveLocalCopy() && data != null)
+            objectPersistentStore.writeObject(m.getName(), protoSerializerService.serialize(m), protoSerializerService.serializeToJObjectDataP(data));
+        else if (m.isHaveLocalCopy() && data == null)
+            objectPersistentStore.writeObjectMeta(m.getName(), protoSerializerService.serialize(m));
+        else if (!m.isHaveLocalCopy())
+            objectPersistentStore.writeObject(m.getName(), protoSerializerService.serialize(m), null);
     }
 
     public void remove(JObject<?> object) {

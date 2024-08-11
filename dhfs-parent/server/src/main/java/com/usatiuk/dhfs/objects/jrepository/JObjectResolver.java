@@ -57,15 +57,6 @@ public class JObjectResolver {
         _metaWriteListeners.put(klass, fn);
     }
 
-    public boolean hasLocalCopy(JObject<?> self) {
-        if (!self.isDeleted() && refVerification) {
-            if (self.hasLocalCopyMd() && !(self.getData() != null || objectPersistentStore.existsObjectData(self.getName())))
-                throw new IllegalStateException("hasLocalCopy mismatch for " + self.getName());
-        }
-        // FIXME: Read/write lock assert?
-        return self.hasLocalCopyMd();
-    }
-
     public void backupRefs(JObject<?> self) {
         self.assertRWLock();
         if (self.getData() != null) {
@@ -163,12 +154,10 @@ public class JObjectResolver {
             for (var r : extracted) quickDeleteRef(self, r);
     }
 
-    public <T extends JObjectData> Optional<T> resolveDataLocal(JObject<T> jObject) {
+    public <T extends JObjectData> T resolveDataLocal(JObject<T> jObject) {
         // jObject.assertRWLock();
         // FIXME: No way to assert read lock?
-        if (objectPersistentStore.existsObjectData(jObject.getName()))
-            return Optional.of(protoSerializerService.deserialize(objectPersistentStore.readObject(jObject.getName())));
-        return Optional.empty();
+        return protoSerializerService.deserialize(objectPersistentStore.readObject(jObject.getName()));
     }
 
     public <T extends JObjectData> T resolveDataRemote(JObject<T> jObject) {
@@ -187,8 +176,6 @@ public class JObjectResolver {
         try {
             Log.debug("Invalidating " + name);
             jObject.getMeta().setHaveLocalCopy(false);
-            jObjectWriteback.remove(jObject);
-            objectPersistentStore.deleteObjectData(name);
         } catch (StatusRuntimeException sx) {
             if (sx.getStatus() != Status.NOT_FOUND)
                 Log.info("Couldn't delete object from persistent store: ", sx);
@@ -215,7 +202,7 @@ public class JObjectResolver {
                     for (var cb : _writeListeners.get(t))
                         cb.apply((JObject) self);
             }
-        if (externalChanged && hasLocalCopy(self)) {
+        if (externalChanged && self.hasLocalCopy()) {
             invalidationQueueService.pushInvalidationToAll(self.getName());
         }
     }
