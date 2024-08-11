@@ -167,6 +167,9 @@ public class JObjectResolver {
         return protoSerializerService.deserialize(obj);
     }
 
+    // Really more like "onUpdateSize"
+    // Also not called from tryResolveRemote/externalResolution because
+    // there it's handled by the notifyWrite
     public void onResolution(JObject<?> self) {
         jObjectLRU.updateSize(self);
     }
