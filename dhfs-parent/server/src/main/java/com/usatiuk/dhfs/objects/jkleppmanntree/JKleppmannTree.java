@@ -115,7 +115,12 @@ public class JKleppmannTree implements OpObject {
         if (Log.isTraceEnabled())
             Log.trace("Received op from " + from + ": " + jop.getOp().timestamp().timestamp() + " " + jop.getOp().childId() + "->" + jop.getOp().newParentId() + " as " + jop.getOp().newMeta().getName());
 
-        _tree.applyExternalOp(from, jop.getOp());
+        try {
+            _tree.applyExternalOp(from, jop.getOp());
+        } catch (Exception e) {
+            Log.error("Error applying external op", e);
+            throw e;
+        }
     }
 
     @Override
