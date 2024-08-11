@@ -164,7 +164,7 @@ public class InvalidationQueueService {
         if (remoteHostManager.isReachable(host))
             _queue.add(Pair.of(host, obj.getName()));
         else
-            deferredInvalidationQueueService.returnForHost(host);
+            deferredInvalidationQueueService.defer(host, obj.getName());
     }
 
     public void pushInvalidationToAll(String name) {

@@ -122,9 +122,6 @@ public class PeerManager {
         if (wasReachable) return;
 
         Log.info("Connected to " + host);
-
-        if (shouldSync)
-            syncHandler.requestInitialResync(host);
     }
 
     public void handleConnectionError(UUID host) {

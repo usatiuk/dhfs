@@ -37,12 +37,6 @@ public class SyncHandler {
     @Inject
     OpObjectRegistry opObjectRegistry;
 
-    public void requestInitialResync(UUID host) {
-        Log.info("Requesting initial resync for " + host);
-
-        remoteObjectServiceClient.getIndex(host);
-    }
-
     public void pushInitialResync(UUID host) {
         Log.info("Doing initial resync for " + host);
 
