@@ -105,10 +105,13 @@ public class PeerManager {
 
         boolean wasReachable = isReachable(host);
 
-        boolean shouldSync = persistentPeerDataService.markInitialSyncDone(host);
+        boolean shouldSyncObj = persistentPeerDataService.markInitialObjSyncDone(host);
+        boolean shouldSyncOp = persistentPeerDataService.markInitialOpSyncDone(host);
 
-        if (shouldSync)
-            syncHandler.pushInitialResync(host);
+        if (shouldSyncObj)
+            syncHandler.pushInitialResyncObj(host);
+        if (shouldSyncOp)
+            syncHandler.pushInitialResyncOp(host);
 
         _transientPeersState.runWriteLocked(d -> {
             d.get(host).setReachable(true);

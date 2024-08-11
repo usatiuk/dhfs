@@ -89,7 +89,7 @@ public class PersistentPeerDataService {
 
         if (!shutdownChecker.lastShutdownClean()) {
             _persistentData.getData().getIrregularShutdownCounter().addAndGet(1);
-            _persistentData.getData().getInitialSyncDone().clear();
+            _persistentData.getData().getInitialObjSyncDone().clear();
         }
 
         jObjectResolver.registerWriteListener(PersistentPeerInfo.class, this::pushPeerUpdates);
@@ -240,7 +240,8 @@ public class PersistentPeerDataService {
             boolean removedInner = d.getPeers().remove(host);
             Log.info("Removing host: " + host + (removedInner ? " removed" : " did not exists"));
             if (removedInner) {
-                _persistentData.runWriteLocked(pd -> pd.getInitialSyncDone().remove(host));
+                _persistentData.runWriteLocked(pd -> pd.getInitialObjSyncDone().remove(host));
+                _persistentData.runWriteLocked(pd -> pd.getInitialOpSyncDone().remove(host));
                 getPeer(host).runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mp, dp, bp, vp) -> {
                     mp.removeRef(m.getName());
                     return null;
@@ -286,8 +287,12 @@ public class PersistentPeerDataService {
     }
 
     // Returns true if host's initial sync wasn't done before, and marks it as done
-    public boolean markInitialSyncDone(UUID connectedHost) {
-        return _persistentData.runWriteLocked(d -> d.getInitialSyncDone().add(connectedHost));
+    public boolean markInitialOpSyncDone(UUID connectedHost) {
+        return _persistentData.runWriteLocked(d -> d.getInitialOpSyncDone().add(connectedHost));
+    }
+
+    public boolean markInitialObjSyncDone(UUID connectedHost) {
+        return _persistentData.runWriteLocked(d -> d.getInitialObjSyncDone().add(connectedHost));
     }
 
 }

@@ -37,21 +37,19 @@ public class SyncHandler {
     @Inject
     OpObjectRegistry opObjectRegistry;
 
-    public void pushInitialResync(UUID host) {
-        Log.info("Doing initial resync for " + host);
+    public void pushInitialResyncObj(UUID host) {
+        Log.info("Doing initial object push for " + host);
 
-        pushInitialSyncData(host);
-    }
-
-    public void pushInitialSyncData(UUID host) {
-        // Push our index to the other peer too, as they might not request it if
-        // they didn't thing we were disconnected
         var objs = jObjectManager.findAll();
 
         for (var obj : objs) {
             Log.trace("IS: " + obj + " to " + host);
             invalidationQueueService.pushInvalidationToOne(host, obj);
         }
+    }
+
+    public void pushInitialResyncOp(UUID host) {
+        Log.info("Doing initial op push for " + host);
 
         opObjectRegistry.pushBootstrapData(host);
     }

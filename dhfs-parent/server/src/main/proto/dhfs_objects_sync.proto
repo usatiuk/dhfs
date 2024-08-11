@@ -11,7 +11,6 @@ package dhfs.objects.sync;
 service DhfsObjectSyncGrpc {
   rpc GetObject (GetObjectRequest) returns (GetObjectReply) {}
   rpc CanDelete (CanDeleteRequest) returns (CanDeleteReply) {}
-  rpc GetIndex (GetIndexRequest) returns (GetIndexReply) {}
   rpc IndexUpdate (IndexUpdatePush) returns (IndexUpdateReply) {}
   rpc OpPush (OpPushMsg) returns (OpPushReply) {}
 
@@ -71,12 +70,6 @@ message CanDeleteReply {
   bool deletionCandidate = 2;
   repeated string referrers = 3;
 }
-
-message GetIndexRequest {
-  string selfUuid = 10;
-}
-
-message GetIndexReply {}
 
 message IndexUpdatePush {
   string selfUuid = 10;

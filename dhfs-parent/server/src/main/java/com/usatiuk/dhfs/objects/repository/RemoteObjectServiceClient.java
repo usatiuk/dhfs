@@ -96,13 +96,6 @@ public class RemoteObjectServiceClient {
         });
     }
 
-    public GetIndexReply getIndex(UUID host) {
-        return rpcClientFactory.withObjSyncClient(host, client -> {
-            var req = GetIndexRequest.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString()).build();
-            return client.getIndex(req);
-        });
-    }
-
     public IndexUpdateReply notifyUpdate(JObject<?> obj, UUID host) {
         var builder = IndexUpdatePush.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString());
 

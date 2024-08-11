@@ -22,7 +22,9 @@ public class PersistentRemoteHostsData implements Serializable {
     @Getter
     private final AtomicLong _irregularShutdownCounter = new AtomicLong();
     @Getter
-    private final HashSet<UUID> _initialSyncDone = new HashSet<>();
+    private final HashSet<UUID> _initialOpSyncDone = new HashSet<>();
+    @Getter
+    private final HashSet<UUID> _initialObjSyncDone = new HashSet<>();
     @Getter
     @Setter
     private X509Certificate _selfCertificate = null;

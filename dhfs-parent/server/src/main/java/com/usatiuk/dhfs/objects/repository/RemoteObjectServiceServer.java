@@ -119,20 +119,6 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
     @Override
     @Blocking
-    public Uni<GetIndexReply> getIndex(GetIndexRequest request) {
-        if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-        if (!persistentPeerDataService.existsHost(UUID.fromString(request.getSelfUuid())))
-            throw new StatusRuntimeException(Status.UNAUTHENTICATED);
-
-        Log.info("<-- getIndex: from " + request.getSelfUuid());
-
-        syncHandler.pushInitialSyncData(UUID.fromString(request.getSelfUuid()));
-
-        return Uni.createFrom().item(GetIndexReply.getDefaultInstance());
-    }
-
-    @Override
-    @Blocking
     public Uni<IndexUpdateReply> indexUpdate(IndexUpdatePush request) {
         if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
         if (!persistentPeerDataService.existsHost(UUID.fromString(request.getSelfUuid())))
