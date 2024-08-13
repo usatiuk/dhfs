@@ -111,6 +111,9 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
             int toRead = (int) (metaOff - 8);
 
+            if (toRead <= 0)
+                throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
+
             if (len > mmapThreshold) {
                 var bs = UnsafeByteOperations.unsafeWrap(rf.getChannel().map(FileChannel.MapMode.READ_ONLY, 8, toRead));
                 // This way, the input will be considered "immutable" which would allow avoiding copies
@@ -174,10 +177,11 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         try {
             var path = getObjPath(name);
             try (var fsb = new FileOutputStream(path.toFile(), false);
-                 var buf = new BufferedOutputStream(fsb, Math.min(65536, data.getSerializedSize()))) {
-                var dataSize = data.getSerializedSize();
+                 var buf = new BufferedOutputStream(fsb, data != null ? Math.min(65536, data.getSerializedSize()) : 2 * meta.getSerializedSize())) {
+                var dataSize = data != null ? data.getSerializedSize() : 0;
                 buf.write(longToBytes(dataSize + 8));
-                data.writeTo(buf);
+                if (data != null)
+                    data.writeTo(buf);
                 meta.writeTo(buf);
             }
         } catch (IOException e) {
