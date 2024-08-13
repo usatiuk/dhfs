@@ -17,7 +17,10 @@
 
     <properties>
         <compiler-plugin.version>3.12.1</compiler-plugin.version>
-        <maven.compiler.release>21</maven.compiler.release>
+        <!--FIXME-->
+        <maven.compiler.release></maven.compiler.release>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
@@ -41,6 +44,12 @@
                 <version>${quarkus.platform.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>1.18.34</version>
+                <scope>provided</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -68,6 +77,8 @@
                 <configuration>
                     <compilerArgs>
                         <arg>-parameters</arg>
+                        <arg>--add-exports</arg>
+                        <arg>java.base/jdk.internal.access=ALL-UNNAMED</arg>
                     </compilerArgs>
                 </configuration>
             </plugin>
@@ -79,7 +90,10 @@
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         <maven.home>${maven.home}</maven.home>
                     </systemPropertyVariables>
-                    <argLine>--add-exports java.base/sun.nio.ch=ALL-UNNAMED</argLine>
+                    <argLine>
+                        --add-exports java.base/sun.nio.ch=ALL-UNNAMED
+                        --add-exports java.base/jdk.internal.access=ALL-UNNAMED
+                    </argLine>
                     <skipTests>${skip.unit}</skipTests>
                 </configuration>
             </plugin>
@@ -101,10 +115,15 @@
                         </native.image.path>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         <buildDirectory>${project.build.directory}</buildDirectory>
-                        <junit.jupiter.execution.parallel.enabled>false</junit.jupiter.execution.parallel.enabled>
+                        <junit.jupiter.execution.parallel.enabled>
+                            true
+                        </junit.jupiter.execution.parallel.enabled>
                         <junit.jupiter.execution.parallel.mode.default>
                             concurrent
                         </junit.jupiter.execution.parallel.mode.default>
+                        <junit.jupiter.execution.parallel.config.dynamic.factor>
+                            0.5
+                        </junit.jupiter.execution.parallel.config.dynamic.factor>
                         <junit.platform.output.capture.stdout>true</junit.platform.output.capture.stdout>
                         <junit.platform.output.capture.stderr>true</junit.platform.output.capture.stderr>
                         <maven.home>${maven.home}</maven.home>
