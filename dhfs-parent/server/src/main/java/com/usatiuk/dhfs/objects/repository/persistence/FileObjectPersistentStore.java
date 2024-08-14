@@ -177,7 +177,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         try {
             var path = getObjPath(name);
             try (var fsb = new FileOutputStream(path.toFile(), false);
-                 var buf = new BufferedOutputStream(fsb, data != null ? Math.min(65536, data.getSerializedSize()) : 2 * meta.getSerializedSize())) {
+                 var buf = new BufferedOutputStream(fsb, data != null ? Math.min(65536, data.getSerializedSize()) : meta.getSerializedSize())) {
                 var dataSize = data != null ? data.getSerializedSize() : 0;
                 buf.write(longToBytes(dataSize + 8));
                 if (data != null)
@@ -209,7 +209,9 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
                 ch.truncate(metaOff + meta.getSerializedSize());
                 ch.position(metaOff);
 
-                meta.writeTo(new BufferedOutputStream(Channels.newOutputStream(ch), Math.min(65536, meta.getSerializedSize())));
+                try (var buf = new BufferedOutputStream(Channels.newOutputStream(ch), Math.min(65536, meta.getSerializedSize()))) {
+                    meta.writeTo(buf);
+                }
             }
         } catch (IOException e) {
             Log.error("Error writing file " + name, e);
