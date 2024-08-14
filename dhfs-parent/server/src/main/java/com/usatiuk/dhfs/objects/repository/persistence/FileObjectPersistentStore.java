@@ -110,20 +110,23 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
             if (toRead <= 0)
                 throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
 
+            ByteBuffer buf;
+
             //FIXME: rewriting files breaks!
             if (false && len > mmapThreshold) {
-                var bs = UnsafeByteOperations.unsafeWrap(rf.getChannel().map(FileChannel.MapMode.READ_ONLY, 8, toRead));
-                // This way, the input will be considered "immutable" which would allow avoiding copies
-                // when parsing byte arrays
-                var ch = bs.newCodedInput();
-                ch.enableAliasing(true);
-                return JObjectDataP.parseFrom(ch);
+                buf = rf.getChannel().map(FileChannel.MapMode.READ_ONLY, 8, toRead);
             } else {
-                var buf = ByteBuffer.allocate(toRead);
+                buf = ByteBuffer.allocateDirect(toRead);
                 fillBuffer(buf, rf.getChannel());
                 buf.flip();
-                return JObjectDataP.parseFrom(UnsafeByteOperations.unsafeWrap(buf));
             }
+
+            var bs = UnsafeByteOperations.unsafeWrap(buf);
+            // This way, the input will be considered "immutable" which would allow avoiding copies
+            // when parsing byte arrays
+            var ch = bs.newCodedInput();
+            ch.enableAliasing(true);
+            return JObjectDataP.parseFrom(ch);
         } catch (EOFException | FileNotFoundException | NoSuchFileException fx) {
             throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
         } catch (IOException e) {
