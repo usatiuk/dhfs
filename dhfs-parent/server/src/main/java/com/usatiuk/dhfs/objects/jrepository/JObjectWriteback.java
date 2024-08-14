@@ -117,6 +117,8 @@ public class JObjectWriteback {
             } catch (InterruptedException ignored) {
             } catch (Exception e) {
                 Log.error("Uncaught exception in writeback", e);
+            } catch (Throwable o) {
+                Log.error("Uncaught THROWABLE in writeback", o);
             }
         }
         Log.info("Writeback thread exiting");

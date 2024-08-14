@@ -101,11 +101,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         try (var rf = new RandomAccessFile(path.toFile(), "r")) {
             var len = rf.length();
             var longBuf = new byte[8];
-            {
-                var read = rf.read(longBuf);
-                if (read != 8)
-                    throw new NotImplementedException();
-            }
+            rf.readFully(longBuf);
 
             var metaOff = bytesToLong(longBuf);
 
@@ -114,7 +110,8 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
             if (toRead <= 0)
                 throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
 
-            if (len > mmapThreshold) {
+            //FIXME: rewriting files breaks!
+            if (false && len > mmapThreshold) {
                 var bs = UnsafeByteOperations.unsafeWrap(rf.getChannel().map(FileChannel.MapMode.READ_ONLY, 8, toRead));
                 // This way, the input will be considered "immutable" which would allow avoiding copies
                 // when parsing byte arrays
@@ -122,11 +119,12 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
                 ch.enableAliasing(true);
                 return JObjectDataP.parseFrom(ch);
             } else {
-                var arr = new byte[(int) toRead];
-                rf.readFully(arr, 0, toRead);
-                return JObjectDataP.parseFrom(UnsafeByteOperations.unsafeWrap(arr));
+                var buf = ByteBuffer.allocate(toRead);
+                fillBuffer(buf, rf.getChannel());
+                buf.flip();
+                return JObjectDataP.parseFrom(UnsafeByteOperations.unsafeWrap(buf));
             }
-        } catch (FileNotFoundException | NoSuchFileException fx) {
+        } catch (EOFException | FileNotFoundException | NoSuchFileException fx) {
             throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
         } catch (IOException e) {
             Log.error("Error reading file " + path, e);
@@ -141,11 +139,8 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         try (var rf = new RandomAccessFile(path.toFile(), "r")) {
             var len = rf.length();
             var longBuf = new byte[8];
-            {
-                var read = rf.read(longBuf);
-                if (read != 8)
-                    throw new NotImplementedException();
-            }
+
+            rf.readFully(longBuf);
 
             var metaOff = bytesToLong(longBuf);
 
@@ -172,12 +167,23 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         return ByteBuffer.wrap(bytes).getLong();
     }
 
+    private void fillBuffer(ByteBuffer dst, FileChannel src) throws IOException {
+        int rem = dst.remaining();
+        int readTotal = 0;
+        int readCur = 0;
+        while (readTotal < rem && (readCur = src.read(dst)) != -1) {
+            readTotal += readCur;
+        }
+        if (rem != readTotal)
+            throw new EOFException();
+    }
+
     @Override
     public void writeObject(String name, ObjectMetadataP meta, JObjectDataP data) {
         try {
             var path = getObjPath(name);
             try (var fsb = new FileOutputStream(path.toFile(), false);
-                 var buf = new BufferedOutputStream(fsb, data != null ? Math.min(65536, data.getSerializedSize()) : meta.getSerializedSize())) {
+                 var buf = new BufferedOutputStream(fsb, Math.min(65536, Math.max(data != null ? data.getSerializedSize() : meta.getSerializedSize(), 4096)))) {
                 var dataSize = data != null ? data.getSerializedSize() : 0;
                 buf.write(longToBytes(dataSize + 8));
                 if (data != null)
@@ -197,11 +203,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
             try (var rf = new RandomAccessFile(path.toFile(), "rw");
                  var ch = rf.getChannel()) {
                 var longBuf = ByteBuffer.allocateDirect(8);
-                {
-                    var read = ch.read(longBuf);
-                    if (read != 8)
-                        throw new NotImplementedException();
-                }
+                fillBuffer(longBuf, ch);
 
                 longBuf.flip();
                 var metaOff = longBuf.getLong();
