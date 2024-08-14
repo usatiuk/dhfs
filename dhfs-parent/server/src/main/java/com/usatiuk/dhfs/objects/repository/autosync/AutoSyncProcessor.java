@@ -94,7 +94,8 @@ public class AutoSyncProcessor {
                 try {
                     jObjectManager.get(name).ifPresent(obj -> {
                         boolean ok = obj.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, i, v) -> {
-                            if (m.isDeletionCandidate() || m.isDeleted()) return false;
+                            if (m.isDeleted()) return true;
+                            if (m.isDeletionCandidate()) return false;
                             if (obj.hasLocalCopy()) return true;
                             return obj.tryResolve(JObject.ResolutionStrategy.REMOTE);
                         });
