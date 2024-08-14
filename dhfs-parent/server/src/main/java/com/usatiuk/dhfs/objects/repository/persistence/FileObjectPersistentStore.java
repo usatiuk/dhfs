@@ -203,6 +203,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
                         throw new NotImplementedException();
                 }
 
+                longBuf.flip();
                 var metaOff = longBuf.getLong();
 
                 ch.truncate(metaOff + meta.getSerializedSize());
