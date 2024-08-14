@@ -60,7 +60,7 @@ public class JKleppmannTree implements OpObject {
     }
 
     public void trash(JKleppmannTreeNodeMeta newMeta, String node) {
-        _tree.move(_storageInterface.getTrashId(), newMeta, node);
+        _tree.move(_storageInterface.getTrashId(), newMeta.withName(node), node);
     }
 
     @Override

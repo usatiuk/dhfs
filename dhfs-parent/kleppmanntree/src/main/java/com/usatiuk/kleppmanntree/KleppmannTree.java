@@ -171,7 +171,8 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                         var node = _storage.getById(n);
                         node.rwLock();
                         try {
-                            trash.getNode().getChildren().remove(node.getNode().getMeta().getName());
+                            if (trash.getNode().getChildren().remove(n.toString()) == null)
+                                LOGGER.severe("Node " + node.getNode().getId() + " not found in trash but should be there");
                             node.notifyRmRef(trash.getNode().getId());
                         } finally {
                             node.rwUnlock();
@@ -369,6 +370,9 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                         }
 
                         newParentNode.getNode().getChildren().put(effect.newMeta().getName(), effect.childId());
+                        if (effect.newParentId().equals(_storage.getTrashId()) &&
+                                !Objects.equals(effect.newMeta().getName(), effect.childId()))
+                            throw new IllegalArgumentException("Move to trash should have id of node as name");
                         node.getNode().setParent(effect.newParentId());
                         node.getNode().setMeta(effect.newMeta());
                         node.getNode().setLastEffectiveOp(effect.effectiveOp());
