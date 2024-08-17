@@ -1,11 +1,12 @@
 package com.usatiuk.dhfs.objects.repository;
 
-import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.opsupport.OpObjectRegistry;
+import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
+import io.grpc.Status;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
@@ -55,7 +56,7 @@ public class SyncHandler {
     }
 
     public void handleOneUpdate(UUID from, ObjectHeader header) {
-        JObject<?> found = jObjectManager.getOrPut(header.getName(), JObjectData.class, Optional.empty());
+        JObjectManager.JObject<?> found = jObjectManager.getOrPut(header.getName(), JObjectData.class, Optional.empty());
 
         var receivedTotalVer = header.getChangelog().getEntriesList()
                 .stream().map(ObjectChangelogEntry::getVersion).reduce(0L, Long::sum);
@@ -65,7 +66,7 @@ public class SyncHandler {
             receivedMap.put(UUID.fromString(e.getHost()), e.getVersion());
         }
 
-        boolean conflict = found.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (md, data, bump, invalidate) -> {
+        boolean conflict = found.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (md, data, bump, invalidate) -> {
             if (md.getRemoteCopies().getOrDefault(from, 0L) > receivedTotalVer) {
                 Log.error("Received older index update than was known for host: "
                         + from + " " + header.getName());
@@ -116,7 +117,7 @@ public class SyncHandler {
                     found.externalResolution(protoSerializerService.deserialize(header.getPushedData()));
                 return false;
             } else if (data == null && header.hasPushedData()) {
-                found.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
+                found.tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
                 if (found.getData() == null)
                     found.externalResolution(protoSerializerService.deserialize(header.getPushedData()));
             }
@@ -143,7 +144,11 @@ public class SyncHandler {
                 theirsHeader = got.getLeft();
             }
 
-            var resolverClass = found.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> found.getConflictResolver());
+            var resolverClass = found.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
+                if (d == null)
+                    throw new StatusRuntimeExceptionNoStacktrace(Status.UNAVAILABLE.withDescription("No local data when conflict " + header.getName()));
+                return d.getConflictResolver();
+            });
             var resolver = conflictResolvers.select(resolverClass);
             resolver.get().resolve(from, theirsHeader, theirsData, found);
             Log.info("Resolved conflict for " + from + " " + header.getName());

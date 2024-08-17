@@ -5,7 +5,6 @@ import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaFile;
-import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
@@ -40,14 +39,14 @@ public class FileConflictResolver implements ConflictResolver {
     // FIXME: There might be a race where node with conflict deletes a file, and we answer that
     // it can do it as we haven't recorded the received file in the object model yet
     @Override
-    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
+    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObjectManager.JObject<?> ours) {
         var theirsFile = (File) theirsData;
         if (!theirsFile.getClass().equals(File.class)) {
             Log.error("Object type mismatch!");
             throw new NotImplementedException();
         }
 
-        var newJFile = ours.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, oursFileU, bumpFile, invalidateFile) -> {
+        var newJFile = ours.runWriteLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, oursFileU, bumpFile, invalidateFile) -> {
             if (oursFileU == null)
                 throw new StatusRuntimeException(Status.ABORTED.withDescription("Conflict but we don't have local copy"));
             if (!(oursFileU instanceof File oursFile))
@@ -114,18 +113,18 @@ public class FileConflictResolver implements ConflictResolver {
                     jObjectManager.getOrPut(e.getValue(), ChunkData.class, Optional.of(newFile.getName()));
                 }
 
-                fileService.updateFileSize((JObject<File>) ours);
+                fileService.updateFileSize((JObjectManager.JObject<File>) ours);
 
                 var ret = jObjectManager.putLocked(newFile, Optional.empty());
 
-                fileService.updateFileSize((JObject<File>) ret);
+                fileService.updateFileSize((JObjectManager.JObject<File>) ret);
 
                 try {
                     for (var cuuid : oursBackup) {
                         if (!oursNew.contains(cuuid))
                             jObjectManager
                                     .get(cuuid)
-                                    .ifPresent(jObject -> jObject.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, d, b, v) -> {
+                                    .ifPresent(jObject -> jObject.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (mc, d, b, v) -> {
                                         mc.removeRef(oursFile.getName());
                                         return null;
                                     }));
@@ -146,7 +145,7 @@ public class FileConflictResolver implements ConflictResolver {
 
         // FIXME: Slow and what happens if a directory is deleted?
         try {
-            var parent = fileService.inoToParent(ours.getName());
+            var parent = fileService.inoToParent(ours.getMeta().getName());
             // FIXME?
             var tree = jKleppmannTreeManager.getTree("fs");
 
@@ -159,7 +158,7 @@ public class FileConflictResolver implements ConflictResolver {
 
             do {
                 try {
-                    tree.move(parent.getRight(), new JKleppmannTreeNodeMetaFile(parent.getLeft() + ".fconflict." + persistentPeerDataService.getSelfUuid() + "." + conflictHost + "." + i, newJFile.getName()), nodeId);
+                    tree.move(parent.getRight(), new JKleppmannTreeNodeMetaFile(parent.getLeft() + ".fconflict." + persistentPeerDataService.getSelfUuid() + "." + conflictHost + "." + i, newJFile.getMeta().getName()), nodeId);
                 } catch (AlreadyExistsException aex) {
                     i++;
                     continue;
@@ -167,7 +166,7 @@ public class FileConflictResolver implements ConflictResolver {
                 break;
             } while (true);
         } catch (Exception e) {
-            Log.error("Error when creating new file for " + ours.getName(), e);
+            Log.error("Error when creating new file for " + ours.getMeta().getName(), e);
         } finally {
             if (newJFile.haveRwLock()) {
                 newJFile.getMeta().unlock();

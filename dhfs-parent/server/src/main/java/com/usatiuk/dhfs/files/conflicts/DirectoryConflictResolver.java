@@ -2,7 +2,6 @@ package com.usatiuk.dhfs.files.conflicts;
 
 import com.usatiuk.dhfs.files.objects.Directory;
 import com.usatiuk.dhfs.files.objects.FsNode;
-import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
@@ -26,18 +25,18 @@ public class DirectoryConflictResolver implements ConflictResolver {
     JObjectManager jObjectManager;
 
     @Override
-    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
+    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObjectManager.JObject<?> ours) {
         var theirsDir = (Directory) theirsData;
         if (!theirsDir.getClass().equals(Directory.class)) {
             Log.error("Object type mismatch!");
             throw new NotImplementedException();
         }
 
-        ours.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, oursDirU, bump, invalidate) -> {
+        ours.runWriteLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, oursDirU, bump, invalidate) -> {
             if (oursDirU == null)
                 throw new StatusRuntimeException(Status.ABORTED.withDescription("Conflict but we don't have local copy"));
             if (!(oursDirU instanceof Directory oursDir))
-                throw new NotImplementedException("Type conflict for " + ours.getName() + ", directory was expected");
+                throw new NotImplementedException("Type conflict for " + ours.getMeta().getName() + ", directory was expected");
 
             Directory first;
             Directory second;

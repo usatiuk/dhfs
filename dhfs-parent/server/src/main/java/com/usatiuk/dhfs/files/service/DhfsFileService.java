@@ -2,7 +2,7 @@ package com.usatiuk.dhfs.files.service;
 
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.files.objects.File;
-import com.usatiuk.dhfs.objects.jrepository.JObject;
+import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.Optional;
@@ -28,7 +28,7 @@ public interface DhfsFileService {
 
     Iterable<String> readDir(String name);
 
-    void updateFileSize(JObject<File> file);
+    void updateFileSize(JObjectManager.JObject<File> file);
 
     Long size(String f);
 

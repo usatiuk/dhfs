@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.objects.repository;
 
 import com.google.common.collect.Maps;
-import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.jrepository.PushResolution;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
@@ -46,10 +45,10 @@ public class RemoteObjectServiceClient {
         });
     }
 
-    public JObjectDataP getObject(JObject<?> jObject) {
-        jObject.assertRWLock();
+    public JObjectDataP getObject(JObjectManager.JObject<?> jObject) {
+        jObject.assertRwLock();
 
-        var targets = jObject.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (md, d) -> {
+        var targets = jObject.runReadLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (md, d) -> {
             var ourVersion = md.getOurVersion();
             if (ourVersion >= 1)
                 return md.getRemoteCopies().entrySet().stream()
@@ -60,19 +59,19 @@ public class RemoteObjectServiceClient {
         });
 
         if (targets.isEmpty())
-            throw new IllegalStateException("No targets for object " + jObject.getName());
+            throw new IllegalStateException("No targets for object " + jObject.getMeta().getName());
 
-        Log.info("Downloading object " + jObject.getName() + " from " + targets.stream().map(UUID::toString).collect(Collectors.joining(", ")));
+        Log.info("Downloading object " + jObject.getMeta().getName() + " from " + targets.stream().map(UUID::toString).collect(Collectors.joining(", ")));
 
         return rpcClientFactory.withObjSyncClient(targets, client -> {
-            var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString()).setName(jObject.getName()).build());
+            var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString()).setName(jObject.getMeta().getName()).build());
 
             var receivedMap = new HashMap<UUID, Long>();
             for (var e : reply.getObject().getHeader().getChangelog().getEntriesList()) {
                 receivedMap.put(UUID.fromString(e.getHost()), e.getVersion());
             }
 
-            return jObject.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (md, d, b, v) -> {
+            return jObject.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (md, d, b, v) -> {
                 var unexpected = !Objects.equals(
                         Maps.filterValues(md.getChangelog(), val -> val != 0),
                         Maps.filterValues(receivedMap, val -> val != 0));
@@ -96,14 +95,14 @@ public class RemoteObjectServiceClient {
         });
     }
 
-    public IndexUpdateReply notifyUpdate(JObject<?> obj, UUID host) {
+    public IndexUpdateReply notifyUpdate(JObjectManager.JObject<?> obj, UUID host) {
         var builder = IndexUpdatePush.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString());
 
         var header = obj
                 .runReadLocked(
-                        obj.getKnownClass().isAnnotationPresent(PushResolution.class)
-                                ? JObject.ResolutionStrategy.LOCAL_ONLY
-                                : JObject.ResolutionStrategy.NO_RESOLUTION,
+                        obj.getMeta().getKnownClass().isAnnotationPresent(PushResolution.class)
+                                ? JObjectManager.ResolutionStrategy.LOCAL_ONLY
+                                : JObjectManager.ResolutionStrategy.NO_RESOLUTION,
                         (m, d) -> {
                             if (m.getKnownClass().isAnnotationPresent(PushResolution.class) && d == null)
                                 Log.warn("Object " + m.getName() + " is marked as PushResolution but no resolution found");
@@ -123,7 +122,7 @@ public class RemoteObjectServiceClient {
     public OpPushReply pushOp(Op op, String queueName, UUID host) {
         for (var ref : op.getEscapedRefs()) {
             jObjectManager.get(ref)
-                    .ifPresent(o -> o.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
+                    .ifPresent(o -> o.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
                         m.markSeen();
                         return null;
                     }));

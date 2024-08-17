@@ -1,6 +1,8 @@
 package com.usatiuk.dhfs.objects.repository.autosync;
 
-import com.usatiuk.dhfs.objects.jrepository.*;
+import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
+import com.usatiuk.dhfs.objects.jrepository.JObjectData;
+import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerDirectory;
 import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
 import com.usatiuk.utils.HashSetDelayedBlockingQueue;
@@ -21,8 +23,6 @@ import java.util.concurrent.Executors;
 public class AutoSyncProcessor {
     private final HashSetDelayedBlockingQueue<String> _pending = new HashSetDelayedBlockingQueue<>(0);
     private final HashSetDelayedBlockingQueue<String> _retries = new HashSetDelayedBlockingQueue<>(10000); //FIXME:
-    @Inject
-    JObjectResolver jObjectResolver;
     @Inject
     JObjectManager jObjectManager;
     @ConfigProperty(name = "dhfs.objects.autosync.threads")
@@ -45,29 +45,29 @@ public class AutoSyncProcessor {
         }
 
         if (downloadAll) {
-            jObjectResolver.registerMetaWriteListener(JObjectData.class, this::alwaysSaveCallback);
+            jObjectManager.registerMetaWriteListener(JObjectData.class, this::alwaysSaveCallback);
         } else {
-            jObjectResolver.registerMetaWriteListener(PersistentPeerInfo.class, this::alwaysSaveCallback);
-            jObjectResolver.registerMetaWriteListener(PeerDirectory.class, this::alwaysSaveCallback);
+            jObjectManager.registerMetaWriteListener(PersistentPeerInfo.class, this::alwaysSaveCallback);
+            jObjectManager.registerMetaWriteListener(PeerDirectory.class, this::alwaysSaveCallback);
         }
 
         if (downloadAll)
             executorService.submit(() -> {
                 for (var obj : jObjectManager.findAll()) {
                     var got = jObjectManager.get(obj);
-                    if (got.isEmpty() || !got.get().hasLocalCopy())
+                    if (got.isEmpty() || !got.get().getMeta().isHaveLocalCopy())
                         add(obj);
                 }
             });
     }
 
-    private void alwaysSaveCallback(JObject<?> obj) {
-        obj.assertRWLock();
+    private void alwaysSaveCallback(JObjectManager.JObject<?> obj) {
+        obj.assertRwLock();
         if (obj.getMeta().isDeleted()) return;
         if (obj.getData() != null) return;
-        if (obj.hasLocalCopy()) return;
+        if (obj.getMeta().isHaveLocalCopy()) return;
 
-        add(obj.getName());
+        add(obj.getMeta().getName());
     }
 
     void shutdown(@Observes @Priority(10) ShutdownEvent event) {
@@ -93,15 +93,15 @@ public class AutoSyncProcessor {
 
                 try {
                     jObjectManager.get(name).ifPresent(obj -> {
-                        boolean ok = obj.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, i, v) -> {
+                        boolean ok = obj.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, i, v) -> {
                             if (m.isDeleted()) return true;
                             if (m.isDeletionCandidate()) return false;
-                            if (obj.hasLocalCopy()) return true;
-                            return obj.tryResolve(JObject.ResolutionStrategy.REMOTE);
+                            if (obj.getMeta().isHaveLocalCopy()) return true;
+                            return obj.tryResolve(JObjectManager.ResolutionStrategy.REMOTE);
                         });
                         if (!ok) {
-                            Log.debug("Failed downloading object " + obj.getName() + ", will retry.");
-                            _retries.add(obj.getName());
+                            Log.debug("Failed downloading object " + obj.getMeta().getName() + ", will retry.");
+                            _retries.add(obj.getMeta().getName());
                         }
                     });
                 } catch (DeletedObjectAccessException ignored) {

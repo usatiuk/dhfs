@@ -2,9 +2,7 @@ package com.usatiuk.dhfs.objects.repository;
 
 import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.ShutdownChecker;
-import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
-import com.usatiuk.dhfs.objects.jrepository.JObjectResolver;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerDirectory;
 import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
@@ -44,8 +42,6 @@ public class PersistentPeerDataService {
     PeerTrustManager peerTrustManager;
     @Inject
     JObjectManager jObjectManager;
-    @Inject
-    JObjectResolver jObjectResolver;
     @Inject
     ExecutorService executorService;
     @Inject
@@ -92,11 +88,11 @@ public class PersistentPeerDataService {
             _persistentData.getData().getInitialObjSyncDone().clear();
         }
 
-        jObjectResolver.registerWriteListener(PersistentPeerInfo.class, this::pushPeerUpdates);
-        jObjectResolver.registerWriteListener(PeerDirectory.class, this::pushPeerUpdates);
+        jObjectManager.registerWriteListener(PersistentPeerInfo.class, this::pushPeerUpdates);
+        jObjectManager.registerWriteListener(PeerDirectory.class, this::pushPeerUpdates);
 
         // FIXME: Warn on failed resolves?
-        getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
+        getPeerDirectory().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
             peerTrustManager.reloadTrustManagerHosts(getHosts());
             return null;
         });
@@ -123,48 +119,48 @@ public class PersistentPeerDataService {
         }
     }
 
-    private JObject<PeerDirectory> getPeerDirectory() {
+    private JObjectManager.JObject<PeerDirectory> getPeerDirectory() {
         var got = jObjectManager.get(PeerDirectory.PeerDirectoryObjName).orElseThrow(() -> new IllegalStateException("Peer directory not found"));
-        got.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
+        got.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
             if (d == null) throw new IllegalStateException("Could not resolve peer directory!");
             if (!(d instanceof PeerDirectory))
                 throw new IllegalStateException("Peer directory is of wrong type!");
             return null;
         });
-        return (JObject<PeerDirectory>) got;
+        return (JObjectManager.JObject<PeerDirectory>) got;
     }
 
     private void pushPeerUpdates() {
         pushPeerUpdates(null);
     }
 
-    private void pushPeerUpdates(@Nullable JObject<?> obj) {
+    private void pushPeerUpdates(@Nullable JObjectManager.JObject<?> obj) {
         if (obj != null)
-            Log.info("Scheduling certificate update after " + obj.getName() + " was updated");
+            Log.info("Scheduling certificate update after " + obj.getMeta().getName() + " was updated");
         executorService.submit(() -> {
             updateCerts();
             invalidationQueueService.pushInvalidationToAll(PeerDirectory.PeerDirectoryObjName);
-            for (var p : getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.getPeers().stream().toList()))
+            for (var p : getPeerDirectory().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.getPeers().stream().toList()))
                 invalidationQueueService.pushInvalidationToAll(PersistentPeerInfo.getNameFromUuid(p));
         });
     }
 
-    private JObject<PersistentPeerInfo> getPeer(UUID uuid) {
+    private JObjectManager.JObject<PersistentPeerInfo> getPeer(UUID uuid) {
         var got = jObjectManager.get(PersistentPeerInfo.getNameFromUuid(uuid)).orElseThrow(() -> new IllegalStateException("Peer " + uuid + " not found"));
-        got.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
+        got.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
             if (d == null) throw new IllegalStateException("Could not resolve peer " + uuid);
             if (!(d instanceof PersistentPeerInfo))
                 throw new IllegalStateException("Peer " + uuid + " is of wrong type!");
             return null;
         });
-        return (JObject<PersistentPeerInfo>) got;
+        return (JObjectManager.JObject<PersistentPeerInfo>) got;
     }
 
     private List<PersistentPeerInfo> getPeersSnapshot() {
-        return getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY,
+        return getPeerDirectory().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY,
                 (m, d) -> d.getPeers().stream().map(u -> {
                     try {
-                        return getPeer(u).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m2, d2) -> d2);
+                        return getPeer(u).runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m2, d2) -> d2);
                     } catch (Exception e) {
                         Log.warn("Error making snapshot of peer " + u, e);
                         return null;
@@ -187,7 +183,7 @@ public class PersistentPeerDataService {
     }
 
     public PersistentPeerInfo getInfo(UUID name) {
-        return getPeer(name).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d);
+        return getPeer(name).runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d);
     }
 
     public List<PersistentPeerInfo> getHosts() {
@@ -195,20 +191,20 @@ public class PersistentPeerDataService {
     }
 
     public List<UUID> getHostUuids() {
-        return getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.getPeers().stream().filter(i -> !i.equals(_selfUuid)).toList());
+        return getPeerDirectory().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.getPeers().stream().filter(i -> !i.equals(_selfUuid)).toList());
     }
 
     public List<UUID> getHostUuidsAndSelf() {
-        return getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.getPeers().stream().toList());
+        return getPeerDirectory().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.getPeers().stream().toList());
     }
 
     public List<PersistentPeerInfo> getHostsNoNulls() {
         for (int i = 0; i < 5; i++) {
             try {
                 return getPeerDirectory()
-                        .runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY,
+                        .runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY,
                                 (m, d) -> d.getPeers().stream()
-                                        .map(u -> getPeer(u).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m2, d2) -> d2))
+                                        .map(u -> getPeer(u).runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m2, d2) -> d2))
                                         .filter(e -> !e.getUuid().equals(_selfUuid)).toList());
             } catch (Exception e) {
                 Log.warn("Error when making snapshot of hosts ", e);
@@ -224,7 +220,7 @@ public class PersistentPeerDataService {
     public boolean addHost(PersistentPeerInfo persistentPeerInfo) {
         if (persistentPeerInfo.getUuid().equals(_selfUuid)) return false;
 
-        boolean added = getPeerDirectory().runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
+        boolean added = getPeerDirectory().runWriteLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
             boolean addedInner = d.getPeers().add(persistentPeerInfo.getUuid());
             if (addedInner) {
                 jObjectManager.put(persistentPeerInfo, Optional.of(m.getName()));
@@ -236,13 +232,13 @@ public class PersistentPeerDataService {
     }
 
     public boolean removeHost(UUID host) {
-        boolean removed = getPeerDirectory().runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
+        boolean removed = getPeerDirectory().runWriteLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
             boolean removedInner = d.getPeers().remove(host);
             Log.info("Removing host: " + host + (removedInner ? " removed" : " did not exists"));
             if (removedInner) {
                 _persistentData.runWriteLocked(pd -> pd.getInitialObjSyncDone().remove(host));
                 _persistentData.runWriteLocked(pd -> pd.getInitialOpSyncDone().remove(host));
-                getPeer(host).runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mp, dp, bp, vp) -> {
+                getPeer(host).runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (mp, dp, bp, vp) -> {
                     mp.removeRef(m.getName());
                     return null;
                 });
@@ -255,7 +251,7 @@ public class PersistentPeerDataService {
 
     private void updateCerts() {
         try {
-            getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
+            getPeerDirectory().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
                 peerTrustManager.reloadTrustManagerHosts(getHostsNoNulls());
                 // Fixme:? I don't think it should be needed with custom trust store
                 // but it doesn't work?
@@ -269,13 +265,13 @@ public class PersistentPeerDataService {
     }
 
     public boolean existsHost(UUID uuid) {
-        return getPeerDirectory().runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.getPeers().contains(uuid));
+        return getPeerDirectory().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.getPeers().contains(uuid));
     }
 
     public PersistentPeerInfo getHost(UUID uuid) {
         if (!existsHost(uuid))
             throw new StatusRuntimeException(Status.NOT_FOUND);
-        return getPeer(uuid).runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d);
+        return getPeer(uuid).runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d);
     }
 
     public KeyPair getSelfKeypair() {

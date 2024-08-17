@@ -209,4 +209,8 @@ public class ObjectMetadata implements Serializable {
     public int dataHash() {
         return Objects.hash(_changelog);
     }
+
+    public boolean isOnlyLocal() {
+        return getKnownClass().isAnnotationPresent(OnlyLocal.class);
+    }
 }

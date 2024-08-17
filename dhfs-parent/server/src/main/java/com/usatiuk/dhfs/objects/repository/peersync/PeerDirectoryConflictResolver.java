@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.objects.repository.peersync;
 
-import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
@@ -28,18 +27,18 @@ public class PeerDirectoryConflictResolver implements ConflictResolver {
     JObjectManager jObjectManager;
 
     @Override
-    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
+    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObjectManager.JObject<?> ours) {
         var theirsDir = (PeerDirectory) theirsData;
         if (!theirsDir.getClass().equals(PeerDirectory.class)) {
             Log.error("Object type mismatch!");
             throw new NotImplementedException();
         }
 
-        ours.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, oursDirU, bump, invalidate) -> {
+        ours.runWriteLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, oursDirU, bump, invalidate) -> {
             if (oursDirU == null)
                 throw new StatusRuntimeException(Status.ABORTED.withDescription("Conflict but we don't have local copy"));
             if (!(oursDirU instanceof PeerDirectory oursPD))
-                throw new NotImplementedException("Type conflict for " + ours.getName() + ", directory was expected");
+                throw new NotImplementedException("Type conflict for " + ours.getMeta().getName() + ", directory was expected");
 
             LinkedHashSet<UUID> mergedChildren = new LinkedHashSet<>(oursPD.getPeers());
             mergedChildren.addAll(theirsDir.getPeers());

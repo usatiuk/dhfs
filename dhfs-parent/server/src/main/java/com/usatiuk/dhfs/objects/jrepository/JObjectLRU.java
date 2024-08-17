@@ -13,7 +13,7 @@ import java.util.concurrent.Executors;
 
 @ApplicationScoped
 public class JObjectLRU {
-    private final LinkedHashMap<JObject<?>, Long> _cache = new LinkedHashMap<>();
+    private final LinkedHashMap<JObjectManager.JObject<?>, Long> _cache = new LinkedHashMap<>();
     @Inject
     JObjectSizeEstimator jObjectSizeEstimator;
     @ConfigProperty(name = "dhfs.objects.lru.limit")
@@ -40,7 +40,7 @@ public class JObjectLRU {
                         if (Log.isTraceEnabled()) {
                             long realSize = 0;
                             synchronized (_cache) {
-                                for (JObject<?> object : _cache.keySet()) {
+                                for (JObjectManager.JObject<?> object : _cache.keySet()) {
                                     realSize += jObjectSizeEstimator.estimateObjectSize(object.getData());
                                 }
                                 Log.info("Cache status: real size="
@@ -60,7 +60,7 @@ public class JObjectLRU {
             _statusExecutor.shutdownNow();
     }
 
-    public void notifyAccess(JObject<?> obj) {
+    public void notifyAccess(JObjectManager.JObject<?> obj) {
         if (obj.getData() == null) return;
         long size = jObjectSizeEstimator.estimateObjectSize(obj.getData());
         synchronized (_cache) {
@@ -77,7 +77,7 @@ public class JObjectLRU {
         }
     }
 
-    public void updateSize(JObject<?> obj) {
+    public void updateSize(JObjectManager.JObject<?> obj) {
         long size = jObjectSizeEstimator.estimateObjectSize(obj.getData());
         synchronized (_cache) {
             var old = _cache.replace(obj, size);

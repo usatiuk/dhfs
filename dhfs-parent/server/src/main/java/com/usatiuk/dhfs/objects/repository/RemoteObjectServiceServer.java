@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.objects.repository;
 
 import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
-import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
@@ -59,12 +58,12 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
         var obj = jObjectManager.get(request.getName()).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
-        Pair<ObjectHeader, JObjectDataP> read = obj.runReadLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (meta, data) -> {
+        Pair<ObjectHeader, JObjectDataP> read = obj.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (meta, data) -> {
             if (data == null) {
                 Log.info("<-- getObject FAIL: " + request.getName() + " from " + request.getSelfUuid());
                 throw new StatusRuntimeException(Status.ABORTED.withDescription("Not available locally"));
             }
-            data.extractRefs().forEach(ref -> jObjectManager.get(ref).ifPresent(JObject::markSeen));
+            data.extractRefs().forEach(ref -> jObjectManager.get(ref).ifPresent(JObjectManager.JObject::markSeen));
             return Pair.of(meta.toRpcHeader(), protoSerializerService.serializeToJObjectDataP(data));
         });
         obj.markSeen();
@@ -91,7 +90,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         builder.setObjName(request.getName());
 
         if (obj.isPresent()) try {
-            boolean tryUpdate = obj.get().runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
+            boolean tryUpdate = obj.get().runReadLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
                 if (m.isDeleted() && !m.isDeletionCandidate())
                     throw new IllegalStateException("Object " + m.getName() + " is deleted but not a deletion candidate");
                 builder.setDeletionCandidate(m.isDeletionCandidate());
@@ -99,7 +98,9 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
                 return m.isDeletionCandidate() && !m.isDeleted();
             });
             if (tryUpdate) {
-                obj.get().runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {return null;});
+                obj.get().runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
+                    return null;
+                });
             }
         } catch (DeletedObjectAccessException dox) {
             builder.setDeletionCandidate(true);

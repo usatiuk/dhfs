@@ -4,7 +4,6 @@ import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.files.objects.ChunkData;
 import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
-import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.kleppmanntree.AlreadyExistsException;
 import io.quarkus.test.junit.QuarkusTestProfile;
@@ -74,10 +73,10 @@ public class DhfsFileServiceSimpleTestImpl {
             var fo = jObjectManager.put(f, Optional.empty());
 
             var all = jObjectManager.findAll();
-            Assertions.assertTrue(all.contains(c1o.getName()));
-            Assertions.assertTrue(all.contains(c2o.getName()));
-            Assertions.assertTrue(all.contains(c3o.getName()));
-            Assertions.assertTrue(all.contains(fo.getName()));
+            Assertions.assertTrue(all.contains(c1o.getMeta().getName()));
+            Assertions.assertTrue(all.contains(c2o.getMeta().getName()));
+            Assertions.assertTrue(all.contains(c3o.getMeta().getName()));
+            Assertions.assertTrue(all.contains(fo.getMeta().getName()));
         }
 
         String all = "1234567891011";
@@ -251,10 +250,10 @@ public class DhfsFileServiceSimpleTestImpl {
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
 
         var oldfile = jObjectManager.get(uuid).orElseThrow(IllegalStateException::new);
-        var chunk = oldfile.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> d.extractRefs()).stream().toList().get(0);
+        var chunk = oldfile.runWriteLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> d.extractRefs()).stream().toList().get(0);
         var chunkObj = jObjectManager.get(chunk).orElseThrow(IllegalStateException::new);
 
-        chunkObj.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
+        chunkObj.runWriteLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
             Assertions.assertTrue(m.getReferrers().contains(uuid));
             return null;
         });
@@ -271,7 +270,7 @@ public class DhfsFileServiceSimpleTestImpl {
         // FIXME: No gc!
 //        Thread.sleep(1000);
 //
-//        chunkObj.runWriteLocked(JObject.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
+//        chunkObj.runWriteLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
 //            Assertions.assertTrue(m.getReferrers().contains(newfile));
 //            Assertions.assertFalse(m.getReferrers().contains(uuid));
 //            return null;

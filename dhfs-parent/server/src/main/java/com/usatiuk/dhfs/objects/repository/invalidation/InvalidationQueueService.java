@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.objects.repository.invalidation;
 
 import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
-import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.PeerManager;
 import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
@@ -143,8 +142,8 @@ public class InvalidationQueueService {
         Log.info("Invalidation sender exited");
     }
 
-    public void pushInvalidationToAll(JObject<?> obj) {
-        if (obj.isOnlyLocal()) return;
+    public void pushInvalidationToAll(JObjectManager.JObject<?> obj) {
+        if (obj.getMeta().isOnlyLocal()) return;
         while (true) {
             var queue = _toAllQueue.get();
             if (queue == null) {
@@ -153,18 +152,18 @@ public class InvalidationQueueService {
                 queue = nq;
             }
 
-            queue.add(obj.getName());
+            queue.add(obj.getMeta().getName());
 
             if (_toAllQueue.get() == queue) break;
         }
     }
 
-    public void pushInvalidationToOne(UUID host, JObject<?> obj) {
-        if (obj.isOnlyLocal()) return;
+    public void pushInvalidationToOne(UUID host, JObjectManager.JObject<?> obj) {
+        if (obj.getMeta().isOnlyLocal()) return;
         if (remoteHostManager.isReachable(host))
-            _queue.add(Pair.of(host, obj.getName()));
+            _queue.add(Pair.of(host, obj.getMeta().getName()));
         else
-            deferredInvalidationQueueService.defer(host, obj.getName());
+            deferredInvalidationQueueService.defer(host, obj.getMeta().getName());
     }
 
     public void pushInvalidationToAll(String name) {

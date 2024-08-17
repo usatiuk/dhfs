@@ -85,7 +85,7 @@ public class JObjectWriteback {
             try {
                 flushOne(v._obj);
             } catch (Exception e) {
-                Log.error("Failed writing object " + v._obj.getName(), e);
+                Log.error("Failed writing object " + v._obj.getMeta().getName(), e);
             }
         }
     }
@@ -103,9 +103,9 @@ public class JObjectWriteback {
                             this.notifyAll();
                         }
                 } catch (Exception e) {
-                    Log.error("Failed writing object " + got._obj.getName() + ", will retry.", e);
+                    Log.error("Failed writing object " + got._obj.getMeta().getName() + ", will retry.", e);
                     try {
-                        got._obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
+                        got._obj.runReadLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
                             var size = jObjectSizeEstimator.estimateObjectSize(d);
                             _currentSize.addAndGet(size);
                             _writeQueue.add(new QueueEntry(got._obj, size));
@@ -124,14 +124,14 @@ public class JObjectWriteback {
         Log.info("Writeback thread exiting");
     }
 
-    private void flushOne(JObject<?> obj) {
-        if (obj.isDeleted())
-            obj.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, data, b, i) -> {
+    private void flushOne(JObjectManager.JObject<?> obj) {
+        if (obj.getMeta().isDeleted())
+            obj.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, data, b, i) -> {
                 flushOneImmediate(m, data);
                 return null;
             });
         else
-            obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, data) -> {
+            obj.runReadLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, data) -> {
                 flushOneImmediate(m, data);
                 return null;
             });
@@ -156,16 +156,16 @@ public class JObjectWriteback {
             objectPersistentStore.writeObject(m.getName(), protoSerializerService.serialize(m), null);
     }
 
-    public void remove(JObject<?> object) {
-        object.assertRWLock();
+    public void remove(JObjectManager.JObject<?> object) {
+        object.assertRwLock();
         var got = _writeQueue.remove(new QueueEntry(object, 0));
         if (got == null) return;
         _currentSize.addAndGet(-got._size);
     }
 
-    public void markDirty(JObject<?> object) {
-        object.assertRWLock();
-        if (object.isDeleted() && !object.getMeta().isWritten()) {
+    public void markDirty(JObjectManager.JObject<?> object) {
+        object.assertRwLock();
+        if (object.getMeta().isDeleted() && !object.getMeta().isWritten()) {
             remove(object);
             return;
         }
@@ -205,7 +205,7 @@ public class JObjectWriteback {
                     flushOneImmediate(object.getMeta(), object.getData());
                     return;
                 } catch (Exception e) {
-                    Log.error("Failed writing object " + object.getName(), e);
+                    Log.error("Failed writing object " + object.getMeta().getName(), e);
                     throw e;
                 }
             }
@@ -222,10 +222,10 @@ public class JObjectWriteback {
     }
 
     private class QueueEntry {
-        private final JObject<?> _obj;
+        private final JObjectManager.JObject<?> _obj;
         private final long _size;
 
-        private QueueEntry(JObject<?> obj, long size) {
+        private QueueEntry(JObjectManager.JObject<?> obj, long size) {
             _obj = obj;
             _size = size;
         }

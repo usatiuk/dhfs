@@ -65,7 +65,7 @@ public class JObjectRefProcessor {
         // Continue GC from last shutdown
         executorService.submit(() ->
                 jObjectManager.findAll().forEach(n -> {
-                    jObjectManager.get(n).ifPresent(o -> o.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
+                    jObjectManager.get(n).ifPresent(o -> o.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
                         return null;
                     }));
                 }));
@@ -95,18 +95,18 @@ public class JObjectRefProcessor {
 
         _movableProcessorExecutorService.submit(() -> {
             var obj = jObjectManager.get(objName).orElse(null);
-            if (obj == null || obj.isDeleted()) return;
+            if (obj == null || obj.getMeta().isDeleted()) return;
             boolean delay = false;
             try {
                 var knownHosts = persistentPeerDataService.getHostUuids();
                 List<UUID> missing = new ArrayList<>();
 
-                var ourReferrers = obj.runReadLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
+                var ourReferrers = obj.runReadLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
                     for (var x : knownHosts)
                         if (!m.getConfirmedDeletes().contains(x)) missing.add(x);
                     return m.getReferrers();
                 });
-                var ret = remoteObjectServiceClient.canDelete(missing, obj.getName(), ourReferrers);
+                var ret = remoteObjectServiceClient.canDelete(missing, obj.getMeta().getName(), ourReferrers);
 
                 long ok = 0;
 
@@ -119,32 +119,32 @@ public class JObjectRefProcessor {
                 }
 
                 if (ok != missing.size()) {
-                    Log.debug("Delaying deletion check of " + obj.getName());
+                    Log.debug("Delaying deletion check of " + obj.getMeta().getName());
                     delay = true;
                 }
 
-                obj.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                obj.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                     for (var r : ret)
                         if (r.getDeletionCandidate())
                             m.getConfirmedDeletes().add(UUID.fromString(r.getSelfUuid()));
                     return null;
                 });
             } catch (Exception e) {
-                Log.warn("When processing deletion of movable object " + obj.getName(), e);
+                Log.warn("When processing deletion of movable object " + obj.getMeta().getName(), e);
             } finally {
                 synchronized (_movablesInProcessing) {
-                    _movablesInProcessing.remove(obj.getName());
+                    _movablesInProcessing.remove(obj.getMeta().getName());
                     if (!delay)
-                        _candidates.add(obj.getName());
+                        _candidates.add(obj.getMeta().getName());
                     else
-                        _canDeleteRetries.add(obj.getName());
+                        _canDeleteRetries.add(obj.getMeta().getName());
                 }
             }
         });
     }
 
-    private boolean processMovable(JObject<?> obj) {
-        obj.assertRWLock();
+    private boolean processMovable(JObjectManager.JObject<?> obj) {
+        obj.assertRwLock();
         var knownHosts = persistentPeerDataService.getHostUuids();
         boolean missing = false;
         for (var x : knownHosts)
@@ -154,13 +154,13 @@ public class JObjectRefProcessor {
             }
 
         if (!missing) return true;
-        asyncProcessMovable(obj.getName());
+        asyncProcessMovable(obj.getMeta().getName());
         return false;
     }
 
-    private void deleteRef(JObject<?> self, String name) {
-        jObjectManager.get(name).ifPresent(ref -> ref.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
-            mc.removeRef(self.getName());
+    private void deleteRef(JObjectManager.JObject<?> self, String name) {
+        jObjectManager.get(name).ifPresent(ref -> ref.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
+            mc.removeRef(self.getMeta().getName());
             return null;
         }));
     }
@@ -181,7 +181,7 @@ public class JObjectRefProcessor {
                 var got = jObjectManager.get(next).orElse(null);
                 if (got == null) continue;
                 try {
-                    got.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, v, i) -> {
+                    got.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, v, i) -> {
                         if (m.isLocked()) return null;
                         if (m.isDeleted()) return null;
                         if (!m.isDeletionCandidate()) return null;
@@ -190,14 +190,14 @@ public class JObjectRefProcessor {
                                 return null;
                         }
 
-                        if (!got.getKnownClass().isAnnotationPresent(Leaf.class))
-                            got.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
+                        if (!got.getMeta().getKnownClass().isAnnotationPresent(Leaf.class))
+                            got.tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
 
                         Log.debug("Deleting " + m.getName());
                         m.markDeleted();
 
                         Collection<String> extracted = null;
-                        if (!got.getKnownClass().isAnnotationPresent(Leaf.class) && got.getData() != null)
+                        if (!got.getMeta().getKnownClass().isAnnotationPresent(Leaf.class) && got.getData() != null)
                             extracted = got.getData().extractRefs();
                         Collection<String> saved = got.getMeta().getSavedRefs();
 

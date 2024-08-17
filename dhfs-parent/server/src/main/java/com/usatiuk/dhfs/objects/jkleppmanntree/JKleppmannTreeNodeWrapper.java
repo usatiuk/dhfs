@@ -2,16 +2,16 @@ package com.usatiuk.dhfs.objects.jkleppmanntree;
 
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
-import com.usatiuk.dhfs.objects.jrepository.JObject;
+import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.kleppmanntree.TreeNode;
 import com.usatiuk.kleppmanntree.TreeNodeWrapper;
 
 import java.util.UUID;
 
 public class JKleppmannTreeNodeWrapper implements TreeNodeWrapper<Long, UUID, JKleppmannTreeNodeMeta, String> {
-    private final JObject<JKleppmannTreeNode> _backing;
+    private final JObjectManager.JObject<JKleppmannTreeNode> _backing;
 
-    public JKleppmannTreeNodeWrapper(JObject<JKleppmannTreeNode> backing) {_backing = backing;}
+    public JKleppmannTreeNodeWrapper(JObjectManager.JObject<JKleppmannTreeNode> backing) {_backing = backing;}
 
     @Override
     public void rLock() {
@@ -36,7 +36,7 @@ public class JKleppmannTreeNodeWrapper implements TreeNodeWrapper<Long, UUID, JK
 
     @Override
     public void lock() {
-        _backing.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
+        _backing.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
             m.lock();
             return null;
         });
@@ -44,7 +44,7 @@ public class JKleppmannTreeNodeWrapper implements TreeNodeWrapper<Long, UUID, JK
 
     @Override
     public void unlock() {
-        _backing.runWriteLocked(JObject.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
+        _backing.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
             m.unlock();
             return null;
         });
@@ -62,8 +62,9 @@ public class JKleppmannTreeNodeWrapper implements TreeNodeWrapper<Long, UUID, JK
 
     @Override
     public TreeNode<Long, UUID, JKleppmannTreeNodeMeta, String> getNode() {
-        _backing.tryResolve(JObject.ResolutionStrategy.LOCAL_ONLY);
-        if (_backing.getData() == null) throw new IllegalStateException("Node " + _backing.getName() + " data lost!");
+        _backing.tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
+        if (_backing.getData() == null)
+            throw new IllegalStateException("Node " + _backing.getMeta().getName() + " data lost!");
         return _backing.getData().getNode();
     }
 }
