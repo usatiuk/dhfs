@@ -66,14 +66,14 @@ public interface JObjectManager {
 
         <R> R runWriteLocked(ResolutionStrategy resolutionStrategy, ObjectFnWrite<T, R> fn);
 
-        default void runReadLocked(ResolutionStrategy resolutionStrategy, ObjectFnReadVoid<T> fn) {
+        default void runReadLockedVoid(ResolutionStrategy resolutionStrategy, ObjectFnReadVoid<T> fn) {
             runReadLocked(resolutionStrategy, (m, d) -> {
                 fn.apply(m, d);
                 return null;
             });
         }
 
-        default void runWriteLocked(ResolutionStrategy resolutionStrategy, ObjectFnWriteVoid<T> fn) {
+        default void runWriteLockedVoid(ResolutionStrategy resolutionStrategy, ObjectFnWriteVoid<T> fn) {
             runWriteLocked(resolutionStrategy, (m, d, b, v) -> {
                 fn.apply(m, d, b, v);
                 return null;
