@@ -384,7 +384,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     }
 
     @Override
-    public Long write(String fileUuid, long offset, byte[] data) {
+    public Long write(String fileUuid, long offset, ByteString data) {
         return jObjectTxManager.executeTx(() -> {
             if (offset < 0)
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Offset should be more than zero: " + offset));
@@ -402,7 +402,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
                 if (writeLogging) {
                     Log.info("Writing to file: " + meta.getName() + " size=" + size(fileUuid) + " "
-                            + offset + " " + data.length + " " + Arrays.toString(data));
+                            + offset + " " + data.size());
                 }
 
                 if (size(fileUuid) < offset)
@@ -410,7 +410,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
                 var chunksAll = fData.getChunks();
                 var first = chunksAll.floorEntry(offset);
-                var last = chunksAll.lowerEntry(offset + data.length);
+                var last = chunksAll.lowerEntry(offset + data.size());
                 HashSet<String> removedChunks = new HashSet<>();
 
                 try {
@@ -438,12 +438,12 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                         var chunkBytes = readChunk(first.getValue());
                         pendingWrites = pendingWrites.concat(chunkBytes.substring(0, (int) (offset - first.getKey())));
                     }
-                    pendingWrites = pendingWrites.concat(UnsafeByteOperations.unsafeWrap(data));
+                    pendingWrites = pendingWrites.concat(data);
 
                     if (last != null) {
                         var lchunkBytes = readChunk(last.getValue());
-                        if (last.getKey() + lchunkBytes.size() > offset + data.length) {
-                            var startInFile = offset + data.length;
+                        if (last.getKey() + lchunkBytes.size() > offset + data.size()) {
+                            var startInFile = offset + data.size();
                             var startInChunk = startInFile - last.getKey();
                             pendingWrites = pendingWrites.concat(lchunkBytes.substring((int) startInChunk, lchunkBytes.size()));
                         }
@@ -542,7 +542,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             });
 
 
-            return (long) data.length;
+            return (long) data.size();
         });
     }
 

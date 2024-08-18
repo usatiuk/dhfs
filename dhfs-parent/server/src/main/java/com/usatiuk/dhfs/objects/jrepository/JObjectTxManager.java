@@ -11,7 +11,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Objects;
 import java.util.function.Supplier;
 
@@ -46,34 +45,6 @@ public class JObjectTxManager {
             throw new IllegalStateException("Transaction not running");
         Log.debug("Committing transaction");
 
-        // FIXME: Reset this?
-        state._isCommitting = true;
-
-        HashSet<JObject<?>> deleted = new HashSet<>();
-
-        boolean updated = true;
-        do {
-            updated = false;
-            // FIXMEEEE
-            for (var obj : state._writeObjects.values()) {
-                if (obj.obj().updateDeletionState()) {
-                    if (deleted.add(obj.obj()))
-                        updated |= true;
-                }
-            }
-            var drained = state._removedObjects;
-            for (var r : drained.entrySet()) {
-                if (state._writeObjects.containsKey(r.getKey())) throw new IllegalStateException();
-            }
-            state._writeObjects.putAll(drained);
-            state._removedObjects = new HashMap<>();
-            for (var obj : drained.values()) {
-                if (obj.obj().updateDeletionState()) {
-                    if (deleted.add(obj.obj()))
-                        updated |= true;
-                }
-            }
-        } while (!state._removedObjects.isEmpty() || updated);
 
         for (var obj : state._writeObjects.values()) {
             Log.debug("Committing " + obj.obj().getMeta().getName() + " deleted=" + obj.obj().getMeta().isDeleted() + " deletion-candidate=" + obj.obj().getMeta().isDeletionCandidate());
@@ -205,9 +176,7 @@ public class JObjectTxManager {
         obj.assertRwLock();
         obj.rwLock();
 
-        var dst = state._isCommitting ? state._removedObjects : state._writeObjects;
-
-        dst.put(obj.getMeta().getName(),
+        state._writeObjects.put(obj.getMeta().getName(),
                 new JObjectSnapshot(
                         obj,
                         protoSerializerService.serialize(obj.getMeta()),
@@ -217,8 +186,6 @@ public class JObjectTxManager {
     }
 
     private class TxState {
-        private boolean _isCommitting = false;
         private final HashMap<String, JObjectSnapshot> _writeObjects = new HashMap<>();
-        private HashMap<String, JObjectSnapshot> _removedObjects = new HashMap<>();
     }
 }

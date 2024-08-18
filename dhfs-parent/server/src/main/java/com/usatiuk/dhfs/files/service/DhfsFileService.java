@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.files.service;
 
 import com.google.protobuf.ByteString;
+import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import org.apache.commons.lang3.tuple.Pair;
@@ -34,7 +35,11 @@ public interface DhfsFileService {
 
     Optional<ByteString> read(String fileUuid, long offset, int length);
 
-    Long write(String fileUuid, long offset, byte[] data);
+    Long write(String fileUuid, long offset, ByteString data);
+
+    default Long write(String fileUuid, long offset, byte[] data) {
+        return write(fileUuid, offset, UnsafeByteOperations.unsafeWrap(data));
+    }
 
     Boolean truncate(String fileUuid, long length);
 

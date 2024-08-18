@@ -26,6 +26,7 @@ import ru.serce.jnrfuse.struct.FuseFileInfo;
 import ru.serce.jnrfuse.struct.Statvfs;
 import ru.serce.jnrfuse.struct.Timespec;
 
+import java.nio.ByteBuffer;
 import java.nio.file.Paths;
 import java.util.Optional;
 
@@ -186,9 +187,15 @@ public class DhfsFuse extends FuseStubFS {
         try {
             var fileOpt = fileService.open(path);
             if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
-            byte[] buffer = new byte[(int) size];
-            buf.get(0, buffer, 0, (int) size);
-            var written = fileService.write(fileOpt.get(), offset, buffer);
+            var buffer = ByteBuffer.allocateDirect((int) size);
+
+            jnrPtrByteOutputAccessors.getUnsafe().copyMemory(
+                    buf.address(),
+                    jnrPtrByteOutputAccessors.getNioAccess().getBufferAddress(buffer),
+                    size
+            );
+
+            var written = fileService.write(fileOpt.get(), offset, UnsafeByteOperations.unsafeWrap(buffer));
             return written.intValue();
         } catch (Exception e) {
             Log.error("When writing " + path, e);

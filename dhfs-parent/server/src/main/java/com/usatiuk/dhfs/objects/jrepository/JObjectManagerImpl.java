@@ -437,6 +437,10 @@ public class JObjectManagerImpl implements JObjectManager {
 
         public void rwUnlock() {
             _lock.writeLock().unlock();
+            // FIXME: this relies on the transaction running
+            if (_lock.writeLock().getHoldCount() == 1) {
+                updateDeletionState();
+            }
         }
 
         public boolean haveRwLock() {
