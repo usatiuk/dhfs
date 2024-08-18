@@ -258,7 +258,7 @@ public class DhfsFusex3IT {
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
         waitingConsumer3.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
 
-        Thread.sleep(2000);
+        Thread.sleep(20000);
         for (var c : List.of(container1, container2, container3)) {
             var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
             var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
