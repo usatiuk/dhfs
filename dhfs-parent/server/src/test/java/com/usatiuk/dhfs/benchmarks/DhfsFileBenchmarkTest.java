@@ -1,14 +1,15 @@
 package com.usatiuk.dhfs.benchmarks;
 
+import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
-import io.quarkus.logging.Log;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
-import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -33,27 +34,21 @@ public class DhfsFileBenchmarkTest {
 
     @Test
     void openRootTest() {
-        Benchmarker.runThroughput(
+        Benchmarker.runAndPrintMixSimple("dhfsFileService.open(\"\")",
                 () -> {
                     return dhfsFileService.open("");
-                }, 5, 1000
-        );
-        var res = Benchmarker.runLatency(
+                }, 1_000_000, 5, 1000, 5, 1000);
+    }
+
+    @Test
+    @Disabled
+    void writeMbTest() {
+        String file = dhfsFileService.create("/writeMbTest", 0777).get();
+        var bb = ByteBuffer.allocateDirect(1024 * 1024);
+        Benchmarker.runAndPrintMixSimple("dhfsFileService.write(\"\")",
                 () -> {
-                    return dhfsFileService.open("");
-                }, 100_000);
-        DescriptiveStatistics stats = new DescriptiveStatistics();
-        for (var r : res) {
-            stats.addValue(r);
-        }
-        Log.info(
-                "\n" + stats.toString() +
-                        "\n 50%: " + stats.getPercentile(50) +
-                        "\n 90%: " + stats.getPercentile(90) +
-                        "\n 95%: " + stats.getPercentile(95) +
-                        "\n 99%: " + stats.getPercentile(99) +
-                        "\n 99.9%: " + stats.getPercentile(99.9) +
-                        "\n 99.99%: " + stats.getPercentile(99.99)
-        );
+                    var thing = UnsafeByteOperations.unsafeWrap(bb);
+                    return dhfsFileService.write(file, dhfsFileService.size(file), thing);
+                }, 1_000, 10, 100, 1, 100);
     }
 }
