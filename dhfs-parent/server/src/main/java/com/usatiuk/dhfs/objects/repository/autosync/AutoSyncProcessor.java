@@ -1,8 +1,6 @@
 package com.usatiuk.dhfs.objects.repository.autosync;
 
-import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
-import com.usatiuk.dhfs.objects.jrepository.JObjectData;
-import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.objects.jrepository.*;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerDirectory;
 import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
 import com.usatiuk.utils.HashSetDelayedBlockingQueue;
@@ -31,6 +29,8 @@ public class AutoSyncProcessor {
     boolean downloadAll;
     @Inject
     ExecutorService executorService;
+    @Inject
+    JObjectTxManager jObjectTxManager;
     private ExecutorService _autosyncExcecutor;
 
     @Startup
@@ -61,7 +61,7 @@ public class AutoSyncProcessor {
             });
     }
 
-    private void alwaysSaveCallback(JObjectManager.JObject<?> obj) {
+    private void alwaysSaveCallback(JObject<?> obj) {
         obj.assertRwLock();
         if (obj.getMeta().isDeleted()) return;
         if (obj.getData() != null) return;
@@ -92,17 +92,21 @@ public class AutoSyncProcessor {
                 }
 
                 try {
-                    jObjectManager.get(name).ifPresent(obj -> {
-                        boolean ok = obj.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, i, v) -> {
-                            if (m.isDeleted()) return true;
-                            if (m.isDeletionCandidate()) return false;
-                            if (obj.getMeta().isHaveLocalCopy()) return true;
-                            return obj.tryResolve(JObjectManager.ResolutionStrategy.REMOTE);
+                    String finalName = name;
+                    jObjectTxManager.executeTx(() -> {
+                        jObjectManager.get(finalName).ifPresent(obj -> {
+                            boolean ok = obj.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, i, v) -> {
+                                if (m.isOnlyLocal()) return true; // FIXME:
+                                if (m.isDeleted()) return true;
+                                if (m.isDeletionCandidate()) return false;
+                                if (obj.getMeta().isHaveLocalCopy()) return true;
+                                return obj.tryResolve(JObjectManager.ResolutionStrategy.REMOTE);
+                            });
+                            if (!ok) {
+                                Log.debug("Failed downloading object " + obj.getMeta().getName() + ", will retry.");
+                                _retries.add(obj.getMeta().getName());
+                            }
                         });
-                        if (!ok) {
-                            Log.debug("Failed downloading object " + obj.getMeta().getName() + ", will retry.");
-                            _retries.add(obj.getMeta().getName());
-                        }
                     });
                 } catch (DeletedObjectAccessException ignored) {
                 } catch (Exception e) {

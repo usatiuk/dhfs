@@ -7,9 +7,12 @@ import java.util.Collection;
 import java.util.Optional;
 
 public interface JObjectManager {
-    <T extends JObjectData> void registerWriteListener(Class<T> klass, WriteListenerFn<T> fn);
+    // FIXME:
+    void runWriteListeners(JObject<?> obj, boolean metaChanged, boolean dataChanged);
 
-    <T extends JObjectData> void registerMetaWriteListener(Class<T> klass, WriteListenerFn<T> fn);
+    <T extends JObjectData> void registerWriteListener(Class<T> klass, WriteListenerFn fn);
+
+    <T extends JObjectData> void registerMetaWriteListener(Class<T> klass, WriteListenerFn fn);
 
     Optional<JObject<?>> get(String name);
 
@@ -33,8 +36,8 @@ public interface JObjectManager {
     }
 
     @FunctionalInterface
-    interface WriteListenerFn<T extends JObjectData> {
-        void apply(JObject<T> obj);
+    interface WriteListenerFn {
+        void apply(JObject<?> obj);
     }
 
     @FunctionalInterface
@@ -57,49 +60,4 @@ public interface JObjectManager {
         void apply(ObjectMetadata indexData, @Nullable T data, VoidFn bump, VoidFn invalidate);
     }
 
-    interface JObject<T extends JObjectData> {
-        ObjectMetadata getMeta();
-
-        T getData();
-
-        <R> R runReadLocked(ResolutionStrategy resolutionStrategy, ObjectFnRead<T, R> fn);
-
-        <R> R runWriteLocked(ResolutionStrategy resolutionStrategy, ObjectFnWrite<T, R> fn);
-
-        default void runReadLockedVoid(ResolutionStrategy resolutionStrategy, ObjectFnReadVoid<T> fn) {
-            runReadLocked(resolutionStrategy, (m, d) -> {
-                fn.apply(m, d);
-                return null;
-            });
-        }
-
-        default void runWriteLockedVoid(ResolutionStrategy resolutionStrategy, ObjectFnWriteVoid<T> fn) {
-            runWriteLocked(resolutionStrategy, (m, d, b, v) -> {
-                fn.apply(m, d, b, v);
-                return null;
-            });
-        }
-
-        boolean tryResolve(ResolutionStrategy resolutionStrategy);
-
-        void externalResolution(T data);
-
-        void rwLock();
-
-        void rwUnlock();
-
-        boolean haveRwLock();
-
-        void assertRwLock();
-
-        void discardData();
-
-        void markSeen();
-
-        void rLock();
-
-        void rUnlock();
-
-        void bumpVer();
-    }
 }

@@ -13,7 +13,6 @@ import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.Shutdown;
 import io.quarkus.runtime.Startup;
-import jakarta.annotation.Nullable;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.Getter;
@@ -34,10 +33,27 @@ import java.util.stream.Stream;
 
 @ApplicationScoped
 public class JObjectManagerImpl implements JObjectManager {
-    private final MultiValuedMap<Class<? extends JObjectData>, WriteListenerFn<?>> _writeListeners
+    private final MultiValuedMap<Class<? extends JObjectData>, WriteListenerFn> _writeListeners
             = new ArrayListValuedHashMap<>();
-    private final MultiValuedMap<Class<? extends JObjectData>, WriteListenerFn<?>> _metaWriteListeners
+    private final MultiValuedMap<Class<? extends JObjectData>, WriteListenerFn> _metaWriteListeners
             = new ArrayListValuedHashMap<>();
+
+    @Override
+    public void runWriteListeners(com.usatiuk.dhfs.objects.jrepository.JObject<?> obj, boolean metaChanged, boolean dataChanged) {
+        if (metaChanged)
+            for (var t : _metaWriteListeners.keySet()) { // FIXME:?
+                if (t.isAssignableFrom(obj.getMeta().getKnownClass()))
+                    for (var cb : _metaWriteListeners.get(t))
+                        cb.apply(obj);
+            }
+        if (dataChanged)
+            for (var t : _writeListeners.keySet()) { // FIXME:?
+                if (t.isAssignableFrom(obj.getMeta().getKnownClass()))
+                    for (var cb : _writeListeners.get(t))
+                        cb.apply(obj);
+            }
+    }
+
     private final ConcurrentHashMap<String, NamedWeakReference> _map = new ConcurrentHashMap<>();
     private final ReferenceQueue<JObject<?>> _refQueue = new ReferenceQueue<>();
 
@@ -59,18 +75,20 @@ public class JObjectManagerImpl implements JObjectManager {
     JObjectRefProcessor jObjectRefProcessor;
     @Inject
     JObjectLRU jObjectLRU;
+    @Inject
+    JObjectTxManager jObjectTxManager;
     @ConfigProperty(name = "dhfs.objects.ref_verification")
     boolean refVerification;
 
     private Thread _refCleanupThread;
 
     @Override
-    public <T extends JObjectData> void registerWriteListener(Class<T> klass, WriteListenerFn<T> fn) {
+    public <T extends JObjectData> void registerWriteListener(Class<T> klass, WriteListenerFn fn) {
         _writeListeners.put(klass, fn);
     }
 
     @Override
-    public <T extends JObjectData> void registerMetaWriteListener(Class<T> klass, WriteListenerFn<T> fn) {
+    public <T extends JObjectData> void registerMetaWriteListener(Class<T> klass, WriteListenerFn fn) {
         _metaWriteListeners.put(klass, fn);
     }
 
@@ -107,7 +125,7 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     @Override
-    public Optional<JObjectManager.JObject<?>> get(String name) {
+    public Optional<com.usatiuk.dhfs.objects.jrepository.JObject<?>> get(String name) {
         {
             var inMap = getFromMap(name);
             if (inMap != null) {
@@ -194,8 +212,9 @@ public class JObjectManagerImpl implements JObjectManager {
                     return null;
                 });
             } finally {
-                if (newObj != null)
-                    newObj.forceInvalidate();
+                // FIXME?
+//                if (newObj != null)
+//                    newObj.forceInvalidate();
             }
             if (newObj == null) {
                 jObjectLRU.notifyAccess(ret);
@@ -213,7 +232,7 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     @Override
-    public JObjectManager.JObject<?> getOrPutLocked(String name, Class<? extends JObjectData> klass, Optional<String> parent) {
+    public com.usatiuk.dhfs.objects.jrepository.JObject<?> getOrPutLocked(String name, Class<? extends JObjectData> klass, Optional<String> parent) {
         while (true) {
             var got = get(name).orElse(null);
 
@@ -251,7 +270,7 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     @Override
-    public JObjectManager.JObject<?> getOrPut(String name, Class<? extends JObjectData> klass, Optional<String> parent) {
+    public com.usatiuk.dhfs.objects.jrepository.JObject<?> getOrPut(String name, Class<? extends JObjectData> klass, Optional<String> parent) {
         var obj = getOrPutLocked(name, klass, parent);
         obj.rwUnlock();
         return obj;
@@ -267,12 +286,11 @@ public class JObjectManagerImpl implements JObjectManager {
         }
     }
 
-    public class JObject<T extends JObjectData> implements JObjectManager.JObject<T> {
-        private static final int lockTimeoutSecs = 15;
+    public class JObject<T extends JObjectData> extends com.usatiuk.dhfs.objects.jrepository.JObject<T> {
+        private static final int lockTimeoutSecs = 5;
         private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
-        private final ObjectMetadata _metaPart;
+        private ObjectMetadata _metaPart;
         private final AtomicReference<T> _dataPart = new AtomicReference<>();
-        private TransactionState _transactionState = null;
 
         // Create a new object
         protected JObject(String name, UUID selfUuid, T obj) {
@@ -294,6 +312,12 @@ public class JObjectManagerImpl implements JObjectManager {
         @Override
         public T getData() {
             return _dataPart.get();
+        }
+
+        @Override
+        void rollback(ObjectMetadata meta, T data) {
+            _metaPart = meta;
+            _dataPart.set(data);
         }
 
         @Override
@@ -322,7 +346,6 @@ public class JObjectManagerImpl implements JObjectManager {
                         _dataPart.set((T) res);
                         _metaPart.setHaveLocalCopy(true);
                         hydrateRefs();
-                        verifyRefs();
                     } // _dataPart.get() == null
                 } finally {
                     rwUnlock();
@@ -370,7 +393,6 @@ public class JObjectManagerImpl implements JObjectManager {
             if (!_metaPart.isLocked())
                 _metaPart.lock();
             hydrateRefs();
-            verifyRefs();
         }
 
         public boolean tryRLock() {
@@ -383,7 +405,12 @@ public class JObjectManagerImpl implements JObjectManager {
 
         public boolean tryRWLock() {
             try {
-                return _lock.writeLock().tryLock(lockTimeoutSecs, TimeUnit.SECONDS);
+                if (!_lock.writeLock().tryLock(lockTimeoutSecs, TimeUnit.SECONDS))
+                    return false;
+                if (_lock.writeLock().getHoldCount() == 1) {
+                    jObjectTxManager.addToTx(this);
+                }
+                return true;
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -392,9 +419,6 @@ public class JObjectManagerImpl implements JObjectManager {
         public void rwLock() {
             if (!tryRWLock())
                 throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Failed to acquire write lock for " + getMeta().getName()));
-            if (_lock.writeLock().getHoldCount() == 1) {
-                _transactionState = new TransactionState();
-            }
         }
 
         public void rLock() {
@@ -406,22 +430,13 @@ public class JObjectManagerImpl implements JObjectManager {
             _lock.readLock().unlock();
         }
 
-        protected void forceInvalidate() {
-            assertRwLock();
-            _transactionState.forceInvalidate();
-        }
+//        protected void forceInvalidate() {
+//            assertRwLock();
+//            jObjectTxManager.forceInvalidate(this);
+//        }
 
         public void rwUnlock() {
-            try {
-                if (_lock.writeLock().getHoldCount() == 1) {
-                    _transactionState.commit();
-                    _transactionState = null;
-                }
-            } catch (Exception ex) {
-                Log.error("When committing changes to " + getMeta().getName(), ex);
-            } finally {
-                _lock.writeLock().unlock();
-            }
+            _lock.writeLock().unlock();
         }
 
         public boolean haveRwLock() {
@@ -450,10 +465,6 @@ public class JObjectManagerImpl implements JObjectManager {
 
         protected boolean isResolved() {
             return _dataPart.get() != null;
-        }
-
-        private void verifyRefs() {
-            verifyRefs(null);
         }
 
         @Override
@@ -529,7 +540,8 @@ public class JObjectManagerImpl implements JObjectManager {
             }
         }
 
-        public void updateDeletionState() {
+        @Override
+        public boolean updateDeletionState() {
             assertRwLock();
 
             if (!getMeta().isDeletionCandidate() && getMeta().isDeleted()) {
@@ -553,7 +565,9 @@ public class JObjectManagerImpl implements JObjectManager {
             if (getMeta().isDeletionCandidate() && !getMeta().isDeleted()) {
                 if (!getMeta().isSeen()) tryQuickDelete();
                 else jObjectRefProcessor.putDeletionCandidate(getMeta().getName());
+                return true;
             }
+            return false;
         }
 
         private void quickDeleteRef(String name) {
@@ -596,7 +610,7 @@ public class JObjectManagerImpl implements JObjectManager {
         public <T extends JObjectData> T resolveDataRemote() {
             var obj = remoteObjectServiceClient.getObject(this);
             jObjectWriteback.markDirty(this);
-            invalidationQueueService.pushInvalidationToAll(getMeta().getName());
+            invalidationQueueService.pushInvalidationToAll(this);
             return protoSerializerService.deserialize(obj);
         }
 
@@ -620,29 +634,6 @@ public class JObjectManagerImpl implements JObjectManager {
             }
         }
 
-        public <T extends JObjectData> void notifyWrite(boolean metaChanged,
-                                                        boolean externalChanged, boolean hasDataChanged) {
-            assertRwLock();
-            jObjectLRU.updateSize(this);
-            if (metaChanged || hasDataChanged)
-                jObjectWriteback.markDirty(this);
-            if (metaChanged)
-                for (var t : _metaWriteListeners.keySet()) { // FIXME:?
-                    if (t.isAssignableFrom(getMeta().getKnownClass()))
-                        for (var cb : _metaWriteListeners.get(t))
-                            cb.apply((JObject) this);
-                }
-            if (hasDataChanged)
-                for (var t : _writeListeners.keySet()) { // FIXME:?
-                    if (t.isAssignableFrom(getMeta().getKnownClass()))
-                        for (var cb : _writeListeners.get(t))
-                            cb.apply((JObject) this);
-                }
-            if (externalChanged && getMeta().isHaveLocalCopy()) {
-                invalidationQueueService.pushInvalidationToAll(getMeta().getName());
-            }
-        }
-
         @Override
         public void bumpVer() {
             assertRwLock();
@@ -651,80 +642,5 @@ public class JObjectManagerImpl implements JObjectManager {
                 return null;
             });
         }
-
-        protected void verifyRefs(@Nullable HashSet<String> oldRefs) {
-            if (!refVerification) return;
-            assertRwLock();
-            if (!isResolved()) return;
-            if (getMeta().isDeleted()) return;
-            var newRefs = getData().extractRefs();
-            if (oldRefs != null) for (var o : oldRefs)
-                if (!newRefs.contains(o)) {
-                    jObjectManager.get(o).ifPresent(obj -> {
-                        if (obj.getMeta().checkRef(getMeta().getName()))
-                            throw new IllegalStateException("Object " + o + " is referenced from " + getMeta().getName() + " but shouldn't be");
-                    });
-                }
-            for (var r : newRefs) {
-                var obj = jObjectManager.get(r).orElseThrow(() -> new IllegalStateException("Object " + r + " not found but should be referenced from " + getMeta().getName()));
-                if (obj.getMeta().isDeleted())
-                    throw new IllegalStateException("Object " + r + " deleted but referenced from " + getMeta().getName());
-                if (!obj.getMeta().checkRef(getMeta().getName()))
-                    throw new IllegalStateException("Object " + r + " is not referenced by " + getMeta().getName() + " but should be");
-            }
-        }
-
-        private class TransactionState {
-            final int dataHash;
-            final int metaHash;
-            final int externalHash;
-            final boolean data;
-            final HashSet<String> oldRefs;
-            boolean forceInvalidate = false;
-
-            TransactionState() {
-                this.dataHash = _metaPart.dataHash();
-                this.metaHash = _metaPart.metaHash();
-                this.externalHash = _metaPart.externalHash();
-                this.data = _dataPart.get() != null || getMeta().isHaveLocalCopy();
-
-                if (refVerification) {
-                    tryLocalResolve();
-                    if (_dataPart.get() != null)
-                        oldRefs = new HashSet<>(_dataPart.get().extractRefs());
-                    else
-                        oldRefs = null;
-                } else {
-                    oldRefs = null;
-                }
-            }
-
-            void commit() {
-                updateDeletionState();
-
-                var newDataHash = _metaPart.dataHash();
-                var newMetaHash = _metaPart.metaHash();
-                var newExternalHash = _metaPart.externalHash();
-                var newData = _dataPart.get() != null || getMeta().isHaveLocalCopy();
-
-                if (_dataPart.get() != null)
-                    _metaPart.narrowClass(_dataPart.get().getClass());
-
-                notifyWrite(
-                        newMetaHash != metaHash || forceInvalidate,
-                        newExternalHash != externalHash || forceInvalidate,
-                        newDataHash != dataHash
-                                || newData != data
-                                || forceInvalidate
-                );
-
-                verifyRefs(oldRefs);
-            }
-
-            void forceInvalidate() {
-                forceInvalidate = true;
-            }
-        }
-
     }
 }

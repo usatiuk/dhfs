@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.files.conflicts;
 
 import com.usatiuk.dhfs.files.objects.Directory;
 import com.usatiuk.dhfs.files.objects.FsNode;
+import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
@@ -25,7 +26,7 @@ public class DirectoryConflictResolver implements ConflictResolver {
     JObjectManager jObjectManager;
 
     @Override
-    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObjectManager.JObject<?> ours) {
+    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
         var theirsDir = (Directory) theirsData;
         if (!theirsDir.getClass().equals(Directory.class)) {
             Log.error("Object type mismatch!");

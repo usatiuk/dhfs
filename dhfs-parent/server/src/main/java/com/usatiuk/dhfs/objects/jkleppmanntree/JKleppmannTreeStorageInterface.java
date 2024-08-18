@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.objects.jkleppmanntree;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaDirectory;
+import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
@@ -30,11 +31,11 @@ public class JKleppmannTreeStorageInterface implements StorageInterface<Long, UU
         }
     }
 
-    public JObjectManager.JObject<JKleppmannTreeNode> putNode(JKleppmannTreeNode node) {
+    public JObject<JKleppmannTreeNode> putNode(JKleppmannTreeNode node) {
         return jObjectManager.put(node, Optional.ofNullable(node.getNode().getParent()));
     }
 
-    public JObjectManager.JObject<JKleppmannTreeNode> putNodeLocked(JKleppmannTreeNode node) {
+    public JObject<JKleppmannTreeNode> putNodeLocked(JKleppmannTreeNode node) {
         return jObjectManager.putLocked(node, Optional.ofNullable(node.getNode().getParent()));
     }
 
@@ -57,7 +58,7 @@ public class JKleppmannTreeStorageInterface implements StorageInterface<Long, UU
     public JKleppmannTreeNodeWrapper getById(String id) {
         var got = jObjectManager.get(id);
         if (got.isEmpty()) return null;
-        return new JKleppmannTreeNodeWrapper((JObjectManager.JObject<JKleppmannTreeNode>) got.get());
+        return new JKleppmannTreeNodeWrapper((JObject<JKleppmannTreeNode>) got.get());
     }
 
     @Override

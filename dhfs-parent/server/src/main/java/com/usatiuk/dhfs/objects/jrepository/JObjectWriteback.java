@@ -31,6 +31,8 @@ public class JObjectWriteback {
     JObjectSizeEstimator jObjectSizeEstimator;
     @Inject
     ProtoSerializerService protoSerializerService;
+    @Inject
+    JObjectTxManager jObjectTxManager;
     @ConfigProperty(name = "dhfs.objects.writeback.limit")
     long sizeLimit;
     @ConfigProperty(name = "dhfs.objects.writeback.watermark-high")
@@ -124,13 +126,16 @@ public class JObjectWriteback {
         Log.info("Writeback thread exiting");
     }
 
-    private void flushOne(JObjectManager.JObject<?> obj) {
-        if (obj.getMeta().isDeleted())
-            obj.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, data, b, i) -> {
-                flushOneImmediate(m, data);
-                return null;
+    private void flushOne(JObject<?> obj) {
+        if (obj.getMeta().isDeleted()) {
+            // FIXME
+            jObjectTxManager.executeTx(() -> {
+                obj.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, data, b, i) -> {
+                    flushOneImmediate(m, data);
+                    return null;
+                });
             });
-        else
+        } else
             obj.runReadLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, data) -> {
                 flushOneImmediate(m, data);
                 return null;
@@ -138,6 +143,7 @@ public class JObjectWriteback {
     }
 
     private <T extends JObjectData> void flushOneImmediate(ObjectMetadata m, T data) {
+        Log.trace("Flushing " + m.getName());
         m.markWritten();
         if (m.isDeleted()) {
             if (!m.isDeletionCandidate())
@@ -156,14 +162,14 @@ public class JObjectWriteback {
             objectPersistentStore.writeObject(m.getName(), protoSerializerService.serialize(m), null);
     }
 
-    public void remove(JObjectManager.JObject<?> object) {
+    public void remove(JObject<?> object) {
         object.assertRwLock();
         var got = _writeQueue.remove(new QueueEntry(object, 0));
         if (got == null) return;
         _currentSize.addAndGet(-got._size);
     }
 
-    public void markDirty(JObjectManager.JObject<?> object) {
+    public void markDirty(JObject<?> object) {
         object.assertRwLock();
         if (object.getMeta().isDeleted() && !object.getMeta().isWritten()) {
             remove(object);
@@ -222,10 +228,10 @@ public class JObjectWriteback {
     }
 
     private class QueueEntry {
-        private final JObjectManager.JObject<?> _obj;
+        private final JObject<?> _obj;
         private final long _size;
 
-        private QueueEntry(JObjectManager.JObject<?> obj, long size) {
+        private QueueEntry(JObject<?> obj, long size) {
             _obj = obj;
             _size = size;
         }

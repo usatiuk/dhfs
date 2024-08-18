@@ -211,12 +211,13 @@ public class DhfsFuseIT {
         Thread.sleep(1000);
         Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
 
-
+        Thread.sleep(500);
         Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "rm /root/dhfs_default/fuse/testf1").getExitCode());
         Thread.sleep(500);
         Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
         Thread.sleep(500);
 
+        // FIXME?
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Deleting from persistent"), 60, TimeUnit.SECONDS, 3);
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Deleting from persistent"), 60, TimeUnit.SECONDS, 3);
 
@@ -290,6 +291,7 @@ public class DhfsFuseIT {
         Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "echo dfgvh > /root/dhfs_default/fuse/newfile2").getExitCode());
         Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo dscfg > /root/dhfs_default/fuse/newfile2").getExitCode());
 
+        Log.info("Re-adding");
         container2.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +

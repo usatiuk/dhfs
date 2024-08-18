@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.files.conflicts;
 
+import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
@@ -16,7 +17,7 @@ import java.util.UUID;
 @ApplicationScoped
 public class NoOpConflictResolver implements ConflictResolver {
     @Override
-    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObjectManager.JObject<?> ours) {
+    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
         ours.runWriteLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, i) -> {
             if (d == null)
                 throw new StatusRuntimeException(Status.ABORTED.withDescription("Conflict but we don't have local copy"));

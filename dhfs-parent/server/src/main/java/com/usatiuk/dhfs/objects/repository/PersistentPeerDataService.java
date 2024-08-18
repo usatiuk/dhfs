@@ -2,7 +2,9 @@ package com.usatiuk.dhfs.objects.repository;
 
 import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.ShutdownChecker;
+import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerDirectory;
 import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
@@ -50,6 +52,8 @@ public class PersistentPeerDataService {
     RpcClientFactory rpcClientFactory;
     @Inject
     ShutdownChecker shutdownChecker;
+    @Inject
+    JObjectTxManager jObjectTxManager;
     private PersistentRemoteHosts _persistentData = new PersistentRemoteHosts();
 
     private UUID _selfUuid;
@@ -67,20 +71,22 @@ public class PersistentPeerDataService {
         _selfUuid = _persistentData.runReadLocked(PersistentRemoteHostsData::getSelfUuid);
 
         if (_persistentData.runReadLocked(d -> d.getSelfCertificate() == null)) {
-            _persistentData.runWriteLocked(d -> {
-                try {
-                    Log.info("Generating a key pair, please wait");
-                    d.setSelfKeyPair(CertificateTools.generateKeyPair());
-                    d.setSelfCertificate(CertificateTools.generateCertificate(d.getSelfKeyPair(), _selfUuid.toString()));
-                } catch (Exception e) {
-                    throw new RuntimeException("Failed generating cert", e);
-                }
-                return null;
+            jObjectTxManager.executeTx(() -> {
+                _persistentData.runWriteLocked(d -> {
+                    try {
+                        Log.info("Generating a key pair, please wait");
+                        d.setSelfKeyPair(CertificateTools.generateKeyPair());
+                        d.setSelfCertificate(CertificateTools.generateCertificate(d.getSelfKeyPair(), _selfUuid.toString()));
+                    } catch (Exception e) {
+                        throw new RuntimeException("Failed generating cert", e);
+                    }
+                    return null;
+                });
+                var newpd = new PeerDirectory();
+                jObjectManager.put(new PersistentPeerInfo(_selfUuid, getSelfCertificate()), Optional.of(PeerDirectory.PeerDirectoryObjName));
+                newpd.getPeers().add(_selfUuid);
+                var dir = jObjectManager.put(newpd, Optional.empty());
             });
-            var newpd = new PeerDirectory();
-            jObjectManager.put(new PersistentPeerInfo(_selfUuid, getSelfCertificate()), Optional.of(PeerDirectory.PeerDirectoryObjName));
-            newpd.getPeers().add(_selfUuid);
-            var dir = jObjectManager.put(newpd, Optional.empty());
         }
 
         if (!shutdownChecker.lastShutdownClean()) {
@@ -119,7 +125,7 @@ public class PersistentPeerDataService {
         }
     }
 
-    private JObjectManager.JObject<PeerDirectory> getPeerDirectory() {
+    private JObject<PeerDirectory> getPeerDirectory() {
         var got = jObjectManager.get(PeerDirectory.PeerDirectoryObjName).orElseThrow(() -> new IllegalStateException("Peer directory not found"));
         got.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
             if (d == null) throw new IllegalStateException("Could not resolve peer directory!");
@@ -127,14 +133,14 @@ public class PersistentPeerDataService {
                 throw new IllegalStateException("Peer directory is of wrong type!");
             return null;
         });
-        return (JObjectManager.JObject<PeerDirectory>) got;
+        return (JObject<PeerDirectory>) got;
     }
 
     private void pushPeerUpdates() {
         pushPeerUpdates(null);
     }
 
-    private void pushPeerUpdates(@Nullable JObjectManager.JObject<?> obj) {
+    private void pushPeerUpdates(@Nullable JObject<?> obj) {
         if (obj != null)
             Log.info("Scheduling certificate update after " + obj.getMeta().getName() + " was updated");
         executorService.submit(() -> {
@@ -145,7 +151,7 @@ public class PersistentPeerDataService {
         });
     }
 
-    private JObjectManager.JObject<PersistentPeerInfo> getPeer(UUID uuid) {
+    private JObject<PersistentPeerInfo> getPeer(UUID uuid) {
         var got = jObjectManager.get(PersistentPeerInfo.getNameFromUuid(uuid)).orElseThrow(() -> new IllegalStateException("Peer " + uuid + " not found"));
         got.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
             if (d == null) throw new IllegalStateException("Could not resolve peer " + uuid);
@@ -153,7 +159,7 @@ public class PersistentPeerDataService {
                 throw new IllegalStateException("Peer " + uuid + " is of wrong type!");
             return null;
         });
-        return (JObjectManager.JObject<PersistentPeerInfo>) got;
+        return (JObject<PersistentPeerInfo>) got;
     }
 
     private List<PersistentPeerInfo> getPeersSnapshot() {
@@ -218,35 +224,39 @@ public class PersistentPeerDataService {
     }
 
     public boolean addHost(PersistentPeerInfo persistentPeerInfo) {
-        if (persistentPeerInfo.getUuid().equals(_selfUuid)) return false;
+        return jObjectTxManager.executeTx(() -> {
+            if (persistentPeerInfo.getUuid().equals(_selfUuid)) return false;
 
-        boolean added = getPeerDirectory().runWriteLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
-            boolean addedInner = d.getPeers().add(persistentPeerInfo.getUuid());
-            if (addedInner) {
-                jObjectManager.put(persistentPeerInfo, Optional.of(m.getName()));
-                b.apply();
-            }
-            return addedInner;
+            boolean added = getPeerDirectory().runWriteLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
+                boolean addedInner = d.getPeers().add(persistentPeerInfo.getUuid());
+                if (addedInner) {
+                    jObjectManager.put(persistentPeerInfo, Optional.of(m.getName()));
+                    b.apply();
+                }
+                return addedInner;
+            });
+            return added;
         });
-        return added;
     }
 
     public boolean removeHost(UUID host) {
-        boolean removed = getPeerDirectory().runWriteLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
-            boolean removedInner = d.getPeers().remove(host);
-            Log.info("Removing host: " + host + (removedInner ? " removed" : " did not exists"));
-            if (removedInner) {
-                _persistentData.runWriteLocked(pd -> pd.getInitialObjSyncDone().remove(host));
-                _persistentData.runWriteLocked(pd -> pd.getInitialOpSyncDone().remove(host));
-                getPeer(host).runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (mp, dp, bp, vp) -> {
-                    mp.removeRef(m.getName());
-                    return null;
-                });
-                b.apply();
-            }
-            return removedInner;
+        return jObjectTxManager.executeTx(() -> {
+            boolean removed = getPeerDirectory().runWriteLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
+                boolean removedInner = d.getPeers().remove(host);
+                Log.info("Removing host: " + host + (removedInner ? " removed" : " did not exists"));
+                if (removedInner) {
+                    _persistentData.runWriteLocked(pd -> pd.getInitialObjSyncDone().remove(host));
+                    _persistentData.runWriteLocked(pd -> pd.getInitialOpSyncDone().remove(host));
+                    getPeer(host).runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (mp, dp, bp, vp) -> {
+                        mp.removeRef(m.getName());
+                        return null;
+                    });
+                    b.apply();
+                }
+                return removedInner;
+            });
+            return removed;
         });
-        return removed;
     }
 
     private void updateCerts() {

@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects.jkleppmanntree;
 
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
+import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.kleppmanntree.TreeNode;
 import com.usatiuk.kleppmanntree.TreeNodeWrapper;
@@ -9,9 +10,9 @@ import com.usatiuk.kleppmanntree.TreeNodeWrapper;
 import java.util.UUID;
 
 public class JKleppmannTreeNodeWrapper implements TreeNodeWrapper<Long, UUID, JKleppmannTreeNodeMeta, String> {
-    private final JObjectManager.JObject<JKleppmannTreeNode> _backing;
+    private final JObject<JKleppmannTreeNode> _backing;
 
-    public JKleppmannTreeNodeWrapper(JObjectManager.JObject<JKleppmannTreeNode> backing) {_backing = backing;}
+    public JKleppmannTreeNodeWrapper(JObject<JKleppmannTreeNode> backing) {_backing = backing;}
 
     @Override
     public void rLock() {

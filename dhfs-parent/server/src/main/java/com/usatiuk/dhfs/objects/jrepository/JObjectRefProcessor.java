@@ -30,6 +30,8 @@ public class JObjectRefProcessor {
     RemoteObjectServiceClient remoteObjectServiceClient;
     @Inject
     AutoSyncProcessor autoSyncProcessor;
+    @Inject
+    JObjectTxManager jObjectTxManager;
     @ConfigProperty(name = "dhfs.objects.move-processor.threads")
     int moveProcessorThreads;
     @ConfigProperty(name = "dhfs.objects.ref-processor.threads")
@@ -38,6 +40,7 @@ public class JObjectRefProcessor {
     long canDeleteRetryDelay;
     @Inject
     ExecutorService executorService;
+
     private ExecutorService _movableProcessorExecutorService;
     private ExecutorService _refProcessorExecutorService;
 
@@ -63,12 +66,13 @@ public class JObjectRefProcessor {
         }
 
         // Continue GC from last shutdown
-        executorService.submit(() ->
-                jObjectManager.findAll().forEach(n -> {
-                    jObjectManager.get(n).ifPresent(o -> o.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
-                        return null;
-                    }));
-                }));
+        //FIXME
+//        executorService.submit(() ->
+//                jObjectManager.findAll().forEach(n -> {
+//                    jObjectManager.get(n).ifPresent(o -> o.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
+//                        return null;
+//                    }));
+//                }));
     }
 
     @Shutdown
@@ -123,11 +127,13 @@ public class JObjectRefProcessor {
                     delay = true;
                 }
 
-                obj.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                    for (var r : ret)
-                        if (r.getDeletionCandidate())
-                            m.getConfirmedDeletes().add(UUID.fromString(r.getSelfUuid()));
-                    return null;
+                jObjectTxManager.executeTx(() -> {
+                    obj.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                        for (var r : ret)
+                            if (r.getDeletionCandidate())
+                                m.getConfirmedDeletes().add(UUID.fromString(r.getSelfUuid()));
+                        return null;
+                    });
                 });
             } catch (Exception e) {
                 Log.warn("When processing deletion of movable object " + obj.getMeta().getName(), e);
@@ -143,7 +149,7 @@ public class JObjectRefProcessor {
         });
     }
 
-    private boolean processMovable(JObjectManager.JObject<?> obj) {
+    private boolean processMovable(JObject<?> obj) {
         obj.assertRwLock();
         var knownHosts = persistentPeerDataService.getHostUuids();
         boolean missing = false;
@@ -158,7 +164,7 @@ public class JObjectRefProcessor {
         return false;
     }
 
-    private void deleteRef(JObjectManager.JObject<?> self, String name) {
+    private void deleteRef(JObject<?> self, String name) {
         jObjectManager.get(name).ifPresent(ref -> ref.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
             mc.removeRef(self.getMeta().getName());
             return null;
@@ -181,34 +187,39 @@ public class JObjectRefProcessor {
                 var got = jObjectManager.get(next).orElse(null);
                 if (got == null) continue;
                 try {
-                    got.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, v, i) -> {
-                        if (m.isLocked()) return null;
-                        if (m.isDeleted()) return null;
-                        if (!m.isDeletionCandidate()) return null;
-                        if (m.isSeen()) {
-                            if (!processMovable(got))
-                                return null;
-                        }
+                    jObjectTxManager.executeTx(() -> {
+                        got.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, v, i) -> {
+                            if (m.isLocked()) return null;
+                            if (m.isDeleted()) return null;
+                            if (!m.isDeletionCandidate()) return null;
+                            if (m.isSeen() && !m.isOnlyLocal()) {
+                                if (!processMovable(got))
+                                    return null;
+                            }
+                            if (m.isSeen() && m.isOnlyLocal())
+                                Log.warn("Seen only-local object: " + m.getName());
 
-                        if (!got.getMeta().getKnownClass().isAnnotationPresent(Leaf.class))
-                            got.tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
 
-                        Log.debug("Deleting " + m.getName());
-                        m.markDeleted();
+                            if (!got.getMeta().getKnownClass().isAnnotationPresent(Leaf.class))
+                                got.tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
 
-                        Collection<String> extracted = null;
-                        if (!got.getMeta().getKnownClass().isAnnotationPresent(Leaf.class) && got.getData() != null)
-                            extracted = got.getData().extractRefs();
-                        Collection<String> saved = got.getMeta().getSavedRefs();
+                            Log.debug("Deleting " + m.getName());
+                            m.markDeleted();
 
-                        got.discardData();
+                            Collection<String> extracted = null;
+                            if (!got.getMeta().getKnownClass().isAnnotationPresent(Leaf.class) && got.getData() != null)
+                                extracted = got.getData().extractRefs();
+                            Collection<String> saved = got.getMeta().getSavedRefs();
 
-                        if (saved != null)
-                            for (var r : saved) deleteRef(got, r);
-                        if (extracted != null)
-                            for (var r : extracted) deleteRef(got, r);
+                            got.discardData();
 
-                        return null;
+                            if (saved != null)
+                                for (var r : saved) deleteRef(got, r);
+                            if (extracted != null)
+                                for (var r : extracted) deleteRef(got, r);
+
+                            return null;
+                        });
                     });
                 } catch (Exception ex) {
                     Log.error("Error when deleting: " + next, ex);

@@ -5,6 +5,7 @@ import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaFile;
+import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
@@ -39,7 +40,7 @@ public class FileConflictResolver implements ConflictResolver {
     // FIXME: There might be a race where node with conflict deletes a file, and we answer that
     // it can do it as we haven't recorded the received file in the object model yet
     @Override
-    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObjectManager.JObject<?> ours) {
+    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
         var theirsFile = (File) theirsData;
         if (!theirsFile.getClass().equals(File.class)) {
             Log.error("Object type mismatch!");
@@ -113,11 +114,11 @@ public class FileConflictResolver implements ConflictResolver {
                     jObjectManager.getOrPut(e.getValue(), ChunkData.class, Optional.of(newFile.getName()));
                 }
 
-                fileService.updateFileSize((JObjectManager.JObject<File>) ours);
+                fileService.updateFileSize((JObject<File>) ours);
 
                 var ret = jObjectManager.putLocked(newFile, Optional.empty());
 
-                fileService.updateFileSize((JObjectManager.JObject<File>) ret);
+                fileService.updateFileSize((JObject<File>) ret);
 
                 try {
                     for (var cuuid : oursBackup) {
@@ -142,6 +143,7 @@ public class FileConflictResolver implements ConflictResolver {
         });
 
         if (newJFile == null) return;
+        boolean locked = true;
 
         // FIXME: Slow and what happens if a directory is deleted?
         try {
@@ -153,6 +155,7 @@ public class FileConflictResolver implements ConflictResolver {
             newJFile.getMeta().addRef(nodeId);
             newJFile.getMeta().unlock();
             newJFile.rwUnlock();
+            locked = false;
 
             int i = 0;
 
@@ -168,7 +171,7 @@ public class FileConflictResolver implements ConflictResolver {
         } catch (Exception e) {
             Log.error("Error when creating new file for " + ours.getMeta().getName(), e);
         } finally {
-            if (newJFile.haveRwLock()) {
+            if (locked) {
                 newJFile.getMeta().unlock();
                 newJFile.getMeta().getReferrersMutable().clear();
                 newJFile.rwUnlock();

@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.objects.repository.peersync;
 
+import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
@@ -27,7 +28,7 @@ public class PeerDirectoryConflictResolver implements ConflictResolver {
     JObjectManager jObjectManager;
 
     @Override
-    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObjectManager.JObject<?> ours) {
+    public void resolve(UUID conflictHost, ObjectHeader theirsHeader, JObjectData theirsData, JObject<?> ours) {
         var theirsDir = (PeerDirectory) theirsData;
         if (!theirsDir.getClass().equals(PeerDirectory.class)) {
             Log.error("Object type mismatch!");

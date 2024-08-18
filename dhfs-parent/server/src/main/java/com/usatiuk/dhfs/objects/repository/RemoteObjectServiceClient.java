@@ -1,7 +1,9 @@
 package com.usatiuk.dhfs.objects.repository;
 
 import com.google.common.collect.Maps;
+import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
 import com.usatiuk.dhfs.objects.jrepository.PushResolution;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
@@ -37,6 +39,8 @@ public class RemoteObjectServiceClient {
     InvalidationQueueService invalidationQueueService;
     @Inject
     ProtoSerializerService protoSerializerService;
+    @Inject
+    JObjectTxManager jObjectTxManager;
 
     public Pair<ObjectHeader, JObjectDataP> getSpecificObject(UUID host, String name) {
         return rpcClientFactory.withObjSyncClient(host, client -> {
@@ -45,7 +49,7 @@ public class RemoteObjectServiceClient {
         });
     }
 
-    public JObjectDataP getObject(JObjectManager.JObject<?> jObject) {
+    public JObjectDataP getObject(JObject<?> jObject) {
         jObject.assertRwLock();
 
         var targets = jObject.runReadLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (md, d) -> {
@@ -71,31 +75,33 @@ public class RemoteObjectServiceClient {
                 receivedMap.put(UUID.fromString(e.getHost()), e.getVersion());
             }
 
-            return jObject.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (md, d, b, v) -> {
-                var unexpected = !Objects.equals(
-                        Maps.filterValues(md.getChangelog(), val -> val != 0),
-                        Maps.filterValues(receivedMap, val -> val != 0));
+            return jObjectTxManager.executeTx(() -> {
+                return jObject.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (md, d, b, v) -> {
+                    var unexpected = !Objects.equals(
+                            Maps.filterValues(md.getChangelog(), val -> val != 0),
+                            Maps.filterValues(receivedMap, val -> val != 0));
 
-                if (unexpected) {
-                    try {
-                        syncHandler.handleOneUpdate(UUID.fromString(reply.getSelfUuid()), reply.getObject().getHeader());
-                    } catch (SyncHandler.OutdatedUpdateException ignored) {
-                        Log.info("Outdated update of " + md.getName() + " from " + reply.getSelfUuid());
-                        invalidationQueueService.pushInvalidationToOne(UUID.fromString(reply.getSelfUuid()), md.getName()); // True?
-                        throw new StatusRuntimeException(Status.ABORTED.withDescription("Received outdated object version"));
-                    } catch (Exception e) {
-                        Log.error("Received unexpected object version from " + reply.getSelfUuid()
-                                + " for " + reply.getObject().getHeader().getName() + " and conflict resolution failed", e);
-                        throw new StatusRuntimeException(Status.ABORTED.withDescription("Received unexpected object version"));
+                    if (unexpected) {
+                        try {
+                            syncHandler.handleOneUpdate(UUID.fromString(reply.getSelfUuid()), reply.getObject().getHeader());
+                        } catch (SyncHandler.OutdatedUpdateException ignored) {
+                            Log.info("Outdated update of " + md.getName() + " from " + reply.getSelfUuid());
+                            invalidationQueueService.pushInvalidationToOne(UUID.fromString(reply.getSelfUuid()), md.getName()); // True?
+                            throw new StatusRuntimeException(Status.ABORTED.withDescription("Received outdated object version"));
+                        } catch (Exception e) {
+                            Log.error("Received unexpected object version from " + reply.getSelfUuid()
+                                    + " for " + reply.getObject().getHeader().getName() + " and conflict resolution failed", e);
+                            throw new StatusRuntimeException(Status.ABORTED.withDescription("Received unexpected object version"));
+                        }
                     }
-                }
 
-                return reply.getObject().getContent();
+                    return reply.getObject().getContent();
+                });
             });
         });
     }
 
-    public IndexUpdateReply notifyUpdate(JObjectManager.JObject<?> obj, UUID host) {
+    public IndexUpdateReply notifyUpdate(JObject<?> obj, UUID host) {
         var builder = IndexUpdatePush.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString());
 
         var header = obj
@@ -111,7 +117,7 @@ public class RemoteObjectServiceClient {
                             else
                                 return m.toRpcHeader();
                         });
-        obj.markSeen();
+        jObjectTxManager.executeTx(obj::markSeen);
         builder.setHeader(header);
 
         var send = builder.build();
@@ -121,13 +127,14 @@ public class RemoteObjectServiceClient {
 
     public OpPushReply pushOp(Op op, String queueName, UUID host) {
         for (var ref : op.getEscapedRefs()) {
-            jObjectManager.get(ref)
-                    .ifPresent(o -> o.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
-                        m.markSeen();
-                        return null;
-                    }));
+            jObjectTxManager.executeTx(() -> {
+                jObjectManager.get(ref)
+                        .ifPresent(o -> o.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
+                            m.markSeen();
+                            return null;
+                        }));
+            });
         }
-
         var msg = OpPushMsg.newBuilder()
                 .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
                 .setQueueId(queueName)

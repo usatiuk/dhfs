@@ -1,12 +1,15 @@
 package com.usatiuk.dhfs.objects.repository;
 
 import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
+import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.autosync.AutoSyncProcessor;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.opsupport.OpObjectRegistry;
+import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.grpc.GrpcService;
@@ -47,6 +50,9 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Inject
     OpObjectRegistry opObjectRegistry;
 
+    @Inject
+    JObjectTxManager jObjectTxManager;
+
     @Override
     @Blocking
     public Uni<GetObjectReply> getObject(GetObjectRequest request) {
@@ -59,14 +65,18 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         var obj = jObjectManager.get(request.getName()).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
         Pair<ObjectHeader, JObjectDataP> read = obj.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (meta, data) -> {
+            if (meta.isOnlyLocal())
+                throw new StatusRuntimeExceptionNoStacktrace(Status.INVALID_ARGUMENT.withDescription("Trying to get local-only object"));
             if (data == null) {
                 Log.info("<-- getObject FAIL: " + request.getName() + " from " + request.getSelfUuid());
                 throw new StatusRuntimeException(Status.ABORTED.withDescription("Not available locally"));
             }
-            data.extractRefs().forEach(ref -> jObjectManager.get(ref).ifPresent(JObjectManager.JObject::markSeen));
+            jObjectTxManager.executeTx(() -> {
+                data.extractRefs().forEach(ref -> jObjectManager.get(ref).ifPresent(JObject::markSeen));
+            });
             return Pair.of(meta.toRpcHeader(), protoSerializerService.serializeToJObjectDataP(data));
         });
-        obj.markSeen();
+        jObjectTxManager.executeTx(obj::markSeen);
         var replyObj = ApiObject.newBuilder().setHeader(read.getLeft()).setContent(read.getRight()).build();
         return Uni.createFrom().item(GetObjectReply.newBuilder()
                 .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
@@ -97,11 +107,12 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
                 builder.addAllReferrers(m.getReferrers());
                 return m.isDeletionCandidate() && !m.isDeleted();
             });
-            if (tryUpdate) {
-                obj.get().runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
-                    return null;
-                });
-            }
+            // FIXME
+//            if (tryUpdate) {
+//                obj.get().runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
+//                    return null;
+//                });
+//            }
         } catch (DeletedObjectAccessException dox) {
             builder.setDeletionCandidate(true);
         }
@@ -137,7 +148,9 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
             throw new StatusRuntimeException(Status.UNAUTHENTICATED);
 
         try {
-            opObjectRegistry.acceptExternalOp(request.getQueueId(), UUID.fromString(request.getSelfUuid()), protoSerializerService.deserialize(request.getMsg()));
+            jObjectTxManager.executeTx(() -> {
+                opObjectRegistry.acceptExternalOp(request.getQueueId(), UUID.fromString(request.getSelfUuid()), protoSerializerService.deserialize(request.getMsg()));
+            });
         } catch (Exception e) {
             Log.error(e, e);
             throw e;

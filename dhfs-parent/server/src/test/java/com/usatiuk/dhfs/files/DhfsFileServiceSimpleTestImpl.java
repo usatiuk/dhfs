@@ -5,6 +5,7 @@ import com.usatiuk.dhfs.files.objects.ChunkData;
 import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
 import com.usatiuk.kleppmanntree.AlreadyExistsException;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import jakarta.inject.Inject;
@@ -15,6 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 class Profiles {
     public static class DhfsFileServiceSimpleTestProfile implements QuarkusTestProfile {
@@ -52,6 +54,8 @@ public class DhfsFileServiceSimpleTestImpl {
     DhfsFileService fileService;
     @Inject
     JObjectManager jObjectManager;
+    @Inject
+    JObjectTxManager jObjectTxManager;
 
     @Test
     void readTest() {
@@ -67,16 +71,23 @@ public class DhfsFileServiceSimpleTestImpl {
 
             // FIXME: dhfs_files
 
-            var c1o = jObjectManager.put(c1, Optional.of(f.getName()));
-            var c2o = jObjectManager.put(c2, Optional.of(f.getName()));
-            var c3o = jObjectManager.put(c3, Optional.of(f.getName()));
-            var fo = jObjectManager.put(f, Optional.empty());
+            var c1o = new AtomicReference<String>();
+            var c2o = new AtomicReference<String>();
+            var c3o = new AtomicReference<String>();
+            var fo = new AtomicReference<String>();
+
+            jObjectTxManager.executeTx(() -> {
+                c1o.set(jObjectManager.put(c1, Optional.of(f.getName())).getMeta().getName());
+                c2o.set(jObjectManager.put(c2, Optional.of(f.getName())).getMeta().getName());
+                c3o.set(jObjectManager.put(c3, Optional.of(f.getName())).getMeta().getName());
+                fo.set(jObjectManager.put(f, Optional.empty()).getMeta().getName());
+            });
 
             var all = jObjectManager.findAll();
-            Assertions.assertTrue(all.contains(c1o.getMeta().getName()));
-            Assertions.assertTrue(all.contains(c2o.getMeta().getName()));
-            Assertions.assertTrue(all.contains(c3o.getMeta().getName()));
-            Assertions.assertTrue(all.contains(fo.getMeta().getName()));
+            Assertions.assertTrue(all.contains(c1o.get()));
+            Assertions.assertTrue(all.contains(c2o.get()));
+            Assertions.assertTrue(all.contains(c3o.get()));
+            Assertions.assertTrue(all.contains(fo.get()));
         }
 
         String all = "1234567891011";
@@ -250,12 +261,11 @@ public class DhfsFileServiceSimpleTestImpl {
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
 
         var oldfile = jObjectManager.get(uuid).orElseThrow(IllegalStateException::new);
-        var chunk = oldfile.runWriteLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> d.extractRefs()).stream().toList().get(0);
+        var chunk = oldfile.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.extractRefs()).stream().toList().get(0);
         var chunkObj = jObjectManager.get(chunk).orElseThrow(IllegalStateException::new);
 
-        chunkObj.runWriteLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
+        chunkObj.runReadLockedVoid(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
             Assertions.assertTrue(m.getReferrers().contains(uuid));
-            return null;
         });
 
         Assertions.assertTrue(fileService.rename("/moveTest2", "/movedTest2"));

@@ -184,30 +184,10 @@ public class ObjectMetadata implements Serializable {
         return headerBuilder.build();
     }
 
-    public int metaHash() {
-        int res = Objects.hashCode(_name);
-        res = 31 * res + Objects.hashCode(isSeen());
-        res = 31 * res + Objects.hashCode(getKnownClass());
-        res = 31 * res + Objects.hashCode(isDeleted());
-        res = 31 * res + Objects.hashCode(_confirmedDeletes);
-        res = 31 * res + Objects.hashCode(_referrers);
-        res = 31 * res + Objects.hashCode(_changelog);
-        res = 31 * res + Objects.hashCode(_locked);
-        res = 31 * res + Objects.hashCode(_remoteCopies);
-        res = 31 * res + Objects.hashCode(_savedRefs);
-        res = 31 * res + Objects.hashCode(_haveLocalCopy);
-        return res;
-    }
-
     public int externalHash() {
         int res = Objects.hashCode(_changelog);
         res = 31 * res + Objects.hashCode(_haveLocalCopy);
         return res;
-    }
-
-    // Not really a hash
-    public int dataHash() {
-        return Objects.hash(_changelog);
     }
 
     public boolean isOnlyLocal() {

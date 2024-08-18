@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects.repository.invalidation;
 
 import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
+import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.repository.PeerManager;
 import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
@@ -142,7 +143,7 @@ public class InvalidationQueueService {
         Log.info("Invalidation sender exited");
     }
 
-    public void pushInvalidationToAll(JObjectManager.JObject<?> obj) {
+    public void pushInvalidationToAll(JObject<?> obj) {
         if (obj.getMeta().isOnlyLocal()) return;
         while (true) {
             var queue = _toAllQueue.get();
@@ -158,7 +159,7 @@ public class InvalidationQueueService {
         }
     }
 
-    public void pushInvalidationToOne(UUID host, JObjectManager.JObject<?> obj) {
+    public void pushInvalidationToOne(UUID host, JObject<?> obj) {
         if (obj.getMeta().isOnlyLocal()) return;
         if (remoteHostManager.isReachable(host))
             _queue.add(Pair.of(host, obj.getMeta().getName()));

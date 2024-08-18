@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects.jkleppmanntree;
 
 import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
 import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.objects.repository.opsupport.OpObjectRegistry;
 import com.usatiuk.dhfs.objects.repository.opsupport.OpSender;
@@ -37,6 +38,8 @@ public class JKleppmannTreeManager {
     JObjectManager jObjectManager;
     @Inject
     PersistentPeerDataService persistentPeerDataService;
+    @Inject
+    JObjectTxManager jObjectTxManager;
     @ConfigProperty(name = "dhfs.objects.root")
     String dataRoot;
     // FIXME: There should be something smarter...
@@ -78,9 +81,11 @@ public class JKleppmannTreeManager {
     }
 
     private JKleppmannTree createTree(String name) {
-        var pdata = _persistentData.computeIfAbsent(name, n -> new JKleppmannTreePersistentData(n, new AtomicClock()));
-        var tree = new JKleppmannTree(pdata, jKleppmannTreePeerInterface, jObjectManager, persistentPeerDataService, opSender);
-        opObjectRegistry.registerObject(tree);
-        return tree;
+        return jObjectTxManager.executeTx(() -> {
+            var pdata = _persistentData.computeIfAbsent(name, n -> new JKleppmannTreePersistentData(n, new AtomicClock()));
+            var tree = new JKleppmannTree(pdata, jKleppmannTreePeerInterface, jObjectManager, persistentPeerDataService, opSender);
+            opObjectRegistry.registerObject(tree);
+            return tree;
+        });
     }
 }

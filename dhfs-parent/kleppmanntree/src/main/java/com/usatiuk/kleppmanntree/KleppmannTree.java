@@ -148,6 +148,8 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         if (!canTrim.isEmpty()) {
             canTrim = log.headMap(new CombinedTimestamp<>(min, null), true);
 
+            LOGGER.fine("Will trim " + canTrim.size() + " entries");
+
             Set<NodeIdT> inTrash = new HashSet<>();
 
             for (var le : canTrim.values()) {
@@ -183,6 +185,8 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                     trash.rwUnlock();
                 }
             }
+        } else {
+            LOGGER.fine("Nothing to trim");
         }
     }
 
