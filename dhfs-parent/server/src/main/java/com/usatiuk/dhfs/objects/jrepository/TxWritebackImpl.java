@@ -193,7 +193,8 @@ public class TxWritebackImpl implements TxWriteback {
         public long calculateTotalSize() {
             long out = 0;
             for (var c : _committed)
-                out = out + jObjectSizeEstimator.estimateObjectSize(c.getLeft().getData()) + c.getMiddle().getSerializedSize() + c.getRight().getSerializedSize();
+                out = out + jObjectSizeEstimator.estimateObjectSize(c.getLeft().getData()) + c.getMiddle().getSerializedSize()
+                        + (c.getRight() != null ? c.getRight().getSerializedSize() : 0);
             for (var c : _meta)
                 out = out + jObjectSizeEstimator.estimateObjectSize(c.getLeft().getData()) + c.getRight().getSerializedSize();
             for (var c : _deleted)
