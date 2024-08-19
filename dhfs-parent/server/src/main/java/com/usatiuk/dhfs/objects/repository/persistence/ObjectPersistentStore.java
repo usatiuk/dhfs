@@ -22,9 +22,15 @@ public interface ObjectPersistentStore {
     @Nonnull
     ObjectMetadataP readObjectMeta(String name);
 
-    void writeObject(String name, ObjectMetadataP meta, JObjectDataP data);
+    void writeObjectDirect(String name, ObjectMetadataP meta, JObjectDataP data);
 
-    void writeObjectMeta(String name, ObjectMetadataP meta);
+    void writeObjectMetaDirect(String name, ObjectMetadataP meta);
+
+    void writeNewObject(String name, ObjectMetadataP meta, JObjectDataP data);
+
+    void writeNewObjectMeta(String name, ObjectMetadataP meta);
+
+    void commitTx(TxManifest names);
 
     // Deletes object metadata and data
     void deleteObject(String name);

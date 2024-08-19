@@ -27,7 +27,11 @@ public abstract class SerializationHelper {
         return deserialize(new ByteArrayInputStream(objectData));
     }
 
+    public static <T extends Serializable> byte[] serializeArray(final T obj) {
+        return SerializationUtils.serialize(obj);
+    }
+
     public static <T extends Serializable> ByteString serialize(final T obj) {
-        return UnsafeByteOperations.unsafeWrap(SerializationUtils.serialize(obj));
+        return UnsafeByteOperations.unsafeWrap(serializeArray(obj));
     }
 }

@@ -155,11 +155,11 @@ public class JObjectWriteback {
             return;
         }
         if (m.isHaveLocalCopy() && data != null)
-            objectPersistentStore.writeObject(m.getName(), protoSerializerService.serialize(m), protoSerializerService.serializeToJObjectDataP(data));
+            objectPersistentStore.writeObjectDirect(m.getName(), protoSerializerService.serialize(m), protoSerializerService.serializeToJObjectDataP(data));
         else if (m.isHaveLocalCopy() && data == null)
-            objectPersistentStore.writeObjectMeta(m.getName(), protoSerializerService.serialize(m));
+            objectPersistentStore.writeObjectMetaDirect(m.getName(), protoSerializerService.serialize(m));
         else if (!m.isHaveLocalCopy())
-            objectPersistentStore.writeObject(m.getName(), protoSerializerService.serialize(m), null);
+            objectPersistentStore.writeObjectDirect(m.getName(), protoSerializerService.serialize(m), null);
     }
 
     public void remove(JObject<?> object) {

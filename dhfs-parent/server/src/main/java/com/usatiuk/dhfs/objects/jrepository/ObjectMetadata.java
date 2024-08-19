@@ -45,6 +45,9 @@ public class ObjectMetadata implements Serializable {
     private volatile boolean _haveLocalCopy = false;
     @Getter
     private transient volatile boolean _written = true;
+    @Getter
+    @Setter
+    private long _lastModifiedTx = 0;
 
     public ObjectMetadata(String name, boolean written, Class<? extends JObjectData> knownClass) {
         _name = name;

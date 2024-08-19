@@ -7,15 +7,20 @@ import io.quarkus.logging.Log;
 import jakarta.annotation.Nullable;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Objects;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 
 @ApplicationScoped
 public class JObjectTxManager {
+    private final ThreadLocal<TxState> _state = new ThreadLocal<>();
     @Inject
     ProtoSerializerService protoSerializerService;
     @Inject
@@ -26,10 +31,20 @@ public class JObjectTxManager {
     JObjectWriteback jObjectWriteback;
     @Inject
     InvalidationQueueService invalidationQueueService;
+    @Inject
+    TxWriteback txWriteback;
     @ConfigProperty(name = "dhfs.objects.ref_verification")
     boolean refVerification;
+    private ExecutorService _serializerThreads;
 
-    private final ThreadLocal<TxState> _state = new ThreadLocal<>();
+    public JObjectTxManager() {
+        BasicThreadFactory factory = new BasicThreadFactory.Builder()
+                .namingPattern("tx-serializer-%d")
+                .build();
+
+        // FIXME:
+        _serializerThreads = Executors.newFixedThreadPool(8, factory);
+    }
 
     public void begin() {
         if (_state.get() != null)
@@ -68,11 +83,41 @@ public class JObjectTxManager {
             }
         }
 
-        for (var obj : state._writeObjects.values()) {
-            // FIXME:
-            jObjectWriteback.markDirty(obj.obj());
-            obj.obj().rwUnlock();
+        var bundle = txWriteback.createBundle();
+
+        try {
+            _serializerThreads.invokeAll(state._writeObjects.values().stream().<Callable<Void>>map(
+                    obj -> () -> {
+                        try {
+                            if (obj.obj().getMeta().isDeleted())
+                                bundle.delete(obj.obj().getMeta().getName());
+                            else if (obj.obj().getMeta().isHaveLocalCopy() && obj.obj().getData() != null)
+                                bundle.commit(obj.obj().getMeta().getName(),
+                                        protoSerializerService.serialize(obj.obj().getMeta()),
+                                        protoSerializerService.serializeToJObjectDataP(obj.obj().getData())
+                                );
+                            else if (obj.obj().getMeta().isHaveLocalCopy() && obj.obj().getData() == null)
+                                bundle.commitMetaChange(obj.obj().getMeta().getName(),
+                                        protoSerializerService.serialize(obj.obj().getMeta())
+                                );
+                            else if (!obj.obj().getMeta().isHaveLocalCopy())
+                                bundle.commit(obj.obj().getMeta().getName(),
+                                        protoSerializerService.serialize(obj.obj().getMeta()),
+                                        null
+                                );
+                        } catch (Exception e) {
+                            Log.error("Error committing object " + obj.obj().getMeta().getName(), e);
+                        }
+                        return null;
+                    }
+            ).toList());
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
+
+        state._writeObjects.values().forEach(o -> o.obj().rwUnlock());
+
+        txWriteback.commitBundle(bundle);
 
         _state.remove();
     }

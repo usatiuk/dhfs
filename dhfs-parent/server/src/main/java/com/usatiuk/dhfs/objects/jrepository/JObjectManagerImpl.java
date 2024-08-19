@@ -37,26 +37,8 @@ public class JObjectManagerImpl implements JObjectManager {
             = new ArrayListValuedHashMap<>();
     private final MultiValuedMap<Class<? extends JObjectData>, WriteListenerFn> _metaWriteListeners
             = new ArrayListValuedHashMap<>();
-
-    @Override
-    public void runWriteListeners(com.usatiuk.dhfs.objects.jrepository.JObject<?> obj, boolean metaChanged, boolean dataChanged) {
-        if (metaChanged)
-            for (var t : _metaWriteListeners.keySet()) { // FIXME:?
-                if (t.isAssignableFrom(obj.getMeta().getKnownClass()))
-                    for (var cb : _metaWriteListeners.get(t))
-                        cb.apply(obj);
-            }
-        if (dataChanged)
-            for (var t : _writeListeners.keySet()) { // FIXME:?
-                if (t.isAssignableFrom(obj.getMeta().getKnownClass()))
-                    for (var cb : _writeListeners.get(t))
-                        cb.apply(obj);
-            }
-    }
-
     private final ConcurrentHashMap<String, NamedWeakReference> _map = new ConcurrentHashMap<>();
     private final ReferenceQueue<JObject<?>> _refQueue = new ReferenceQueue<>();
-
     @Inject
     ObjectPersistentStore objectPersistentStore;
     @Inject
@@ -77,10 +59,27 @@ public class JObjectManagerImpl implements JObjectManager {
     JObjectLRU jObjectLRU;
     @Inject
     JObjectTxManager jObjectTxManager;
+    @Inject
+    TxWriteback txWriteback;
     @ConfigProperty(name = "dhfs.objects.ref_verification")
     boolean refVerification;
-
     private Thread _refCleanupThread;
+
+    @Override
+    public void runWriteListeners(com.usatiuk.dhfs.objects.jrepository.JObject<?> obj, boolean metaChanged, boolean dataChanged) {
+        if (metaChanged)
+            for (var t : _metaWriteListeners.keySet()) { // FIXME:?
+                if (t.isAssignableFrom(obj.getMeta().getKnownClass()))
+                    for (var cb : _metaWriteListeners.get(t))
+                        cb.apply(obj);
+            }
+        if (dataChanged)
+            for (var t : _writeListeners.keySet()) { // FIXME:?
+                if (t.isAssignableFrom(obj.getMeta().getKnownClass()))
+                    for (var cb : _writeListeners.get(t))
+                        cb.apply(obj);
+            }
+    }
 
     @Override
     public <T extends JObjectData> void registerWriteListener(Class<T> klass, WriteListenerFn fn) {
@@ -191,6 +190,7 @@ public class JObjectManagerImpl implements JObjectManager {
                         if (ref.get() == null) _map.remove(object.getName(), ref);
                         else ret = ref.get();
                     }
+                    // FIXME! newObj leak!
                     if (ret != newObj) continue;
                 }
                 JObject<D> finalRet = (JObject<D>) ret;
@@ -289,8 +289,8 @@ public class JObjectManagerImpl implements JObjectManager {
     public class JObject<T extends JObjectData> extends com.usatiuk.dhfs.objects.jrepository.JObject<T> {
         private static final int lockTimeoutSecs = 5;
         private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
-        private ObjectMetadata _metaPart;
         private final AtomicReference<T> _dataPart = new AtomicReference<>();
+        private ObjectMetadata _metaPart;
 
         // Create a new object
         protected JObject(String name, UUID selfUuid, T obj) {
@@ -613,7 +613,6 @@ public class JObjectManagerImpl implements JObjectManager {
 
         public <T extends JObjectData> T resolveDataRemote() {
             var obj = remoteObjectServiceClient.getObject(this);
-            jObjectWriteback.markDirty(this);
             invalidationQueueService.pushInvalidationToAll(this);
             return protoSerializerService.deserialize(obj);
         }
@@ -645,6 +644,13 @@ public class JObjectManagerImpl implements JObjectManager {
                 m.bumpVersion(persistentPeerDataService.getSelfUuid());
                 return null;
             });
+        }
+
+        @Override
+        public void commitFence() {
+            if (haveRwLock())
+                throw new IllegalStateException("Waiting on object flush inside transaction?");
+            txWriteback.fence(getMeta().getLastModifiedTx());
         }
     }
 }

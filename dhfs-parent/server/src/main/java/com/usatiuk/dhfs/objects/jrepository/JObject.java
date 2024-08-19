@@ -47,5 +47,7 @@ public abstract class JObject<T extends JObjectData> {
 
     public abstract void bumpVer();
 
+    public abstract void commitFence();
+
     abstract boolean updateDeletionState();
 }
