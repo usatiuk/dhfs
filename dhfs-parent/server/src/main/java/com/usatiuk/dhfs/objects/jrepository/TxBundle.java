@@ -6,9 +6,9 @@ import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
 public interface TxBundle {
     long getId();
 
-    void commit(String objName, ObjectMetadataP meta, JObjectDataP data);
+    void commit(JObject<?> obj, ObjectMetadataP meta, JObjectDataP data);
 
-    void commitMetaChange(String objName, ObjectMetadataP meta);
+    void commitMetaChange(JObject<?> obj, ObjectMetadataP meta);
 
-    void delete(String objName);
+    void delete(JObject<?> obj);
 }

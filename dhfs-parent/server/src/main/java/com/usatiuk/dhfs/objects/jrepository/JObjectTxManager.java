@@ -90,18 +90,18 @@ public class JObjectTxManager {
                     obj -> () -> {
                         try {
                             if (obj.obj().getMeta().isDeleted())
-                                bundle.delete(obj.obj().getMeta().getName());
+                                bundle.delete(obj.obj());
                             else if (obj.obj().getMeta().isHaveLocalCopy() && obj.obj().getData() != null)
-                                bundle.commit(obj.obj().getMeta().getName(),
+                                bundle.commit(obj.obj(),
                                         protoSerializerService.serialize(obj.obj().getMeta()),
                                         protoSerializerService.serializeToJObjectDataP(obj.obj().getData())
                                 );
                             else if (obj.obj().getMeta().isHaveLocalCopy() && obj.obj().getData() == null)
-                                bundle.commitMetaChange(obj.obj().getMeta().getName(),
+                                bundle.commitMetaChange(obj.obj(),
                                         protoSerializerService.serialize(obj.obj().getMeta())
                                 );
                             else if (!obj.obj().getMeta().isHaveLocalCopy())
-                                bundle.commit(obj.obj().getMeta().getName(),
+                                bundle.commit(obj.obj(),
                                         protoSerializerService.serialize(obj.obj().getMeta()),
                                         null
                                 );
