@@ -105,7 +105,6 @@ public class JObjectWriteback {
                             this.notifyAll();
                         }
                 } catch (Exception e) {
-                    Log.error("Failed writing object " + got._obj.getMeta().getName() + ", will retry.", e);
                     try {
                         got._obj.runReadLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
                             var size = jObjectSizeEstimator.estimateObjectSize(d);
@@ -113,6 +112,7 @@ public class JObjectWriteback {
                             _writeQueue.add(new QueueEntry(got._obj, size));
                             return null;
                         });
+                        Log.error("Failed writing object " + got._obj.getMeta().getName() + ", will retry.", e);
                     } catch (DeletedObjectAccessException ignored) {
                     }
                 }
@@ -163,14 +163,13 @@ public class JObjectWriteback {
     }
 
     public void remove(JObject<?> object) {
-        object.assertRwLock();
         var got = _writeQueue.remove(new QueueEntry(object, 0));
         if (got == null) return;
         _currentSize.addAndGet(-got._size);
     }
 
+    // Object should be at least read-locked
     public void markDirty(JObject<?> object) {
-        object.assertRwLock();
         if (object.getMeta().isDeleted() && !object.getMeta().isWritten()) {
             remove(object);
             return;

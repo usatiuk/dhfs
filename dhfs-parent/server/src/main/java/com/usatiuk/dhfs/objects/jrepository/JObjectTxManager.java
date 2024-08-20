@@ -232,6 +232,9 @@ public class JObjectTxManager {
     }
 
     void addToTx(JObject<?> obj, boolean copy) {
+        if (obj.getMeta().getKnownClass().isAnnotationPresent(NoTransaction.class))
+            throw new IllegalArgumentException("NoTransaction objects shouldn't be in transaction");
+
         var state = _state.get();
 
         if (state == null)

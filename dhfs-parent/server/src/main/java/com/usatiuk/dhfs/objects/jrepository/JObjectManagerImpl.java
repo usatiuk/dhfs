@@ -54,6 +54,8 @@ public class JObjectManagerImpl implements JObjectManager {
     @Inject
     JObjectRefProcessor jObjectRefProcessor;
     @Inject
+    JObjectWriteback jObjectWriteback;
+    @Inject
     JObjectLRU jObjectLRU;
     @Inject
     JObjectTxManager jObjectTxManager;
@@ -194,23 +196,29 @@ public class JObjectManagerImpl implements JObjectManager {
                     }
                 }
                 JObject<D> finalRet = (JObject<D>) ret;
-                ret.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                    if (object.getClass().isAnnotationPresent(PushResolution.class)
+                if (ret.runReadLocked(ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
+                    return (object.getClass().isAnnotationPresent(PushResolution.class)
                             && object.getClass().isAnnotationPresent(AssumedUnique.class)
-                            && finalRet.getData() == null) {
-                        finalRet.externalResolution(object);
-                    }
+                            && finalRet.getData() == null && !finalRet.getMeta().isHaveLocalCopy())
+                            || (parent.isEmpty() && !m.isLocked()) || (parent.isPresent() && !m.checkRef(parent.get()));
+                }))
+                    ret.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                        if (object.getClass().isAnnotationPresent(PushResolution.class)
+                                && object.getClass().isAnnotationPresent(AssumedUnique.class)
+                                && finalRet.getData() == null && !finalRet.getMeta().isHaveLocalCopy()) {
+                            finalRet.externalResolution(object);
+                        }
 
-                    if (parent.isPresent()) {
-                        m.addRef(parent.get());
-                        if (m.isLocked())
-                            m.unlock();
-                    } else {
-                        m.lock();
-                    }
+                        if (parent.isPresent()) {
+                            m.addRef(parent.get());
+                            if (m.isLocked())
+                                m.unlock();
+                        } else {
+                            m.lock();
+                        }
 
-                    return null;
-                });
+                        return null;
+                    });
             } finally {
                 // FIXME?
 //                if (newObj != null)
@@ -241,12 +249,17 @@ public class JObjectManagerImpl implements JObjectManager {
                 var meta = got.getMeta();
                 meta.narrowClass(klass);
                 meta.markSeen();
-                parent.ifPresent(s -> got.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                    if (m.isLocked())
-                        m.unlock();
-                    m.addRef(s);
-                    return true;
-                }));
+
+                parent.ifPresent(s -> {
+                    if (got.runReadLocked(ResolutionStrategy.NO_RESOLUTION, (m, d) -> m.checkRef(s))) return;
+
+                    got.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                        if (m.isLocked())
+                            m.unlock();
+                        m.addRef(s);
+                        return true;
+                    });
+                });
                 return got;
             }
 
@@ -294,6 +307,7 @@ public class JObjectManagerImpl implements JObjectManager {
         private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
         private final AtomicReference<T> _dataPart = new AtomicReference<>();
         private ObjectMetadata _metaPart;
+        private boolean _inTransaction = false; // FIXME:
 
         // Create a new object
         protected JObject(String name, UUID selfUuid, T obj) {
@@ -410,8 +424,9 @@ public class JObjectManagerImpl implements JObjectManager {
             try {
                 if (!_lock.writeLock().tryLock(lockTimeoutSecs, TimeUnit.SECONDS))
                     return false;
-                if (_lock.writeLock().getHoldCount() == 1) {
+                if (_lock.writeLock().getHoldCount() == 1 && !getMeta().getKnownClass().isAnnotationPresent(NoTransaction.class)) {
                     jObjectTxManager.addToTx(this, txCopy);
+                    _inTransaction = true;
                 }
                 return true;
             } catch (InterruptedException e) {
@@ -446,9 +461,34 @@ public class JObjectManagerImpl implements JObjectManager {
 //        }
 
         public void rwUnlock() {
+            int hc = _lock.writeLock().getHoldCount();
+
+            boolean shouldNotifyWriteback = false;
+
+            if (hc == 1 && !_inTransaction) {
+                shouldNotifyWriteback = true;
+                updateDeletionState();
+            }
+
+            if (hc == 1 && _inTransaction) {
+                _inTransaction = false;
+            }
+
             _lock.writeLock().unlock();
+
+            if (shouldNotifyWriteback) {
+                // TODO: assuming always dirty!
+                rLock();
+                try {
+                    jObjectWriteback.markDirty(this);
+                    invalidationQueueService.pushInvalidationToAll(this);
+                } finally {
+                    rUnlock();
+                }
+            }
+
             // FIXME: this relies on the transaction running
-            if (_lock.writeLock().getHoldCount() == 1) {
+            if (hc == 2 && _inTransaction) {
                 updateDeletionState();
             }
         }

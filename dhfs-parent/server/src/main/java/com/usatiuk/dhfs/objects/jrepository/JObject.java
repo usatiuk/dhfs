@@ -9,6 +9,7 @@ public abstract class JObject<T extends JObjectData> {
 
     public abstract <R> R runReadLocked(JObjectManager.ResolutionStrategy resolutionStrategy, JObjectManager.ObjectFnRead<T, R> fn);
 
+    // Note: this is expensive
     public abstract <R> R runWriteLocked(JObjectManager.ResolutionStrategy resolutionStrategy, JObjectManager.ObjectFnWrite<T, R> fn);
 
     public void runReadLockedVoid(JObjectManager.ResolutionStrategy resolutionStrategy, JObjectManager.ObjectFnReadVoid<T> fn) {
