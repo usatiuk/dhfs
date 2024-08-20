@@ -45,6 +45,7 @@ public class JObjectWriteback {
     long promotionDelay;
     private ExecutorService _writebackExecutor;
     private ExecutorService _statusExecutor;
+    private AtomicLong _waitedTotal = new AtomicLong(0);
 
     public JObjectWriteback(@ConfigProperty(name = "dhfs.objects.writeback.delay") long promotionDelay) {
         _writeQueue = new HashSetDelayedBlockingQueue<>(promotionDelay);
@@ -90,6 +91,7 @@ public class JObjectWriteback {
                 Log.error("Failed writing object " + v._obj.getMeta().getName(), e);
             }
         }
+        Log.info("Total writeback wait time: " + _waitedTotal.get() + "ms");
     }
 
     private void writeback() {
@@ -213,6 +215,11 @@ public class JObjectWriteback {
                     Log.error("Failed writing object " + object.getMeta().getName(), e);
                     throw e;
                 }
+            } else {
+                long waited = System.currentTimeMillis() - started;
+                _waitedTotal.addAndGet(waited);
+                if (Log.isTraceEnabled())
+                    Log.trace("Thread " + Thread.currentThread().getName() + " waited for writeback for " + waited + " ms");
             }
         }
 

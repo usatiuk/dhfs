@@ -42,6 +42,7 @@ public class TxWritebackImpl implements TxWriteback {
     private AtomicLong _counter = new AtomicLong();
     private ExecutorService _writebackExecutor;
     private ExecutorService _commitExecutor;
+    private AtomicLong _waitedTotal = new AtomicLong(0);
 
     @Startup
     void init() {
@@ -65,7 +66,7 @@ public class TxWritebackImpl implements TxWriteback {
 
     void shutdown(@Observes @Priority(10) ShutdownEvent event) {
         _writebackExecutor.shutdownNow();
-
+        Log.info("Total tx bundle wait time: " + _waitedTotal.get() + "ms");
     }
 
     private void writeback() {
@@ -131,6 +132,7 @@ public class TxWritebackImpl implements TxWriteback {
         while (true) {
             if (wait) {
                 synchronized (_flushWaitSynchronizer) {
+                    long started = System.currentTimeMillis();
                     while (currentSize > sizeLimit) {
                         try {
                             _flushWaitSynchronizer.wait();
@@ -138,6 +140,10 @@ public class TxWritebackImpl implements TxWriteback {
                             throw new RuntimeException(e);
                         }
                     }
+                    long waited = System.currentTimeMillis() - started;
+                    _waitedTotal.addAndGet(waited);
+                    if (Log.isTraceEnabled())
+                        Log.trace("Thread " + Thread.currentThread().getName() + " waited for tx bundle for " + waited + " ms");
                     wait = false;
                 }
             }
