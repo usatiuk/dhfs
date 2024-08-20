@@ -164,6 +164,8 @@ public class TxWritebackImpl implements TxWriteback {
     private class TxBundle implements com.usatiuk.dhfs.objects.jrepository.TxBundle {
         private final long _txId;
 
+        private long _size = -1;
+
         private final ArrayList<Triple<JObject<?>, ObjectMetadataP, JObjectDataP>> _committed = new ArrayList<>();
         private final ArrayList<Pair<JObject<?>, ObjectMetadataP>> _meta = new ArrayList<>();
         private final ArrayList<JObject<?>> _deleted = new ArrayList<>();
@@ -177,20 +179,27 @@ public class TxWritebackImpl implements TxWriteback {
 
         @Override
         public void commit(JObject<?> obj, ObjectMetadataP meta, JObjectDataP data) {
-            _committed.add(Triple.of(obj, meta, data));
+            synchronized (_committed) {
+                _committed.add(Triple.of(obj, meta, data));
+            }
         }
 
         @Override
         public void commitMetaChange(JObject<?> obj, ObjectMetadataP meta) {
-            _meta.add(Pair.of(obj, meta));
+            synchronized (_meta) {
+                _meta.add(Pair.of(obj, meta));
+            }
         }
 
         @Override
         public void delete(JObject<?> obj) {
-            _deleted.add(obj);
+            synchronized (_deleted) {
+                _deleted.add(obj);
+            }
         }
 
         public long calculateTotalSize() {
+            if (_size >= 0) return _size;
             long out = 0;
             for (var c : _committed)
                 out = out + jObjectSizeEstimator.estimateObjectSize(c.getLeft().getData()) + c.getMiddle().getSerializedSize()
@@ -199,7 +208,8 @@ public class TxWritebackImpl implements TxWriteback {
                 out = out + jObjectSizeEstimator.estimateObjectSize(c.getLeft().getData()) + c.getRight().getSerializedSize();
             for (var c : _deleted)
                 out = out + jObjectSizeEstimator.estimateObjectSize(c.getData());
-            return out;
+            _size = out;
+            return _size;
         }
     }
 }
