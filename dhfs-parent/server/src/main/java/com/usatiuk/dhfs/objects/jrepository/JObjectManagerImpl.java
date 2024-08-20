@@ -406,12 +406,12 @@ public class JObjectManagerImpl implements JObjectManager {
             }
         }
 
-        public boolean tryRWLock() {
+        boolean tryRWLock(boolean txCopy) {
             try {
                 if (!_lock.writeLock().tryLock(lockTimeoutSecs, TimeUnit.SECONDS))
                     return false;
                 if (_lock.writeLock().getHoldCount() == 1) {
-                    jObjectTxManager.addToTx(this);
+                    jObjectTxManager.addToTx(this, txCopy);
                 }
                 return true;
             } catch (InterruptedException e) {
@@ -420,7 +420,14 @@ public class JObjectManagerImpl implements JObjectManager {
         }
 
         public void rwLock() {
-            if (!tryRWLock())
+            if (!tryRWLock(true))
+                throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Failed to acquire write lock for " + getMeta().getName()));
+        }
+
+
+        @Override
+        public void rwLockNoCopy() {
+            if (!tryRWLock(false))
                 throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Failed to acquire write lock for " + getMeta().getName()));
         }
 
@@ -652,10 +659,7 @@ public class JObjectManagerImpl implements JObjectManager {
         @Override
         public void bumpVer() {
             assertRwLock();
-            runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, data, bump, invalidate) -> {
-                m.bumpVersion(persistentPeerDataService.getSelfUuid());
-                return null;
-            });
+            getMeta().bumpVersion(persistentPeerDataService.getSelfUuid());
         }
 
         @Override

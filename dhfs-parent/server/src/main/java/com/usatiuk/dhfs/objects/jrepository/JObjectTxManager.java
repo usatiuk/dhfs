@@ -71,59 +71,59 @@ public class JObjectTxManager {
             throw new IllegalStateException("Transaction not running");
 
         if (state._writeObjects.isEmpty()) {
-            Log.trace("Empty transaction " + state._id);
+//            Log.trace("Empty transaction " + state._id);
             _state.remove();
             return;
         }
 
         Log.debug("Committing transaction " + state._id);
 
-        for (var obj : state._writeObjects.values()) {
-            Log.debug("Committing " + obj.obj().getMeta().getName() + " deleted=" + obj.obj().getMeta().isDeleted() + " deletion-candidate=" + obj.obj().getMeta().isDeletionCandidate());
+        for (var obj : state._writeObjects.entrySet()) {
+            Log.debug("Committing " + obj.getKey().getMeta().getName() + " deleted=" + obj.getKey().getMeta().isDeleted() + " deletion-candidate=" + obj.getKey().getMeta().isDeletionCandidate());
 
-            var newExternalHash = obj.obj().getMeta().externalHash();
+            var newExternalHash = obj.getKey().getMeta().externalHash();
 
             // FIXME
-            notifyWrite(obj.obj(),
-                    !Objects.equals(obj.meta(), protoSerializerService.serialize(obj.obj().getMeta())),
-                    newExternalHash != obj.externalHash(),
-                    (obj.data() == null) != (obj.obj().getData() == null) ||
-                            (obj.data() == null) ||
-                            !Objects.equals(obj.data(), protoSerializerService.serialize(obj.obj().getData()))
+            notifyWrite(obj.getKey(),
+                    obj.getValue() == null || !Objects.equals(obj.getValue().meta(), protoSerializerService.serialize(obj.getKey().getMeta())),
+                    obj.getValue() == null || newExternalHash != obj.getValue().externalHash(),
+                    obj.getValue() == null || (obj.getValue().data() == null) != (obj.getKey().getData() == null) ||
+                            (obj.getValue().data() == null) ||
+                            !Objects.equals(obj.getValue().data(), protoSerializerService.serialize(obj.getKey().getData()))
             );
 
             if (refVerification) {
-                var oldRefs = obj.data() == null
+                var oldRefs = (obj.getValue() == null || obj.getValue().data() == null)
                         ? null
-                        : ((JObjectData) protoSerializerService.deserialize(obj.data())).extractRefs();
-                verifyRefs(obj.obj(), oldRefs);
+                        : ((JObjectData) protoSerializerService.deserialize(obj.getValue().data())).extractRefs();
+                verifyRefs(obj.getKey(), oldRefs);
             }
         }
 
         var bundle = txWriteback.createBundle();
 
         try {
-            _serializerThreads.invokeAll(state._writeObjects.values().stream().<Callable<Void>>map(
+            _serializerThreads.invokeAll(state._writeObjects.entrySet().stream().<Callable<Void>>map(
                     obj -> () -> {
                         try {
-                            if (obj.obj().getMeta().isDeleted())
-                                bundle.delete(obj.obj());
-                            else if (obj.obj().getMeta().isHaveLocalCopy() && obj.obj().getData() != null)
-                                bundle.commit(obj.obj(),
-                                        protoSerializerService.serialize(obj.obj().getMeta()),
-                                        protoSerializerService.serializeToJObjectDataP(obj.obj().getData())
+                            if (obj.getKey().getMeta().isDeleted())
+                                bundle.delete(obj.getKey());
+                            else if (obj.getKey().getMeta().isHaveLocalCopy() && obj.getKey().getData() != null)
+                                bundle.commit(obj.getKey(),
+                                        protoSerializerService.serialize(obj.getKey().getMeta()),
+                                        protoSerializerService.serializeToJObjectDataP(obj.getKey().getData())
                                 );
-                            else if (obj.obj().getMeta().isHaveLocalCopy() && obj.obj().getData() == null)
-                                bundle.commitMetaChange(obj.obj(),
-                                        protoSerializerService.serialize(obj.obj().getMeta())
+                            else if (obj.getKey().getMeta().isHaveLocalCopy() && obj.getKey().getData() == null)
+                                bundle.commitMetaChange(obj.getKey(),
+                                        protoSerializerService.serialize(obj.getKey().getMeta())
                                 );
-                            else if (!obj.obj().getMeta().isHaveLocalCopy())
-                                bundle.commit(obj.obj(),
-                                        protoSerializerService.serialize(obj.obj().getMeta()),
+                            else if (!obj.getKey().getMeta().isHaveLocalCopy())
+                                bundle.commit(obj.getKey(),
+                                        protoSerializerService.serialize(obj.getKey().getMeta()),
                                         null
                                 );
                         } catch (Exception e) {
-                            Log.error("Error committing object " + obj.obj().getMeta().getName(), e);
+                            Log.error("Error committing object " + obj.getKey().getMeta().getName(), e);
                         }
                         return null;
                     }
@@ -132,7 +132,7 @@ public class JObjectTxManager {
             throw new RuntimeException(e);
         }
 
-        state._writeObjects.values().forEach(o -> o.obj().rwUnlock());
+        state._writeObjects.forEach((key, value) -> key.rwUnlock());
 
         txWriteback.commitBundle(bundle);
 
@@ -177,15 +177,19 @@ public class JObjectTxManager {
             throw new IllegalStateException("Transaction not running");
         Log.debug("Rollback of " + state._id);
 
-        for (var obj : state._writeObjects.values()) {
-            Log.debug("Rollback of " + obj.obj().getMeta().getName());
+        for (var obj : state._writeObjects.entrySet()) {
+            Log.debug("Rollback of " + obj.getKey().getMeta().getName());
             try {
-                obj.obj().rollback(
-                        protoSerializerService.deserialize(obj.meta()),
-                        obj.data() != null ? protoSerializerService.deserialize(obj.data()) : null);
-                obj.obj().updateDeletionState();
+                if (obj.getValue() == null) {
+                    Log.warn("Skipped rollback of " + obj.getKey().getMeta().getName());
+                    continue;
+                }
+                obj.getKey().rollback(
+                        protoSerializerService.deserialize(obj.getValue().meta()),
+                        obj.getValue().data() != null ? protoSerializerService.deserialize(obj.getValue().data()) : null);
+                obj.getKey().updateDeletionState();
             } finally {
-                obj.obj().rwUnlock();
+                obj.getKey().rwUnlock();
             }
         }
 
@@ -227,7 +231,7 @@ public class JObjectTxManager {
         }
     }
 
-    void addToTx(JObject<?> obj) {
+    void addToTx(JObject<?> obj, boolean copy) {
         var state = _state.get();
 
         if (state == null)
@@ -239,12 +243,11 @@ public class JObjectTxManager {
         obj.rwLock();
 
         state._writeObjects.put(obj,
-                new JObjectSnapshot(
-                        obj,
+                copy ? new JObjectSnapshot(
                         protoSerializerService.serialize(obj.getMeta()),
                         obj.getData() != null ? protoSerializerService.serializeToJObjectDataP(obj.getData()) : null,
-                        obj.getMeta().externalHash()
-                ));
+                        obj.getMeta().externalHash())
+                        : null);
     }
 
     private class TxState {

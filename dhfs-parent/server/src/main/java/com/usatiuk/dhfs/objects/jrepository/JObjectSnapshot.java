@@ -4,8 +4,7 @@ import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
 
 public record JObjectSnapshot
-        (JObject<?> obj,
-         ObjectMetadataP meta,
+        (ObjectMetadataP meta,
          JObjectDataP data,
          int externalHash) {
 }

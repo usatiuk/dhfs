@@ -19,6 +19,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.ArrayList;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
@@ -40,16 +41,25 @@ public class TxWritebackImpl implements TxWriteback {
     private long currentSize = 0;
     private AtomicLong _counter = new AtomicLong();
     private ExecutorService _writebackExecutor;
+    private ExecutorService _commitExecutor;
 
     @Startup
     void init() {
-        BasicThreadFactory factory = new BasicThreadFactory.Builder()
-                .namingPattern("com-writeback-%d")
-                .build();
+        {
+            BasicThreadFactory factory = new BasicThreadFactory.Builder()
+                    .namingPattern("tx-writeback-%d")
+                    .build();
 
-        _writebackExecutor = Executors.newFixedThreadPool(1, factory);
-        for (int i = 0; i < 1; i++) {
+            _writebackExecutor = Executors.newSingleThreadExecutor(factory);
             _writebackExecutor.submit(this::writeback);
+        }
+
+        {
+            BasicThreadFactory factory = new BasicThreadFactory.Builder()
+                    .namingPattern("writeback-commit-%d")
+                    .build();
+
+            _commitExecutor = Executors.newFixedThreadPool(8, factory);
         }
     }
 
@@ -69,17 +79,28 @@ public class TxWritebackImpl implements TxWriteback {
                     bundle = _pendingBundles.pollFirstEntry().getValue().getLeft();
                 }
 
+
+                ArrayList<Callable<Void>> tasks = new ArrayList<>();
+
                 for (var c : bundle._committed) {
-                    Log.trace("Writing new " + c.getLeft());
-                    objectPersistentStore.writeNewObject(c.getLeft().getMeta().getName(), c.getMiddle(), c.getRight());
+                    tasks.add(() -> {
+                        Log.trace("Writing new " + c.getLeft());
+                        objectPersistentStore.writeNewObject(c.getLeft().getMeta().getName(), c.getMiddle(), c.getRight());
+                        return null;
+                    });
                 }
                 for (var c : bundle._meta) {
-                    Log.trace("Writing new (meta) " + c.getLeft());
-                    objectPersistentStore.writeNewObjectMeta(c.getLeft().getMeta().getName(), c.getRight());
+                    tasks.add(() -> {
+                        Log.trace("Writing new (meta) " + c.getLeft());
+                        objectPersistentStore.writeNewObjectMeta(c.getLeft().getMeta().getName(), c.getRight());
+                        return null;
+                    });
                 }
                 if (Log.isDebugEnabled())
                     for (var d : bundle._deleted)
                         Log.debug("Deleting from persistent storage " + d.getMeta().getName()); // FIXME: For tests
+
+                _commitExecutor.invokeAll(tasks);
 
                 objectPersistentStore.commitTx(
                         new TxManifest(

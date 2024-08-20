@@ -5,6 +5,7 @@ import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
 import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
+import com.usatiuk.utils.VoidFn;
 import io.grpc.Status;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
@@ -13,6 +14,7 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import org.apache.commons.lang3.NotImplementedException;
+import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.annotation.Nonnull;
@@ -27,6 +29,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
@@ -41,10 +46,18 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     private final static long mmapThreshold = 65536;
     private final Path _root;
     private final Path _txManifest;
+    private ExecutorService _flushExecutor;
 
     public FileObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.persistence.files.root") String root) {
         this._root = Path.of(root).resolve("objects");
         _txManifest = Path.of(root).resolve("cur-tx-manifest");
+        {
+            BasicThreadFactory factory = new BasicThreadFactory.Builder()
+                    .namingPattern("persistent-commit-%d")
+                    .build();
+
+            _flushExecutor = Executors.newFixedThreadPool(8, factory);
+        }
     }
 
     void init(@Observes @Priority(200) StartupEvent event) {
@@ -296,15 +309,28 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         try {
             putTransactionManifest(manifest);
 
+            ArrayList<Callable<VoidFn>> tasks = new ArrayList<>();
+
             for (var n : manifest.getWritten()) {
-                Files.move(getTmpObjPath(n), getObjPath(n), ATOMIC_MOVE, REPLACE_EXISTING);
+                tasks.add(() -> {
+                    Files.move(getTmpObjPath(n), getObjPath(n), ATOMIC_MOVE, REPLACE_EXISTING);
+                    return null;
+                });
             }
             for (var d : manifest.getDeleted()) {
-                deleteImpl(getObjPath(d));
+                tasks.add(() -> {
+                    deleteImpl(getObjPath(d));
+                    return null;
+                });
             }
+
+            _flushExecutor.invokeAll(tasks);
+
             Files.delete(_txManifest);
         } catch (IOException e) {
             Log.error("Failed committing transaction to disk: ", e);
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
     }

@@ -395,13 +395,15 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 return -1L;
             }
 
-            // FIXME:
-            file.runWriteLocked(JObjectManager.ResolutionStrategy.REMOTE, (meta, fDataU, bump, i) -> {
-                if (!(fDataU instanceof File fData))
+
+            file.rwLockNoCopy();
+            try {
+                // FIXME:
+                if (!(file.getData() instanceof File fData))
                     throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
 
                 if (writeLogging) {
-                    Log.info("Writing to file: " + meta.getName() + " size=" + size(fileUuid) + " "
+                    Log.info("Writing to file: " + file.getMeta().getName() + " size=" + size(fileUuid) + " "
                             + offset + " " + data.size());
                 }
 
@@ -457,7 +459,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                             boolean rightDone = false;
                             while (!leftDone && !rightDone) {
                                 if (beforeFirst.isEmpty()) leftDone = true;
-                                if (!beforeFirst.isEmpty() && !leftDone) {
+                                if (!beforeFirst.isEmpty() || !leftDone) {
                                     var takeLeft = beforeFirst.lastEntry();
 
                                     var cuuid = takeLeft.getValue();
@@ -524,7 +526,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
                             ChunkData newChunkData = createChunk(thisChunk);
                             //FIXME:
-                            jObjectManager.put(newChunkData, Optional.of(meta.getName()));
+                            jObjectManager.put(newChunkData, Optional.of(file.getMeta().getName()));
                             chunksAll.put(start, newChunkData.getName());
 
                             start += thisChunk.size();
@@ -532,15 +534,15 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                         }
                     }
 
-                    bump.apply();
+                    file.bumpVer();
                     fData.setMtime(System.currentTimeMillis());
                 } finally {
                     cleanupChunks(fData, removedChunks);
                     updateFileSize((JObject<File>) file);
                 }
-                return null;
-            });
-
+            } finally {
+                file.rwUnlock();
+            }
 
             return (long) data.size();
         });
