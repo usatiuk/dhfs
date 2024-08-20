@@ -196,12 +196,20 @@ public class JObjectManagerImpl implements JObjectManager {
                     }
                 }
                 JObject<D> finalRet = (JObject<D>) ret;
-                if (ret.runReadLocked(ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
-                    return (object.getClass().isAnnotationPresent(PushResolution.class)
-                            && object.getClass().isAnnotationPresent(AssumedUnique.class)
-                            && finalRet.getData() == null && !finalRet.getMeta().isHaveLocalCopy())
-                            || (parent.isEmpty() && !m.isLocked()) || (parent.isPresent() && !m.checkRef(parent.get()));
-                }))
+
+                boolean shouldWrite = false;
+                try {
+                    shouldWrite = ret.runReadLocked(ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
+                        return (object.getClass().isAnnotationPresent(PushResolution.class)
+                                && object.getClass().isAnnotationPresent(AssumedUnique.class)
+                                && finalRet.getData() == null && !finalRet.getMeta().isHaveLocalCopy())
+                                || (parent.isEmpty() && !m.isLocked()) || (parent.isPresent() && !m.checkRef(parent.get()));
+                    });
+                } catch (DeletedObjectAccessException dex) {
+                    shouldWrite = true;
+                }
+
+                if (shouldWrite)
                     ret.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                         if (object.getClass().isAnnotationPresent(PushResolution.class)
                                 && object.getClass().isAnnotationPresent(AssumedUnique.class)
@@ -251,7 +259,14 @@ public class JObjectManagerImpl implements JObjectManager {
                 meta.markSeen();
 
                 parent.ifPresent(s -> {
-                    if (got.runReadLocked(ResolutionStrategy.NO_RESOLUTION, (m, d) -> m.checkRef(s))) return;
+                    boolean shouldWrite = false;
+                    try {
+                        shouldWrite = !got.runReadLocked(ResolutionStrategy.NO_RESOLUTION, (m, d) -> m.checkRef(s));
+                    } catch (DeletedObjectAccessException dex) {
+                        shouldWrite = true;
+                    }
+
+                    if (!shouldWrite) return;
 
                     got.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                         if (m.isLocked())
