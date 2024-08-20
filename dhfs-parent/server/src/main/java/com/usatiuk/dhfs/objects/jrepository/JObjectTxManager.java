@@ -54,6 +54,16 @@ public class JObjectTxManager {
         _state.set(new TxState());
     }
 
+    public void drop(JObject<?> obj) {
+        var state = _state.get();
+        if (state == null)
+            throw new IllegalStateException("Transaction not running");
+        Log.debug("Dropping " + obj.getMeta().getName());
+        obj.assertRwLock();
+        state._writeObjects.remove(obj);
+        obj.rwUnlock();
+    }
+
     public void commit() {
         var state = _state.get();
         if (state == null)
@@ -221,7 +231,7 @@ public class JObjectTxManager {
         obj.assertRwLock();
         obj.rwLock();
 
-        state._writeObjects.put(obj.getMeta().getName(),
+        state._writeObjects.put(obj,
                 new JObjectSnapshot(
                         obj,
                         protoSerializerService.serialize(obj.getMeta()),
@@ -231,6 +241,6 @@ public class JObjectTxManager {
     }
 
     private class TxState {
-        private final HashMap<String, JObjectSnapshot> _writeObjects = new HashMap<>();
+        private final HashMap<JObject<?>, JObjectSnapshot> _writeObjects = new HashMap<>();
     }
 }

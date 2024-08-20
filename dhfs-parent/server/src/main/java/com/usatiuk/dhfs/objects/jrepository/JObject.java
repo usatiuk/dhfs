@@ -33,6 +33,8 @@ public abstract class JObject<T extends JObjectData> {
 
     public abstract void rwUnlock();
 
+    public abstract void drop();
+
     abstract boolean haveRwLock();
 
     public abstract void assertRwLock();

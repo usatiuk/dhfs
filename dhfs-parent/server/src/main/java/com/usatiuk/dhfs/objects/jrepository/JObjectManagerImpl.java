@@ -190,8 +190,10 @@ public class JObjectManagerImpl implements JObjectManager {
                         if (ref.get() == null) _map.remove(object.getName(), ref);
                         else ret = ref.get();
                     }
-                    // FIXME! newObj leak!
-                    if (ret != newObj) continue;
+                    if (ret != newObj) {
+                        newObj.drop();
+                        continue;
+                    }
                 }
                 JObject<D> finalRet = (JObject<D>) ret;
                 ret.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
@@ -258,7 +260,10 @@ public class JObjectManagerImpl implements JObjectManager {
                 if (ref.get() == null) _map.remove(name, ref);
                 else ret = ref.get();
             }
-            if (ret != created) continue;
+            if (ret != created) {
+                created.drop();
+                continue;
+            }
 
             created.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                 parent.ifPresent(m::addRef);
@@ -441,6 +446,15 @@ public class JObjectManagerImpl implements JObjectManager {
             if (_lock.writeLock().getHoldCount() == 1) {
                 updateDeletionState();
             }
+        }
+
+        @Override
+        public void drop() {
+            if (_lock.writeLock().getHoldCount() < 2) {
+                throw new IllegalStateException("Expected for object to be locked and in transaction");
+            }
+            _lock.writeLock().unlock();
+            jObjectTxManager.drop(this);
         }
 
         public boolean haveRwLock() {
