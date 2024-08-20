@@ -7,9 +7,9 @@ import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.Startup;
 import jakarta.annotation.Priority;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -19,7 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-@Singleton
+@ApplicationScoped
 public class JObjectWriteback {
     private final HashSetDelayedBlockingQueue<QueueEntry> _writeQueue;
     private final AtomicLong _currentSize = new AtomicLong(0);

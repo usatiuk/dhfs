@@ -16,6 +16,7 @@ import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 @ApplicationScoped
@@ -36,6 +37,7 @@ public class JObjectTxManager {
     @ConfigProperty(name = "dhfs.objects.ref_verification")
     boolean refVerification;
     private ExecutorService _serializerThreads;
+    private AtomicLong _transientTxId = new AtomicLong();
 
     public JObjectTxManager() {
         BasicThreadFactory factory = new BasicThreadFactory.Builder()
@@ -49,7 +51,6 @@ public class JObjectTxManager {
     public void begin() {
         if (_state.get() != null)
             throw new IllegalStateException("Transaction already running");
-        Log.debug("Starting transaction");
 
         _state.set(new TxState());
     }
@@ -58,7 +59,7 @@ public class JObjectTxManager {
         var state = _state.get();
         if (state == null)
             throw new IllegalStateException("Transaction not running");
-        Log.debug("Dropping " + obj.getMeta().getName());
+        Log.debug("Dropping " + obj.getMeta().getName() + " from " + state._id);
         obj.assertRwLock();
         state._writeObjects.remove(obj);
         obj.rwUnlock();
@@ -68,8 +69,14 @@ public class JObjectTxManager {
         var state = _state.get();
         if (state == null)
             throw new IllegalStateException("Transaction not running");
-        Log.debug("Committing transaction");
 
+        if (state._writeObjects.isEmpty()) {
+            Log.trace("Empty transaction " + state._id);
+            _state.remove();
+            return;
+        }
+
+        Log.debug("Committing transaction " + state._id);
 
         for (var obj : state._writeObjects.values()) {
             Log.debug("Committing " + obj.obj().getMeta().getName() + " deleted=" + obj.obj().getMeta().isDeleted() + " deletion-candidate=" + obj.obj().getMeta().isDeletionCandidate());
@@ -168,7 +175,7 @@ public class JObjectTxManager {
         var state = _state.get();
         if (state == null)
             throw new IllegalStateException("Transaction not running");
-        Log.debug("Rollback");
+        Log.debug("Rollback of " + state._id);
 
         for (var obj : state._writeObjects.values()) {
             Log.debug("Rollback of " + obj.obj().getMeta().getName());
@@ -197,7 +204,7 @@ public class JObjectTxManager {
             fn.apply();
             commit();
         } catch (Exception e) {
-            Log.debug("Error in transaction", e);
+            Log.debug("Error in transaction " + _state.get()._id, e);
             rollback();
             throw e;
         }
@@ -214,7 +221,7 @@ public class JObjectTxManager {
             commit();
             return ret;
         } catch (Exception e) {
-            Log.debug("Error in transaction", e);
+            Log.debug("Error in transaction " + _state.get()._id, e);
             rollback();
             throw e;
         }
@@ -226,7 +233,7 @@ public class JObjectTxManager {
         if (state == null)
             throw new IllegalStateException("Transaction not running");
 
-        Log.debug("Adding " + obj.getMeta().getName() + " to transaction");
+        Log.debug("Adding " + obj.getMeta().getName() + " to transaction " + state._id);
 
         obj.assertRwLock();
         obj.rwLock();
@@ -241,6 +248,7 @@ public class JObjectTxManager {
     }
 
     private class TxState {
+        private final long _id = _transientTxId.incrementAndGet();
         private final HashMap<JObject<?>, JObjectSnapshot> _writeObjects = new HashMap<>();
     }
 }

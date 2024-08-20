@@ -46,8 +46,6 @@ public class JObjectManagerImpl implements JObjectManager {
     @Inject
     InvalidationQueueService invalidationQueueService;
     @Inject
-    JObjectWriteback jObjectWriteback;
-    @Inject
     JObjectManager jObjectManager;
     @Inject
     PersistentPeerDataService persistentPeerDataService;
