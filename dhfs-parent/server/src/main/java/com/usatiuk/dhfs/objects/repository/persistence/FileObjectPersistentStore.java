@@ -5,7 +5,6 @@ import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
 import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
-import com.usatiuk.utils.VoidFn;
 import io.grpc.Status;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
@@ -29,7 +28,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
-import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -47,26 +46,31 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     private final Path _root;
     private final Path _txManifest;
     private ExecutorService _flushExecutor;
+    private RandomAccessFile _txFile;
 
     public FileObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.persistence.files.root") String root) {
         this._root = Path.of(root).resolve("objects");
         _txManifest = Path.of(root).resolve("cur-tx-manifest");
-        {
-            BasicThreadFactory factory = new BasicThreadFactory.Builder()
-                    .namingPattern("persistent-commit-%d")
-                    .build();
-
-            _flushExecutor = Executors.newFixedThreadPool(8, factory);
-        }
     }
 
-    void init(@Observes @Priority(200) StartupEvent event) {
+    void init(@Observes @Priority(200) StartupEvent event) throws IOException {
         if (!_root.toFile().exists()) {
             Log.info("Initializing with root " + _root);
             _root.toFile().mkdirs();
             for (int i = 0; i < 256; i++) {
                 _root.resolve(String.valueOf(i)).toFile().mkdirs();
             }
+        }
+        if (!Files.exists(_txManifest)) {
+            Files.createFile(_txManifest);
+        }
+        _txFile = new RandomAccessFile(_txManifest.toFile(), "rw");
+        {
+            BasicThreadFactory factory = new BasicThreadFactory.Builder()
+                    .namingPattern("persistent-commit-%d")
+                    .build();
+
+            _flushExecutor = Executors.newFixedThreadPool(8, factory);
         }
     }
 
@@ -292,13 +296,14 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     }
 
     private void putTransactionManifest(TxManifest manifest) {
-        try (var fsb = new FileOutputStream(_txManifest.toFile(), false);
-             var buf = new BufferedOutputStream(fsb, 65536)) {
-            fsb.write(SerializationHelper.serializeArray(manifest));
-
-            buf.flush();
-            fsb.flush();
-            fsb.getFD().sync();
+        try {
+            // TODO: Checksum?
+            var channel = _txFile.getChannel();
+            var data = SerializationHelper.serializeArray(manifest);
+            channel.truncate(data.length);
+            channel.position(0);
+            channel.write(ByteBuffer.wrap(data));
+            channel.force(true);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -309,27 +314,34 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         try {
             putTransactionManifest(manifest);
 
-            ArrayList<Callable<VoidFn>> tasks = new ArrayList<>();
+            var latch = new CountDownLatch(manifest.getWritten().size() + manifest.getDeleted().size());
 
             for (var n : manifest.getWritten()) {
-                tasks.add(() -> {
-                    Files.move(getTmpObjPath(n), getObjPath(n), ATOMIC_MOVE, REPLACE_EXISTING);
-                    return null;
+                _flushExecutor.execute(() -> {
+                    try {
+                        Files.move(getTmpObjPath(n), getObjPath(n), ATOMIC_MOVE, REPLACE_EXISTING);
+                        latch.countDown();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
                 });
             }
             for (var d : manifest.getDeleted()) {
-                tasks.add(() -> {
+                _flushExecutor.execute(() -> {
                     deleteImpl(getObjPath(d));
-                    return null;
+                    latch.countDown();
                 });
             }
 
-            _flushExecutor.invokeAll(tasks);
+            latch.await();
 
-            Files.delete(_txManifest);
-        } catch (IOException e) {
-            Log.error("Failed committing transaction to disk: ", e);
-            throw new RuntimeException(e);
+            // No real need to truncate here
+//            try (var channel = _txFile.getChannel()) {
+//                channel.truncate(0);
+//            }
+//        } catch (IOException e) {
+//            Log.error("Failed committing transaction to disk: ", e);
+//            throw new RuntimeException(e);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
