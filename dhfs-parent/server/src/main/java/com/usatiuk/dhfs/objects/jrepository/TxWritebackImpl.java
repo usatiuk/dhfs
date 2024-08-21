@@ -42,6 +42,7 @@ public class TxWritebackImpl implements TxWriteback {
     private AtomicLong _counter = new AtomicLong();
     private ExecutorService _writebackExecutor;
     private ExecutorService _commitExecutor;
+    private ExecutorService _statusExecutor;
     private AtomicLong _waitedTotal = new AtomicLong(0);
 
     @Startup
@@ -62,6 +63,18 @@ public class TxWritebackImpl implements TxWriteback {
 
             _commitExecutor = Executors.newFixedThreadPool(8, factory);
         }
+        _statusExecutor = Executors.newSingleThreadExecutor();
+        _statusExecutor.submit(() -> {
+            try {
+                while (true) {
+                    Thread.sleep(1000);
+                    if (currentSize > 0)
+                        Log.info("Tx commit status: size="
+                                + currentSize / 1024 / 1024 + "MB");
+                }
+            } catch (InterruptedException ignored) {
+            }
+        });
     }
 
     void shutdown(@Observes @Priority(10) ShutdownEvent event) {
