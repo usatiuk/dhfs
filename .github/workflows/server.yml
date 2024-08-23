@@ -108,10 +108,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set SANITIZED_DOCKER_PLATFORM
+        run: echo "SANITIZED_DOCKER_PLATFORM=$(echo $DOCKER_PLATFORM | tr / _ )" >> $GITHUB_ENV
+      - name: Set DOCKER_BUILDER_IMAGE
+        run: echo "DOCKER_BUILDER_IMAGE=dhfs_lib_builder-${{matrix.os}}-$SANITIZED_DOCKER_PLATFORM" >> $GITHUB_ENV
+
       - name: Build config
         run: |
           echo DO_LOCAL_BUILD: $DO_LOCAL_BUILD
           echo DOCKER_PLATFORM: $DOCKER_PLATFORM
+          echo SANITIZED_DOCKER_PLATFORM: $SANITIZED_DOCKER_PLATFORM
+          echo DOCKER_BUILDER_IMAGE: $DOCKER_BUILDER_IMAGE
 
       - name: Set up JDK 21
         if: ${{ env.DO_LOCAL_BUILD == 'TRUE' }}
@@ -129,6 +136,19 @@ jobs:
         if: ${{ env.DO_LOCAL_BUILD != 'TRUE' }}
         uses: docker/setup-qemu-action@v3
 
+      - name: Build Docker builder image
+        if: ${{ env.DO_LOCAL_BUILD != 'TRUE' }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ./libdhfs_support/builder
+          file: ./libdhfs_support/builder/Dockerfile
+          push: false
+          platforms: ${{ env.DOCKER_PLATFORM }}
+          tags: ${{ env.DOCKER_BUILDER_IMAGE }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          load: true
+
       - name: Build the library
         run: |
           CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release" libdhfs_support/builder/cross-build.sh both build "$(pwd)/result"
@@ -136,7 +156,7 @@ jobs:
       - name: Upload build
         uses: actions/upload-artifact@v3
         with:
-          name: NativeLib-${{ matrix.os }}-${{ env.DOCKER_PLATFORM }}
+          name: NativeLib-${{ matrix.os }}-${{ env.SANITIZED_DOCKER_PLATFORM }}
           path: result
 
   merge-native-libs:
