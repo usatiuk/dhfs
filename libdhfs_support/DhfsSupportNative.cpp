@@ -7,18 +7,40 @@
 
 #include "com_usatiuk_dhfs_supportlib_DhfsSupportNative.h"
 
-long get_page_size() {
-    static const long PAGE_SIZE = sysconf(_SC_PAGESIZE);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-conversion"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+
+template<typename To, typename From>
+constexpr To checked_cast(const From& f) {
+    To result = static_cast<To>(f);
+    assert(f == result);
+    return result;
+}
+
+#pragma GCC diagnostic pop
+
+unsigned int get_page_size() {
+    static const auto PAGE_SIZE = checked_cast<unsigned int>(sysconf(_SC_PAGESIZE));
     return PAGE_SIZE;
 }
 
-constexpr uintptr_t align_up(uintptr_t what, size_t alignment) {
+template<typename T, typename A>
+T align_up(T what, A alignment) {
     assert(__builtin_popcount(alignment) == 1);
-    const uintptr_t mask = alignment - 1;
-    if (what & mask) {
-        return (what & ~mask) + alignment;
-    }
-    return what;
+
+    const T mask = checked_cast<T>(alignment - 1);
+
+    T ret;
+
+    if (what & mask)
+        ret = (what + mask) & ~mask;
+    else
+        ret = what;
+
+    assert((ret & mask) == 0);
+
+    return ret;
 }
 
 extern "C" {
@@ -28,28 +50,33 @@ JNIEXPORT void JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_hello(
 
 JNIEXPORT jlong JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_allocateUninitializedByteBuffer
 (JNIEnv* env, jclass klass, jobjectArray bb, jint size) {
+    if (size < 0) {
+        env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"), "Size less than 0?");
+        return 0;
+    }
+
+    size_t checked_size = checked_cast<size_t>(size);
+
     void* buf;
-    if (size < get_page_size())
-        buf = malloc(size);
+    if (checked_size < get_page_size())
+        buf = malloc(checked_size);
     else
-        buf = std::aligned_alloc(get_page_size(), align_up(size, get_page_size()));
+        buf = std::aligned_alloc(get_page_size(), align_up(checked_size, get_page_size()));
 
     if (buf == nullptr) {
         env->ThrowNew(env->FindClass("java/lang/OutOfMemoryError"), "Buffer memory allocation failed");
         return 0;
     }
 
-    env->SetObjectArrayElement(bb, 0, env->NewDirectByteBuffer(buf, size));
+    env->SetObjectArrayElement(bb, 0, env->NewDirectByteBuffer(buf, checked_cast<jlong>(checked_size)));
 
-    jlong token = static_cast<jlong>((uintptr_t) buf);
-    assert(token == (uintptr_t)buf);
+    jlong token = checked_cast<jlong>((uintptr_t) buf);
     return token;
 }
 
 JNIEXPORT void JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_dropByteBuffer
 (JNIEnv* env, jclass klass, jlong token) {
-    uintptr_t addr = static_cast<uintptr_t>(token);
-    assert(addr == token);
+    const auto addr = checked_cast<uintptr_t>(token);
 
     if (addr == 0) {
         env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"), "Trying to free null pointer");
@@ -57,5 +84,10 @@ JNIEXPORT void JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_dropBy
     }
 
     free((void*) addr);
+}
+
+JNIEXPORT jint JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_getPageSize
+(JNIEnv*, jclass) {
+    return checked_cast<jint>(get_page_size());
 }
 }

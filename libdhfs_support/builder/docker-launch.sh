@@ -14,5 +14,5 @@ docker build $PLATFORM_ARG --iidfile "$DOCKER_IMG_FILE" .
 
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
-docker run $PLATFORM_ARG --rm -v "$ROOT_DIR:$ROOT_DIR" -e INSIDE_DOCKER_ALREADY=TRUE "$(cat "$DOCKER_IMG_FILE")" \
+docker run $PLATFORM_ARG --rm -v "$ROOT_DIR:$ROOT_DIR" -e DO_LOCAL_BUILD=TRUE "$(cat "$DOCKER_IMG_FILE")" \
   "$SCRIPT_DIR/cross-build.sh" "$@"

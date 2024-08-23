@@ -108,10 +108,9 @@ jobs:
           distribution: "zulu"
           cache: maven
 
-      - name: Cmake build
+      - name: Build the library
         run: |
-          cmake -B"build" -S"libdhfs_support" -DDHFS_LIB_INSTALL="$(pwd)/result"
-          cmake --build build --target install
+          CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release" DO_LOCAL_BUILD=True libdhfs_support/builder/cross-build.sh both build "$(pwd)/result"
 
       - name: Upload build
         uses: actions/upload-artifact@v3
@@ -127,12 +126,13 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: build
+      - name: Build the library
         run: |
-          CROSS_PLATFORM="linux/arm64" libdhfs_support/builder/cross-build.sh both build "$(pwd)/result"
+          CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release" CROSS_PLATFORM="linux/arm64" libdhfs_support/builder/cross-build.sh both build "$(pwd)/result"
 
       - name: Upload build
         uses: actions/upload-artifact@v3
@@ -152,14 +152,15 @@ jobs:
         with:
           path: downloaded-libs
 
-      - name: Merge
+      - name: Merge all
         run: rsync -av downloaded-libs/NativeLib*/* result/
 
-      - name: Check paths
+      - name: Check that libs exists
         run: |
           test -f "result/Linux-x86_64/libdhfs_support.so" || exit 1
 
-      - uses: actions/upload-artifact@v3
+      - name: Upload
+        uses: actions/upload-artifact@v3
         with:
           name: NativeLibs
           path: result
@@ -179,17 +180,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v3
+      - name: Download server package
+        uses: actions/download-artifact@v3
         with:
           name: DHFS Server Package
           path: dhfs-package-downloaded
 
-      - uses: actions/download-artifact@v3
+      - name: Download webui
+        uses: actions/download-artifact@v3
         with:
           name: Webui
           path: webui-dist-downloaded
 
-      - uses: actions/download-artifact@v3
+      - name: Download native libs
+        uses: actions/download-artifact@v3
         with:
           name: NativeLibs
           path: dhfs-native-downloaded
@@ -314,7 +318,8 @@ jobs:
       - name: Tar run wrapper
         run: tar -cvf ~/run-wrapper.tar.gz ./run-wrapper-out
 
-      - uses: actions/upload-artifact@v3
+      - name: Upload
+        uses: actions/upload-artifact@v3
         with:
           name: Run wrapper
           path: ~/run-wrapper.tar.gz

@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 
+CMAKE_ARGS="${CMAKE_ARGS:--DCMAKE_BUILD_TYPE=Debug}"
+
 export SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 cd "$SCRIPT_DIR"
 
-if [[ -z "${INSIDE_DOCKER_ALREADY}" ]]; then
+if [[ -z "${DO_LOCAL_BUILD}" ]]; then
   if [[ "$(uname)" == "Linux" ]]; then
     if [[ -z "${CROSS_PLATFORM}" ]]; then
       echo "Already on linux"
@@ -26,7 +28,7 @@ CONFIGURE_DIR="$2"
 INSTALL_DIR="$3"
 
 function configure() {
-  cmake -B"$CONFIGURE_DIR" -S"$PROJECT_DIR" -DDHFS_LIB_INSTALL="$INSTALL_DIR"
+  cmake -B"$CONFIGURE_DIR" -S"$PROJECT_DIR" -DDHFS_LIB_INSTALL="$INSTALL_DIR" $CMAKE_ARGS
 }
 
 function build() {

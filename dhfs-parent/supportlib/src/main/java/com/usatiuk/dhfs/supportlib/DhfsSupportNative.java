@@ -15,4 +15,6 @@ class DhfsSupportNative {
 
     static native void dropByteBuffer(long token);
 
+    static native int getPageSize();
+
 }
