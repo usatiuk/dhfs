@@ -31,12 +31,9 @@ jobs:
       - name: Download maven
         run: |
           cd "$HOME"
-          wget -qO- https://dlcdn.apache.org/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz | tar xvz --strip-components=1 
-          find .
-          $HOME/apache-maven-3.9.9-bin/bin/mvn
-
-      - name: Update path
-        run: echo "$HOME"/apache-maven-3.9.9-bin/bin >> $GITHUB_PATH
+          mkdir maven-bin
+          curl -s -L https://dlcdn.apache.org/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz | tar xvz - -C maven-bin
+          echo "$HOME"/maven-bin/bin >> $GITHUB_PATH
 
       - name: Maven info
         run: |
