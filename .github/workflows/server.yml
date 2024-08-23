@@ -31,7 +31,8 @@ jobs:
       - name: Download maven
         run: |
           cd "$HOME"
-          wget -qO- https://dlcdn.apache.org/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz | tar xvz
+          wget -qO- https://dlcdn.apache.org/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz | tar --strip-components=1 xvz
+          find .
           $HOME/apache-maven-3.9.9-bin/bin/mvn
 
       - name: Update path
