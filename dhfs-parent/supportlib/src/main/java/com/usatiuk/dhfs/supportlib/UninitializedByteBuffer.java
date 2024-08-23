@@ -7,6 +7,9 @@ public class UninitializedByteBuffer {
     private static final Cleaner CLEANER = Cleaner.create();
 
     public static ByteBuffer allocateUninitialized(int size) {
+        if (size < DhfsSupportNative.PAGE_SIZE)
+            return ByteBuffer.allocateDirect(size);
+
         var bb = new ByteBuffer[1];
         long token = DhfsSupportNative.allocateUninitializedByteBuffer(bb, size);
         var ret = bb[0];

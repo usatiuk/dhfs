@@ -5,8 +5,11 @@ import java.nio.ByteBuffer;
 
 
 class DhfsSupportNative {
+    static public final int PAGE_SIZE;
+
     static {
         System.load(DhfsNativeLibFinder.getLibPath().toAbsolutePath().toString());
+        PAGE_SIZE = getPageSizeInternal();
     }
 
     public static native void hello();
@@ -15,6 +18,5 @@ class DhfsSupportNative {
 
     static native void dropByteBuffer(long token);
 
-    static native int getPageSize();
-
+    private static native int getPageSizeInternal();
 }

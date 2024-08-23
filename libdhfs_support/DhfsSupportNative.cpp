@@ -86,7 +86,7 @@ JNIEXPORT void JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_dropBy
     free((void*) addr);
 }
 
-JNIEXPORT jint JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_getPageSize
+JNIEXPORT jint JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_getPageSizeInternal
 (JNIEnv*, jclass) {
     return checked_cast<jint>(get_page_size());
 }
