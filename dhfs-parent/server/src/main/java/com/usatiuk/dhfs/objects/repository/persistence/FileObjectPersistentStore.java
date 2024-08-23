@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.objects.repository.persistence;
 
+import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
@@ -19,7 +20,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import javax.annotation.Nonnull;
 import java.io.*;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -212,16 +212,24 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     }
 
     private void writeObjectImpl(Path path, ObjectMetadataP meta, JObjectDataP data, boolean sync) throws IOException {
-        try (var fsb = new FileOutputStream(path.toFile(), false);
-             var buf = new BufferedOutputStream(fsb, Math.min(65536, Math.max(data != null ? data.getSerializedSize() : meta.getSerializedSize(), 4096)))) {
+        try (var fsb = new FileOutputStream(path.toFile(), false)) {
             var dataSize = data != null ? data.getSerializedSize() : 0;
-            buf.write(longToBytes(dataSize + 8));
+            fsb.write(longToBytes(dataSize + 8));
+
+            var totalSize = dataSize + meta.getSerializedSize();
+            // Avoids CodedOutputStream flushing all the time
+            var bb = ByteBuffer.allocateDirect(totalSize);
+            var bbOut = CodedOutputStream.newInstance(bb);
+
             if (data != null)
-                data.writeTo(buf);
-            meta.writeTo(buf);
+                data.writeTo(bbOut);
+            meta.writeTo(bbOut);
+            bbOut.flush();
+
+            if (fsb.getChannel().write(bb.flip()) != totalSize)
+                throw new IOException("Could not write to file");
 
             if (sync) {
-                buf.flush();
                 fsb.flush();
                 fsb.getFD().sync();
             }
@@ -240,9 +248,15 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
             ch.truncate(metaOff + meta.getSerializedSize());
             ch.position(metaOff);
 
-            try (var buf = new BufferedOutputStream(Channels.newOutputStream(ch), Math.min(65536, meta.getSerializedSize()))) {
-                meta.writeTo(buf);
-            }
+            var totalSize = meta.getSerializedSize();
+            // Avoids CodedOutputStream flushing all the time
+            var bb = ByteBuffer.allocateDirect(totalSize);
+            var bbOut = CodedOutputStream.newInstance(bb);
+
+            meta.writeTo(bbOut);
+            bbOut.flush();
+            if (ch.write(bb.flip()) != totalSize)
+                throw new IOException("Could not write to file");
 
             if (sync)
                 rf.getFD().sync();
@@ -302,7 +316,8 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
             var data = SerializationHelper.serializeArray(manifest);
             channel.truncate(data.length);
             channel.position(0);
-            channel.write(ByteBuffer.wrap(data));
+            if (channel.write(ByteBuffer.wrap(data)) != data.length)
+                throw new StatusRuntimeExceptionNoStacktrace(Status.INTERNAL);
             channel.force(true);
         } catch (IOException e) {
             throw new RuntimeException(e);
