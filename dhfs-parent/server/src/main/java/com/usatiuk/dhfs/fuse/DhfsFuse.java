@@ -6,7 +6,7 @@ import com.usatiuk.dhfs.files.service.DhfsFileService;
 import com.usatiuk.dhfs.files.service.DirectoryNotEmptyException;
 import com.usatiuk.dhfs.files.service.GetattrRes;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
-import com.usatiuk.dhfs.supportlib.DhfsSupport;
+import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
 import com.usatiuk.kleppmanntree.AlreadyExistsException;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -28,7 +28,6 @@ import ru.serce.jnrfuse.struct.FuseFileInfo;
 import ru.serce.jnrfuse.struct.Statvfs;
 import ru.serce.jnrfuse.struct.Timespec;
 
-import java.nio.ByteBuffer;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Optional;
@@ -55,7 +54,6 @@ public class DhfsFuse extends FuseStubFS {
     DhfsFileService fileService;
 
     void init(@Observes @Priority(100000) StartupEvent event) {
-        DhfsSupport.hello();
         if (!enabled) return;
         Paths.get(root).toFile().mkdirs();
         Log.info("Mounting with root " + root);
@@ -203,7 +201,7 @@ public class DhfsFuse extends FuseStubFS {
         try {
             var fileOpt = fileService.open(path);
             if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
-            var buffer = ByteBuffer.allocateDirect((int) size);
+            var buffer = UninitializedByteBuffer.allocateUninitialized((int) size);
 
             jnrPtrByteOutputAccessors.getUnsafe().copyMemory(
                     buf.address(),

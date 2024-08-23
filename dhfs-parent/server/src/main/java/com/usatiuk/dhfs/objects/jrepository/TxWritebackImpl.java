@@ -18,7 +18,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.TreeMap;
-import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
@@ -93,28 +94,43 @@ public class TxWritebackImpl implements TxWriteback {
                     currentSize += bundle.calculateTotalSize();
                 }
 
-
-                ArrayList<Callable<Void>> tasks = new ArrayList<>();
+                var latch = new CountDownLatch(bundle._committed.size() + bundle._meta.size());
+                ConcurrentLinkedQueue<Throwable> errors = new ConcurrentLinkedQueue<>();
 
                 for (var c : bundle._committed.values()) {
-                    tasks.add(() -> {
-                        Log.trace("Writing new " + c.newMeta.getName());
-                        objectPersistentStore.writeNewObject(c.newMeta.getName(), c.newMeta, c.newData);
-                        return null;
+                    _commitExecutor.execute(() -> {
+                        try {
+                            Log.trace("Writing new " + c.newMeta.getName());
+                            objectPersistentStore.writeNewObject(c.newMeta.getName(), c.newMeta, c.newData);
+                        } catch (Throwable t) {
+                            Log.error("Error writing " + c.newMeta.getName(), t);
+                            errors.add(t);
+                        } finally {
+                            latch.countDown();
+                        }
                     });
                 }
                 for (var c : bundle._meta.values()) {
-                    tasks.add(() -> {
-                        Log.trace("Writing (meta) " + c.newMeta.getName());
-                        objectPersistentStore.writeNewObjectMeta(c.newMeta.getName(), c.newMeta);
-                        return null;
+                    _commitExecutor.execute(() -> {
+                        try {
+                            Log.trace("Writing (meta) " + c.newMeta.getName());
+                            objectPersistentStore.writeNewObjectMeta(c.newMeta.getName(), c.newMeta);
+                        } catch (Throwable t) {
+                            Log.error("Error writing " + c.newMeta.getName(), t);
+                            errors.add(t);
+                        } finally {
+                            latch.countDown();
+                        }
                     });
                 }
                 if (Log.isDebugEnabled())
                     for (var d : bundle._deleted.keySet())
                         Log.debug("Deleting from persistent storage " + d.getMeta().getName()); // FIXME: For tests
 
-                _commitExecutor.invokeAll(tasks);
+                latch.await();
+                if (!errors.isEmpty()) {
+                    throw new RuntimeException("Errors in writeback!");
+                }
                 objectPersistentStore.commitTx(
                         new TxManifest(
                                 Stream.concat(bundle._committed.keySet().stream().map(t -> t.getMeta().getName()),

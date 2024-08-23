@@ -5,6 +5,7 @@ import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
+import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
 import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
 import io.grpc.Status;
 import io.quarkus.logging.Log;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -146,7 +148,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
             if (false && len > mmapThreshold) {
                 buf = rf.getChannel().map(FileChannel.MapMode.READ_ONLY, 8, toRead);
             } else {
-                buf = ByteBuffer.allocateDirect(toRead);
+                buf = UninitializedByteBuffer.allocateUninitialized(toRead);
                 fillBuffer(buf, rf.getChannel());
                 buf.flip();
             }
@@ -218,7 +220,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
             var totalSize = dataSize + meta.getSerializedSize();
             // Avoids CodedOutputStream flushing all the time
-            var bb = ByteBuffer.allocateDirect(totalSize);
+            var bb = UninitializedByteBuffer.allocateUninitialized(totalSize);
             var bbOut = CodedOutputStream.newInstance(bb);
 
             if (data != null)
@@ -239,7 +241,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     private void writeObjectMetaImpl(Path path, ObjectMetadataP meta, boolean sync) throws IOException {
         try (var rf = new RandomAccessFile(path.toFile(), "rw");
              var ch = rf.getChannel()) {
-            var longBuf = ByteBuffer.allocateDirect(8);
+            var longBuf = UninitializedByteBuffer.allocateUninitialized(8);
             fillBuffer(longBuf, ch);
 
             longBuf.flip();
@@ -250,7 +252,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
             var totalSize = meta.getSerializedSize();
             // Avoids CodedOutputStream flushing all the time
-            var bb = ByteBuffer.allocateDirect(totalSize);
+            var bb = UninitializedByteBuffer.allocateUninitialized(totalSize);
             var bbOut = CodedOutputStream.newInstance(bb);
 
             meta.writeTo(bbOut);
@@ -330,25 +332,38 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
             putTransactionManifest(manifest);
 
             var latch = new CountDownLatch(manifest.getWritten().size() + manifest.getDeleted().size());
+            ConcurrentLinkedQueue<Throwable> errors = new ConcurrentLinkedQueue<>();
 
             for (var n : manifest.getWritten()) {
                 _flushExecutor.execute(() -> {
                     try {
                         Files.move(getTmpObjPath(n), getObjPath(n), ATOMIC_MOVE, REPLACE_EXISTING);
+                    } catch (Throwable t) {
+                        Log.error("Error writing " + n, t);
+                        errors.add(t);
+                    } finally {
                         latch.countDown();
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
                     }
                 });
             }
             for (var d : manifest.getDeleted()) {
                 _flushExecutor.execute(() -> {
-                    deleteImpl(getObjPath(d));
-                    latch.countDown();
+                    try {
+                        deleteImpl(getObjPath(d));
+                    } catch (Throwable t) {
+                        Log.error("Error deleting " + d, t);
+                        errors.add(t);
+                    } finally {
+                        latch.countDown();
+                    }
                 });
             }
 
             latch.await();
+
+            if (!errors.isEmpty()) {
+                throw new RuntimeException("Errors when commiting tx!");
+            }
 
             // No real need to truncate here
 //            try (var channel = _txFile.getChannel()) {

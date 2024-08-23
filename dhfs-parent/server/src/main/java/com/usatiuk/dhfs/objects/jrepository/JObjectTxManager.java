@@ -13,6 +13,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -102,6 +103,7 @@ public class JObjectTxManager {
 
         var bundle = txWriteback.createBundle();
         var latch = new CountDownLatch(state._writeObjects.size());
+        ConcurrentLinkedQueue<Throwable> errors = new ConcurrentLinkedQueue<>();
 
         state._writeObjects.forEach((key, value) -> {
             try {
@@ -110,11 +112,17 @@ public class JObjectTxManager {
                     latch.countDown();
                 } else if (key.getMeta().isHaveLocalCopy() && key.getData() != null) {
                     _serializerThreads.execute(() -> {
-                        bundle.commit(key,
-                                protoSerializerService.serialize(key.getMeta()),
-                                protoSerializerService.serializeToJObjectDataP(key.getData())
-                        );
-                        latch.countDown();
+                        try {
+                            bundle.commit(key,
+                                    protoSerializerService.serialize(key.getMeta()),
+                                    protoSerializerService.serializeToJObjectDataP(key.getData())
+                            );
+                        } catch (Throwable t) {
+                            Log.error("Error serializing " + key.getMeta().getName(), t);
+                            errors.add(t);
+                        } finally {
+                            latch.countDown();
+                        }
                     });
                 } else if (key.getMeta().isHaveLocalCopy() && key.getData() == null) {
                     bundle.commitMetaChange(key,
@@ -137,6 +145,10 @@ public class JObjectTxManager {
             latch.await();
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
+        }
+
+        if (!errors.isEmpty()) {
+            throw new RuntimeException("Errors when committing!");
         }
 
         state._writeObjects.forEach((key, value) -> key.rwUnlock());
