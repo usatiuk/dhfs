@@ -137,7 +137,7 @@ jobs:
       - name: Upload build
         uses: actions/upload-artifact@v3
         with:
-          name: NativeLib-${{ matrix.os }}
+          name: NativeLib-docker
           path: result
 
   merge-native-libs:
