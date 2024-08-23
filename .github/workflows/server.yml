@@ -92,57 +92,56 @@ jobs:
   build-native-libs:
     strategy:
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
+        include:
+          - os: ubuntu-latest
+            cross: "linux/amd64"
+          - os: ubuntu-latest
+            cross: "linux/arm64"
+          - os: macos-latest
 
     runs-on: ${{ matrix.os }}
+    env:
+      DO_LOCAL_BUILD: ${{ matrix.os == 'macos-latest' }}
+      DOCKER_PLATFORM: ${{ matrix.cross || 'NATIVE' }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Build config
+        run: |
+          echo DO_LOCAL_BUILD: $DO_LOCAL_BUILD
+          echo DOCKER_PLATFORM: $DOCKER_PLATFORM
+
       - name: Set up JDK 21
+        if: ${{ env.DO_LOCAL_BUILD == 'TRUE' }}
         uses: actions/setup-java@v4
         with:
           java-version: "21"
           distribution: "zulu"
           cache: maven
 
-      - name: Build the library
-        run: |
-          CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release" DO_LOCAL_BUILD=True libdhfs_support/builder/cross-build.sh both build "$(pwd)/result"
-
-      - name: Upload build
-        uses: actions/upload-artifact@v3
-        with:
-          name: NativeLib-${{ matrix.os }}
-          path: result
-
-  build-native-libs-docker:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Set up Docker Buildx
+        if: ${{ env.DO_LOCAL_BUILD != 'TRUE' }}
         uses: docker/setup-buildx-action@v3
 
       - name: Set up QEMU
+        if: ${{ env.DO_LOCAL_BUILD != 'TRUE' }}
         uses: docker/setup-qemu-action@v3
 
       - name: Build the library
         run: |
-          CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release" CROSS_PLATFORM="linux/arm64" libdhfs_support/builder/cross-build.sh both build "$(pwd)/result"
+          CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release" libdhfs_support/builder/cross-build.sh both build "$(pwd)/result"
 
       - name: Upload build
         uses: actions/upload-artifact@v3
         with:
-          name: NativeLib-docker
+          name: NativeLib-${{ matrix.os }}-${{ env.DOCKER_PLATFORM }}
           path: result
 
   merge-native-libs:
     runs-on: ubuntu-latest
-    needs: [build-native-libs, build-native-libs-docker]
+    needs: [build-native-libs]
     steps:
       - name: Checkout
         uses: actions/checkout@v4

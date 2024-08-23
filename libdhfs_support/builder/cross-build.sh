@@ -5,9 +5,9 @@ CMAKE_ARGS="${CMAKE_ARGS:--DCMAKE_BUILD_TYPE=Debug}"
 export SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 cd "$SCRIPT_DIR"
 
-if [[ -z "${DO_LOCAL_BUILD}" ]]; then
+if [[ "${DO_LOCAL_BUILD^^}" != "TRUE" ]]; then
   if [[ "$(uname)" == "Linux" ]]; then
-    if [[ -z "${CROSS_PLATFORM}" ]]; then
+    if [[ -z "${DOCKER_PLATFORM}" ]]; then
       echo "Already on linux"
       exit 0
     fi

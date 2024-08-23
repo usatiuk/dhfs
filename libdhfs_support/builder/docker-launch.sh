@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 PLATFORM_ARG=""
-if [[ ! -z "${CROSS_PLATFORM}" ]]; then
-  PLATFORM_ARG="--platform $CROSS_PLATFORM"
+if [[ ! -z "${DOCKER_PLATFORM}" ]]; then
+  PLATFORM_ARG="--platform $DOCKER_PLATFORM"
 fi
 
 set -euxo pipefail
