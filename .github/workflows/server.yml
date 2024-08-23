@@ -145,8 +145,8 @@ jobs:
           push: false
           platforms: ${{ env.DOCKER_PLATFORM }}
           tags: ${{ env.DOCKER_BUILDER_IMAGE }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=build-${{ env.DOCKER_BUILDER_IMAGE }}
+          cache-to: type=gha,mode=max,scope=build-${{ env.DOCKER_BUILDER_IMAGE }}
           load: true
 
       - name: Build the library
