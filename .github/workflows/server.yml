@@ -34,7 +34,9 @@ jobs:
           echo "$(pwd)/apache-maven-3.9.9-bin/bin" >> $GITHUB_PATH
 
       - name: Maven info
-        run: mvn -v
+        run: |
+          echo "$GITHUB_PATH"
+          mvn -v
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
