@@ -110,7 +110,7 @@ jobs:
 
       - name: Cmake build
         run: |
-          cmake -B"build" -S"libdhfs_support" -DDHFS_LIB_INSTALL="result"
+          cmake -B"build" -S"libdhfs_support" -DDHFS_LIB_INSTALL="$(pwd)/result"
           cmake --build build --target install
 
       - name: Upload build
@@ -132,7 +132,7 @@ jobs:
 
       - name: build
         run: |
-          CROSS_PLATFORM="linux/arm64" libdhfs_support/builder/cross-build.sh both build result
+          CROSS_PLATFORM="linux/arm64" libdhfs_support/builder/cross-build.sh both build "$(pwd)/result"
 
       - name: Upload build
         uses: actions/upload-artifact@v3
