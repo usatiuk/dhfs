@@ -55,7 +55,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         _txManifest = Path.of(root).resolve("cur-tx-manifest");
     }
 
-    void init(@Observes @Priority(200) StartupEvent event) throws IOException {
+    void init(@Observes @Priority(100) StartupEvent event) throws IOException {
         if (!_root.toFile().exists()) {
             Log.info("Initializing with root " + _root);
             _root.toFile().mkdirs();
@@ -76,7 +76,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         }
     }
 
-    void shutdown(@Observes @Priority(400) ShutdownEvent event) {
+    void shutdown(@Observes @Priority(900) ShutdownEvent event) {
         Log.info("Shutdown");
     }
 

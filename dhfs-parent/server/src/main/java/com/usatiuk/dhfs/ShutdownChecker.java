@@ -19,7 +19,7 @@ public class ShutdownChecker {
     boolean _cleanShutdown = true;
     boolean _initialized = false;
 
-    void init(@Observes @Priority(1) StartupEvent event) throws IOException {
+    void init(@Observes @Priority(2) StartupEvent event) throws IOException {
         Paths.get(dataRoot).toFile().mkdirs();
         Log.info("Initializing with root " + dataRoot);
         if (Paths.get(dataRoot).resolve(dataFileName).toFile().exists()) {

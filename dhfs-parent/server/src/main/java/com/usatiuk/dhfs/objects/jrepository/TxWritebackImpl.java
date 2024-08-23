@@ -5,7 +5,7 @@ import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
-import io.quarkus.runtime.Startup;
+import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -41,8 +41,7 @@ public class TxWritebackImpl implements TxWriteback {
     private ExecutorService _statusExecutor;
     private AtomicLong _waitedTotal = new AtomicLong(0);
 
-    @Startup
-    void init() {
+    void init(@Observes @Priority(110) StartupEvent event) {
         {
             BasicThreadFactory factory = new BasicThreadFactory.Builder()
                     .namingPattern("tx-writeback-%d")
@@ -73,7 +72,7 @@ public class TxWritebackImpl implements TxWriteback {
         });
     }
 
-    void shutdown(@Observes @Priority(10) ShutdownEvent event) {
+    void shutdown(@Observes @Priority(890) ShutdownEvent event) {
         _writebackExecutor.shutdownNow();
         Log.info("Total tx bundle wait time: " + _waitedTotal.get() + "ms");
     }

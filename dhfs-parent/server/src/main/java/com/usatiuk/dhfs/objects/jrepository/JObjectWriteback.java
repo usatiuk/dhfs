@@ -5,7 +5,7 @@ import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
 import com.usatiuk.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
-import io.quarkus.runtime.Startup;
+import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -49,8 +49,7 @@ public class JObjectWriteback {
         _writeQueue = new HashSetDelayedBlockingQueue<>(promotionDelay);
     }
 
-    @Startup
-    void init() {
+    void init(@Observes @Priority(110) StartupEvent event) {
         BasicThreadFactory factory = new BasicThreadFactory.Builder()
                 .namingPattern("writeback-%d")
                 .build();
@@ -74,7 +73,7 @@ public class JObjectWriteback {
         }
     }
 
-    void shutdown(@Observes @Priority(10) ShutdownEvent event) {
+    void shutdown(@Observes @Priority(890) ShutdownEvent event) {
         _shutdown.set(true);
         _writebackExecutor.shutdownNow();
         _statusExecutor.shutdownNow();

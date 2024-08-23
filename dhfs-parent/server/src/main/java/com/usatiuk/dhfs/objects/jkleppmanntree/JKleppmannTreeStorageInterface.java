@@ -10,8 +10,6 @@ import com.usatiuk.kleppmanntree.CombinedTimestamp;
 import com.usatiuk.kleppmanntree.LogRecord;
 import com.usatiuk.kleppmanntree.StorageInterface;
 import com.usatiuk.kleppmanntree.TreeNode;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import org.apache.commons.lang3.NotImplementedException;
 
 import java.util.*;
