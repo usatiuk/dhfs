@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 
-if [[ "$(uname)" == "*Linux*" ]]
-then
-  echo "Already on linux"
-  exit 1
-fi
-
 export SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 cd "$SCRIPT_DIR"
 
 if [[ -z "${INSIDE_DOCKER_ALREADY}" ]]; then
+  if [[ "$(uname)" == "Linux" ]]
+  then
+    echo "Already on linux"
+    exit 0
+  fi
   exec "$SCRIPT_DIR"/docker-launch.sh "$@"
 fi
 
