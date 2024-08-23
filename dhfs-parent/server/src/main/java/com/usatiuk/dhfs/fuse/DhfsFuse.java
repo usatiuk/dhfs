@@ -17,6 +17,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jnr.ffi.Pointer;
+import org.apache.commons.lang3.SystemUtils;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import ru.serce.jnrfuse.ErrorCodes;
 import ru.serce.jnrfuse.FuseFillDir;
@@ -28,30 +29,27 @@ import ru.serce.jnrfuse.struct.Timespec;
 
 import java.nio.ByteBuffer;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Optional;
 
 import static jnr.posix.FileStat.*;
 
 @ApplicationScoped
 public class DhfsFuse extends FuseStubFS {
+    private static final int blksize = 33554432;
+    private static final int iosize = 33554432;
     @Inject
     ObjectPersistentStore persistentStore; // FIXME?
-
     @ConfigProperty(name = "dhfs.fuse.root")
     String root;
-
     @ConfigProperty(name = "dhfs.fuse.enabled")
     boolean enabled;
-
     @ConfigProperty(name = "dhfs.fuse.debug")
     Boolean debug;
-
     @ConfigProperty(name = "dhfs.files.target_chunk_size")
     int targetChunkSize;
-
     @Inject
     JnrPtrByteOutputAccessors jnrPtrByteOutputAccessors;
-
     @Inject
     DhfsFileService fileService;
 
@@ -63,8 +61,21 @@ public class DhfsFuse extends FuseStubFS {
         var uid = new UnixSystem().getUid();
         var gid = new UnixSystem().getGid();
 
-        mount(Paths.get(root), false, debug,
-                new String[]{"-o", "auto_cache", "-o", "uid=" + uid, "-o", "gid=" + gid});
+        var opts = new ArrayList<String>();
+
+        // Assuming macFuse
+        if (SystemUtils.IS_OS_MAC) {
+            opts.add("-o");
+            opts.add("iosize=" + iosize);
+        }
+        opts.add("-o");
+        opts.add("auto_cache");
+        opts.add("-o");
+        opts.add("uid=" + uid);
+        opts.add("-o");
+        opts.add("gid=" + gid);
+
+        mount(Paths.get(root), false, debug, opts.toArray(String[]::new));
     }
 
     void shutdown(@Observes @Priority(1) ShutdownEvent event) {
@@ -77,12 +88,11 @@ public class DhfsFuse extends FuseStubFS {
     @Override
     public int statfs(String path, Statvfs stbuf) {
         try {
-            int target = targetChunkSize > 0 ? targetChunkSize : 4096;
-            stbuf.f_frsize.set(target);
-            stbuf.f_bsize.set(target);
-            stbuf.f_blocks.set(persistentStore.getTotalSpace() / target); // total data blocks in file system
-            stbuf.f_bfree.set(persistentStore.getFreeSpace() / target);  // free blocks in fs
-            stbuf.f_bavail.set(persistentStore.getUsableSpace() / target); // avail blocks in fs
+            stbuf.f_frsize.set(blksize);
+            stbuf.f_bsize.set(blksize);
+            stbuf.f_blocks.set(persistentStore.getTotalSpace() / blksize); // total data blocks in file system
+            stbuf.f_bfree.set(persistentStore.getFreeSpace() / blksize);  // free blocks in fs
+            stbuf.f_bavail.set(persistentStore.getUsableSpace() / blksize); // avail blocks in fs
             stbuf.f_files.set(1000); //FIXME:
             stbuf.f_ffree.set(Integer.MAX_VALUE - 2000); //FIXME:
             stbuf.f_favail.set(Integer.MAX_VALUE - 2000); //FIXME:
@@ -128,6 +138,7 @@ public class DhfsFuse extends FuseStubFS {
             stat.st_mtim.tv_nsec.set((found.get().mtime() % 1000) * 1000);
             stat.st_atim.tv_sec.set(found.get().mtime() / 1000);
             stat.st_atim.tv_nsec.set((found.get().mtime() % 1000) * 1000);
+            stat.st_blksize.set(blksize);
         } catch (Exception e) {
             Log.error("When getattr " + path, e);
             return -ErrorCodes.EIO();
