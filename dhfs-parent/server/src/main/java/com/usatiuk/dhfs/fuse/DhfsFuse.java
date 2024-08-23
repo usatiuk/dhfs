@@ -6,6 +6,7 @@ import com.usatiuk.dhfs.files.service.DhfsFileService;
 import com.usatiuk.dhfs.files.service.DirectoryNotEmptyException;
 import com.usatiuk.dhfs.files.service.GetattrRes;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
+import com.usatiuk.dhfs.supportlib.DhfsSupport;
 import com.usatiuk.kleppmanntree.AlreadyExistsException;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -54,6 +55,7 @@ public class DhfsFuse extends FuseStubFS {
     DhfsFileService fileService;
 
     void init(@Observes @Priority(100000) StartupEvent event) {
+        DhfsSupport.hello();
         if (!enabled) return;
         Paths.get(root).toFile().mkdirs();
         Log.info("Mounting with root " + root);
@@ -140,6 +142,9 @@ public class DhfsFuse extends FuseStubFS {
             stat.st_atim.tv_nsec.set((found.get().mtime() % 1000) * 1000);
             stat.st_blksize.set(blksize);
         } catch (Exception e) {
+            Log.error("When getattr " + path, e);
+            return -ErrorCodes.EIO();
+        } catch (Throwable e) {
             Log.error("When getattr " + path, e);
             return -ErrorCodes.EIO();
         }

@@ -13,6 +13,7 @@
     <modules>
         <module>server</module>
         <module>kleppmanntree</module>
+        <module>supportlib</module>
     </modules>
 
     <properties>
@@ -27,6 +28,7 @@
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.version>3.11.3</quarkus.platform.version>
         <surefire-plugin.version>3.2.5</surefire-plugin.version>
+        <dhfs.native-libs-dir>${project.parent.build.outputDirectory}/native</dhfs.native-libs-dir>
     </properties>
 
     <repositories>
@@ -89,6 +91,9 @@
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         <maven.home>${maven.home}</maven.home>
+                        <com.usatiuk.dhfs.supportlib.native-path>
+                            ${dhfs.native-libs-dir}
+                        </com.usatiuk.dhfs.supportlib.native-path>
                     </systemPropertyVariables>
                     <argLine>
                         --add-exports java.base/sun.nio.ch=ALL-UNNAMED
@@ -115,6 +120,7 @@
                         </native.image.path>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         <buildDirectory>${project.build.directory}</buildDirectory>
+                        <nativeLibsDirectory>${dhfs.native-libs-dir}</nativeLibsDirectory>
                         <junit.jupiter.execution.parallel.enabled>
                             true
                         </junit.jupiter.execution.parallel.enabled>

@@ -38,7 +38,9 @@ public class DhfsFusex3IT {
     @BeforeEach
     void setup(TestInfo testInfo) throws IOException, InterruptedException, TimeoutException {
         String buildPath = System.getProperty("buildDirectory");
-        System.out.println("Build path: " + buildPath);
+        String nativeLibsDirectory = System.getProperty("nativeLibsDirectory");
+        Log.info("Build path: " + buildPath);
+        Log.info("Native libs path: " + nativeLibsDirectory);
 
         // TODO: Dedup
         Network network = Network.newNetwork();
@@ -48,6 +50,7 @@ public class DhfsFusex3IT {
                                 .from("azul/zulu-openjdk-debian:21-jre-latest")
                                 .run("apt update && apt install -y libfuse2 curl gcc")
                                 .copy("/app", "/app")
+                                .copy("/libs", "/libs")
                                 .cmd("java", "-ea", "-Xmx128M", "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
                                         "--add-exports", "java.base/jdk.internal.access=ALL-UNNAMED",
                                         "-Ddhfs.objects.peerdiscovery.interval=100",
@@ -58,11 +61,13 @@ public class DhfsFusex3IT {
                                         "-Ddhfs.objects.sync.timeout=10",
                                         "-Ddhfs.objects.sync.ping.timeout=5",
                                         "-Ddhfs.objects.reconnect_interval=1s",
+                                        "-Dcom.usatiuk.dhfs.supportlib.native-path=/libs",
                                         "-Dquarkus.log.category.\"com.usatiuk\".level=TRACE",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
                                         "-jar", "/app/quarkus-run.jar")
                                 .build())
-                .withFileFromPath("/app", Paths.get(buildPath, "quarkus-app"));
+                .withFileFromPath("/app", Paths.get(buildPath, "quarkus-app"))
+                .withFileFromPath("/libs", Paths.get(nativeLibsDirectory));
         container1 = new GenericContainer<>(image)
                 .withPrivilegedMode(true)
                 .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")))
