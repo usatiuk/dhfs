@@ -54,5 +54,7 @@ public abstract class JObject<T extends JObjectData> {
 
     public abstract void commitFence();
 
+    public abstract int estimateSize();
+
     abstract boolean updateDeletionState();
 }

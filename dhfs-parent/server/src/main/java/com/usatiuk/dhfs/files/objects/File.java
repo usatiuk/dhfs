@@ -41,7 +41,7 @@ public class File extends FsNode {
     }
 
     @Override
-    public long estimateSize() {
-        return _chunks.size() * 192L;
+    public int estimateSize() {
+        return _chunks.size() * 192;
     }
 }

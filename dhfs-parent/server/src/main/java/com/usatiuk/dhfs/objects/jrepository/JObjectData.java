@@ -20,7 +20,7 @@ public abstract class JObjectData implements Serializable {
 
     public abstract Collection<String> extractRefs();
 
-    public long estimateSize() {
+    public int estimateSize() {
         return 0;
     }
 }

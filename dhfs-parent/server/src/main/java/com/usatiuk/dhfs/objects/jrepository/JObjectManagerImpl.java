@@ -171,8 +171,7 @@ public class JObjectManagerImpl implements JObjectManager {
         return out;
     }
 
-    @Override
-    public <D extends JObjectData> JObject<D> putLocked(D object, Optional<String> parent) {
+    public <D extends JObjectData> JObject<D> putImpl(D object, Optional<String> parent, boolean lock) {
         while (true) {
             JObject<?> ret;
             JObject<?> newObj = null;
@@ -234,29 +233,52 @@ public class JObjectManagerImpl implements JObjectManager {
             }
             if (newObj == null) {
                 jObjectLRU.notifyAccess(ret);
-                ret.rwLock();
+                if (lock)
+                    ret.rwLock();
             }
+            if (newObj != null && !lock)
+                newObj.rwUnlock();
             return (JObject<D>) ret;
         }
     }
 
     @Override
-    public <D extends JObjectData> JObject<D> put(D object, Optional<String> parent) {
-        var ret = putLocked(object, parent);
-        ret.rwUnlock();
-        return ret;
+    public <D extends JObjectData> JObject<D> putLocked(D object, Optional<String> parent) {
+        return putImpl(object, parent, true);
     }
 
     @Override
-    public com.usatiuk.dhfs.objects.jrepository.JObject<?> getOrPutLocked(String name, Class<? extends JObjectData> klass, Optional<String> parent) {
+    public <D extends JObjectData> JObject<D> put(D object, Optional<String> parent) {
+        return putImpl(object, parent, false);
+    }
+
+    public com.usatiuk.dhfs.objects.jrepository.JObject<?> getOrPutImpl(String name, Class<? extends JObjectData> klass, Optional<String> parent, boolean lock) {
         while (true) {
             var got = get(name).orElse(null);
 
             if (got != null) {
-                got.rwLock();
-                var meta = got.getMeta();
-                meta.narrowClass(klass);
-                meta.markSeen();
+                {
+                    boolean shouldWrite = false;
+                    try {
+                        shouldWrite = !got.runReadLocked(ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
+                            return ((m.getKnownClass().equals(klass)) ||
+                                    (klass.isAssignableFrom(m.getKnownClass())))
+                                    && m.isSeen();
+                        });
+                    } catch (DeletedObjectAccessException dex) {
+                        shouldWrite = true;
+                    }
+                    if (shouldWrite || lock) {
+                        got.rwLock();
+                        try {
+                            var meta = got.getMeta();
+                            meta.narrowClass(klass);
+                            meta.markSeen();
+                        } finally {
+                            if (!lock) got.rwUnlock();
+                        }
+                    }
+                }
 
                 parent.ifPresent(s -> {
                     boolean shouldWrite = false;
@@ -296,15 +318,20 @@ public class JObjectManagerImpl implements JObjectManager {
                 m.markSeen();
                 return null;
             });
+            if (!lock)
+                created.rwUnlock();
             return created;
         }
     }
 
     @Override
+    public com.usatiuk.dhfs.objects.jrepository.JObject<?> getOrPutLocked(String name, Class<? extends JObjectData> klass, Optional<String> parent) {
+        return getOrPutImpl(name, klass, parent, true);
+    }
+
+    @Override
     public com.usatiuk.dhfs.objects.jrepository.JObject<?> getOrPut(String name, Class<? extends JObjectData> klass, Optional<String> parent) {
-        var obj = getOrPutLocked(name, klass, parent);
-        obj.rwUnlock();
-        return obj;
+        return getOrPutImpl(name, klass, parent, false);
     }
 
     private static class NamedWeakReference extends WeakReference<JObject<?>> {
@@ -563,8 +590,10 @@ public class JObjectManagerImpl implements JObjectManager {
         }
 
         public boolean tryResolve(ResolutionStrategy resolutionStrategy) {
-            if (resolutionStrategy == ResolutionStrategy.LOCAL_ONLY) tryLocalResolve();
-            else if (resolutionStrategy == ResolutionStrategy.REMOTE) tryRemoteResolve();
+            if (resolutionStrategy == ResolutionStrategy.LOCAL_ONLY ||
+                    resolutionStrategy == ResolutionStrategy.REMOTE)
+                tryLocalResolve();
+            if (resolutionStrategy == ResolutionStrategy.REMOTE) tryRemoteResolve();
 
             return _dataPart.get() != null;
         }
@@ -722,6 +751,12 @@ public class JObjectManagerImpl implements JObjectManager {
             if (haveRwLock())
                 throw new IllegalStateException("Waiting on object flush inside transaction?");
             txWriteback.fence(getMeta().getLastModifiedTx());
+        }
+
+        @Override
+        public int estimateSize() {
+            if (_dataPart.get() == null) return 1024; // Assume metadata etc takes up something
+            else return _dataPart.get().estimateSize() + 1024;
         }
     }
 }

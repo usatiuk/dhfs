@@ -13,11 +13,10 @@ import jakarta.inject.Inject;
 import lombok.Getter;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.apache.commons.lang3.tuple.MutablePair;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.commons.lang3.tuple.Triple;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -28,16 +27,12 @@ import java.util.stream.Stream;
 
 @ApplicationScoped
 public class TxWritebackImpl implements TxWriteback {
-    @Inject
-    ObjectPersistentStore objectPersistentStore;
-    @Inject
-    JObjectSizeEstimator jObjectSizeEstimator;
-
-    @ConfigProperty(name = "dhfs.objects.writeback.limit")
-    long sizeLimit;
-
     private final TreeMap<Long, MutablePair<TxBundle, Boolean>> _pendingBundles = new TreeMap<>();
     private final Object _flushWaitSynchronizer = new Object();
+    @Inject
+    ObjectPersistentStore objectPersistentStore;
+    @ConfigProperty(name = "dhfs.objects.writeback.limit")
+    long sizeLimit;
     private long currentSize = 0;
     private AtomicLong _counter = new AtomicLong();
     private ExecutorService _writebackExecutor;
@@ -85,44 +80,47 @@ public class TxWritebackImpl implements TxWriteback {
     private void writeback() {
         while (!Thread.interrupted()) {
             try {
-                TxBundle bundle;
+                TxBundle bundle = new TxBundle(0);
                 synchronized (_pendingBundles) {
                     while (_pendingBundles.isEmpty()
                             || !_pendingBundles.firstEntry().getValue().getRight())
                         _pendingBundles.wait();
-                    bundle = _pendingBundles.pollFirstEntry().getValue().getLeft();
+                    while (!_pendingBundles.isEmpty() && _pendingBundles.firstEntry().getValue().getRight()) {
+                        var toCompress = _pendingBundles.pollFirstEntry().getValue().getLeft();
+                        currentSize -= toCompress._size;
+                        bundle.compress(toCompress);
+                    }
+                    currentSize += bundle.calculateTotalSize();
                 }
 
 
                 ArrayList<Callable<Void>> tasks = new ArrayList<>();
 
-                for (var c : bundle._committed) {
+                for (var c : bundle._committed.values()) {
                     tasks.add(() -> {
-                        Log.trace("Writing new " + c.getLeft());
-                        objectPersistentStore.writeNewObject(c.getLeft().getMeta().getName(), c.getMiddle(), c.getRight());
+                        Log.trace("Writing new " + c.newMeta.getName());
+                        objectPersistentStore.writeNewObject(c.newMeta.getName(), c.newMeta, c.newData);
                         return null;
                     });
                 }
-                for (var c : bundle._meta) {
+                for (var c : bundle._meta.values()) {
                     tasks.add(() -> {
-                        Log.trace("Writing new (meta) " + c.getLeft());
-                        objectPersistentStore.writeNewObjectMeta(c.getLeft().getMeta().getName(), c.getRight());
+                        Log.trace("Writing (meta) " + c.newMeta.getName());
+                        objectPersistentStore.writeNewObjectMeta(c.newMeta.getName(), c.newMeta);
                         return null;
                     });
                 }
                 if (Log.isDebugEnabled())
-                    for (var d : bundle._deleted)
+                    for (var d : bundle._deleted.keySet())
                         Log.debug("Deleting from persistent storage " + d.getMeta().getName()); // FIXME: For tests
 
                 _commitExecutor.invokeAll(tasks);
-
                 objectPersistentStore.commitTx(
                         new TxManifest(
-                                Stream.concat(bundle._committed.stream().map(t -> t.getLeft().getMeta().getName()),
-                                        bundle._meta.stream().map(p -> p.getLeft().getMeta().getName())).collect(Collectors.toCollection(ArrayList::new)),
-                                bundle._deleted.stream().map(o -> o.getMeta().getName()).collect(Collectors.toCollection(ArrayList::new))
-                        )
-                );
+                                Stream.concat(bundle._committed.keySet().stream().map(t -> t.getMeta().getName()),
+                                        bundle._meta.keySet().stream().map(t -> t.getMeta().getName())).collect(Collectors.toCollection(ArrayList::new)),
+                                bundle._deleted.keySet().stream().map(t -> t.getMeta().getName()).collect(Collectors.toCollection(ArrayList::new))
+                        ));
                 Log.trace("Transaction " + bundle.getId() + " committed");
                 synchronized (_flushWaitSynchronizer) {
                     currentSize -= ((TxBundle) bundle).calculateTotalSize();
@@ -202,13 +200,11 @@ public class TxWritebackImpl implements TxWriteback {
     }
 
     private class TxBundle implements com.usatiuk.dhfs.objects.jrepository.TxBundle {
-        private final long _txId;
-
+        private final HashMap<JObject<?>, CommittedEntry> _committed = new HashMap<>();
+        private final HashMap<JObject<?>, CommittedMeta> _meta = new HashMap<>();
+        private final HashMap<JObject<?>, Integer> _deleted = new HashMap<>();
+        private long _txId;
         private long _size = -1;
-
-        private final ArrayList<Triple<JObject<?>, ObjectMetadataP, JObjectDataP>> _committed = new ArrayList<>();
-        private final ArrayList<Pair<JObject<?>, ObjectMetadataP>> _meta = new ArrayList<>();
-        private final ArrayList<JObject<?>> _deleted = new ArrayList<>();
 
         private TxBundle(long txId) {_txId = txId;}
 
@@ -220,36 +216,75 @@ public class TxWritebackImpl implements TxWriteback {
         @Override
         public void commit(JObject<?> obj, ObjectMetadataP meta, JObjectDataP data) {
             synchronized (_committed) {
-                _committed.add(Triple.of(obj, meta, data));
+                _committed.put(obj, new CommittedEntry(meta, data, obj.estimateSize()));
             }
         }
 
         @Override
         public void commitMetaChange(JObject<?> obj, ObjectMetadataP meta) {
             synchronized (_meta) {
-                _meta.add(Pair.of(obj, meta));
+                _meta.put(obj, new CommittedMeta(meta, obj.estimateSize()));
             }
         }
 
         @Override
         public void delete(JObject<?> obj) {
             synchronized (_deleted) {
-                _deleted.add(obj);
+                _deleted.put(obj, obj.estimateSize());
             }
         }
 
         public long calculateTotalSize() {
             if (_size >= 0) return _size;
             long out = 0;
-            for (var c : _committed)
-                out = out + jObjectSizeEstimator.estimateObjectSize(c.getLeft().getData()) + c.getMiddle().getSerializedSize()
-                        + (c.getRight() != null ? c.getRight().getSerializedSize() : 0);
-            for (var c : _meta)
-                out = out + jObjectSizeEstimator.estimateObjectSize(c.getLeft().getData()) + c.getRight().getSerializedSize();
-            for (var c : _deleted)
-                out = out + jObjectSizeEstimator.estimateObjectSize(c.getData());
+            for (var c : _committed.values())
+                out += c.size;
+            for (var c : _meta.values())
+                out += c.size;
+            for (var c : _deleted.entrySet())
+                out += c.getValue();
             _size = out;
             return _size;
         }
+
+        public void compress(TxBundle other) {
+            if (_txId >= other._txId)
+                throw new IllegalArgumentException("Compressing an older bundle into newer");
+
+            _txId = other._txId;
+            _size = -1;
+
+            for (var d : other._deleted.entrySet()) {
+                _committed.remove(d.getKey());
+                _meta.remove(d.getKey());
+                _deleted.put(d.getKey(), d.getValue());
+            }
+
+            for (var c : other._committed.entrySet()) {
+                _committed.put(c.getKey(), c.getValue());
+                _meta.remove(c.getKey());
+                _deleted.remove(c.getKey());
+            }
+
+            for (var m : other._meta.entrySet()) {
+                var deleted = _deleted.remove(m.getKey());
+                if (deleted != null) {
+                    _committed.put(m.getKey(), new CommittedEntry(m.getValue().newMeta, null, m.getKey().estimateSize()));
+                    continue;
+                }
+                var committed = _committed.remove(m.getKey());
+                if (committed != null) {
+                    _committed.put(m.getKey(), new CommittedEntry(m.getValue().newMeta, committed.newData, m.getKey().estimateSize()));
+                    continue;
+                }
+                _meta.put(m.getKey(), m.getValue());
+            }
+        }
+
+        private record CommittedEntry(ObjectMetadataP newMeta, JObjectDataP newData, int size) {}
+
+        private record CommittedMeta(ObjectMetadataP newMeta, int size) {}
+
+        private record Deleted(JObject<?> handle) {}
     }
 }

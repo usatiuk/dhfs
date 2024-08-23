@@ -86,7 +86,7 @@ public class ChunkData extends JObjectData {
     }
 
     @Override
-    public long estimateSize() {
+    public int estimateSize() {
         return _data.getData().size();
     }
 }

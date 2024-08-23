@@ -28,8 +28,6 @@ public class JObjectWriteback {
     @Inject
     ObjectPersistentStore objectPersistentStore;
     @Inject
-    JObjectSizeEstimator jObjectSizeEstimator;
-    @Inject
     ProtoSerializerService protoSerializerService;
     @Inject
     JObjectTxManager jObjectTxManager;
@@ -109,7 +107,7 @@ public class JObjectWriteback {
                 } catch (Exception e) {
                     try {
                         got._obj.runReadLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
-                            var size = jObjectSizeEstimator.estimateObjectSize(d);
+                            var size = got._obj.estimateSize();
                             _currentSize.addAndGet(size);
                             _writeQueue.add(new QueueEntry(got._obj, size));
                             return null;
@@ -223,7 +221,7 @@ public class JObjectWriteback {
             }
         }
 
-        var size = jObjectSizeEstimator.estimateObjectSize(object.getData());
+        var size = object.estimateSize();
 
         var old = _writeQueue.readd(new QueueEntry(object, size));
 

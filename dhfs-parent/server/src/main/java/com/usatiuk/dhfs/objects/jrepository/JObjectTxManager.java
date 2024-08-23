@@ -13,7 +13,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Objects;
-import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
@@ -101,33 +101,40 @@ public class JObjectTxManager {
         }
 
         var bundle = txWriteback.createBundle();
+        var latch = new CountDownLatch(state._writeObjects.size());
+
+        state._writeObjects.forEach((key, value) -> {
+            try {
+                if (key.getMeta().isDeleted()) {
+                    bundle.delete(key);
+                    latch.countDown();
+                } else if (key.getMeta().isHaveLocalCopy() && key.getData() != null) {
+                    _serializerThreads.execute(() -> {
+                        bundle.commit(key,
+                                protoSerializerService.serialize(key.getMeta()),
+                                protoSerializerService.serializeToJObjectDataP(key.getData())
+                        );
+                        latch.countDown();
+                    });
+                } else if (key.getMeta().isHaveLocalCopy() && key.getData() == null) {
+                    bundle.commitMetaChange(key,
+                            protoSerializerService.serialize(key.getMeta())
+                    );
+                    latch.countDown();
+                } else if (!key.getMeta().isHaveLocalCopy()) {
+                    bundle.commit(key,
+                            protoSerializerService.serialize(key.getMeta()),
+                            null
+                    );
+                    latch.countDown();
+                }
+            } catch (Exception e) {
+                Log.error("Error committing object " + key.getMeta().getName(), e);
+            }
+        });
 
         try {
-            _serializerThreads.invokeAll(state._writeObjects.entrySet().stream().<Callable<Void>>map(
-                    obj -> () -> {
-                        try {
-                            if (obj.getKey().getMeta().isDeleted())
-                                bundle.delete(obj.getKey());
-                            else if (obj.getKey().getMeta().isHaveLocalCopy() && obj.getKey().getData() != null)
-                                bundle.commit(obj.getKey(),
-                                        protoSerializerService.serialize(obj.getKey().getMeta()),
-                                        protoSerializerService.serializeToJObjectDataP(obj.getKey().getData())
-                                );
-                            else if (obj.getKey().getMeta().isHaveLocalCopy() && obj.getKey().getData() == null)
-                                bundle.commitMetaChange(obj.getKey(),
-                                        protoSerializerService.serialize(obj.getKey().getMeta())
-                                );
-                            else if (!obj.getKey().getMeta().isHaveLocalCopy())
-                                bundle.commit(obj.getKey(),
-                                        protoSerializerService.serialize(obj.getKey().getMeta()),
-                                        null
-                                );
-                        } catch (Exception e) {
-                            Log.error("Error committing object " + obj.getKey().getMeta().getName(), e);
-                        }
-                        return null;
-                    }
-            ).toList());
+            latch.await();
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
