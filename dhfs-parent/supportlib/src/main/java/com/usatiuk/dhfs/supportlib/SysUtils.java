@@ -32,6 +32,7 @@ class SysUtils {
         } else if (SystemUtils.IS_OS_LINUX) {
             return switch (SystemUtils.OS_ARCH) {
                 case "aarch64" -> "aarch64";
+                case "amd64" -> "x86_64";
                 default -> throw new IllegalStateException("Unsupported architecture: " + SystemUtils.OS_ARCH);
             };
         } else {
