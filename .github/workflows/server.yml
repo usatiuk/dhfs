@@ -32,6 +32,7 @@ jobs:
         run: |
           cd "$HOME"
           wget -qO- https://dlcdn.apache.org/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz | tar xvz
+          $HOME/apache-maven-3.9.9-bin/bin/mvn
 
       - name: Update path
         run: echo "$HOME"/apache-maven-3.9.9-bin/bin >> $GITHUB_PATH
@@ -39,6 +40,7 @@ jobs:
       - name: Maven info
         run: |
           echo $GITHUB_PATH
+          echo $PATH
           mvn -v
 
       - name: Set up JDK 21
