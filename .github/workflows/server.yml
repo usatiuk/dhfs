@@ -89,6 +89,81 @@ jobs:
           name: Webui
           path: webui/dist
 
+  build-native-libs:
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "zulu"
+          cache: maven
+
+      - name: Cmake build
+        run: |
+          cmake -B"build" -S"libdhfs_support" -DDHFS_LIB_INSTALL="result"
+          cmake --build build --target install
+
+      - name: Upload build
+        uses: actions/upload-artifact@v3
+        with:
+          name: NativeLib-${{ matrix.os }}
+          path: result
+
+  build-native-libs-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: build
+        run: |
+          CROSS_PLATFORM="linux/arm64" libdhfs_support/builder/cross-build.sh both build result
+
+      - name: Upload build
+        uses: actions/upload-artifact@v3
+        with:
+          name: NativeLib-${{ matrix.os }}
+          path: result
+
+  merge-native-libs:
+    runs-on: ubuntu-latest
+    needs: [build-native-libs, build-native-libs-docker]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: downloaded-libs
+
+      - name: Merge
+        run: rsync -av downloaded-libs/NativeLib*/* result/
+
+      - name: Check paths
+        run: |
+          test -f "result/Linux-x86_64/libdhfs_support.so" || exit 1
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: NativeLibs
+          path: result
+
   publish-docker:
     runs-on: ubuntu-latest
     permissions:
@@ -98,7 +173,7 @@ jobs:
       # with sigstore/fulcio when running outside of PRs.
       id-token: write
 
-    needs: [build-webui, build-dhfs]
+    needs: [build-webui, merge-native-libs, build-dhfs]
 
     steps:
       - name: Checkout repository
@@ -113,6 +188,11 @@ jobs:
         with:
           name: Webui
           path: webui-dist-downloaded
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: NativeLibs
+          path: dhfs-native-downloaded
 
       - name: Show all the files
         run: find .
@@ -189,7 +269,7 @@ jobs:
       # with sigstore/fulcio when running outside of PRs.
       id-token: write
 
-    needs: [build-webui, build-dhfs]
+    needs: [build-webui, merge-native-libs, build-dhfs]
 
     steps:
       - name: Checkout repository
@@ -205,6 +285,11 @@ jobs:
           name: Webui
           path: webui-dist-downloaded
 
+      - uses: actions/download-artifact@v3
+        with:
+          name: NativeLibs
+          path: dhfs-native-downloaded
+
       - name: Show all the files
         run: find .
 
@@ -216,6 +301,9 @@ jobs:
 
       - name: Copy Webui
         run: cp -r ./webui-dist-downloaded "run-wrapper-out/dhfs/app/Webui"
+
+      - name: Copy Webui
+        run: cp -r ./dhfs-native-downloaded "run-wrapper-out/dhfs/app/NativeLibs"
 
       - name: Copy run wrapper
         run: cp -r ./run-wrapper/* "run-wrapper-out/dhfs/app/"

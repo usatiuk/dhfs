@@ -4,11 +4,14 @@ RUN apk update && apk add fuse && rm -rf /var/cache/apk/*
 
 WORKDIR /usr/src/app
 COPY ./dhfs-package-downloaded/. .
-RUN mkdir -p webui
-COPY ./webui-dist-downloaded/. ./webui
+WORKDIR /usr/src/app/native-libs
+COPY ./dhfs-native-downloaded/. .
+WORKDIR /usr/src/app/webui
+COPY ./webui-dist-downloaded/. .
 
 ENV dhfs_webui_root=/usr/src/app/webui
 
+WORKDIR /usr/src/app
 COPY ./dockerentry.sh .
 
 RUN ["chmod", "+x", "./dockerentry.sh"]

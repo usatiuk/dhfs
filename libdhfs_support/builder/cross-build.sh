@@ -4,20 +4,20 @@ export SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd
 cd "$SCRIPT_DIR"
 
 if [[ -z "${INSIDE_DOCKER_ALREADY}" ]]; then
-  if [[ "$(uname)" == "Linux" ]]
-  then
-    echo "Already on linux"
-    exit 0
+  if [[ "$(uname)" == "Linux" ]]; then
+    if [[ -z "${CROSS_PLATFORM}" ]]; then
+      echo "Already on linux"
+      exit 0
+    fi
   fi
   exec "$SCRIPT_DIR"/docker-launch.sh "$@"
 fi
 
 set -euxo pipefail
 
-if [ $# -lt 3 ]
-  then
-    echo "Not enough arguments supplied: (build/configure) (build dir) (output dir)"
-    exit 1
+if [ $# -lt 3 ]; then
+  echo "Not enough arguments supplied: (build/configure) (build dir) (output dir)"
+  exit 1
 fi
 
 PROJECT_DIR="$SCRIPT_DIR/.."
@@ -37,14 +37,18 @@ mkdir -p "$2"
 mkdir -p "$3"
 
 case "$1" in
-  "configure")
-    configure
-    ;;
-  "build")
-    build
-    ;;
-  *)
-    echo "Unknown command"
-    exit 1
-    ;;
+"configure")
+  configure
+  ;;
+"build")
+  build
+  ;;
+"both")
+  configure
+  build
+  ;;
+*)
+  echo "Unknown command"
+  exit 1
+  ;;
 esac

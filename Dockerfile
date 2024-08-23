@@ -14,7 +14,7 @@ COPY ./server/mvnw ./server/pom.xml ./
 RUN ./mvnw quarkus:go-offline
 # The previous thing still doesn't download 100% everything
 RUN ./mvnw -Dmaven.test.skip=true -Dskip.unit=true package --fail-never
-COPY ./server/. .
+COPY ./server/. .   
 RUN ./mvnw -Dmaven.test.skip=true -Dskip.unit=true clean package
 
 FROM azul/zulu-openjdk-alpine:21-jre-headless
