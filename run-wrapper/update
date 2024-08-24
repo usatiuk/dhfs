@@ -45,6 +45,7 @@ rm "run-wrapper.tar.gz"
 
 rm -rf "DHFS Package"
 rm -rf "Webui"
+rm -rf "NativeLibs"
 
 mv dhfs/app/* .
 
