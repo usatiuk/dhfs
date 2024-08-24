@@ -1,5 +1,7 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
+import com.usatiuk.utils.VoidFn;
+
 public abstract class JObject<T extends JObjectData> {
     public abstract ObjectMetadata getMeta();
 
@@ -53,6 +55,8 @@ public abstract class JObject<T extends JObjectData> {
     public abstract void bumpVer();
 
     public abstract void commitFence();
+
+    public abstract void commitFenceAsync(VoidFn callback);
 
     public abstract int estimateSize();
 

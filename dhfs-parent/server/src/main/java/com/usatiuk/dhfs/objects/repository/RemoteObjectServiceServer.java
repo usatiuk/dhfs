@@ -1,10 +1,8 @@
 package com.usatiuk.dhfs.objects.repository;
 
 import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
-import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
-import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.autosync.AutoSyncProcessor;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
@@ -18,9 +16,9 @@ import io.smallrye.common.annotation.Blocking;
 import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
-import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 // Note: RunOnVirtualThread hangs somehow
 @GrpcService
@@ -64,23 +62,38 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
         var obj = jObjectManager.get(request.getName()).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
-        Pair<ObjectHeader, JObjectDataP> read = obj.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (meta, data) -> {
-            if (meta.isOnlyLocal())
-                throw new StatusRuntimeExceptionNoStacktrace(Status.INVALID_ARGUMENT.withDescription("Trying to get local-only object"));
-            if (data == null) {
-                Log.info("<-- getObject FAIL: " + request.getName() + " from " + request.getSelfUuid());
-                throw new StatusRuntimeException(Status.ABORTED.withDescription("Not available locally"));
+        // Does @Blocking break this?
+        return Uni.createFrom().emitter(emitter -> {
+            AtomicBoolean didLock = new AtomicBoolean(false);
+            try {
+                jObjectTxManager.executeTx(() -> {
+                    obj.runReadLockedVoid(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (meta, data) -> {
+                        if (meta.isOnlyLocal())
+                            throw new StatusRuntimeExceptionNoStacktrace(Status.INVALID_ARGUMENT.withDescription("Trying to get local-only object"));
+                        if (data == null) {
+                            Log.info("<-- getObject FAIL: " + request.getName() + " from " + request.getSelfUuid());
+                            throw new StatusRuntimeException(Status.ABORTED.withDescription("Not available locally"));
+                        }
+                        data.extractRefs().forEach(ref ->
+                                jObjectManager.get(ref)
+                                        .orElseThrow(() -> new IllegalStateException("Non-hydrated refs for local object?"))
+                                        .markSeen());
+                    });
+                    obj.markSeen();
+                    obj.rLock();
+                    didLock.set(true);
+                });
+                var replyObj = ApiObject.newBuilder()
+                        .setHeader(obj.getMeta().toRpcHeader())
+                        .setContent(protoSerializerService.serializeToJObjectDataP(obj.getData())).build();
+                obj.commitFenceAsync(() -> emitter.complete(GetObjectReply.newBuilder()
+                        .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
+                        .setObject(replyObj).build()));
+            } finally {
+                if (didLock.get())
+                    obj.rUnlock();
             }
-            jObjectTxManager.executeTx(() -> {
-                data.extractRefs().forEach(ref -> jObjectManager.get(ref).ifPresent(JObject::markSeen));
-            });
-            return Pair.of(meta.toRpcHeader(), protoSerializerService.serializeToJObjectDataP(data));
         });
-        jObjectTxManager.executeTx(obj::markSeen);
-        var replyObj = ApiObject.newBuilder().setHeader(read.getLeft()).setContent(read.getRight()).build();
-        return Uni.createFrom().item(GetObjectReply.newBuilder()
-                .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
-                .setObject(replyObj).build());
     }
 
     @Override
@@ -137,7 +150,9 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
             throw new StatusRuntimeException(Status.UNAUTHENTICATED);
 
 //        Log.info("<-- indexUpdate: " + request.getHeader().getName());
-        return Uni.createFrom().item(syncHandler.handleRemoteUpdate(request));
+        return jObjectTxManager.executeTxAndFlush(() -> {
+            return Uni.createFrom().item(syncHandler.handleRemoteUpdate(request));
+        });
     }
 
     @Override
@@ -148,7 +163,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
             throw new StatusRuntimeException(Status.UNAUTHENTICATED);
 
         try {
-            jObjectTxManager.executeTx(() -> {
+            jObjectTxManager.executeTxAndFlush(() -> {
                 opObjectRegistry.acceptExternalOp(request.getQueueId(), UUID.fromString(request.getSelfUuid()), protoSerializerService.deserialize(request.getMsg()));
             });
         } catch (Exception e) {

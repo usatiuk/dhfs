@@ -440,6 +440,8 @@ public class JObjectManagerImpl implements JObjectManager {
         @Override
         public void externalResolution(T data) {
             assertRwLock();
+            if (Log.isTraceEnabled())
+                Log.trace("External resolution of " + getMeta().getName());
             if (_dataPart.get() != null)
                 throw new IllegalStateException("Data is not null when recording external resolution of " + getMeta().getName());
             if (!data.getClass().isAnnotationPresent(PushResolution.class))
@@ -748,7 +750,19 @@ public class JObjectManagerImpl implements JObjectManager {
         public void commitFence() {
             if (haveRwLock())
                 throw new IllegalStateException("Waiting on object flush inside transaction?");
+            if (getMeta().getLastModifiedTx() == -1) return;
             txWriteback.fence(getMeta().getLastModifiedTx());
+        }
+
+        @Override
+        public void commitFenceAsync(VoidFn callback) {
+            if (haveRwLock())
+                throw new IllegalStateException("Waiting on object flush inside transaction?");
+            if (getMeta().getLastModifiedTx() == -1) {
+                callback.apply();
+                return;
+            }
+            txWriteback.asyncFence(getMeta().getLastModifiedTx(), callback);
         }
 
         @Override

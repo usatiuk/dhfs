@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.objects.jrepository;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
+import com.usatiuk.utils.VoidFn;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -12,12 +13,9 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import lombok.Getter;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
-import org.apache.commons.lang3.tuple.MutablePair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -28,13 +26,16 @@ import java.util.stream.Stream;
 
 @ApplicationScoped
 public class TxWritebackImpl implements TxWriteback {
-    private final TreeMap<Long, MutablePair<TxBundle, Boolean>> _pendingBundles = new TreeMap<>();
+    private final LinkedList<TxBundle> _pendingBundles = new LinkedList<>();
+    private final LinkedHashMap<Long, TxBundle> _notFlushedBundles = new LinkedHashMap<>();
+
     private final Object _flushWaitSynchronizer = new Object();
     @Inject
     ObjectPersistentStore objectPersistentStore;
     @ConfigProperty(name = "dhfs.objects.writeback.limit")
     long sizeLimit;
     private long currentSize = 0;
+    private AtomicLong _lastWrittenTx = new AtomicLong(-1);
     private AtomicLong _counter = new AtomicLong();
     private ExecutorService _writebackExecutor;
     private ExecutorService _commitExecutor;
@@ -98,14 +99,18 @@ public class TxWritebackImpl implements TxWriteback {
                 TxBundle bundle = new TxBundle(0);
                 synchronized (_pendingBundles) {
                     while (_pendingBundles.isEmpty()
-                            || !_pendingBundles.firstEntry().getValue().getRight())
+                            || !_pendingBundles.peek()._ready)
                         _pendingBundles.wait();
-                    while (!_pendingBundles.isEmpty() && _pendingBundles.firstEntry().getValue().getRight()) {
-                        var toCompress = _pendingBundles.pollFirstEntry().getValue().getLeft();
-                        currentSize -= toCompress._size;
+                    long diff = 0;
+                    while (!_pendingBundles.isEmpty() && _pendingBundles.peek()._ready) {
+                        var toCompress = _pendingBundles.poll();
+                        diff -= toCompress._size;
                         bundle.compress(toCompress);
                     }
-                    currentSize += bundle.calculateTotalSize();
+                    diff += bundle.calculateTotalSize();
+                    synchronized (_flushWaitSynchronizer) {
+                        currentSize += diff;
+                    }
                 }
 
                 var latch = new CountDownLatch(bundle._committed.size() + bundle._meta.size());
@@ -151,7 +156,18 @@ public class TxWritebackImpl implements TxWriteback {
                                         bundle._meta.keySet().stream().map(t -> t.getMeta().getName())).collect(Collectors.toCollection(ArrayList::new)),
                                 bundle._deleted.keySet().stream().map(t -> t.getMeta().getName()).collect(Collectors.toCollection(ArrayList::new))
                         ));
-                Log.trace("Transaction " + bundle.getId() + " committed");
+                Log.trace("Bundle " + bundle.getId() + " committed");
+
+
+                List<List<VoidFn>> callbacks = new ArrayList<>();
+                synchronized (_notFlushedBundles) {
+                    _lastWrittenTx.set(bundle.getId());
+                    while (!_notFlushedBundles.isEmpty() && _notFlushedBundles.firstEntry().getKey() <= bundle.getId()) {
+                        callbacks.add(_notFlushedBundles.pollFirstEntry().getValue().setCommitted());
+                    }
+                }
+                callbacks.forEach(l -> l.forEach(VoidFn::apply));
+
                 synchronized (_flushWaitSynchronizer) {
                     currentSize -= ((TxBundle) bundle).calculateTotalSize();
                     // FIXME:
@@ -197,9 +213,12 @@ public class TxWritebackImpl implements TxWriteback {
                         continue;
                     }
                 }
-                var bundle = new TxBundle(_counter.incrementAndGet());
-                _pendingBundles.put(bundle.getId(), MutablePair.of(bundle, false));
-                return bundle;
+                synchronized (_notFlushedBundles) {
+                    var bundle = new TxBundle(_counter.incrementAndGet());
+                    _pendingBundles.add(bundle);
+                    _notFlushedBundles.put(bundle.getId(), bundle);
+                    return bundle;
+                }
             }
         }
     }
@@ -208,8 +227,8 @@ public class TxWritebackImpl implements TxWriteback {
     public void commitBundle(com.usatiuk.dhfs.objects.jrepository.TxBundle bundle) {
         verifyReady();
         synchronized (_pendingBundles) {
-            _pendingBundles.get(bundle.getId()).setRight(Boolean.TRUE);
-            if (_pendingBundles.firstKey().equals(bundle.getId()))
+            ((TxBundle) bundle).setReady();
+            if (_pendingBundles.peek() == bundle)
                 _pendingBundles.notify();
             synchronized (_flushWaitSynchronizer) {
                 currentSize += ((TxBundle) bundle).calculateTotalSize();
@@ -218,8 +237,38 @@ public class TxWritebackImpl implements TxWriteback {
     }
 
     @Override
-    public void fence(long txId) {
+    public void fence(long bundleId) {
+        var synchronizer = new Object();
+        asyncFence(bundleId, () -> {
+            synchronized (synchronizer) {
+                synchronizer.notifyAll();
+            }
+        });
+        synchronized (synchronizer) {
+            if (_lastWrittenTx.get() >= bundleId) return;
+            try {
+                synchronizer.wait();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    @Override
+    public void asyncFence(long bundleId, VoidFn fn) {
         verifyReady();
+        if (bundleId < 0) throw new IllegalArgumentException("txId should be >0!");
+        if (_lastWrittenTx.get() >= bundleId) {
+            fn.apply();
+            return;
+        }
+        synchronized (_notFlushedBundles) {
+            if (_lastWrittenTx.get() >= bundleId) {
+                fn.apply();
+                return;
+            }
+            _notFlushedBundles.get(bundleId).addCallback(fn);
+        }
     }
 
     @Getter
@@ -237,14 +286,36 @@ public class TxWritebackImpl implements TxWriteback {
         private final HashMap<JObject<?>, CommittedEntry> _committed = new HashMap<>();
         private final HashMap<JObject<?>, CommittedMeta> _meta = new HashMap<>();
         private final HashMap<JObject<?>, Integer> _deleted = new HashMap<>();
+        private final ArrayList<VoidFn> _callbacks = new ArrayList<>();
         private long _txId;
+        @Getter
+        private volatile boolean _ready = false;
         private long _size = -1;
+        private boolean _wasCommitted = false;
 
         private TxBundle(long txId) {_txId = txId;}
 
         @Override
         public long getId() {
             return _txId;
+        }
+
+        public void setReady() {
+            _ready = true;
+        }
+
+        public void addCallback(VoidFn callback) {
+            synchronized (_callbacks) {
+                if (_wasCommitted) throw new IllegalStateException();
+                _callbacks.add(callback);
+            }
+        }
+
+        public List<VoidFn> setCommitted() {
+            synchronized (_callbacks) {
+                _wasCommitted = true;
+                return Collections.unmodifiableList(_callbacks);
+            }
         }
 
         @Override
@@ -267,6 +338,7 @@ public class TxWritebackImpl implements TxWriteback {
                 _deleted.put(obj, obj.estimateSize());
             }
         }
+
 
         public long calculateTotalSize() {
             if (_size >= 0) return _size;

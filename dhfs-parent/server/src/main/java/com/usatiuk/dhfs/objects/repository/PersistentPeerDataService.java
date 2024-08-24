@@ -213,7 +213,7 @@ public class PersistentPeerDataService {
                                         .map(u -> getPeer(u).runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m2, d2) -> d2))
                                         .filter(e -> !e.getUuid().equals(_selfUuid)).toList());
             } catch (Exception e) {
-                Log.warn("Error when making snapshot of hosts ", e);
+                Log.warn("Error when making snapshot of hosts: " + e.getMessage());
                 try {
                     Thread.sleep(i * 2);
                 } catch (InterruptedException ignored) {
@@ -269,7 +269,7 @@ public class PersistentPeerDataService {
                 return null;
             });
         } catch (Exception ex) {
-            Log.error("Error when refreshing certificates, will retry", ex);
+            Log.warn("Error when refreshing certificates, will retry: " + ex.getMessage());
             pushPeerUpdates();
         }
     }

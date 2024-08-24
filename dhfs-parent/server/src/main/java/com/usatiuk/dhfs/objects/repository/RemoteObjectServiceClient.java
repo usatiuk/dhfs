@@ -16,6 +16,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 
+import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -101,6 +102,7 @@ public class RemoteObjectServiceClient {
         });
     }
 
+    @Nullable
     public IndexUpdateReply notifyUpdate(JObject<?> obj, UUID host) {
         var builder = IndexUpdatePush.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString());
 
@@ -110,6 +112,7 @@ public class RemoteObjectServiceClient {
                                 ? JObjectManager.ResolutionStrategy.LOCAL_ONLY
                                 : JObjectManager.ResolutionStrategy.NO_RESOLUTION,
                         (m, d) -> {
+                            if (obj.getMeta().isDeleted()) return null;
                             if (m.getKnownClass().isAnnotationPresent(PushResolution.class) && d == null)
                                 Log.warn("Object " + m.getName() + " is marked as PushResolution but no resolution found");
                             if (m.getKnownClass().isAnnotationPresent(PushResolution.class))
@@ -117,6 +120,7 @@ public class RemoteObjectServiceClient {
                             else
                                 return m.toRpcHeader();
                         });
+        if (header == null) return null;
         jObjectTxManager.executeTx(obj::markSeen);
         builder.setHeader(header);
 

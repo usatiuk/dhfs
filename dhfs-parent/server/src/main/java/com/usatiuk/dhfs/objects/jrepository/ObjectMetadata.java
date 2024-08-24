@@ -47,7 +47,7 @@ public class ObjectMetadata implements Serializable {
     private transient volatile boolean _written = true;
     @Getter
     @Setter
-    private long _lastModifiedTx = 0;
+    private long _lastModifiedTx = -1; // -1 if it's already on disk
 
     public ObjectMetadata(String name, boolean written, Class<? extends JObjectData> knownClass) {
         _name = name;

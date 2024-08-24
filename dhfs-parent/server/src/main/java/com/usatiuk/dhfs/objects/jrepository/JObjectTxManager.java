@@ -10,6 +10,7 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Objects;
@@ -18,6 +19,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 @ApplicationScoped
@@ -66,15 +68,17 @@ public class JObjectTxManager {
         obj.rwUnlock();
     }
 
-    public void commit() {
+    // Returns Id of bundle to wait for, or -1 if there was nothing written
+    public long commit() {
         var state = _state.get();
         if (state == null)
             throw new IllegalStateException("Transaction not running");
 
         if (state._writeObjects.isEmpty()) {
 //            Log.trace("Empty transaction " + state._id);
+            state._callbacks.forEach(c -> c.accept(null));
             _state.remove();
-            return;
+            return -1;
         }
 
         Log.debug("Committing transaction " + state._id);
@@ -107,6 +111,7 @@ public class JObjectTxManager {
 
         state._writeObjects.forEach((key, value) -> {
             try {
+                key.getMeta().setLastModifiedTx(bundle.getId());
                 if (key.getMeta().isDeleted()) {
                     bundle.delete(key);
                     latch.countDown();
@@ -153,9 +158,13 @@ public class JObjectTxManager {
 
         state._writeObjects.forEach((key, value) -> key.rwUnlock());
 
+        state._callbacks.forEach(s -> txWriteback.asyncFence(bundle.getId(), () -> s.accept(null)));
+
         txWriteback.commitBundle(bundle);
 
         _state.remove();
+
+        return bundle.getId();
     }
 
     private <T extends JObjectData> void notifyWrite(JObject<?> obj, boolean metaChanged,
@@ -190,7 +199,7 @@ public class JObjectTxManager {
         }
     }
 
-    public void rollback() {
+    public void rollback(String message) {
         var state = _state.get();
         if (state == null)
             throw new IllegalStateException("Transaction not running");
@@ -212,25 +221,62 @@ public class JObjectTxManager {
             }
         }
 
+        state._callbacks.forEach(c -> c.accept(message != null ? message : "Unknown error"));
+        Log.debug("Rollback of " + state._id + " done");
         _state.remove();
     }
 
-    public void executeTx(VoidFn fn) {
-        // FIXME: Exception handling/nested tx stuff?
-        if (_state.get() != null) {
+    public void executeTxAndFlushAsync(VoidFn fn, Consumer<String> callback) {
+        var state = _state.get();
+        if (state != null) {
+            _state.get()._callbacks.add(callback);
             fn.apply();
             return;
         }
 
         begin();
         try {
+            _state.get()._callbacks.add(callback);
             fn.apply();
             commit();
         } catch (Exception e) {
             Log.debug("Error in transaction " + _state.get()._id, e);
-            rollback();
+            rollback(e.getMessage());
             throw e;
         }
+    }
+
+    public void executeTxAndFlush(VoidFn fn) {
+        executeTxAndFlush(() -> {
+            fn.apply();
+            return null;
+        });
+    }
+
+    public <T> T executeTxAndFlush(Supplier<T> fn) {
+        if (_state.get() != null) {
+            throw new IllegalStateException("Can't wait for transaction to flush from non-top-level tx");
+        }
+
+        begin();
+        try {
+            var ret = fn.get();
+            var bundleId = commit();
+            if (bundleId != -1)
+                txWriteback.fence(bundleId);
+            return ret;
+        } catch (Exception e) {
+            Log.debug("Error in transaction " + _state.get()._id, e);
+            rollback(e.getMessage());
+            throw e;
+        }
+    }
+
+    public void executeTx(VoidFn fn) {
+        executeTx(() -> {
+            fn.apply();
+            return null;
+        });
     }
 
     public <T> T executeTx(Supplier<T> fn) {
@@ -245,7 +291,7 @@ public class JObjectTxManager {
             return ret;
         } catch (Exception e) {
             Log.debug("Error in transaction " + _state.get()._id, e);
-            rollback();
+            rollback(e.getMessage());
             throw e;
         }
     }
@@ -275,5 +321,6 @@ public class JObjectTxManager {
     private class TxState {
         private final long _id = _transientTxId.incrementAndGet();
         private final HashMap<JObject<?>, JObjectSnapshot> _writeObjects = new HashMap<>();
+        private final ArrayList<Consumer<String>> _callbacks = new ArrayList<>();
     }
 }
