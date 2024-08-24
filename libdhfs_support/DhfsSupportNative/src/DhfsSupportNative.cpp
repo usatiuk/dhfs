@@ -3,45 +3,10 @@
 #include <cstdint>
 #include <cassert>
 
-#include <unistd.h>
-
 #include "com_usatiuk_dhfs_supportlib_DhfsSupportNative.h"
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsign-conversion"
-#pragma GCC diagnostic ignored "-Wsign-compare"
-
-template<typename To, typename From>
-constexpr To checked_cast(const From& f) {
-    To result = static_cast<To>(f);
-    assert(f == result);
-    return result;
-}
-
-#pragma GCC diagnostic pop
-
-unsigned int get_page_size() {
-    static const auto PAGE_SIZE = checked_cast<unsigned int>(sysconf(_SC_PAGESIZE));
-    return PAGE_SIZE;
-}
-
-template<typename T, typename A>
-T align_up(T what, A alignment) {
-    assert(__builtin_popcount(alignment) == 1);
-
-    const T mask = checked_cast<T>(alignment - 1);
-
-    T ret;
-
-    if (what & mask)
-        ret = (what + mask) & ~mask;
-    else
-        ret = what;
-
-    assert((ret & mask) == 0);
-
-    return ret;
-}
+#include "Utils.h"
+#include "MemoryHelpers.h"
 
 extern "C" {
 JNIEXPORT void JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_hello(JNIEnv* env, jclass klass) {
@@ -58,10 +23,10 @@ JNIEXPORT jlong JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_alloc
     size_t checked_size = checked_cast<size_t>(size);
 
     void* buf;
-    if (checked_size < get_page_size())
+    if (checked_size < MemoryHelpers::get_page_size())
         buf = malloc(checked_size);
     else
-        buf = std::aligned_alloc(get_page_size(), align_up(checked_size, get_page_size()));
+        buf = std::aligned_alloc(MemoryHelpers::get_page_size(), align_up(checked_size, MemoryHelpers::get_page_size()));
 
     if (buf == nullptr) {
         env->ThrowNew(env->FindClass("java/lang/OutOfMemoryError"), "Buffer memory allocation failed");
@@ -88,6 +53,6 @@ JNIEXPORT void JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_dropBy
 
 JNIEXPORT jint JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_getPageSizeInternal
 (JNIEnv*, jclass) {
-    return checked_cast<jint>(get_page_size());
+    return checked_cast<jint>(MemoryHelpers::get_page_size());
 }
 }
