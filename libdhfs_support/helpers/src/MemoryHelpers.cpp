@@ -8,9 +8,7 @@
 
 #include "Utils.h"
 
-using namespace MemoryHelpers;
-
-unsigned int get_page_size() {
+unsigned int MemoryHelpers::get_page_size() {
     static const auto PAGE_SIZE = checked_cast<unsigned int>(sysconf(_SC_PAGESIZE));
     return PAGE_SIZE;
 }
