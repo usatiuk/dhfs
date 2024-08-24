@@ -36,8 +36,8 @@ import static jnr.posix.FileStat.*;
 
 @ApplicationScoped
 public class DhfsFuse extends FuseStubFS {
-    private static final int blksize = 33554432;
-    private static final int iosize = 33554432;
+    private static final int blksize = 1048576;
+    private static final int iosize = 1048576;
     @Inject
     ObjectPersistentStore persistentStore; // FIXME?
     @ConfigProperty(name = "dhfs.fuse.root")
@@ -69,8 +69,8 @@ public class DhfsFuse extends FuseStubFS {
             opts.add("iosize=" + iosize);
         } else if (SystemUtils.IS_OS_LINUX) {
             // FIXME: There's something else missing: the writes still seem to be 32k max
-            opts.add("-o");
-            opts.add("large_read");
+//            opts.add("-o");
+//            opts.add("large_read");
             opts.add("-o");
             opts.add("big_writes");
             opts.add("-o");
