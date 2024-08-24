@@ -33,5 +33,7 @@ endif ()
 
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 add_subdirectory(helpers)
 add_subdirectory(DhfsSupportNative)
