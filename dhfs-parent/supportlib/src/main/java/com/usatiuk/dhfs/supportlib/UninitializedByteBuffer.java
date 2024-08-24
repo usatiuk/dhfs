@@ -13,7 +13,7 @@ public class UninitializedByteBuffer {
         var bb = new ByteBuffer[1];
         long token = DhfsSupportNative.allocateUninitializedByteBuffer(bb, size);
         var ret = bb[0];
-        CLEANER.register(ret, () -> DhfsSupportNative.dropByteBuffer(token));
+        CLEANER.register(ret, () -> DhfsSupportNative.releaseByteBuffer(token));
         return ret;
     }
 }

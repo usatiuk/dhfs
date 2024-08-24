@@ -16,7 +16,7 @@ class DhfsSupportNative {
 
     static native long allocateUninitializedByteBuffer(ByteBuffer[] bb, int size);
 
-    static native void dropByteBuffer(long token);
+    static native void releaseByteBuffer(long token);
 
     private static native int getPageSizeInternal();
 }

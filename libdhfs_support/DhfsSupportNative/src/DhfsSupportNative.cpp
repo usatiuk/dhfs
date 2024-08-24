@@ -26,7 +26,8 @@ JNIEXPORT jlong JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_alloc
     if (checked_size < MemoryHelpers::get_page_size())
         buf = malloc(checked_size);
     else
-        buf = std::aligned_alloc(MemoryHelpers::get_page_size(), align_up(checked_size, MemoryHelpers::get_page_size()));
+        buf = std::aligned_alloc(MemoryHelpers::get_page_size(),
+                                 align_up(checked_size, MemoryHelpers::get_page_size()));
 
     if (buf == nullptr) {
         env->ThrowNew(env->FindClass("java/lang/OutOfMemoryError"), "Buffer memory allocation failed");
@@ -39,7 +40,7 @@ JNIEXPORT jlong JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_alloc
     return token;
 }
 
-JNIEXPORT void JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_dropByteBuffer
+JNIEXPORT void JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_releaseByteBuffer
 (JNIEnv* env, jclass klass, jlong token) {
     const auto addr = checked_cast<uintptr_t>(token);
 
