@@ -1,0 +1,16 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Main Fast" type="QsApplicationConfigurationType" factoryName="QuarkusApplication">
+    <option name="MAIN_CLASS_NAME" value="com.usatiuk.dhfs.Main" />
+    <module name="server" />
+    <option name="VM_PARAMETERS" value="-Xmx1G --add-exports java.base/sun.nio.ch=ALL-UNNAMED --add-exports java.base/jdk.internal.access=ALL-UNNAMED -Ddhfs.objects.ref_verification=false -Dquarkus.log.category.\&quot;com.usatiuk.dhfs\&quot;.level=INFO -Dcom.usatiuk.dhfs.supportlib.native-path-override=$ProjectFileDir$/../libdhfs_support/cmake-build-debug/DhfsSupportNative/libdhfs_support.so -agentpath:$APPLICATION_HOME_DIR$/lib/async-profiler/amd64/libasyncProfiler.so=start,event=cpu,interval=100us,ann,features=vtable,cstack=vm,loop=10s,file=$USER_HOME$/dhfs_default/profile-%t.html" />
+    <extension name="coverage">
+      <pattern>
+        <option name="PATTERN" value="com.usatiuk.dhfs.*" />
+        <option name="ENABLED" value="true" />
+      </pattern>
+    </extension>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
