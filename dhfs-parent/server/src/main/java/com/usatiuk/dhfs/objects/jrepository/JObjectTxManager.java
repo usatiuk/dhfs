@@ -68,6 +68,39 @@ public class JObjectTxManager {
         obj.rwUnlock();
     }
 
+    private void flushDirect() {
+        var state = _state.get();
+        if (state == null)
+            throw new IllegalStateException("Transaction not running");
+
+        for (var obj : state._directObjects.entrySet()) {
+            Log.trace("Flushing direct " + obj.getKey().getMeta().getName());
+
+            if (!obj.getKey().getMeta().getKnownClass().isAnnotationPresent(AssumedUnique.class))
+                throw new IllegalStateException("Only working with unique-direct objects for now");
+
+            boolean metaChanged = !Objects.equals(obj.getValue().snapshot.meta(), protoSerializerService.serialize(obj.getKey().getMeta()));
+            boolean externalHashChanged = obj.getValue().snapshot.externalHash() != obj.getKey().getMeta().externalHash();
+
+            // FIXME: hasDataChanged is a bit broken here
+            notifyWrite(obj.getKey(),
+                    obj.getValue()._forceInvalidated || metaChanged,
+                    obj.getValue()._forceInvalidated || externalHashChanged,
+                    obj.getValue()._forceInvalidated || metaChanged);
+
+            obj.getKey().rLock();
+            obj.getKey().rwUnlock();
+
+            try {
+                // This relies on the fact that we always flush data if we have it
+                if (metaChanged || obj.getValue()._forceInvalidated)
+                    jObjectWriteback.markDirty(obj.getKey());
+            } finally {
+                obj.getKey().rUnlock();
+            }
+        }
+    }
+
     // Returns Id of bundle to wait for, or -1 if there was nothing written
     public long commit() {
         var state = _state.get();
@@ -77,6 +110,7 @@ public class JObjectTxManager {
         if (state._writeObjects.isEmpty()) {
 //            Log.trace("Empty transaction " + state._id);
             state._callbacks.forEach(c -> c.accept(null));
+            flushDirect();
             _state.remove();
             return -1;
         }
@@ -157,6 +191,7 @@ public class JObjectTxManager {
         }
 
         state._writeObjects.forEach((key, value) -> key.rwUnlock());
+        flushDirect();
 
         state._callbacks.forEach(s -> txWriteback.asyncFence(bundle.getId(), () -> s.accept(null)));
 
@@ -170,6 +205,7 @@ public class JObjectTxManager {
     private <T extends JObjectData> void notifyWrite(JObject<?> obj, boolean metaChanged,
                                                      boolean externalChanged, boolean hasDataChanged) {
         jObjectLRU.updateSize(obj);
+        //FIXME: externalChanged/hasDataChanged? but the other one is broken right now
         jObjectManager.runWriteListeners(obj, metaChanged, externalChanged);
         if (externalChanged && obj.getMeta().isHaveLocalCopy()) {
             invalidationQueueService.pushInvalidationToAll(obj);
@@ -220,6 +256,8 @@ public class JObjectTxManager {
                 obj.getKey().rwUnlock();
             }
         }
+
+        flushDirect();
 
         state._callbacks.forEach(c -> c.accept(message != null ? message : "Unknown error"));
         Log.debug("Rollback of " + state._id + " done");
@@ -296,10 +334,21 @@ public class JObjectTxManager {
         }
     }
 
-    void addToTx(JObject<?> obj, boolean copy) {
-        if (obj.getMeta().getKnownClass().isAnnotationPresent(NoTransaction.class))
-            throw new IllegalArgumentException("NoTransaction objects shouldn't be in transaction");
+    public void forceInvalidate(JObject<?> obj) {
+        if (!obj.getMeta().getKnownClass().isAnnotationPresent(NoTransaction.class))
+            return;
 
+        var state = _state.get();
+
+        if (state == null)
+            throw new IllegalStateException("Transaction not running");
+
+        obj.assertRwLock();
+
+        state._directObjects.get(obj)._forceInvalidated = true;
+    }
+
+    void addToTx(JObject<?> obj, boolean copy) {
         var state = _state.get();
 
         if (state == null)
@@ -310,17 +359,32 @@ public class JObjectTxManager {
         obj.assertRwLock();
         obj.rwLock();
 
-        state._writeObjects.put(obj,
-                copy ? new JObjectSnapshot(
-                        protoSerializerService.serialize(obj.getMeta()),
-                        obj.getData() != null ? protoSerializerService.serializeToJObjectDataP(obj.getData()) : null,
-                        obj.getMeta().externalHash())
-                        : null);
+        boolean noTx = obj.getMeta().getKnownClass().isAnnotationPresent(NoTransaction.class);
+
+        var snapshot = copy
+                ? new JObjectSnapshot(
+                protoSerializerService.serialize(obj.getMeta()),
+                (noTx || obj.getData() == null) ? null : protoSerializerService.serializeToJObjectDataP(obj.getData()),
+                obj.getMeta().externalHash())
+                : null;
+
+        if (noTx)
+            state._directObjects.put(obj, new TxState.DirectObjectState(snapshot));
+        else
+            state._writeObjects.put(obj, snapshot);
     }
 
     private class TxState {
+        private static class DirectObjectState {
+            final JObjectSnapshot snapshot;
+            boolean _forceInvalidated = false;
+
+            private DirectObjectState(JObjectSnapshot snapshot) {this.snapshot = snapshot;}
+        }
+
         private final long _id = _transientTxId.incrementAndGet();
         private final HashMap<JObject<?>, JObjectSnapshot> _writeObjects = new HashMap<>();
+        private final HashMap<JObject<?>, DirectObjectState> _directObjects = new HashMap<>();
         private final ArrayList<Consumer<String>> _callbacks = new ArrayList<>();
     }
 }

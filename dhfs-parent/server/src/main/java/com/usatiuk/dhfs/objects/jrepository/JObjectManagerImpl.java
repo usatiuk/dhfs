@@ -226,8 +226,8 @@ public class JObjectManagerImpl implements JObjectManager {
                     });
             } finally {
                 // FIXME?
-//                if (newObj != null)
-//                    newObj.forceInvalidate();
+                if (newObj != null)
+                    newObj.forceInvalidate();
             }
             if (newObj == null) {
                 jObjectLRU.notifyAccess(ret);
@@ -347,7 +347,6 @@ public class JObjectManagerImpl implements JObjectManager {
         private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
         private final AtomicReference<T> _dataPart = new AtomicReference<>();
         private ObjectMetadata _metaPart;
-        private boolean _inTransaction = false; // FIXME:
 
         // Create a new object
         protected JObject(String name, UUID selfUuid, T obj) {
@@ -466,9 +465,8 @@ public class JObjectManagerImpl implements JObjectManager {
             try {
                 if (!_lock.writeLock().tryLock(lockTimeoutSecs, TimeUnit.SECONDS))
                     return false;
-                if (_lock.writeLock().getHoldCount() == 1 && !getMeta().getKnownClass().isAnnotationPresent(NoTransaction.class)) {
+                if (_lock.writeLock().getHoldCount() == 1) {
                     jObjectTxManager.addToTx(this, txCopy);
-                    _inTransaction = true;
                 }
                 return true;
             } catch (InterruptedException e) {
@@ -497,40 +495,18 @@ public class JObjectManagerImpl implements JObjectManager {
             _lock.readLock().unlock();
         }
 
-//        protected void forceInvalidate() {
-//            assertRwLock();
-//            jObjectTxManager.forceInvalidate(this);
-//        }
+        protected void forceInvalidate() {
+            assertRwLock();
+            jObjectTxManager.forceInvalidate(this);
+        }
 
         public void rwUnlock() {
             int hc = _lock.writeLock().getHoldCount();
 
-            boolean shouldNotifyWriteback = false;
-
-            if (hc == 1 && !_inTransaction) {
-                shouldNotifyWriteback = true;
-                updateDeletionState();
-            }
-
-            if (hc == 1 && _inTransaction) {
-                _inTransaction = false;
-            }
-
             _lock.writeLock().unlock();
 
-            if (shouldNotifyWriteback) {
-                // TODO: assuming always dirty!
-                rLock();
-                try {
-                    jObjectWriteback.markDirty(this);
-                    invalidationQueueService.pushInvalidationToAll(this);
-                } finally {
-                    rUnlock();
-                }
-            }
-
             // FIXME: this relies on the transaction running
-            if (hc == 2 && _inTransaction) {
+            if (hc == 2) {
                 updateDeletionState();
             }
         }

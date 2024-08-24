@@ -153,6 +153,7 @@ public class JObjectWriteback {
             m.markUnWritten();
             return;
         }
+        // Can be unnecessary
         if (m.isHaveLocalCopy() && data != null)
             objectPersistentStore.writeObjectDirect(m.getName(), protoSerializerService.serialize(m), protoSerializerService.serializeToJObjectDataP(data));
         else if (m.isHaveLocalCopy() && data == null)
