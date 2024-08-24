@@ -21,4 +21,12 @@ public class TreeNode<TimestampT extends Comparable<TimestampT>, PeerIdT extends
         _meta = meta;
         _parent = parent;
     }
+
+    public TreeNode(NodeIdT id, NodeIdT parent, MetaT meta, Map<String, NodeIdT> children) {
+        _id = id;
+        _meta = meta;
+        _parent = parent;
+        _children = children;
+    }
+
 }

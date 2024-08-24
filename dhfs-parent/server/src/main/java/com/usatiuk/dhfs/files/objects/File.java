@@ -6,14 +6,11 @@ import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.TreeMap;
-import java.util.UUID;
+import java.util.*;
 
 public class File extends FsNode {
     @Getter
-    private final TreeMap<Long, String> _chunks = new TreeMap<>();
+    private final NavigableMap<Long, String> _chunks;
     @Getter
     private final boolean _symlink;
     @Getter
@@ -23,6 +20,13 @@ public class File extends FsNode {
     public File(UUID uuid, long mode, boolean symlink) {
         super(uuid, mode);
         _symlink = symlink;
+        _chunks = new TreeMap<>();
+    }
+
+    public File(UUID uuid, long mode, boolean symlink, NavigableMap<Long, String> chunks) {
+        super(uuid, mode);
+        _symlink = symlink;
+        _chunks = chunks;
     }
 
     @Override

@@ -12,6 +12,7 @@ import com.usatiuk.kleppmanntree.TreeNode;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.util.HashMap;
 import java.util.UUID;
 
 @ApplicationScoped
@@ -21,12 +22,14 @@ public class JKleppmannTreeNodeProtoSerializer implements ProtoDeserializer<JKle
 
     @Override
     public JKleppmannTreeNode deserialize(JKleppmannTreeNodeP message) {
+        var children = new HashMap<String, String>();
+        message.getChildrenList().forEach(child -> children.put(child.getKey(), child.getValue()));
         var node = new TreeNode<Long, UUID, JKleppmannTreeNodeMeta, String>(
                 message.getId(),
                 message.hasParent() ? message.getParent() : null,
-                message.hasMeta() ? protoSerializerService.deserialize(message.getMeta()) : null
+                message.hasMeta() ? protoSerializerService.deserialize(message.getMeta()) : null,
+                children
         );
-        node.getChildren().putAll(message.getChildrenMap());
         if (message.hasLastEffectiveOp())
             node.setLastEffectiveOp(((JKleppmannTreeOpWrapper) protoSerializerService.deserialize(message.getLastEffectiveOp())).getOp());
         return new JKleppmannTreeNode(node);
@@ -34,7 +37,7 @@ public class JKleppmannTreeNodeProtoSerializer implements ProtoDeserializer<JKle
 
     @Override
     public JKleppmannTreeNodeP serialize(JKleppmannTreeNode object) {
-        var builder = JKleppmannTreeNodeP.newBuilder().setId(object.getNode().getId()).putAllChildren(object.getNode().getChildren());
+        var builder = JKleppmannTreeNodeP.newBuilder().setId(object.getNode().getId());
         if (object.getNode().getParent() != null)
             builder.setParent(object.getNode().getParent());
         if (object.getNode().getMeta() != null) {
@@ -44,6 +47,9 @@ public class JKleppmannTreeNodeProtoSerializer implements ProtoDeserializer<JKle
             builder.setLastEffectiveOp(
                     (JKleppmannTreeOpP) protoSerializerService.serialize(new JKleppmannTreeOpWrapper(object.getNode().getLastEffectiveOp()))
             );
+        object.getNode().getChildren().forEach((k, v) -> {
+            builder.addChildrenBuilder().setKey(k).setValue(v);
+        });
         return builder.build();
     }
 }
