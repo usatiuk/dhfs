@@ -1,14 +1,17 @@
 package com.usatiuk.dhfs.objects.repository.persistence;
 
+import com.google.protobuf.ByteString;
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
+import com.usatiuk.dhfs.supportlib.DhfsSupportNative;
 import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
 import com.usatiuk.utils.ByteUtils;
 import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
 import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -39,13 +42,16 @@ import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
 // File format:
-//   64-bit offset of metadata (if 8 then file has no data)
+//   64-bit metadata serialized size
+//   64-bit offset of "rest of" metadata (if -1 then file has no data,
+//      if 0 then file has data and metadata fits into META_BLOCK_SIZE)
+//   Until META_BLOCK_SIZE - metadata (encoded as ObjectMetadataP)
 //   data (encoded as JObjectDataP)
-//   metadata (encoded as ObjectMetadataP)
+//   rest of metadata
 
 @ApplicationScoped
 public class FileObjectPersistentStore implements ObjectPersistentStore {
-    private final static long mmapThreshold = 65536;
+    private final int META_BLOCK_SIZE = DhfsSupportNative.PAGE_SIZE;
     private final Path _root;
     private final Path _txManifest;
     private ExecutorService _flushExecutor;
@@ -141,27 +147,26 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         verifyReady();
         var path = getObjPath(name);
         try (var rf = new RandomAccessFile(path.toFile(), "r")) {
-            var len = rf.length();
             var longBuf = new byte[8];
+            rf.seek(8);
             rf.readFully(longBuf);
+            int metaOff = Math.toIntExact(ByteUtils.bytesToLong(longBuf));
 
-            var metaOff = ByteUtils.bytesToLong(longBuf);
+            if (metaOff < 0)
+                throw new StatusRuntimeException(Status.NOT_FOUND);
 
-            int toRead = (int) (metaOff - 8);
+            int toRead;
 
-            if (toRead <= 0)
-                throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
+            if (metaOff > 0)
+                toRead = metaOff - META_BLOCK_SIZE;
+            else
+                toRead = Math.toIntExact(rf.length()) - META_BLOCK_SIZE;
 
-            ByteBuffer buf;
+            rf.seek(META_BLOCK_SIZE);
 
-            //FIXME: rewriting files breaks!
-            if (false && len > mmapThreshold) {
-                buf = rf.getChannel().map(FileChannel.MapMode.READ_ONLY, 8, toRead);
-            } else {
-                buf = UninitializedByteBuffer.allocateUninitialized(toRead);
-                fillBuffer(buf, rf.getChannel());
-                buf.flip();
-            }
+            ByteBuffer buf = UninitializedByteBuffer.allocateUninitialized(toRead);
+            fillBuffer(buf, rf.getChannel());
+            buf.flip();
 
             var bs = UnsafeByteOperations.unsafeWrap(buf);
             // This way, the input will be considered "immutable" which would allow avoiding copies
@@ -183,19 +188,40 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         verifyReady();
         var path = getObjPath(name);
         try (var rf = new RandomAccessFile(path.toFile(), "r")) {
-            var len = rf.length();
-            var longBuf = new byte[8];
+            int len = Math.toIntExact(rf.length());
+            var buf = UninitializedByteBuffer.allocateUninitialized(META_BLOCK_SIZE);
+            fillBuffer(buf, rf.getChannel());
 
-            rf.readFully(longBuf);
+            buf.flip();
+            int metaSize = Math.toIntExact(buf.getLong());
+            int metaOff = Math.toIntExact(buf.getLong());
 
-            var metaOff = ByteUtils.bytesToLong(longBuf);
+            ByteBuffer extraBuf;
 
-            int toRead = (int) (len - metaOff);
+            if (metaOff > 0) {
+                extraBuf = UninitializedByteBuffer.allocateUninitialized(len - metaOff);
+                rf.seek(metaOff);
+                fillBuffer(extraBuf, rf.getChannel());
+            } else if (metaOff < 0) {
+                if (len > META_BLOCK_SIZE) {
+                    extraBuf = UninitializedByteBuffer.allocateUninitialized(len - META_BLOCK_SIZE);
+                    fillBuffer(extraBuf, rf.getChannel());
+                } else {
+                    extraBuf = null;
+                }
+            } else {
+                extraBuf = null;
+            }
 
-            var arr = new byte[(int) toRead];
-            rf.seek(metaOff);
-            rf.readFully(arr, 0, toRead);
-            return ObjectMetadataP.parseFrom(UnsafeByteOperations.unsafeWrap(arr));
+            ByteString bs = UnsafeByteOperations.unsafeWrap(buf.position(16).slice());
+            if (extraBuf != null) {
+                extraBuf.flip();
+                bs = bs.concat(UnsafeByteOperations.unsafeWrap(extraBuf));
+            }
+
+            bs = bs.substring(0, metaSize);
+
+            return ObjectMetadataP.parseFrom(bs);
         } catch (FileNotFoundException | NoSuchFileException fx) {
             throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
         } catch (IOException e) {
@@ -217,21 +243,42 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     private void writeObjectImpl(Path path, ObjectMetadataP meta, JObjectDataP data, boolean sync) throws IOException {
         try (var fsb = new FileOutputStream(path.toFile(), false)) {
-            var dataSize = data != null ? data.getSerializedSize() : 0;
-            fsb.write(ByteUtils.longToBytes(dataSize + 8));
+            int metaSize = meta.getSerializedSize() + 16;
+            int dataSize = data == null ? 0 : data.getSerializedSize();
 
-            var totalSize = dataSize + meta.getSerializedSize();
             // Avoids CodedOutputStream flushing all the time
-            var bb = UninitializedByteBuffer.allocateUninitialized(totalSize);
-            var bbOut = CodedOutputStream.newInstance(bb);
+            var metaBb = UninitializedByteBuffer.allocateUninitialized(Math.max(META_BLOCK_SIZE, meta.getSerializedSize() + 16));
+            metaBb.putLong(metaSize - 16);
+            if (data == null)
+                metaBb.putLong(-1);
+            else if (metaSize <= META_BLOCK_SIZE)
+                metaBb.putLong(0);
+            else
+                metaBb.putLong(META_BLOCK_SIZE + dataSize);
+            {
+                var metaBbOut = CodedOutputStream.newInstance(metaBb);
+                meta.writeTo(metaBbOut);
+                metaBbOut.flush();
+                metaBb.flip();
+            }
 
-            if (data != null)
-                data.writeTo(bbOut);
-            meta.writeTo(bbOut);
-            bbOut.flush();
-
-            if (fsb.getChannel().write(bb.flip()) != totalSize)
+            if (fsb.getChannel().write(metaBb.limit(META_BLOCK_SIZE)) != META_BLOCK_SIZE)
                 throw new IOException("Could not write to file");
+
+            if (data != null) {
+                var dataBb = UninitializedByteBuffer.allocateUninitialized(dataSize);
+                var dataBbOut = CodedOutputStream.newInstance(dataBb);
+                data.writeTo(dataBbOut);
+                dataBbOut.flush();
+                dataBb.flip();
+                if (fsb.getChannel().write(dataBb) != dataSize)
+                    throw new IOException("Could not write to file");
+            }
+
+            if (metaSize > META_BLOCK_SIZE) {
+                if (fsb.getChannel().write(metaBb.limit(metaSize).position(META_BLOCK_SIZE)) != metaSize - META_BLOCK_SIZE)
+                    throw new IOException("Could not write to file");
+            }
 
             if (sync) {
                 fsb.flush();
@@ -243,24 +290,52 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     private void writeObjectMetaImpl(Path path, ObjectMetadataP meta, boolean sync) throws IOException {
         try (var rf = new RandomAccessFile(path.toFile(), "rw");
              var ch = rf.getChannel()) {
-            var longBuf = UninitializedByteBuffer.allocateUninitialized(8);
-            fillBuffer(longBuf, ch);
+            int len = Math.toIntExact(rf.length());
+            var buf = UninitializedByteBuffer.allocateUninitialized(META_BLOCK_SIZE);
+            fillBuffer(buf, rf.getChannel());
 
-            longBuf.flip();
-            var metaOff = longBuf.getLong();
+            buf.flip();
+            buf.position(8);
+            int metaOff = Math.toIntExact(buf.getLong());
 
-            ch.truncate(metaOff + meta.getSerializedSize());
-            ch.position(metaOff);
+            int metaSize = meta.getSerializedSize() + 16;
+            int dataSize;
 
-            var totalSize = meta.getSerializedSize();
+            if (metaOff > 0) {
+                dataSize = metaOff - META_BLOCK_SIZE;
+            } else if (metaOff < 0) {
+                dataSize = 0;
+            } else {
+                dataSize = len - META_BLOCK_SIZE;
+            }
+
+            ch.truncate(metaSize + dataSize);
+            ch.position(0);
+
             // Avoids CodedOutputStream flushing all the time
-            var bb = UninitializedByteBuffer.allocateUninitialized(totalSize);
-            var bbOut = CodedOutputStream.newInstance(bb);
+            var metaBb = UninitializedByteBuffer.allocateUninitialized(Math.max(META_BLOCK_SIZE, meta.getSerializedSize() + 16));
+            metaBb.putLong(metaSize - 16);
+            if (dataSize == 0)
+                metaBb.putLong(-1);
+            else if (metaSize <= META_BLOCK_SIZE)
+                metaBb.putLong(0);
+            else
+                metaBb.putLong(META_BLOCK_SIZE + dataSize);
+            {
+                var metaBbOut = CodedOutputStream.newInstance(metaBb);
+                meta.writeTo(metaBbOut);
+                metaBbOut.flush();
+                metaBb.flip();
+            }
 
-            meta.writeTo(bbOut);
-            bbOut.flush();
-            if (ch.write(bb.flip()) != totalSize)
+            if (ch.write(metaBb.limit(META_BLOCK_SIZE)) != META_BLOCK_SIZE)
                 throw new IOException("Could not write to file");
+
+            if (metaSize > META_BLOCK_SIZE) {
+                ch.position(META_BLOCK_SIZE + dataSize);
+                if (ch.write(metaBb.limit(metaSize).position(META_BLOCK_SIZE)) != metaSize - META_BLOCK_SIZE)
+                    throw new IOException("Could not write to file");
+            }
 
             if (sync)
                 rf.getFD().sync();

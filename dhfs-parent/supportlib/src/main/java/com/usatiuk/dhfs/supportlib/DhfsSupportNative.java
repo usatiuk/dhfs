@@ -4,7 +4,7 @@ package com.usatiuk.dhfs.supportlib;
 import java.nio.ByteBuffer;
 
 
-class DhfsSupportNative {
+public class DhfsSupportNative {
     static public final int PAGE_SIZE;
 
     static {
