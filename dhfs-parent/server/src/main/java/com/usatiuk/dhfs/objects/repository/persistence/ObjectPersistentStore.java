@@ -11,12 +11,6 @@ public interface ObjectPersistentStore {
     Collection<String> findAllObjects();
 
     @Nonnull
-    Boolean existsObject(String name);
-
-    @Nonnull
-    Boolean existsObjectData(String name);
-
-    @Nonnull
     JObjectDataP readObject(String name);
 
     @Nonnull
@@ -33,7 +27,7 @@ public interface ObjectPersistentStore {
     void commitTx(TxManifest names);
 
     // Deletes object metadata and data
-    void deleteObject(String name);
+    void deleteObjectDirect(String name);
 
     long getTotalSpace();
 

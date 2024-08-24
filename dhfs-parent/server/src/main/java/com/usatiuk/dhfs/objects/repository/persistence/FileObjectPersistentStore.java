@@ -6,6 +6,7 @@ import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
 import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
+import com.usatiuk.utils.ByteUtils;
 import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
 import io.grpc.Status;
 import io.quarkus.logging.Log;
@@ -14,7 +15,7 @@ import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
-import org.apache.commons.lang3.NotImplementedException;
+import net.openhft.hashing.LongHashFunction;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -49,6 +50,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     private final Path _txManifest;
     private ExecutorService _flushExecutor;
     private RandomAccessFile _txFile;
+    private volatile boolean _ready = false;
 
     public FileObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.persistence.files.root") String root) {
         this._root = Path.of(root).resolve("objects");
@@ -74,10 +76,28 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
             _flushExecutor = Executors.newFixedThreadPool(8, factory);
         }
+
+        tryReplay();
+        Log.info("Transaction replay done");
+        _ready = true;
     }
 
-    void shutdown(@Observes @Priority(900) ShutdownEvent event) {
-        Log.info("Shutdown");
+    void shutdown(@Observes @Priority(900) ShutdownEvent event) throws IOException {
+        _ready = false;
+        Log.debug("Deleting manifest file");
+        _txFile.close();
+        Files.delete(_txManifest);
+        Log.debug("Manifest file deleted");
+    }
+
+    private void verifyReady() {
+        if (!_ready) throw new IllegalStateException("Wrong service order!");
+    }
+
+    private void tryReplay() {
+        var read = readTxManifest();
+        if (read != null)
+            commitTxImpl(read, false);
     }
 
     private Path getObjPath(@Nonnull String obj) {
@@ -109,6 +129,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     @Nonnull
     @Override
     public Collection<String> findAllObjects() {
+        verifyReady();
         ArrayList<String> out = new ArrayList<>();
         findAllObjectsImpl(out, _root);
         return Collections.unmodifiableCollection(out);
@@ -116,26 +137,15 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     @Nonnull
     @Override
-    public Boolean existsObject(String name) {
-        throw new NotImplementedException();
-    }
-
-    @Nonnull
-    @Override
-    public Boolean existsObjectData(String name) {
-        throw new NotImplementedException();
-    }
-
-    @Nonnull
-    @Override
     public JObjectDataP readObject(String name) {
+        verifyReady();
         var path = getObjPath(name);
         try (var rf = new RandomAccessFile(path.toFile(), "r")) {
             var len = rf.length();
             var longBuf = new byte[8];
             rf.readFully(longBuf);
 
-            var metaOff = bytesToLong(longBuf);
+            var metaOff = ByteUtils.bytesToLong(longBuf);
 
             int toRead = (int) (metaOff - 8);
 
@@ -170,6 +180,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     @Nonnull
     @Override
     public ObjectMetadataP readObjectMeta(String name) {
+        verifyReady();
         var path = getObjPath(name);
         try (var rf = new RandomAccessFile(path.toFile(), "r")) {
             var len = rf.length();
@@ -177,7 +188,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
             rf.readFully(longBuf);
 
-            var metaOff = bytesToLong(longBuf);
+            var metaOff = ByteUtils.bytesToLong(longBuf);
 
             int toRead = (int) (len - metaOff);
 
@@ -191,15 +202,6 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
             Log.error("Error reading file " + path, e);
             throw new StatusRuntimeExceptionNoStacktrace(Status.INTERNAL);
         }
-    }
-
-    //FIXME: Could be more optimal...
-    private byte[] longToBytes(long val) {
-        return ByteBuffer.wrap(new byte[8]).putLong(val).array();
-    }
-
-    private long bytesToLong(byte[] bytes) {
-        return ByteBuffer.wrap(bytes).getLong();
     }
 
     private void fillBuffer(ByteBuffer dst, FileChannel src) throws IOException {
@@ -216,7 +218,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     private void writeObjectImpl(Path path, ObjectMetadataP meta, JObjectDataP data, boolean sync) throws IOException {
         try (var fsb = new FileOutputStream(path.toFile(), false)) {
             var dataSize = data != null ? data.getSerializedSize() : 0;
-            fsb.write(longToBytes(dataSize + 8));
+            fsb.write(ByteUtils.longToBytes(dataSize + 8));
 
             var totalSize = dataSize + meta.getSerializedSize();
             // Avoids CodedOutputStream flushing all the time
@@ -267,6 +269,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     @Override
     public void writeObjectDirect(String name, ObjectMetadataP meta, JObjectDataP data) {
+        verifyReady();
         try {
             var path = getObjPath(name);
             writeObjectImpl(path, meta, data, false);
@@ -278,6 +281,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     @Override
     public void writeObjectMetaDirect(String name, ObjectMetadataP meta) {
+        verifyReady();
         try {
             var path = getObjPath(name);
             writeObjectMetaImpl(path, meta, false);
@@ -289,6 +293,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     @Override
     public void writeNewObject(String name, ObjectMetadataP meta, JObjectDataP data) {
+        verifyReady();
         try {
             var tmpPath = getTmpObjPath(name);
             writeObjectImpl(tmpPath, meta, data, true);
@@ -299,6 +304,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     @Override
     public void writeNewObjectMeta(String name, ObjectMetadataP meta) {
+        verifyReady();
         // TODO COW
         try {
             var path = getObjPath(name);
@@ -311,13 +317,42 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         }
     }
 
-    private void putTransactionManifest(TxManifest manifest) {
+    private TxManifest readTxManifest() {
         try {
-            // TODO: Checksum?
+            var channel = _txFile.getChannel();
+
+            if (channel.size() == 0)
+                return null;
+
+            channel.position(0);
+
+            var buf = ByteBuffer.allocate(Math.toIntExact(channel.size()));
+
+            fillBuffer(buf, channel);
+            buf.flip();
+
+            long checksum = buf.getLong();
+            var data = buf.slice();
+            var hash = LongHashFunction.xx3().hashBytes(data);
+
+            if (hash != checksum)
+                throw new StatusRuntimeExceptionNoStacktrace(Status.DATA_LOSS.withDescription("Transaction manifest checksum mismatch!"));
+
+            return SerializationHelper.deserialize(data.array(), data.arrayOffset());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void putTxManifest(TxManifest manifest) {
+        try {
             var channel = _txFile.getChannel();
             var data = SerializationHelper.serializeArray(manifest);
-            channel.truncate(data.length);
+            channel.truncate(data.length + 8);
             channel.position(0);
+            var hash = LongHashFunction.xx3().hashBytes(data);
+            if (channel.write(ByteUtils.longToBb(hash)) != 8)
+                throw new StatusRuntimeExceptionNoStacktrace(Status.INTERNAL);
             if (channel.write(ByteBuffer.wrap(data)) != data.length)
                 throw new StatusRuntimeExceptionNoStacktrace(Status.INTERNAL);
             channel.force(true);
@@ -328,8 +363,13 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     @Override
     public void commitTx(TxManifest manifest) {
+        verifyReady();
+        commitTxImpl(manifest, true);
+    }
+
+    public void commitTxImpl(TxManifest manifest, boolean failIfNotFound) {
         try {
-            putTransactionManifest(manifest);
+            putTxManifest(manifest);
 
             var latch = new CountDownLatch(manifest.getWritten().size() + manifest.getDeleted().size());
             ConcurrentLinkedQueue<Throwable> errors = new ConcurrentLinkedQueue<>();
@@ -339,6 +379,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
                     try {
                         Files.move(getTmpObjPath(n), getObjPath(n), ATOMIC_MOVE, REPLACE_EXISTING);
                     } catch (Throwable t) {
+                        if (!failIfNotFound && (t instanceof NoSuchFileException)) return;
                         Log.error("Error writing " + n, t);
                         errors.add(t);
                     } finally {
@@ -388,22 +429,26 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     }
 
     @Override
-    public void deleteObject(String name) {
+    public void deleteObjectDirect(String name) {
+        verifyReady();
         deleteImpl(getObjPath(name));
     }
 
     @Override
     public long getTotalSpace() {
+        verifyReady();
         return _root.toFile().getTotalSpace();
     }
 
     @Override
     public long getFreeSpace() {
+        verifyReady();
         return _root.toFile().getFreeSpace();
     }
 
     @Override
     public long getUsableSpace() {
+        verifyReady();
         return _root.toFile().getUsableSpace();
     }
 

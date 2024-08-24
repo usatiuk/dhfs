@@ -5,13 +5,16 @@ import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.objects.repository.autosync.AutoSyncProcessor;
 import com.usatiuk.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
-import io.quarkus.runtime.Shutdown;
-import io.quarkus.runtime.Startup;
+import io.quarkus.runtime.ShutdownEvent;
+import io.quarkus.runtime.StartupEvent;
+import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -50,8 +53,7 @@ public class JObjectRefProcessor {
         _canDeleteRetries = new HashSetDelayedBlockingQueue<>(canDeleteRetryDelay);
     }
 
-    @Startup
-    void init() {
+    void init(@Observes @Priority(200) StartupEvent event) throws IOException {
         BasicThreadFactory factory = new BasicThreadFactory.Builder()
                 .namingPattern("move-proc-%d")
                 .build();
@@ -75,8 +77,7 @@ public class JObjectRefProcessor {
 //                }));
     }
 
-    @Shutdown
-    void shutdown() throws InterruptedException {
+    void shutdown(@Observes @Priority(800) ShutdownEvent event) throws InterruptedException {
         _refProcessorExecutorService.shutdownNow();
         if (!_refProcessorExecutorService.awaitTermination(30, TimeUnit.SECONDS)) {
             Log.error("Refcounting threads didn't exit in 30 seconds");

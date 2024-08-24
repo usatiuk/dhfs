@@ -23,8 +23,12 @@ public abstract class SerializationHelper {
         }
     }
 
+    public static <T> T deserialize(final byte[] objectData, int offset) {
+        return deserialize(new ByteArrayInputStream(objectData, offset, objectData.length - offset));
+    }
+
     public static <T> T deserialize(final byte[] objectData) {
-        return deserialize(new ByteArrayInputStream(objectData));
+        return deserialize(objectData, 0);
     }
 
     public static <T extends Serializable> byte[] serializeArray(final T obj) {

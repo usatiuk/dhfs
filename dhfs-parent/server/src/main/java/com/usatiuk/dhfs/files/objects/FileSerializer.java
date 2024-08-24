@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.files.objects;
 
 import com.usatiuk.dhfs.objects.persistence.FileP;
-import com.usatiuk.dhfs.objects.persistence.FilePChunksEntry;
 import com.usatiuk.dhfs.objects.persistence.FsNodeP;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoDeserializer;
 import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializer;

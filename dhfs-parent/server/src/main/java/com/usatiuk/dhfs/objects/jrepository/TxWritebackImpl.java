@@ -40,6 +40,7 @@ public class TxWritebackImpl implements TxWriteback {
     private ExecutorService _commitExecutor;
     private ExecutorService _statusExecutor;
     private AtomicLong _waitedTotal = new AtomicLong(0);
+    private volatile boolean _ready = false;
 
     void init(@Observes @Priority(110) StartupEvent event) {
         {
@@ -70,11 +71,25 @@ public class TxWritebackImpl implements TxWriteback {
             } catch (InterruptedException ignored) {
             }
         });
+        _ready = true;
     }
 
-    void shutdown(@Observes @Priority(890) ShutdownEvent event) {
+    void shutdown(@Observes @Priority(890) ShutdownEvent event) throws InterruptedException {
+        Log.info("Waiting for all transactions to drain");
+
+        synchronized (_flushWaitSynchronizer) {
+            _ready = false;
+            while (currentSize > 0) {
+                _flushWaitSynchronizer.wait();
+            }
+        }
+
         _writebackExecutor.shutdownNow();
         Log.info("Total tx bundle wait time: " + _waitedTotal.get() + "ms");
+    }
+
+    private void verifyReady() {
+        if (!_ready) throw new IllegalStateException("Not doing transactions while shutting down!");
     }
 
     private void writeback() {
@@ -139,7 +154,8 @@ public class TxWritebackImpl implements TxWriteback {
                 Log.trace("Transaction " + bundle.getId() + " committed");
                 synchronized (_flushWaitSynchronizer) {
                     currentSize -= ((TxBundle) bundle).calculateTotalSize();
-                    if (currentSize <= sizeLimit)
+                    // FIXME:
+                    if (currentSize <= sizeLimit || !_ready)
                         _flushWaitSynchronizer.notifyAll();
                 }
             } catch (InterruptedException ignored) {
@@ -154,6 +170,7 @@ public class TxWritebackImpl implements TxWriteback {
 
     @Override
     public com.usatiuk.dhfs.objects.jrepository.TxBundle createBundle() {
+        verifyReady();
         boolean wait = false;
         while (true) {
             if (wait) {
@@ -189,6 +206,7 @@ public class TxWritebackImpl implements TxWriteback {
 
     @Override
     public void commitBundle(com.usatiuk.dhfs.objects.jrepository.TxBundle bundle) {
+        verifyReady();
         synchronized (_pendingBundles) {
             _pendingBundles.get(bundle.getId()).setRight(Boolean.TRUE);
             if (_pendingBundles.firstKey().equals(bundle.getId()))
@@ -201,6 +219,7 @@ public class TxWritebackImpl implements TxWriteback {
 
     @Override
     public void fence(long txId) {
+        verifyReady();
     }
 
     @Getter
