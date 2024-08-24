@@ -13,8 +13,8 @@ import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.Shutdown;
 import io.quarkus.runtime.Startup;
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import lombok.Getter;
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
@@ -31,7 +31,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-@ApplicationScoped
+@Singleton
 public class JObjectManagerImpl implements JObjectManager {
     private final MultiValuedMap<Class<? extends JObjectData>, WriteListenerFn> _writeListeners
             = new ArrayListValuedHashMap<>();
@@ -45,8 +45,6 @@ public class JObjectManagerImpl implements JObjectManager {
     RemoteObjectServiceClient remoteObjectServiceClient;
     @Inject
     InvalidationQueueService invalidationQueueService;
-    @Inject
-    JObjectManager jObjectManager;
     @Inject
     PersistentPeerDataService persistentPeerDataService;
     @Inject
@@ -632,7 +630,7 @@ public class JObjectManagerImpl implements JObjectManager {
                 Log.debug(sb.toString());
                 for (var r : getMeta().getSavedRefs()) {
                     if (!extracted.contains(r))
-                        jObjectManager.get(r).ifPresent(ro -> ro.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
+                        get(r).ifPresent(ro -> ro.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
                             m.removeRef(getMeta().getName());
                             return null;
                         }));
@@ -640,7 +638,7 @@ public class JObjectManagerImpl implements JObjectManager {
                 for (var r : extracted) {
                     if (!getMeta().getSavedRefs().contains(r)) {
                         Log.trace("Hydrating ref " + r + " for " + getMeta().getName());
-                        jObjectManager.getOrPut(r, getData().getRefType(), Optional.of(getMeta().getName()));
+                        getOrPut(r, getData().getRefType(), Optional.of(getMeta().getName()));
                     }
                 }
                 getMeta().setSavedRefs(null);
@@ -664,7 +662,7 @@ public class JObjectManagerImpl implements JObjectManager {
 
                 refs.forEach(r -> {
                     Log.trace("Hydrating ref after undelete " + r + " for " + getMeta().getName());
-                    jObjectManager.getOrPut(r, getData() != null ? getData().getRefType() : JObjectData.class, Optional.of(getMeta().getName()));
+                    getOrPut(r, getData() != null ? getData().getRefType() : JObjectData.class, Optional.of(getMeta().getName()));
                 });
 
             }
@@ -678,7 +676,7 @@ public class JObjectManagerImpl implements JObjectManager {
         }
 
         private void quickDeleteRef(String name) {
-            jObjectManager.get(name)
+            get(name)
                     .ifPresent(ref -> ref.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
                         mc.removeRef(getMeta().getName());
                         return null;
