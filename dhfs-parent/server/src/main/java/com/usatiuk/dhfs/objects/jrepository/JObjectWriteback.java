@@ -189,7 +189,7 @@ public class JObjectWriteback {
             }
         }
 
-        if (_currentSize.get() > sizeLimit) {
+        if (!object.getMeta().isDeleted() && _currentSize.get() > sizeLimit) {
             long started = System.currentTimeMillis();
             final long timeout = 15000L; // FIXME:
             boolean finished = false;
