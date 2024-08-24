@@ -67,6 +67,16 @@ public class DhfsFuse extends FuseStubFS {
         if (SystemUtils.IS_OS_MAC) {
             opts.add("-o");
             opts.add("iosize=" + iosize);
+        } else if (SystemUtils.IS_OS_LINUX) {
+            // FIXME: There's something else missing: the writes still seem to be 32k max
+            opts.add("-o");
+            opts.add("large_read");
+            opts.add("-o");
+            opts.add("big_writes");
+            opts.add("-o");
+            opts.add("max_read=" + iosize);
+            opts.add("-o");
+            opts.add("max_write=" + iosize);
         }
         opts.add("-o");
         opts.add("auto_cache");
