@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.objects.repository.opsupport;
 
+import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
 import com.usatiuk.dhfs.objects.repository.PeerManager;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.utils.HashSetDelayedBlockingQueue;
@@ -7,6 +8,7 @@ import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.Startup;
 import jakarta.annotation.Priority;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
@@ -16,6 +18,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+@ApplicationScoped
 public class OpSender {
     private static final int _threads = 1;
     private final HashSetDelayedBlockingQueue<OpObject> _queue = new HashSetDelayedBlockingQueue<>(0); // FIXME:
@@ -23,6 +26,8 @@ public class OpSender {
     PeerManager remoteHostManager;
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
+    @Inject
+    JObjectTxManager jObjectTxManager;
     private ExecutorService _executor;
     private volatile boolean _shutdown = false;
 
@@ -52,7 +57,9 @@ public class OpSender {
             try {
                 var got = _queue.get();
                 for (var h : remoteHostManager.getAvailableHosts()) {
-                    sendForHost(got, h);
+                    jObjectTxManager.executeTxAndFlush(() -> {
+                        sendForHost(got, h);
+                    });
                 }
             } catch (InterruptedException ignored) {
             }

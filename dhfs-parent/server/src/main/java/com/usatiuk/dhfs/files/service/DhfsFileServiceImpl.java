@@ -5,7 +5,6 @@ import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.files.objects.ChunkData;
 import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.objects.FsNode;
-import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTree;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
@@ -71,7 +70,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Inject
     JKleppmannTreeManager jKleppmannTreeManager;
 
-    private JKleppmannTree _tree;
+    private JKleppmannTreeManager.JKleppmannTree _tree;
 
     private ChunkData createChunk(ByteString bytes) {
         if (useHashForChunks) {

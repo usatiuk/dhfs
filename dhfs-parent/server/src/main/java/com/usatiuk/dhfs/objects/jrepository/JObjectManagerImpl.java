@@ -465,8 +465,13 @@ public class JObjectManagerImpl implements JObjectManager {
             try {
                 if (!_lock.writeLock().tryLock(lockTimeoutSecs, TimeUnit.SECONDS))
                     return false;
-                if (_lock.writeLock().getHoldCount() == 1) {
-                    jObjectTxManager.addToTx(this, txCopy);
+                try {
+                    if (_lock.writeLock().getHoldCount() == 1) {
+                        jObjectTxManager.addToTx(this, txCopy);
+                    }
+                } catch (Throwable t) {
+                    _lock.writeLock().unlock();
+                    throw t;
                 }
                 return true;
             } catch (InterruptedException e) {

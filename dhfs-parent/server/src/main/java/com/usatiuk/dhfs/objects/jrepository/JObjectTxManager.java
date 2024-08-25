@@ -375,16 +375,16 @@ public class JObjectTxManager {
     }
 
     private class TxState {
+        private final long _id = _transientTxId.incrementAndGet();
+        private final HashMap<JObject<?>, JObjectSnapshot> _writeObjects = new HashMap<>();
+        private final HashMap<JObject<?>, DirectObjectState> _directObjects = new HashMap<>();
+        private final ArrayList<Consumer<String>> _callbacks = new ArrayList<>();
+
         private static class DirectObjectState {
             final JObjectSnapshot snapshot;
             boolean _forceInvalidated = false;
 
             private DirectObjectState(JObjectSnapshot snapshot) {this.snapshot = snapshot;}
         }
-
-        private final long _id = _transientTxId.incrementAndGet();
-        private final HashMap<JObject<?>, JObjectSnapshot> _writeObjects = new HashMap<>();
-        private final HashMap<JObject<?>, DirectObjectState> _directObjects = new HashMap<>();
-        private final ArrayList<Consumer<String>> _callbacks = new ArrayList<>();
     }
 }

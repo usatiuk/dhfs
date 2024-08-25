@@ -86,6 +86,10 @@ public class ProtoSerializerService {
             return Optional.of(JObjectDataP.newBuilder().setPersistentPeerInfo((PersistentPeerInfoP) ser).build());
         } else if (ser instanceof JKleppmannTreeNodeP) {
             return Optional.of(JObjectDataP.newBuilder().setTreeNode((JKleppmannTreeNodeP) ser).build());
+        } else if (ser instanceof JKleppmannTreePersistentDataP) {
+            return Optional.of(JObjectDataP.newBuilder().setKleppmannTreePersistentData((JKleppmannTreePersistentDataP) ser).build());
+        } else if (ser instanceof JKleppmannTreeOpLogP) {
+            return Optional.of(JObjectDataP.newBuilder().setKleppmannTreeOpLog((JKleppmannTreeOpLogP) ser).build());
         } else {
             return Optional.empty();
         }

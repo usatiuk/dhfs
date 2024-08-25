@@ -3,7 +3,6 @@ package com.usatiuk.kleppmanntree;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -118,7 +117,8 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     private void redoOp(Map.Entry<CombinedTimestamp<TimestampT, PeerIdT>, LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT>> entry) {
-        entry.setValue(doOp(entry.getValue().op(), false));
+        var newEffects = doOp(entry.getValue().op(), false);
+        _storage.getLog().replace(entry.getKey(), newEffects);
     }
 
     private void doAndPut(OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> op, boolean failCreatingIfExists) {
@@ -132,39 +132,38 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         var timeLog = _storage.getPeerTimestampLog();
         TimestampT min = null;
         for (var e : _peers.getAllPeers()) {
-            var got = timeLog.get(e);
-            if (got == null || got.get() == null) return;
-            var gotNum = got.get();
+            var got = timeLog.getForPeer(e);
+            if (got == null) return;
             if (min == null) {
-                min = gotNum;
+                min = got;
                 continue;
             }
-            if (gotNum.compareTo(min) < 0)
-                min = gotNum;
+            if (got.compareTo(min) < 0)
+                min = got;
         }
         if (min == null) return;
 
-        var canTrim = log.headMap(new CombinedTimestamp<>(min, null), true);
-        if (!canTrim.isEmpty()) {
-            canTrim = log.headMap(new CombinedTimestamp<>(min, null), true);
+        var threshold = new CombinedTimestamp<TimestampT, PeerIdT>(min, null);
 
-            LOGGER.fine("Will trim " + canTrim.size() + " entries");
-
+        if (!log.isEmpty() && log.peekOldest().getLeft().compareTo(threshold) <= 0) {
             Set<NodeIdT> inTrash = new HashSet<>();
 
-            for (var le : canTrim.values()) {
-                if (le.effects() != null)
-                    for (var e : le.effects()) {
-                        if (Objects.equals(e.newParentId(), _storage.getTrashId())) {
-                            inTrash.add(e.childId());
-                        } else {
-                            inTrash.remove(e.childId());
+            {
+                Pair<CombinedTimestamp<TimestampT, PeerIdT>, LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT>> entry = null;
+                while ((entry = log.peekOldest()) != null
+                        && entry.getLeft().compareTo(threshold) <= 0) {
+                    log.takeOldest();
+                    if (entry.getRight().effects() != null)
+                        for (var e : entry.getRight().effects()) {
+                            if (Objects.equals(e.newParentId(), _storage.getTrashId())) {
+                                inTrash.add(e.childId());
+                            } else {
+                                inTrash.remove(e.childId());
+                            }
                         }
-                    }
+                }
+
             }
-
-            canTrim.clear();
-
             if (!inTrash.isEmpty()) {
                 var trash = _storage.getById(_storage.getTrashId());
                 trash.rwLock();
@@ -218,17 +217,12 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     // Returns true if the timestamp is newer than what's seen, false otherwise
     private boolean updateTimestampImpl(PeerIdT from, TimestampT newTimestamp) {
         assertRwLock();
-        var ref = _storage.getPeerTimestampLog().computeIfAbsent(from, f -> new AtomicReference<>());
-        TimestampT oldRef;
-        TimestampT newRef;
-        do {
-            oldRef = ref.get();
-            if (oldRef != null && oldRef.compareTo(newTimestamp) > 0) { // FIXME?
-                LOGGER.warning("Wrong op order: received older than known from " + from.toString());
-                return false;
-            }
-            newRef = newTimestamp;
-        } while (!ref.compareAndSet(oldRef, newRef));
+        TimestampT oldRef = _storage.getPeerTimestampLog().getForPeer(from);
+        if (oldRef != null && oldRef.compareTo(newTimestamp) > 0) { // FIXME?
+            LOGGER.warning("Wrong op order: received older than known from " + from.toString());
+            return false;
+        }
+        _storage.getPeerTimestampLog().putForPeer(from, newTimestamp);
         return true;
     }
 
@@ -251,7 +245,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         var log = _storage.getLog();
 
         // FIXME: hack?
-        int cmp = log.isEmpty() ? 1 : op.timestamp().compareTo(log.lastEntry().getKey());
+        int cmp = log.isEmpty() ? 1 : op.timestamp().compareTo(log.peekNewest().getKey());
 
         if (log.containsKey(op.timestamp())) {
             tryTrimLog();
@@ -261,15 +255,15 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         if (cmp < 0) {
             try {
                 if (log.containsKey(op.timestamp())) return;
-                var toUndo = log.tailMap(op.timestamp(), false);
+                var toUndo = log.newestSlice(op.timestamp(), false);
                 _undoCtx = new HashMap<>();
-                for (var entry : toUndo.reversed().entrySet()) {
+                for (var entry : toUndo.reversed()) {
                     undoOp(entry.getValue());
                 }
                 try {
                     doAndPut(op, failCreatingIfExists);
                 } finally {
-                    for (var entry : toUndo.entrySet()) {
+                    for (var entry : toUndo) {
                         redoOp(entry);
                     }
 
@@ -550,7 +544,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 result.put(node.getNode().getLastEffectiveOp().timestamp(), node.getNode().getLastEffectiveOp());
             });
 
-            for (var le : _storage.getLog().entrySet()) {
+            for (var le : _storage.getLog().getAll()) {
                 var op = le.getValue().op();
                 LOGGER.fine("bootstrap op from log for " + host + ": " + op.timestamp().toString() + " " + op.newMeta().getName() + " " + op.childId() + "->" + op.newParentId());
                 result.put(le.getKey(), le.getValue().op());

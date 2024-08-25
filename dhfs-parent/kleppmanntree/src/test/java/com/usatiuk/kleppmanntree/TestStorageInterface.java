@@ -1,13 +1,13 @@
 package com.usatiuk.kleppmanntree;
 
-import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.HashMap;
+import java.util.Map;
 
 public class TestStorageInterface implements StorageInterface<Long, Long, TestNodeMeta, Long, TestNodeWrapper> {
     private final long _peerId;
     private final Map<Long, TreeNode<Long, Long, TestNodeMeta, Long>> _nodes = new HashMap<>();
-    private final NavigableMap<CombinedTimestamp<Long, Long>, LogRecord<Long, Long, TestNodeMeta, Long>> _log = new TreeMap<>();
-    private final Map<Long, AtomicReference<Long>> _peerTimestampLog = new HashMap<>();
+    private final TestLog _log = new TestLog();
+    private final TestPeerLog _peerLog = new TestPeerLog();
     private long _curId = 1;
 
     public TestStorageInterface(long peerId) {
@@ -53,18 +53,15 @@ public class TestStorageInterface implements StorageInterface<Long, Long, TestNo
         _nodes.remove(id);
     }
 
-    @Override
-    public void lockSet(Collection<TestNodeWrapper> nodes) {
-
-    }
 
     @Override
-    public NavigableMap<CombinedTimestamp<Long, Long>, LogRecord<Long, Long, TestNodeMeta, Long>> getLog() {
+    public LogInterface<Long, Long, TestNodeMeta, Long> getLog() {
         return _log;
     }
 
+
     @Override
-    public Map<Long, AtomicReference<Long>> getPeerTimestampLog() {
-        return _peerTimestampLog;
+    public PeerTimestampLogInterface<Long, Long> getPeerTimestampLog() {
+        return _peerLog;
     }
 }

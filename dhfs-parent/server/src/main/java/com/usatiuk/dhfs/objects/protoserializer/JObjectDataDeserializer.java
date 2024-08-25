@@ -19,6 +19,9 @@ public class JObjectDataDeserializer implements ProtoDeserializer<JObjectDataP, 
             case PEERDIRECTORY -> protoSerializerService.deserialize(message.getPeerDirectory());
             case PERSISTENTPEERINFO -> protoSerializerService.deserialize(message.getPersistentPeerInfo());
             case TREENODE -> protoSerializerService.deserialize(message.getTreeNode());
+            case KLEPPMANNTREEPERSISTENTDATA ->
+                    protoSerializerService.deserialize(message.getKleppmannTreePersistentData());
+            case KLEPPMANNTREEOPLOG -> protoSerializerService.deserialize(message.getKleppmannTreeOpLog());
             case OBJ_NOT_SET -> throw new IllegalStateException("Type not set when deserializing");
         };
     }

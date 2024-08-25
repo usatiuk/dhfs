@@ -6,6 +6,10 @@ import java.util.concurrent.atomic.AtomicLong;
 public class AtomicClock implements Clock<Long>, Serializable {
     private final AtomicLong _max = new AtomicLong(0L);
 
+    public AtomicClock(long counter) {
+        _max.set(counter);
+    }
+
     @Override
     public Long getTimestamp() {
         return _max.incrementAndGet();

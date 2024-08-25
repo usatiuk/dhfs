@@ -56,7 +56,11 @@ public class SyncHandler {
     public void pushInitialResyncOp(UUID host) {
         Log.info("Doing initial op push for " + host);
 
-        opObjectRegistry.pushBootstrapData(host);
+        jObjectTxManager.executeTxAndFlush(
+                () -> {
+                    opObjectRegistry.pushBootstrapData(host);
+                }
+        );
     }
 
     public void handleOneUpdate(UUID from, ObjectHeader header) {
