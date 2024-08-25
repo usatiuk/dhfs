@@ -43,7 +43,9 @@ public class SoftJObjectFactory {
                     if (ref != null)
                         return ref;
                 }
-                var next = new SoftReference<>((JObject<T>) jObjectManager.get(_objName).get());
+                var got = (JObject<T>) jObjectManager.get(_objName).orElse(null);
+                if (got == null) return null;
+                var next = new SoftReference<>(got);
                 _obj.compareAndSet(have, next);
             }
         }
