@@ -33,7 +33,7 @@ public class DeadlockDetector {
                 long[] threadIds = bean.findDeadlockedThreads(); // Returns null if no threads are deadlocked.
 
                 if (threadIds != null) {
-                    ThreadInfo[] infos = bean.getThreadInfo(threadIds);
+                    ThreadInfo[] infos = bean.getThreadInfo(threadIds, Integer.MAX_VALUE);
 
                     StringBuilder sb = new StringBuilder();
 
@@ -42,9 +42,10 @@ public class DeadlockDetector {
                     for (ThreadInfo info : infos) {
                         StackTraceElement[] stack = info.getStackTrace();
                         sb.append(info.getThreadName()).append("\n");
-                        sb.append("getLockedMonitors:").append(Arrays.toString(info.getLockedMonitors())).append("\n");
-                        sb.append("getLockedSynchronizers:").append(Arrays.toString(info.getLockedSynchronizers())).append("\n");
-                        sb.append("waiting on:").append(info.getLockInfo()).append("\n");
+                        sb.append("getLockedMonitors: ").append(Arrays.toString(info.getLockedMonitors())).append("\n");
+                        sb.append("getLockedSynchronizers: ").append(Arrays.toString(info.getLockedSynchronizers())).append("\n");
+                        sb.append("waiting on: ").append(info.getLockInfo()).append("\n");
+                        sb.append("locked by: ").append(info.getLockOwnerName()).append("\n");
                         sb.append("Stack trace:\n");
                         for (var e : stack) {
                             sb.append(e.toString()).append("\n");
