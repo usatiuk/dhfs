@@ -18,7 +18,6 @@ import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 // Note: RunOnVirtualThread hangs somehow
 @GrpcService
@@ -64,36 +63,31 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
         // Does @Blocking break this?
         return Uni.createFrom().emitter(emitter -> {
-            AtomicBoolean didLock = new AtomicBoolean(false);
-            try {
-                jObjectTxManager.executeTx(() -> {
-                    // Obj.markSeen before markSeen of its children
-                    obj.markSeen();
-                    obj.runReadLockedVoid(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (meta, data) -> {
-                        if (meta.isOnlyLocal())
-                            throw new StatusRuntimeExceptionNoStacktrace(Status.INVALID_ARGUMENT.withDescription("Trying to get local-only object"));
-                        if (data == null) {
-                            Log.info("<-- getObject FAIL: " + request.getName() + " from " + request.getSelfUuid());
-                            throw new StatusRuntimeException(Status.ABORTED.withDescription("Not available locally"));
-                        }
-                        data.extractRefs().forEach(ref ->
-                                jObjectManager.get(ref)
-                                        .orElseThrow(() -> new IllegalStateException("Non-hydrated refs for local object?"))
-                                        .markSeen());
-                    });
-                    obj.rLock();
-                    didLock.set(true);
+            var replyObj = jObjectTxManager.executeTx(() -> {
+                // Obj.markSeen before markSeen of its children
+                obj.markSeen();
+                return obj.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (meta, data) -> {
+                    if (meta.isOnlyLocal())
+                        throw new StatusRuntimeExceptionNoStacktrace(Status.INVALID_ARGUMENT.withDescription("Trying to get local-only object"));
+                    if (data == null) {
+                        Log.info("<-- getObject FAIL: " + request.getName() + " from " + request.getSelfUuid());
+                        throw new StatusRuntimeException(Status.ABORTED.withDescription("Not available locally"));
+                    }
+                    data.extractRefs().forEach(ref ->
+                            jObjectManager.get(ref)
+                                    .orElseThrow(() -> new IllegalStateException("Non-hydrated refs for local object?"))
+                                    .markSeen());
+
+                    return ApiObject.newBuilder()
+                            .setHeader(obj.getMeta().toRpcHeader())
+                            .setContent(protoSerializerService.serializeToJObjectDataP(obj.getData())).build();
                 });
-                var replyObj = ApiObject.newBuilder()
-                        .setHeader(obj.getMeta().toRpcHeader())
-                        .setContent(protoSerializerService.serializeToJObjectDataP(obj.getData())).build();
-                obj.commitFenceAsync(() -> emitter.complete(GetObjectReply.newBuilder()
-                        .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
-                        .setObject(replyObj).build()));
-            } finally {
-                if (didLock.get())
-                    obj.rUnlock();
-            }
+            });
+            var ret = GetObjectReply.newBuilder()
+                    .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
+                    .setObject(replyObj).build();
+            // TODO: Could this cause problems if we wait for too long?
+            obj.commitFenceAsync(() -> emitter.complete(ret));
         });
     }
 
