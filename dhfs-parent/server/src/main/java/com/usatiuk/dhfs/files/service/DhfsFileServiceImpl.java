@@ -397,6 +397,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             file.rwLockNoCopy();
             try {
+                file.tryResolve(JObjectManager.ResolutionStrategy.REMOTE);
                 // FIXME:
                 if (!(file.getData() instanceof File fData))
                     throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
