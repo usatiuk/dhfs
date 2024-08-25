@@ -191,7 +191,7 @@ public class JObjectWriteback {
 
         if (!object.getMeta().isDeleted() && _currentSize.get() > sizeLimit) {
             long started = System.currentTimeMillis();
-            final long timeout = 15000L; // FIXME:
+            final long timeout = 100L; // FIXME:
             boolean finished = false;
             while (!finished && System.currentTimeMillis() - started < timeout) {
                 synchronized (this) {

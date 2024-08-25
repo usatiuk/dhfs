@@ -345,7 +345,9 @@ public class JObjectTxManager {
 
         obj.assertRwLock();
 
-        state._directObjects.get(obj)._forceInvalidated = true;
+        var got = state._directObjects.get(obj);
+        if (got != null)
+            got._forceInvalidated = true;
     }
 
     void addToTx(JObject<?> obj, boolean copy) {

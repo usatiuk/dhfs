@@ -61,6 +61,8 @@ public class JObjectManagerImpl implements JObjectManager {
     TxWriteback txWriteback;
     @ConfigProperty(name = "dhfs.objects.ref_verification")
     boolean refVerification;
+    @ConfigProperty(name = "dhfs.objects.lock_timeout_secs")
+    int lockTimeoutSecs;
     private Thread _refCleanupThread;
 
     @Override
@@ -345,7 +347,6 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     public class JObject<T extends JObjectData> extends com.usatiuk.dhfs.objects.jrepository.JObject<T> {
-        private static final int lockTimeoutSecs = 5;
         private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
         private final AtomicReference<T> _dataPart = new AtomicReference<>();
         private ObjectMetadata _metaPart;
