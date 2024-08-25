@@ -67,6 +67,8 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
             AtomicBoolean didLock = new AtomicBoolean(false);
             try {
                 jObjectTxManager.executeTx(() -> {
+                    // Obj.markSeen before markSeen of its children
+                    obj.markSeen();
                     obj.runReadLockedVoid(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (meta, data) -> {
                         if (meta.isOnlyLocal())
                             throw new StatusRuntimeExceptionNoStacktrace(Status.INVALID_ARGUMENT.withDescription("Trying to get local-only object"));
@@ -79,7 +81,6 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
                                         .orElseThrow(() -> new IllegalStateException("Non-hydrated refs for local object?"))
                                         .markSeen());
                     });
-                    obj.markSeen();
                     obj.rLock();
                     didLock.set(true);
                 });
