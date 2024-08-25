@@ -52,7 +52,7 @@ public class JObjectManagerImpl implements JObjectManager {
     @Inject
     JObjectRefProcessor jObjectRefProcessor;
     @Inject
-    JObjectWriteback jObjectWriteback;
+    SoftJObjectFactory softJObjectFactory;
     @Inject
     JObjectLRU jObjectLRU;
     @Inject
@@ -464,10 +464,15 @@ public class JObjectManagerImpl implements JObjectManager {
             }
         }
 
-        boolean tryRWLock(boolean txCopy) {
+        boolean tryRwLockImpl(boolean block, boolean txCopy) {
             try {
-                if (!_lock.writeLock().tryLock(lockTimeoutSecs, TimeUnit.SECONDS))
-                    return false;
+                if (block) {
+                    if (!_lock.writeLock().tryLock(lockTimeoutSecs, TimeUnit.SECONDS))
+                        return false;
+                } else {
+                    if (!_lock.writeLock().tryLock())
+                        return false;
+                }
                 try {
                     if (_lock.writeLock().getHoldCount() == 1) {
                         jObjectTxManager.addToTx(this, txCopy);
@@ -482,15 +487,20 @@ public class JObjectManagerImpl implements JObjectManager {
             }
         }
 
+        @Override
         public void rwLock() {
-            if (!tryRWLock(true))
+            if (!tryRwLockImpl(true, true))
                 throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Failed to acquire write lock for " + getMeta().getName()));
         }
 
+        @Override
+        public boolean tryRwLock() {
+            return tryRwLockImpl(false, true);
+        }
 
         @Override
         public void rwLockNoCopy() {
-            if (!tryRWLock(false))
+            if (!tryRwLockImpl(true, false))
                 throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Failed to acquire write lock for " + getMeta().getName()));
         }
 
@@ -662,11 +672,17 @@ public class JObjectManagerImpl implements JObjectManager {
         }
 
         private void quickDeleteRef(String name) {
-            get(name)
-                    .ifPresent(ref -> ref.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (mc, dc, bc, ic) -> {
-                        mc.removeRef(getMeta().getName());
-                        return null;
-                    }));
+            var got = get(name).orElse(null);
+            if (got == null) return;
+            if (got.tryRwLock()) {
+                try {
+                    got.getMeta().removeRef(getMeta().getName());
+                } finally {
+                    got.rwUnlock();
+                }
+            } else {
+                jObjectRefProcessor.putQuickDeletionCandidate(softJObjectFactory.create(got));
+            }
         }
 
         private void tryQuickDelete() {

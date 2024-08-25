@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 
 @ApplicationScoped
 public class JObjectRefProcessor {
+    private final HashSetDelayedBlockingQueue<SoftJObject<?>> _quickCandidates = new HashSetDelayedBlockingQueue<>(0);
     private final HashSetDelayedBlockingQueue<String> _candidates;
     private final HashSetDelayedBlockingQueue<String> _canDeleteRetries;
     private final HashSet<String> _movablesInProcessing = new HashSet<>();
@@ -82,6 +83,10 @@ public class JObjectRefProcessor {
         if (!_refProcessorExecutorService.awaitTermination(30, TimeUnit.SECONDS)) {
             Log.error("Refcounting threads didn't exit in 30 seconds");
         }
+    }
+
+    public void putQuickDeletionCandidate(SoftJObject<?> obj) {
+        _quickCandidates.add(obj);
     }
 
     public void putDeletionCandidate(String name) {
@@ -176,48 +181,60 @@ public class JObjectRefProcessor {
         try {
             while (!Thread.interrupted()) {
                 String next = null;
+                SoftJObject<?> nextObj = null;
 
-                while (next == null) {
-                    next = _candidates.tryGet();
+                while (next == null && nextObj == null) {
+                    nextObj = _quickCandidates.tryGet();
+
+                    if (nextObj != null) break;
+
+                    next = _canDeleteRetries.tryGet();
                     if (next == null)
-                        next = _canDeleteRetries.tryGet();
+                        next = _candidates.tryGet();
                     if (next == null)
-                        next = _candidates.get(canDeleteRetryDelay);
+                        nextObj = _quickCandidates.get(canDeleteRetryDelay);
                 }
 
-                var got = jObjectManager.get(next).orElse(null);
-                if (got == null) continue;
+                JObject<?> target;
+
+                if (nextObj != null) {
+                    target = nextObj.get();
+                } else {
+                    target = jObjectManager.get(next).orElse(null);
+                }
+
+                if (target == null) continue;
                 try {
                     jObjectTxManager.executeTx(() -> {
-                        got.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, v, i) -> {
+                        target.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, v, i) -> {
                             if (m.isLocked()) return null;
                             if (m.isDeleted()) return null;
                             if (!m.isDeletionCandidate()) return null;
                             if (m.isSeen() && !m.isOnlyLocal()) {
-                                if (!processMovable(got))
+                                if (!processMovable(target))
                                     return null;
                             }
                             if (m.isSeen() && m.isOnlyLocal())
                                 Log.warn("Seen only-local object: " + m.getName());
 
 
-                            if (!got.getMeta().getKnownClass().isAnnotationPresent(Leaf.class))
-                                got.tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
+                            if (!target.getMeta().getKnownClass().isAnnotationPresent(Leaf.class))
+                                target.tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
 
                             Log.debug("Deleting " + m.getName());
                             m.markDeleted();
 
                             Collection<String> extracted = null;
-                            if (!got.getMeta().getKnownClass().isAnnotationPresent(Leaf.class) && got.getData() != null)
-                                extracted = got.getData().extractRefs();
-                            Collection<String> saved = got.getMeta().getSavedRefs();
+                            if (!target.getMeta().getKnownClass().isAnnotationPresent(Leaf.class) && target.getData() != null)
+                                extracted = target.getData().extractRefs();
+                            Collection<String> saved = target.getMeta().getSavedRefs();
 
-                            got.discardData();
+                            target.discardData();
 
                             if (saved != null)
-                                for (var r : saved) deleteRef(got, r);
+                                for (var r : saved) deleteRef(target, r);
                             if (extracted != null)
-                                for (var r : extracted) deleteRef(got, r);
+                                for (var r : extracted) deleteRef(target, r);
 
                             return null;
                         });

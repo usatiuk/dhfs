@@ -34,6 +34,8 @@ public abstract class JObject<T extends JObjectData> {
 
     public abstract void rwLock();
 
+    public abstract boolean tryRwLock();
+
     public abstract void rwLockNoCopy();
 
     public abstract void rwUnlock();
