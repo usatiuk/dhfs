@@ -132,11 +132,7 @@ public class RemoteObjectServiceClient {
     public OpPushReply pushOp(Op op, String queueName, UUID host) {
         for (var ref : op.getEscapedRefs()) {
             jObjectTxManager.executeTx(() -> {
-                jObjectManager.get(ref)
-                        .ifPresent(o -> o.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
-                            m.markSeen();
-                            return null;
-                        }));
+                jObjectManager.get(ref).ifPresent(JObject::markSeen);
             });
         }
         var msg = OpPushMsg.newBuilder()
