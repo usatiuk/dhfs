@@ -65,6 +65,7 @@ public class JObjectTxManager {
         Log.debug("Dropping " + obj.getMeta().getName() + " from " + state._id);
         obj.assertRwLock();
         state._writeObjects.remove(obj);
+        state._directObjects.remove(obj);
         obj.rwUnlock();
     }
 
