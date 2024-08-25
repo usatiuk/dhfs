@@ -258,11 +258,13 @@ public class JObjectManagerImpl implements JObjectManager {
                 {
                     boolean shouldWrite = false;
                     try {
-                        shouldWrite = !got.runReadLocked(ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
-                            return ((m.getKnownClass().equals(klass)) ||
-                                    (klass.isAssignableFrom(m.getKnownClass())))
-                                    && m.isSeen();
-                        });
+                        // These two mutate in one direction only, it's ok to not take the lock
+                        var gotKlass = got.getMeta().getKnownClass();
+                        var gotSeen = got.getMeta().isSeen();
+                        shouldWrite
+                                = !(((gotKlass.equals(klass))
+                                || (klass.isAssignableFrom(gotKlass)))
+                                && gotSeen);
                     } catch (DeletedObjectAccessException dex) {
                         shouldWrite = true;
                     }
