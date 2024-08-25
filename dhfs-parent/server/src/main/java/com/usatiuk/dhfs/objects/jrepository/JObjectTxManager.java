@@ -127,8 +127,8 @@ public class JObjectTxManager {
                     obj.getValue() == null || !Objects.equals(obj.getValue().meta(), protoSerializerService.serialize(obj.getKey().getMeta())),
                     obj.getValue() == null || newExternalHash != obj.getValue().externalHash(),
                     obj.getValue() == null || (obj.getValue().data() == null) != (obj.getKey().getData() == null) ||
-                            (obj.getValue().data() == null) ||
-                            !Objects.equals(obj.getValue().data(), protoSerializerService.serialize(obj.getKey().getData()))
+                            (obj.getKey().getData() != null &&
+                                    !Objects.equals(obj.getValue().data(), protoSerializerService.serialize(obj.getKey().getData())))
             );
 
             if (refVerification) {
