@@ -309,7 +309,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
                 dataSize = len - META_BLOCK_SIZE;
             }
 
-            ch.truncate(metaSize + dataSize);
+            ch.truncate(Math.max(metaSize, META_BLOCK_SIZE) + dataSize);
             ch.position(0);
 
             // Avoids CodedOutputStream flushing all the time

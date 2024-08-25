@@ -38,7 +38,7 @@ public class FileObjectPersistentStoreTest {
     FileObjectPersistentStore fileObjectPersistentStore;
 
     @Test
-    public void writeReadFullObjectSmallMeta() {
+    public void writeReadFullObject() {
         String name = "writeReadFullObjectSmallMeta";
 
         var bytes = new byte[100000];
@@ -78,6 +78,18 @@ public class FileObjectPersistentStoreTest {
         Assertions.assertThrows(Throwable.class, () -> fileObjectPersistentStore.readObject(name));
 
         fileObjectPersistentStore.writeObjectDirect(name, newMeta, data);
+        readMeta = fileObjectPersistentStore.readObjectMeta(name);
+        readData = fileObjectPersistentStore.readObject(name);
+        Assertions.assertEquals(newMeta, readMeta);
+        Assertions.assertEquals(data, readData);
+
+        fileObjectPersistentStore.writeObjectMetaDirect(name, meta);
+        readMeta = fileObjectPersistentStore.readObjectMeta(name);
+        readData = fileObjectPersistentStore.readObject(name);
+        Assertions.assertEquals(meta, readMeta);
+        Assertions.assertEquals(data, readData);
+
+        fileObjectPersistentStore.writeObjectMetaDirect(name, newMeta);
         readMeta = fileObjectPersistentStore.readObjectMeta(name);
         readData = fileObjectPersistentStore.readObject(name);
         Assertions.assertEquals(newMeta, readMeta);
