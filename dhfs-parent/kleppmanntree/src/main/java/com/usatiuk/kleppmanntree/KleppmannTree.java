@@ -229,6 +229,10 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     public void updateExternalTimestamp(PeerIdT from, TimestampT timestamp) {
         _lock.writeLock().lock();
         try {
+            var gotExt = _storage.getPeerTimestampLog().getForPeer(from);
+            var gotSelf = _storage.getPeerTimestampLog().getForPeer(_peers.getSelfId());
+            if ((gotExt != null && gotExt.compareTo(timestamp) >= 0)
+                    && (gotSelf != null && gotSelf.compareTo(_clock.peekTimestamp()) >= 0)) return;
             updateTimestampImpl(_peers.getSelfId(), _clock.peekTimestamp()); // FIXME:? Kind of a hack?
             updateTimestampImpl(from, timestamp);
             tryTrimLog();
