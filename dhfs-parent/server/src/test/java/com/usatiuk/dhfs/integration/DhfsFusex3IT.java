@@ -35,6 +35,8 @@ public class DhfsFusex3IT {
     String c2uuid;
     String c3uuid;
 
+    long emptyFileCount;
+
     @BeforeEach
     void setup(TestInfo testInfo) throws IOException, InterruptedException, TimeoutException {
         String buildPath = System.getProperty("buildDirectory");
@@ -56,6 +58,7 @@ public class DhfsFusex3IT {
                                         "-Ddhfs.objects.peerdiscovery.interval=100",
                                         "-Ddhfs.objects.invalidation.delay=100",
                                         "-Ddhfs.objects.deletion.delay=0",
+                                        "-Ddhfs.objects.deletion.can-delete-retry-delay=1000",
                                         "-Ddhfs.objects.ref_verification=true",
                                         "-Ddhfs.objects.write_log=true",
                                         "-Ddhfs.objects.sync.timeout=10",
@@ -87,6 +90,10 @@ public class DhfsFusex3IT {
         c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/data/stuff/self_uuid").getStdout();
         c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/data/stuff/self_uuid").getStdout();
         c3uuid = container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/data/stuff/self_uuid").getStdout();
+
+        Log.info(container1.getContainerId() + "=" + c1uuid);
+        Log.info(container2.getContainerId() + "=" + c2uuid);
+        Log.info(container3.getContainerId() + "=" + c3uuid);
 
         waitingConsumer1 = new WaitingConsumer();
         var loggingConsumer1 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFusex3IT.class))
@@ -138,6 +145,19 @@ public class DhfsFusex3IT {
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
 
         Thread.sleep(2000);
+
+        emptyFileCount = Integer.valueOf(container1.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/data/objs -type f | wc -l").getStdout().strip());
+    }
+
+    private void checkEmpty() throws IOException, InterruptedException {
+        for (var container : List.of(container1, container2, container3)) {
+            var found = container.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/data/objs -type f");
+            var foundWc = container.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/data/objs -type f | wc -l");
+            Log.info("Remaining objects in " + container.getContainerId() + ": " + found.toString() + " " + foundWc.toString());
+            Assertions.assertEquals(0, found.getExitCode());
+            Assertions.assertEquals(0, foundWc.getExitCode());
+            Assertions.assertEquals(emptyFileCount, Integer.parseInt(foundWc.getStdout().strip()));
+        }
     }
 
     @AfterEach
@@ -151,6 +171,26 @@ public class DhfsFusex3IT {
         Thread.sleep(2000);
         Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
         Assertions.assertEquals("tesempty\n", container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
+    }
+
+    @Test
+    void largerFileDeleteTest() throws IOException, InterruptedException, TimeoutException {
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "cd /root/dhfs_default/fuse && curl -O https://ash-speed.hetzner.com/100MB.bin").getExitCode());
+        Thread.sleep(2000);
+        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "head -c 10 /root/dhfs_default/fuse/100MB.bin").getExitCode());
+        Thread.sleep(2000);
+        Assertions.assertEquals(0, container3.execInContainer("/bin/sh", "-c", "rm /root/dhfs_default/fuse/100MB.bin").getExitCode());
+        Thread.sleep(10000);
+        checkEmpty();
+    }
+
+    @Test
+    void largerFileDeleteTestNoDelays() throws IOException, InterruptedException, TimeoutException {
+        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "cd /root/dhfs_default/fuse && curl -O https://ash-speed.hetzner.com/100MB.bin").getExitCode());
+        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "head -c 10 /root/dhfs_default/fuse/100MB.bin").getExitCode());
+        Assertions.assertEquals(0, container3.execInContainer("/bin/sh", "-c", "rm /root/dhfs_default/fuse/100MB.bin").getExitCode());
+        Thread.sleep(10000);
+        checkEmpty();
     }
 
     @Test
