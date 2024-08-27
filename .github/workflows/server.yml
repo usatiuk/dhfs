@@ -26,7 +26,7 @@ jobs:
         if: env.ACT=='true'
 
       - name: Install fuse and maven
-        run: sudo apt-get update && sudo apt-get install -y fuse
+        run: sudo apt-get update && sudo apt-get install -y libfuse2
 
       - name: Download maven
         run: |
@@ -51,8 +51,8 @@ jobs:
       - name: Test with Maven
         run: cd dhfs-parent && mvn --batch-mode --update-snapshots package verify
 
-      - name: Build with Maven
-        run: cd dhfs-parent && mvn --batch-mode --update-snapshots package # -Dquarkus.log.category.\"com.usatiuk.dhfs\".min-level=DEBUG
+      # - name: Build with Maven
+      #   run: cd dhfs-parent && mvn --batch-mode --update-snapshots package # -Dquarkus.log.category.\"com.usatiuk.dhfs\".min-level=DEBUG
 
       - uses: actions/upload-artifact@v3
         with:
@@ -110,6 +110,7 @@ jobs:
 
       - name: Set SANITIZED_DOCKER_PLATFORM
         run: echo "SANITIZED_DOCKER_PLATFORM=$(echo $DOCKER_PLATFORM | tr / _ )" >> $GITHUB_ENV
+
       - name: Set DOCKER_BUILDER_IMAGE
         run: echo "DOCKER_BUILDER_IMAGE=dhfs_lib_builder-${{matrix.os}}-$SANITIZED_DOCKER_PLATFORM" >> $GITHUB_ENV
 
