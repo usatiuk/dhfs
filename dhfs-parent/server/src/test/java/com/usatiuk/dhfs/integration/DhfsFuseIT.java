@@ -32,11 +32,6 @@ public class DhfsFuseIT {
 
     @BeforeEach
     void setup(TestInfo testInfo) throws IOException, InterruptedException, TimeoutException {
-        String buildPath = System.getProperty("buildDirectory");
-        String nativeLibsDirectory = System.getProperty("nativeLibsDirectory");
-        Log.info("Build path: " + buildPath);
-        Log.info("Native libs path: " + nativeLibsDirectory);
-
         Network network = Network.newNetwork();
         container1 = new GenericContainer<>(DhfsImage.getInstance())
                 .withPrivilegedMode(true)

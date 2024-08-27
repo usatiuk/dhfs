@@ -44,6 +44,8 @@ public class DhfsImage implements Future<String> {
             return _builtImage;
         }
 
+        Log.info("Building image");
+
         String buildPath = System.getProperty("buildDirectory");
         String nativeLibsDirectory = System.getProperty("nativeLibsDirectory");
         Log.info("Build path: " + buildPath);

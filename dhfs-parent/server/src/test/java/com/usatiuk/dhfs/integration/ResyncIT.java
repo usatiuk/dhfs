@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.integration;
 
 import com.github.dockerjava.api.model.Device;
-import io.quarkus.logging.Log;
 import org.junit.jupiter.api.*;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
@@ -30,11 +29,6 @@ public class ResyncIT {
 
     @BeforeEach
     void setup(TestInfo testInfo) throws IOException, InterruptedException, TimeoutException {
-        String buildPath = System.getProperty("buildDirectory");
-        String nativeLibsDirectory = System.getProperty("nativeLibsDirectory");
-        Log.info("Build path: " + buildPath);
-        Log.info("Native libs path: " + nativeLibsDirectory);
-
         Network network = Network.newNetwork();
 
         container1 = new GenericContainer<>(DhfsImage.getInstance())
