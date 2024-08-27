@@ -11,10 +11,8 @@ import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.output.WaitingConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.images.builder.ImageFromDockerfile;
 
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
@@ -40,35 +38,11 @@ public class DhfsFuseIT {
         Log.info("Native libs path: " + nativeLibsDirectory);
 
         Network network = Network.newNetwork();
-        var image = new ImageFromDockerfile()
-                .withDockerfileFromBuilder(builder ->
-                        builder
-                                .from("azul/zulu-openjdk-debian:21-jre-latest")
-                                .run("apt update && apt install -y libfuse2 curl")
-                                .copy("/app", "/app")
-                                .copy("/libs", "/libs")
-                                .cmd("java", "-ea", "-Xmx128M", "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
-                                        "--add-exports", "java.base/jdk.internal.access=ALL-UNNAMED",
-                                        "-Ddhfs.objects.peerdiscovery.interval=100",
-                                        "-Ddhfs.objects.invalidation.delay=100",
-                                        "-Ddhfs.objects.ref_verification=true",
-                                        "-Ddhfs.objects.deletion.delay=0",
-                                        "-Ddhfs.objects.write_log=true",
-                                        "-Ddhfs.objects.sync.timeout=20",
-                                        "-Ddhfs.objects.sync.ping.timeout=20",
-                                        "-Ddhfs.objects.reconnect_interval=1s",
-                                        "-Dcom.usatiuk.dhfs.supportlib.native-path=/libs",
-                                        "-Dquarkus.log.category.\"com.usatiuk\".level=TRACE",
-                                        "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
-                                        "-jar", "/app/quarkus-run.jar")
-                                .build())
-                .withFileFromPath("/app", Paths.get(buildPath, "quarkus-app"))
-                .withFileFromPath("/libs", Paths.get(nativeLibsDirectory));
-        container1 = new GenericContainer<>(image)
+        container1 = new GenericContainer<>(DhfsImage.getInstance())
                 .withPrivilegedMode(true)
                 .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")))
                 .waitingFor(Wait.forLogMessage(".*Listening.*", 1).withStartupTimeout(Duration.ofSeconds(60))).withNetwork(network);
-        container2 = new GenericContainer<>(image)
+        container2 = new GenericContainer<>(DhfsImage.getInstance())
                 .withPrivilegedMode(true)
                 .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")))
                 .waitingFor(Wait.forLogMessage(".*Listening.*", 1).withStartupTimeout(Duration.ofSeconds(60))).withNetwork(network);
