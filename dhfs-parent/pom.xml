@@ -14,6 +14,7 @@
         <module>server</module>
         <module>kleppmanntree</module>
         <module>supportlib</module>
+        <module>autoprotomap</module>
     </modules>
 
     <properties>
@@ -68,21 +69,12 @@
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>quarkus-maven-plugin</artifactId>
                 <version>${quarkus.platform.version}</version>
-                <extensions>true</extensions>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>build</goal>
-                            <goal>generate-code</goal>
-                            <goal>generate-code-tests</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>${compiler-plugin.version}</version>
                 <configuration>
+                    <parameters>true</parameters>
                     <compilerArgs>
                         <arg>-parameters</arg>
                         <arg>--add-exports</arg>
