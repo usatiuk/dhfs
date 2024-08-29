@@ -60,6 +60,11 @@
                 <version>5.9.1</version>
                 <scope>test</scope>
             </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-collections4</artifactId>
+                <version>4.5.0-M2</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 

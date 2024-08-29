@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.usatiuk.autoprotomap.it";
+option java_outer_classname = "TestProto";
+
+package autoprotomap.test;
+
+message SimpleObjectProto {
+  int32 Numfield = 1;
+}
