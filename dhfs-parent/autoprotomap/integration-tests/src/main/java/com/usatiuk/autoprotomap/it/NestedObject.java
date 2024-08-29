@@ -3,8 +3,8 @@ package com.usatiuk.autoprotomap.it;
 import com.usatiuk.autoprotomap.runtime.ProtoMirror;
 import lombok.AllArgsConstructor;
 
-@ProtoMirror(SimpleObjectProto.class)
+@ProtoMirror(NestedObjectProto.class)
 @AllArgsConstructor
-public class SimpleObject {
-    public int numfield = 0;
+public class NestedObject {
+    public SimpleObject object;
 }

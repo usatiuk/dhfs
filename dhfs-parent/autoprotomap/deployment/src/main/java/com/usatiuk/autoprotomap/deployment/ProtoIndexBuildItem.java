@@ -1,8 +1,5 @@
 package com.usatiuk.autoprotomap.deployment;
 
-import com.google.protobuf.GeneratedMessage;
-import com.google.protobuf.GeneratedMessageV3;
-import com.google.protobuf.Message;
 import io.quarkus.builder.item.SimpleBuildItem;
 import org.apache.commons.collections4.BidiMap;
 import org.apache.commons.collections4.bidimap.DualHashBidiMap;

@@ -7,5 +7,9 @@ option java_outer_classname = "TestProto";
 package autoprotomap.test;
 
 message SimpleObjectProto {
-  int32 Numfield = 1;
+  int32 numfield = 1;
+}
+
+message NestedObjectProto {
+  SimpleObjectProto object = 1;
 }
