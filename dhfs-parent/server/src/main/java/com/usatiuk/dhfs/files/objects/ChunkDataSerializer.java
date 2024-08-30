@@ -1,12 +1,12 @@
 package com.usatiuk.dhfs.files.objects;
 
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.persistence.ChunkDataP;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoDeserializer;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializer;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Singleton;
 
-@ApplicationScoped
-public class ChunkDataSerializer implements ProtoSerializer<ChunkDataP, ChunkData>, ProtoDeserializer<ChunkDataP, ChunkData> {
+@Singleton
+public class ChunkDataSerializer implements ProtoSerializer<ChunkDataP, ChunkData> {
     @Override
     public ChunkData deserialize(ChunkDataP message) {
         return new ChunkData(message);

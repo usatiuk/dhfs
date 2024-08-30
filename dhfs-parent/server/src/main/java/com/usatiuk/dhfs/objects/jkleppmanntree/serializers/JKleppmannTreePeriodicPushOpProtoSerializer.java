@@ -1,15 +1,15 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.serializers;
 
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreePeriodicPushOp;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoDeserializer;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializer;
 import com.usatiuk.dhfs.objects.repository.JKleppmannTreePeriodicPushOpP;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Singleton;
 
 import java.util.UUID;
 
-@ApplicationScoped
-public class JKleppmannTreePeriodicPushOpProtoSerializer implements ProtoDeserializer<JKleppmannTreePeriodicPushOpP, JKleppmannTreePeriodicPushOp>, ProtoSerializer<JKleppmannTreePeriodicPushOpP, JKleppmannTreePeriodicPushOp> {
+@Singleton
+public class JKleppmannTreePeriodicPushOpProtoSerializer implements ProtoSerializer<JKleppmannTreePeriodicPushOpP, JKleppmannTreePeriodicPushOp> {
 
     @Override
     public JKleppmannTreePeriodicPushOp deserialize(JKleppmannTreePeriodicPushOpP message) {

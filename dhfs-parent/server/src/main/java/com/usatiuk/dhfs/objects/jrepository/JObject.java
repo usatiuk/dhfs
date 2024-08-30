@@ -7,7 +7,7 @@ public abstract class JObject<T extends JObjectData> {
 
     public abstract T getData();
 
-    abstract void rollback(ObjectMetadata meta, T data);
+    abstract void rollback(ObjectMetadata meta, JObjectData data);
 
     public abstract <R> R runReadLocked(JObjectManager.ResolutionStrategy resolutionStrategy, JObjectManager.ObjectFnRead<T, R> fn);
 
@@ -30,7 +30,7 @@ public abstract class JObject<T extends JObjectData> {
 
     public abstract boolean tryResolve(JObjectManager.ResolutionStrategy resolutionStrategy);
 
-    public abstract void externalResolution(T data);
+    public abstract void externalResolution(JObjectData data);
 
     public abstract void rwLock();
 

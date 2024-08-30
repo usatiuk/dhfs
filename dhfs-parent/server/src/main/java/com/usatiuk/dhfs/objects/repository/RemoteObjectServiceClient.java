@@ -1,12 +1,9 @@
 package com.usatiuk.dhfs.objects.repository;
 
 import com.google.common.collect.Maps;
-import com.usatiuk.dhfs.objects.jrepository.JObject;
-import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
-import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
-import com.usatiuk.dhfs.objects.jrepository.PushResolution;
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
+import com.usatiuk.dhfs.objects.jrepository.*;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.opsupport.Op;
 import io.grpc.Status;
@@ -39,7 +36,9 @@ public class RemoteObjectServiceClient {
     @Inject
     InvalidationQueueService invalidationQueueService;
     @Inject
-    ProtoSerializerService protoSerializerService;
+    ProtoSerializer<JObjectDataP, JObjectData> dataProtoSerializer;
+    @Inject
+    ProtoSerializer<OpPushPayload, Op> opProtoSerializer;
     @Inject
     JObjectTxManager jObjectTxManager;
 
@@ -116,7 +115,7 @@ public class RemoteObjectServiceClient {
                             if (m.getKnownClass().isAnnotationPresent(PushResolution.class) && d == null)
                                 Log.warn("Object " + m.getName() + " is marked as PushResolution but no resolution found");
                             if (m.getKnownClass().isAnnotationPresent(PushResolution.class))
-                                return m.toRpcHeader(protoSerializerService.serializeToJObjectDataP(d));
+                                return m.toRpcHeader(dataProtoSerializer.serialize(d));
                             else
                                 return m.toRpcHeader();
                         });
@@ -138,7 +137,7 @@ public class RemoteObjectServiceClient {
         var msg = OpPushMsg.newBuilder()
                 .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
                 .setQueueId(queueName)
-                .setMsg(protoSerializerService.serializeToOpPushPayload(op))
+                .setMsg(opProtoSerializer.serialize(op))
                 .build();
         return rpcClientFactory.withObjSyncClient(host, client -> client.opPush(msg));
     }

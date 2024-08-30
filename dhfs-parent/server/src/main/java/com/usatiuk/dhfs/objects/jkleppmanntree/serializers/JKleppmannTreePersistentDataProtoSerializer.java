@@ -1,27 +1,26 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.serializers;
 
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeOpWrapper;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreePersistentData;
 import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeOpP;
 import com.usatiuk.dhfs.objects.persistence.JKleppmannTreePersistentDataP;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoDeserializer;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializer;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.kleppmanntree.AtomicClock;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
 import com.usatiuk.kleppmanntree.OpMove;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 import java.util.HashMap;
 import java.util.TreeMap;
 import java.util.UUID;
 
-@ApplicationScoped
-public class JKleppmannTreePersistentDataProtoSerializer implements ProtoDeserializer<JKleppmannTreePersistentDataP, JKleppmannTreePersistentData>, ProtoSerializer<JKleppmannTreePersistentDataP, JKleppmannTreePersistentData> {
+@Singleton
+public class JKleppmannTreePersistentDataProtoSerializer implements ProtoSerializer<JKleppmannTreePersistentDataP, JKleppmannTreePersistentData> {
     @Inject
-    ProtoSerializerService protoSerializerService;
+    ProtoSerializer<JKleppmannTreeOpP, JKleppmannTreeOpWrapper> opProtoSerializer;
 
     @Override
     public JKleppmannTreePersistentData deserialize(JKleppmannTreePersistentDataP message) {
@@ -30,7 +29,7 @@ public class JKleppmannTreePersistentDataProtoSerializer implements ProtoDeseria
         for (var q : message.getQueuesList()) {
             var qmap = new TreeMap<CombinedTimestamp<Long, UUID>, OpMove<Long, UUID, JKleppmannTreeNodeMeta, String>>();
             for (var o : q.getEntriesList()) {
-                var op = (JKleppmannTreeOpWrapper) protoSerializerService.deserialize(o.getOp());
+                var op = (JKleppmannTreeOpWrapper) opProtoSerializer.deserialize(o.getOp());
                 qmap.put(new CombinedTimestamp<>(o.getClock(), UUID.fromString(o.getUuid())), op.getOp());
             }
             queues.put(UUID.fromString(q.getNode()), qmap);
@@ -60,7 +59,7 @@ public class JKleppmannTreePersistentDataProtoSerializer implements ProtoDeseria
             qb.setNode(q.getKey().toString());
             for (var e : q.getValue().entrySet()) {
                 qb.addEntriesBuilder().setClock(e.getKey().timestamp()).setUuid(e.getKey().nodeId().toString())
-                        .setOp((JKleppmannTreeOpP) protoSerializerService.serialize(new JKleppmannTreeOpWrapper(e.getValue())));
+                        .setOp((JKleppmannTreeOpP) opProtoSerializer.serialize(new JKleppmannTreeOpWrapper(e.getValue())));
             }
         }
         for (var peerLogEntry : object.getPeerTimestampLog().entrySet()) {

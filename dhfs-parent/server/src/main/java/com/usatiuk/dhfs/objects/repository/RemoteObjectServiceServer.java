@@ -1,11 +1,14 @@
 package com.usatiuk.dhfs.objects.repository;
 
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
+import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
+import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.repository.autosync.AutoSyncProcessor;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
+import com.usatiuk.dhfs.objects.repository.opsupport.Op;
 import com.usatiuk.dhfs.objects.repository.opsupport.OpObjectRegistry;
 import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
 import io.grpc.Status;
@@ -42,7 +45,9 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     InvalidationQueueService invalidationQueueService;
 
     @Inject
-    ProtoSerializerService protoSerializerService;
+    ProtoSerializer<JObjectDataP, JObjectData> dataProtoSerializer;
+    @Inject
+    ProtoSerializer<OpPushPayload, Op> opProtoSerializer;
 
     @Inject
     OpObjectRegistry opObjectRegistry;
@@ -80,7 +85,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
                     return ApiObject.newBuilder()
                             .setHeader(obj.getMeta().toRpcHeader())
-                            .setContent(protoSerializerService.serializeToJObjectDataP(obj.getData())).build();
+                            .setContent(dataProtoSerializer.serialize(obj.getData())).build();
                 });
             });
             var ret = GetObjectReply.newBuilder()
@@ -159,7 +164,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
         try {
             jObjectTxManager.executeTxAndFlush(() -> {
-                opObjectRegistry.acceptExternalOp(request.getQueueId(), UUID.fromString(request.getSelfUuid()), protoSerializerService.deserialize(request.getMsg()));
+                opObjectRegistry.acceptExternalOp(request.getQueueId(), UUID.fromString(request.getSelfUuid()), opProtoSerializer.deserialize(request.getMsg()));
             });
         } catch (Exception e) {
             Log.error(e, e);

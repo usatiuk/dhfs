@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 public class AutoprotomapResourceTest {
     @Inject
     ProtoSerializer<SimpleObjectProto, SimpleObject> protoSerializer;
+    @Inject
+    ProtoSerializer<NestedObjectProto, NestedObject> nestedProtoSerializer;
 
     @Test
     public void testSimple() {
@@ -25,9 +27,6 @@ public class AutoprotomapResourceTest {
         Assertions.assertEquals("simple test", des.getName());
         Assertions.assertEquals(ByteString.copyFrom(new byte[]{1, 2, 3}), des.getSomeBytes());
     }
-
-    @Inject
-    ProtoSerializer<NestedObjectProto, NestedObject> nestedProtoSerializer;
 
     @Test
     public void testNested() {

@@ -21,14 +21,19 @@ import java.util.function.IntConsumer;
 import java.util.stream.Collectors;
 
 class AutoprotomapProcessor {
-    @FunctionalInterface
-    public interface Effect {
-        void apply();
+    private static final String FIELD_PREFIX = "_";
+    private static final String FEATURE = "autoprotomap";
+
+    private static String capitalize(String str) {
+        return str.substring(0, 1).toUpperCase() + str.substring(1);
     }
 
-    private static final String FIELD_PREFIX = "_";
-
-    private static final String FEATURE = "autoprotomap";
+    private static String stripPrefix(String str, String prefix) {
+        if (str.startsWith(prefix)) {
+            return str.substring(prefix.length());
+        }
+        return str;
+    }
 
     @BuildStep
     FeatureBuildItem feature() {
@@ -47,17 +52,6 @@ class AutoprotomapProcessor {
             ret.protoMsgToObj.put(protoTarget, a.target().asClass());
         }
         return ret;
-    }
-
-    private static String capitalize(String str) {
-        return str.substring(0, 1).toUpperCase() + str.substring(1);
-    }
-
-    private static String stripPrefix(String str, String prefix) {
-        if (str.startsWith(prefix)) {
-            return str.substring(prefix.length());
-        }
-        return str;
     }
 
     private void generateBuilderUse(Index index,
@@ -245,5 +239,10 @@ class AutoprotomapProcessor {
             }
             System.out.println(sb.toString());
         }
+    }
+
+    @FunctionalInterface
+    public interface Effect {
+        void apply();
     }
 }

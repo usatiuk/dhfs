@@ -1,8 +1,9 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
 import com.google.common.collect.Streams;
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
+import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
@@ -48,8 +49,6 @@ public class JObjectManagerImpl implements JObjectManager {
     @Inject
     PersistentPeerDataService persistentPeerDataService;
     @Inject
-    ProtoSerializerService protoSerializerService;
-    @Inject
     JObjectRefProcessor jObjectRefProcessor;
     @Inject
     SoftJObjectFactory softJObjectFactory;
@@ -59,6 +58,12 @@ public class JObjectManagerImpl implements JObjectManager {
     JObjectTxManager jObjectTxManager;
     @Inject
     TxWriteback txWriteback;
+
+    @Inject
+    ProtoSerializer<ObjectMetadataP, ObjectMetadata> metaProtoSerializer;
+    @Inject
+    ProtoSerializer<JObjectDataP, JObjectData> dataProtoSerializer;
+
     @ConfigProperty(name = "dhfs.objects.ref_verification")
     boolean refVerification;
     @ConfigProperty(name = "dhfs.objects.lock_timeout_secs")
@@ -141,7 +146,7 @@ public class JObjectManagerImpl implements JObjectManager {
                 return Optional.empty();
             throw ex;
         }
-        var meta = protoSerializerService.deserialize(readMd);
+        var meta = metaProtoSerializer.deserialize(readMd);
         if (!(meta instanceof ObjectMetadata))
             throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("Unexpected metadata type for " + name));
 
@@ -374,9 +379,9 @@ public class JObjectManagerImpl implements JObjectManager {
         }
 
         @Override
-        void rollback(ObjectMetadata meta, T data) {
+        void rollback(ObjectMetadata meta, JObjectData data) {
             _metaPart = meta;
-            _dataPart.set(data);
+            _dataPart.set((T) data);
         }
 
         @Override
@@ -440,7 +445,7 @@ public class JObjectManagerImpl implements JObjectManager {
         }
 
         @Override
-        public void externalResolution(T data) {
+        public void externalResolution(JObjectData data) {
             assertRwLock();
             if (Log.isTraceEnabled())
                 Log.trace("External resolution of " + getMeta().getName());
@@ -449,7 +454,7 @@ public class JObjectManagerImpl implements JObjectManager {
             if (!data.getClass().isAnnotationPresent(PushResolution.class))
                 throw new IllegalStateException("Expected external resolution only for classes with pushResolution " + getMeta().getName());
             _metaPart.narrowClass(data.getClass());
-            _dataPart.set(data);
+            _dataPart.set((T) data);
             _metaPart.setHaveLocalCopy(true);
             if (!_metaPart.isLocked())
                 _metaPart.lock();
@@ -711,13 +716,13 @@ public class JObjectManagerImpl implements JObjectManager {
         public <T extends JObjectData> T resolveDataLocal() {
             // jObject.assertRwLock();
             // FIXME: No way to assert read lock?
-            return protoSerializerService.deserialize(objectPersistentStore.readObject(getMeta().getName()));
+            return (T) dataProtoSerializer.deserialize(objectPersistentStore.readObject(getMeta().getName()));
         }
 
         public <T extends JObjectData> T resolveDataRemote() {
             var obj = remoteObjectServiceClient.getObject(this);
             invalidationQueueService.pushInvalidationToAll(this);
-            return protoSerializerService.deserialize(obj);
+            return (T) dataProtoSerializer.deserialize(obj);
         }
 
         // Really more like "onUpdateSize"

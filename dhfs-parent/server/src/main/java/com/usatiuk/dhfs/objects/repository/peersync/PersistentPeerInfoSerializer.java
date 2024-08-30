@@ -1,18 +1,18 @@
 package com.usatiuk.dhfs.objects.repository.peersync;
 
 import com.google.protobuf.UnsafeByteOperations;
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.persistence.PersistentPeerInfoP;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoDeserializer;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializer;
 import com.usatiuk.dhfs.objects.repository.CertificateTools;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Singleton;
 
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.util.UUID;
 
-@ApplicationScoped
-public class PersistentPeerInfoSerializer implements ProtoSerializer<PersistentPeerInfoP, PersistentPeerInfo>, ProtoDeserializer<PersistentPeerInfoP, PersistentPeerInfo> {
+@Singleton
+public class PersistentPeerInfoSerializer implements ProtoSerializer<PersistentPeerInfoP, PersistentPeerInfo> {
     @Override
     public PersistentPeerInfo deserialize(PersistentPeerInfoP message) {
         try {

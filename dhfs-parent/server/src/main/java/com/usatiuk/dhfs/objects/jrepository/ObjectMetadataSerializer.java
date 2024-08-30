@@ -1,11 +1,11 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoDeserializer;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializer;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Singleton;
 
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -13,8 +13,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-@ApplicationScoped
-public class ObjectMetadataSerializer implements ProtoSerializer<ObjectMetadataP, ObjectMetadata>, ProtoDeserializer<ObjectMetadataP, ObjectMetadata> {
+@Singleton
+public class ObjectMetadataSerializer implements ProtoSerializer<ObjectMetadataP, ObjectMetadata> {
     @Override
     public ObjectMetadataP serialize(ObjectMetadata object) {
         return ObjectMetadataP.newBuilder()

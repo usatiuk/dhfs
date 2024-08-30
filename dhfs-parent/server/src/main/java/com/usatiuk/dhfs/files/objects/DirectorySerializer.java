@@ -1,17 +1,17 @@
 package com.usatiuk.dhfs.files.objects;
 
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.persistence.DirectoryP;
 import com.usatiuk.dhfs.objects.persistence.FsNodeP;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoDeserializer;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializer;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Singleton;
 
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-@ApplicationScoped
-public class DirectorySerializer implements ProtoSerializer<DirectoryP, Directory>, ProtoDeserializer<DirectoryP, Directory> {
+@Singleton
+public class DirectorySerializer implements ProtoSerializer<DirectoryP, Directory> {
     @Override
     public Directory deserialize(DirectoryP message) {
         var ret = new Directory(UUID.fromString(message.getFsNode().getUuid()));

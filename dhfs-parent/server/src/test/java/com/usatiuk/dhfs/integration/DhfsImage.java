@@ -12,6 +12,15 @@ import java.util.concurrent.TimeoutException;
 
 public class DhfsImage implements Future<String> {
 
+    private static String _builtImage = null;
+    private static DhfsImage INSTANCE = new DhfsImage();
+
+    private DhfsImage() {}
+
+    public static DhfsImage getInstance() {
+        return INSTANCE;
+    }
+
     @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
         return false;
@@ -36,8 +45,6 @@ public class DhfsImage implements Future<String> {
     public String get(long timeout, @NotNull TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
         return buildImpl();
     }
-
-    private static String _builtImage = null;
 
     private synchronized String buildImpl() {
         if (_builtImage != null) {
@@ -81,13 +88,5 @@ public class DhfsImage implements Future<String> {
         _builtImage = image.get();
         Log.info("Image built: " + _builtImage);
         return _builtImage;
-    }
-
-    private DhfsImage() {}
-
-    private static DhfsImage INSTANCE = new DhfsImage();
-
-    public static DhfsImage getInstance() {
-        return INSTANCE;
     }
 }

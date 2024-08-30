@@ -1,10 +1,11 @@
 package com.usatiuk.dhfs.objects.repository;
 
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
+import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.opsupport.OpObjectRegistry;
 import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
@@ -36,7 +37,7 @@ public class SyncHandler {
     @Inject
     PersistentPeerDataService persistentPeerDataService;
     @Inject
-    ProtoSerializerService protoSerializerService;
+    ProtoSerializer<JObjectDataP, JObjectData> dataProtoSerializer;
     @Inject
     OpObjectRegistry opObjectRegistry;
     @Inject
@@ -123,12 +124,12 @@ public class SyncHandler {
                     md.getChangelog().putAll(receivedMap);
                     md.getChangelog().putIfAbsent(persistentPeerDataService.getSelfUuid(), 0L);
                     if (header.hasPushedData())
-                        found.externalResolution(protoSerializerService.deserialize(header.getPushedData()));
+                        found.externalResolution(dataProtoSerializer.deserialize(header.getPushedData()));
                     return false;
                 } else if (data == null && header.hasPushedData()) {
                     found.tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
                     if (found.getData() == null)
-                        found.externalResolution(protoSerializerService.deserialize(header.getPushedData()));
+                        found.externalResolution(dataProtoSerializer.deserialize(header.getPushedData()));
                 }
 
                 assert Objects.equals(receivedTotalVer, md.getOurVersion());
@@ -146,10 +147,10 @@ public class SyncHandler {
                 ObjectHeader theirsHeader;
                 if (header.hasPushedData()) {
                     theirsHeader = header;
-                    theirsData = protoSerializerService.deserialize(header.getPushedData());
+                    theirsData = dataProtoSerializer.deserialize(header.getPushedData());
                 } else {
                     var got = remoteObjectServiceClient.getSpecificObject(from, header.getName());
-                    theirsData = protoSerializerService.deserialize(got.getRight());
+                    theirsData = dataProtoSerializer.deserialize(got.getRight());
                     theirsHeader = got.getLeft();
                 }
 

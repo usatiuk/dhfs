@@ -1,27 +1,28 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.serializers;
 
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeOpWrapper;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
+import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeNodeMetaP;
 import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeOpP;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoDeserializer;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializer;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
 import com.usatiuk.kleppmanntree.OpMove;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 import java.util.UUID;
 
-@ApplicationScoped
-public class JKleppmannTreeOpProtoSerializer implements ProtoDeserializer<JKleppmannTreeOpP, JKleppmannTreeOpWrapper>, ProtoSerializer<JKleppmannTreeOpP, JKleppmannTreeOpWrapper> {
+@Singleton
+public class JKleppmannTreeOpProtoSerializer implements ProtoSerializer<JKleppmannTreeOpP, JKleppmannTreeOpWrapper> {
     @Inject
-    ProtoSerializerService protoSerializerService;
+    ProtoSerializer<JKleppmannTreeNodeMetaP, JKleppmannTreeNodeMeta> metaProtoSerializer;
 
     @Override
     public JKleppmannTreeOpWrapper deserialize(JKleppmannTreeOpP message) {
         return new JKleppmannTreeOpWrapper(new OpMove<>(
                 new CombinedTimestamp<>(message.getTimestamp(), UUID.fromString(message.getPeer())), message.getNewParentId(),
-                message.hasMeta() ? protoSerializerService.deserialize(message.getMeta()) : null,
+                message.hasMeta() ? metaProtoSerializer.deserialize(message.getMeta()) : null,
                 message.getChild()
         ));
     }
@@ -34,7 +35,7 @@ public class JKleppmannTreeOpProtoSerializer implements ProtoDeserializer<JKlepp
                 .setNewParentId(object.getOp().newParentId())
                 .setChild(object.getOp().childId());
         if (object.getOp().newMeta() != null)
-            builder.setMeta(protoSerializerService.serializeToTreeNodeMetaP(object.getOp().newMeta()));
+            builder.setMeta(metaProtoSerializer.serialize(object.getOp().newMeta()));
         return builder.build();
     }
 }

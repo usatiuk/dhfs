@@ -1,13 +1,13 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.serializers;
 
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaDirectory;
 import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeNodeMetaDirectoryP;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoDeserializer;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializer;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Singleton;
 
-@ApplicationScoped
-public class JKleppmannTreeNodeMetaDirectoryProtoSerializer implements ProtoDeserializer<JKleppmannTreeNodeMetaDirectoryP, JKleppmannTreeNodeMetaDirectory>, ProtoSerializer<JKleppmannTreeNodeMetaDirectoryP, JKleppmannTreeNodeMetaDirectory> {
+@Singleton
+public class JKleppmannTreeNodeMetaDirectoryProtoSerializer implements ProtoSerializer<JKleppmannTreeNodeMetaDirectoryP, JKleppmannTreeNodeMetaDirectory> {
     @Override
     public JKleppmannTreeNodeMetaDirectory deserialize(JKleppmannTreeNodeMetaDirectoryP message) {
         return new JKleppmannTreeNodeMetaDirectory(message.getName());

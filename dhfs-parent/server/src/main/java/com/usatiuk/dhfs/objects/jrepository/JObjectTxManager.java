@@ -1,6 +1,8 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
+import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
+import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.utils.VoidFn;
 import io.quarkus.logging.Log;
@@ -25,8 +27,12 @@ import java.util.function.Supplier;
 @ApplicationScoped
 public class JObjectTxManager {
     private final ThreadLocal<TxState> _state = new ThreadLocal<>();
+
     @Inject
-    ProtoSerializerService protoSerializerService;
+    ProtoSerializer<JObjectDataP, JObjectData> dataProtoSerializer;
+    @Inject
+    ProtoSerializer<ObjectMetadataP, ObjectMetadata> metaProtoSerializer;
+
     @Inject
     JObjectLRU jObjectLRU;
     @Inject
@@ -80,7 +86,7 @@ public class JObjectTxManager {
             if (!obj.getKey().getMeta().getKnownClass().isAnnotationPresent(AssumedUnique.class))
                 throw new IllegalStateException("Only working with unique-direct objects for now");
 
-            boolean metaChanged = !Objects.equals(obj.getValue().snapshot.meta(), protoSerializerService.serialize(obj.getKey().getMeta()));
+            boolean metaChanged = !Objects.equals(obj.getValue().snapshot.meta(), metaProtoSerializer.serialize(obj.getKey().getMeta()));
             boolean externalHashChanged = obj.getValue().snapshot.externalHash() != obj.getKey().getMeta().externalHash();
 
             // FIXME: hasDataChanged is a bit broken here
@@ -125,17 +131,17 @@ public class JObjectTxManager {
 
             // FIXME
             notifyWrite(obj.getKey(),
-                    obj.getValue() == null || !Objects.equals(obj.getValue().meta(), protoSerializerService.serialize(obj.getKey().getMeta())),
+                    obj.getValue() == null || !Objects.equals(obj.getValue().meta(), metaProtoSerializer.serialize(obj.getKey().getMeta())),
                     obj.getValue() == null || newExternalHash != obj.getValue().externalHash(),
                     obj.getValue() == null || (obj.getValue().data() == null) != (obj.getKey().getData() == null) ||
                             (obj.getKey().getData() != null &&
-                                    !Objects.equals(obj.getValue().data(), protoSerializerService.serialize(obj.getKey().getData())))
+                                    !Objects.equals(obj.getValue().data(), dataProtoSerializer.serialize(obj.getKey().getData())))
             );
 
             if (refVerification) {
                 var oldRefs = (obj.getValue() == null || obj.getValue().data() == null)
                         ? null
-                        : ((JObjectData) protoSerializerService.deserialize(obj.getValue().data())).extractRefs();
+                        : ((JObjectData) dataProtoSerializer.deserialize(obj.getValue().data())).extractRefs();
                 verifyRefs(obj.getKey(), oldRefs);
             }
         }
@@ -154,8 +160,8 @@ public class JObjectTxManager {
                     _serializerThreads.execute(() -> {
                         try {
                             bundle.commit(key,
-                                    protoSerializerService.serialize(key.getMeta()),
-                                    protoSerializerService.serializeToJObjectDataP(key.getData())
+                                    metaProtoSerializer.serialize(key.getMeta()),
+                                    dataProtoSerializer.serialize(key.getData())
                             );
                         } catch (Throwable t) {
                             Log.error("Error serializing " + key.getMeta().getName(), t);
@@ -166,12 +172,12 @@ public class JObjectTxManager {
                     });
                 } else if (key.getMeta().isHaveLocalCopy() && key.getData() == null) {
                     bundle.commitMetaChange(key,
-                            protoSerializerService.serialize(key.getMeta())
+                            metaProtoSerializer.serialize(key.getMeta())
                     );
                     latch.countDown();
                 } else if (!key.getMeta().isHaveLocalCopy()) {
                     bundle.commit(key,
-                            protoSerializerService.serialize(key.getMeta()),
+                            metaProtoSerializer.serialize(key.getMeta()),
                             null
                     );
                     latch.countDown();
@@ -250,8 +256,8 @@ public class JObjectTxManager {
                     continue;
                 }
                 obj.getKey().rollback(
-                        protoSerializerService.deserialize(obj.getValue().meta()),
-                        obj.getValue().data() != null ? protoSerializerService.deserialize(obj.getValue().data()) : null);
+                        metaProtoSerializer.deserialize(obj.getValue().meta()),
+                        obj.getValue().data() != null ? dataProtoSerializer.deserialize(obj.getValue().data()) : null);
                 obj.getKey().updateDeletionState();
             } finally {
                 obj.getKey().rwUnlock();
@@ -366,8 +372,8 @@ public class JObjectTxManager {
 
         var snapshot = copy
                 ? new JObjectSnapshot(
-                protoSerializerService.serialize(obj.getMeta()),
-                (noTx || obj.getData() == null) ? null : protoSerializerService.serializeToJObjectDataP(obj.getData()),
+                metaProtoSerializer.serialize(obj.getMeta()),
+                (noTx || obj.getData() == null) ? null : dataProtoSerializer.serialize(obj.getData()),
                 obj.getMeta().externalHash())
                 : null;
 

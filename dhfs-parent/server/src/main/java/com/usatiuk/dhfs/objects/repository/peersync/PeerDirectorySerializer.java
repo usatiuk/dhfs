@@ -1,15 +1,15 @@
 package com.usatiuk.dhfs.objects.repository.peersync;
 
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.persistence.PeerDirectoryP;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoDeserializer;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializer;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Singleton;
 
 import java.util.Objects;
 import java.util.UUID;
 
-@ApplicationScoped
-public class PeerDirectorySerializer implements ProtoSerializer<PeerDirectoryP, PeerDirectory>, ProtoDeserializer<PeerDirectoryP, PeerDirectory> {
+@Singleton
+public class PeerDirectorySerializer implements ProtoSerializer<PeerDirectoryP, PeerDirectory> {
     @Override
     public PeerDirectory deserialize(PeerDirectoryP message) {
         var ret = new PeerDirectory();

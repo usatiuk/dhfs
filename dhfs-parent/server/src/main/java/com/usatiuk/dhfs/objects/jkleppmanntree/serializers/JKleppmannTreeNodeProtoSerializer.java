@@ -1,24 +1,26 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.serializers;
 
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeOpWrapper;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
+import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeNodeMetaP;
 import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeNodeP;
 import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeOpP;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoDeserializer;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializer;
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
 import com.usatiuk.kleppmanntree.TreeNode;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 import java.util.HashMap;
 import java.util.UUID;
 
-@ApplicationScoped
-public class JKleppmannTreeNodeProtoSerializer implements ProtoDeserializer<JKleppmannTreeNodeP, JKleppmannTreeNode>, ProtoSerializer<JKleppmannTreeNodeP, JKleppmannTreeNode> {
+@Singleton
+public class JKleppmannTreeNodeProtoSerializer implements ProtoSerializer<JKleppmannTreeNodeP, JKleppmannTreeNode> {
     @Inject
-    ProtoSerializerService protoSerializerService;
+    ProtoSerializer<JKleppmannTreeNodeMetaP, JKleppmannTreeNodeMeta> metaProtoSerializer;
+    @Inject
+    ProtoSerializer<JKleppmannTreeOpP, JKleppmannTreeOpWrapper> opProtoSerializer;
 
     @Override
     public JKleppmannTreeNode deserialize(JKleppmannTreeNodeP message) {
@@ -27,11 +29,11 @@ public class JKleppmannTreeNodeProtoSerializer implements ProtoDeserializer<JKle
         var node = new TreeNode<Long, UUID, JKleppmannTreeNodeMeta, String>(
                 message.getId(),
                 message.hasParent() ? message.getParent() : null,
-                message.hasMeta() ? protoSerializerService.deserialize(message.getMeta()) : null,
+                message.hasMeta() ? metaProtoSerializer.deserialize(message.getMeta()) : null,
                 children
         );
         if (message.hasLastEffectiveOp())
-            node.setLastEffectiveOp(((JKleppmannTreeOpWrapper) protoSerializerService.deserialize(message.getLastEffectiveOp())).getOp());
+            node.setLastEffectiveOp((opProtoSerializer.deserialize(message.getLastEffectiveOp())).getOp());
         return new JKleppmannTreeNode(node);
     }
 
@@ -41,11 +43,11 @@ public class JKleppmannTreeNodeProtoSerializer implements ProtoDeserializer<JKle
         if (object.getNode().getParent() != null)
             builder.setParent(object.getNode().getParent());
         if (object.getNode().getMeta() != null) {
-            builder.setMeta(protoSerializerService.serializeToTreeNodeMetaP(object.getNode().getMeta()));
+            builder.setMeta(metaProtoSerializer.serialize(object.getNode().getMeta()));
         }
         if (object.getNode().getLastEffectiveOp() != null)
             builder.setLastEffectiveOp(
-                    (JKleppmannTreeOpP) protoSerializerService.serialize(new JKleppmannTreeOpWrapper(object.getNode().getLastEffectiveOp()))
+                    opProtoSerializer.serialize(new JKleppmannTreeOpWrapper(object.getNode().getLastEffectiveOp()))
             );
         object.getNode().getChildren().forEach((k, v) -> {
             builder.addChildrenBuilder().setKey(k).setValue(v);

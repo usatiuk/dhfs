@@ -1,6 +1,8 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
-import com.usatiuk.dhfs.objects.protoserializer.ProtoSerializerService;
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
+import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
+import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
 import com.usatiuk.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
@@ -28,7 +30,9 @@ public class JObjectWriteback {
     @Inject
     ObjectPersistentStore objectPersistentStore;
     @Inject
-    ProtoSerializerService protoSerializerService;
+    ProtoSerializer<JObjectDataP, JObjectData> dataProtoSerializer;
+    @Inject
+    ProtoSerializer<ObjectMetadataP, ObjectMetadata> metaProtoSerializer;
     @Inject
     JObjectTxManager jObjectTxManager;
     @ConfigProperty(name = "dhfs.objects.writeback.limit")
@@ -155,11 +159,11 @@ public class JObjectWriteback {
         }
         // Can be unnecessary
         if (m.isHaveLocalCopy() && data != null)
-            objectPersistentStore.writeObjectDirect(m.getName(), protoSerializerService.serialize(m), protoSerializerService.serializeToJObjectDataP(data));
+            objectPersistentStore.writeObjectDirect(m.getName(), metaProtoSerializer.serialize(m), dataProtoSerializer.serialize(data));
         else if (m.isHaveLocalCopy() && data == null)
-            objectPersistentStore.writeObjectMetaDirect(m.getName(), protoSerializerService.serialize(m));
+            objectPersistentStore.writeObjectMetaDirect(m.getName(), metaProtoSerializer.serialize(m));
         else if (!m.isHaveLocalCopy())
-            objectPersistentStore.writeObjectDirect(m.getName(), protoSerializerService.serialize(m), null);
+            objectPersistentStore.writeObjectDirect(m.getName(), metaProtoSerializer.serialize(m), null);
     }
 
     public void remove(JObject<?> object) {
