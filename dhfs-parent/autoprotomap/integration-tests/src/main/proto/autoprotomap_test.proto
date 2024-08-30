@@ -8,8 +8,12 @@ package autoprotomap.test;
 
 message SimpleObjectProto {
   int32 numfield = 1;
+  string name = 2;
+  bytes someBytes = 3;
 }
 
 message NestedObjectProto {
   SimpleObjectProto object = 1;
+  string nestedName = 2;
+  bytes nestedSomeBytes = 3;
 }

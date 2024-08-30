@@ -1,5 +1,6 @@
 package com.usatiuk.autoprotomap.deployment;
 
+import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
 import com.usatiuk.autoprotomap.runtime.ProtoMirror;
 import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
@@ -16,9 +17,14 @@ import org.jboss.jandex.*;
 import org.objectweb.asm.Opcodes;
 
 import java.util.Objects;
+import java.util.function.IntConsumer;
 import java.util.stream.Collectors;
 
 class AutoprotomapProcessor {
+    @FunctionalInterface
+    public interface Effect {
+        void apply();
+    }
 
     private static final String FIELD_PREFIX = "_";
 
@@ -68,10 +74,18 @@ class AutoprotomapProcessor {
         for (var f : objectClass.fields()) {
             var consideredFieldName = stripPrefix(f.name(), FIELD_PREFIX);
 
+            Effect doSimpleCopy = () -> {
+                var setter = MethodDescriptor.ofMethod(builderType.name().toString(), "set" + capitalize(consideredFieldName),
+                        builderType.name().toString(), f.type().toString());
+
+                var val = bytecodeCreator.readInstanceField(f, object);
+                bytecodeCreator.invokeVirtualMethod(setter, builder, val);
+            };
+
             switch (f.type().kind()) {
                 case CLASS -> {
-                    if (f.type().equals(Type.create(String.class))) {
-                        //TODO:String
+                    if (f.type().equals(Type.create(String.class)) || f.type().equals(Type.create(ByteString.class))) {
+                        doSimpleCopy.apply();
                     } else {
                         var builderGetter = "get" + capitalize(f.name()) + "Builder";
                         var protoType = protoIndex.protoMsgToObj.inverseBidiMap().get(index.getClassByName(f.type().name()));
@@ -85,11 +99,7 @@ class AutoprotomapProcessor {
                     }
                 }
                 case PRIMITIVE -> {
-                    var setter = MethodDescriptor.ofMethod(builderType.name().toString(), "set" + capitalize(consideredFieldName),
-                            builderType.name().toString(), f.type().toString());
-
-                    var val = bytecodeCreator.readInstanceField(f, object);
-                    bytecodeCreator.invokeVirtualMethod(setter, builder, val);
+                    doSimpleCopy.apply();
                 }
                 case WILDCARD_TYPE -> throw new UnsupportedOperationException("Wildcards not supported yet");
                 case PARAMETERIZED_TYPE ->
@@ -116,20 +126,28 @@ class AutoprotomapProcessor {
 
         for (int i = 0; i < argMap.length; i++) {
             var type = constructor.parameterType(i);
-            var name = constructor.parameterName(i);
+            var strippedName = stripPrefix(constructor.parameterName(i), FIELD_PREFIX);
+
+            IntConsumer doSimpleCopy = (arg) -> {
+                var call = MethodDescriptor.ofMethod(messageType.name().toString(), "get" + capitalize(strippedName),
+                        type.name().toString());
+                argMap[arg] = bytecodeCreator.invokeVirtualMethod(call, message);
+            };
 
             switch (type.kind()) {
                 case CLASS -> {
-                    var nestedProtoType = protoIndex.protoMsgToObj.inverseBidiMap().get(index.getClassByName(type.name()));
-                    var call = MethodDescriptor.ofMethod(messageType.name().toString(), "get" + capitalize(name),
-                            nestedProtoType.name().toString());
-                    var nested = bytecodeCreator.invokeVirtualMethod(call, message);
-                    argMap[i] = generateConstructorUse(index, protoIndex, bytecodeCreator, classCreator, Type.create(nestedProtoType.name(), Type.Kind.CLASS), type, nested);
+                    if (type.equals(Type.create(String.class)) || type.equals(Type.create(ByteString.class))) {
+                        doSimpleCopy.accept(i);
+                    } else {
+                        var nestedProtoType = protoIndex.protoMsgToObj.inverseBidiMap().get(index.getClassByName(type.name()));
+                        var call = MethodDescriptor.ofMethod(messageType.name().toString(), "get" + capitalize(strippedName),
+                                nestedProtoType.name().toString());
+                        var nested = bytecodeCreator.invokeVirtualMethod(call, message);
+                        argMap[i] = generateConstructorUse(index, protoIndex, bytecodeCreator, classCreator, Type.create(nestedProtoType.name(), Type.Kind.CLASS), type, nested);
+                    }
                 }
                 case PRIMITIVE -> {
-                    var call = MethodDescriptor.ofMethod(messageType.name().toString(), "get" + capitalize(name),
-                            type.name().toString());
-                    argMap[i] = bytecodeCreator.invokeVirtualMethod(call, message);
+                    doSimpleCopy.accept(i);
                 }
                 case WILDCARD_TYPE -> throw new UnsupportedOperationException("Wildcards not supported yet");
                 case PARAMETERIZED_TYPE ->
@@ -149,11 +167,11 @@ class AutoprotomapProcessor {
 
         for (var m : klass.constructors()) {
             if (m.parametersCount() != fieldCount) continue;
-            var parameterNames = m.parameters().stream().map(MethodParameterInfo::name).sorted().toList();
+            var parameterNames = m.parameters().stream().map(n -> stripPrefix(n.name(), FIELD_PREFIX)).sorted().toList();
             if (!Objects.equals(fieldNames, parameterNames)) continue;
 
             for (var p : m.parameters()) {
-                if (!Objects.equals(fieldNameToType.get(p.name()), p.type())) continue;
+                if (!Objects.equals(fieldNameToType.get(stripPrefix(p.name(), FIELD_PREFIX)), p.type())) continue;
             }
 
             return m;
