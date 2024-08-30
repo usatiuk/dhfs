@@ -16,8 +16,11 @@ import org.jboss.jandex.Type;
 import org.jboss.jandex.*;
 import org.objectweb.asm.Opcodes;
 
+import java.util.ArrayList;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 class AutoprotomapProcessor {
@@ -54,6 +57,25 @@ class AutoprotomapProcessor {
         return ret;
     }
 
+    private void traverseHierarchy(Index index, ClassInfo klass, Consumer<ClassInfo> visitor) {
+        var cur = klass;
+        while (true) {
+            visitor.accept(cur);
+
+            var next = cur.superClassType().name();
+            if (next.equals(DotName.OBJECT_NAME)) break;
+            cur = index.getClassByName(next);
+        }
+    }
+
+    private ArrayList<FieldInfo> findAllFields(Index index, ClassInfo klass) {
+        ArrayList<FieldInfo> ret = new ArrayList<>();
+        traverseHierarchy(index, klass, cur -> {
+            ret.addAll(cur.fields());
+        });
+        return ret;
+    }
+
     private void generateBuilderUse(Index index,
                                     ProtoIndexBuildItem protoIndex,
                                     BytecodeCreator bytecodeCreator,
@@ -65,14 +87,24 @@ class AutoprotomapProcessor {
 
         var objectClass = index.getClassByName(objectType.name().toString());
 
-        for (var f : objectClass.fields()) {
+        for (var f : findAllFields(index, objectClass)) {
             var consideredFieldName = stripPrefix(f.name(), FIELD_PREFIX);
+
+            Supplier<ResultHandle> get = () -> {
+                if ((f.flags() & Opcodes.ACC_PUBLIC) != 0)
+                    return bytecodeCreator.readInstanceField(f, object);
+                else {
+                    var fieldGetter = "get" + capitalize(stripPrefix(f.name(), FIELD_PREFIX));
+                    return bytecodeCreator.invokeVirtualMethod(
+                            MethodDescriptor.ofMethod(objectType.toString(), fieldGetter, f.type().name().toString()), object);
+                }
+            };
 
             Effect doSimpleCopy = () -> {
                 var setter = MethodDescriptor.ofMethod(builderType.name().toString(), "set" + capitalize(consideredFieldName),
                         builderType.name().toString(), f.type().toString());
 
-                var val = bytecodeCreator.readInstanceField(f, object);
+                var val = get.get();
                 bytecodeCreator.invokeVirtualMethod(setter, builder, val);
             };
 
@@ -87,7 +119,7 @@ class AutoprotomapProcessor {
                         var nestedBuilder = bytecodeCreator.invokeVirtualMethod(
                                 MethodDescriptor.ofMethod(builderType.toString(), builderGetter, nestedBuilderType.name().toString()), builder);
 
-                        var val = bytecodeCreator.readInstanceField(f, object);
+                        var val = get.get();
 
                         generateBuilderUse(index, protoIndex, bytecodeCreator, classCreator, nestedBuilder, Type.create(protoType.name(), Type.Kind.CLASS), f.type(), val);
                     }
@@ -112,7 +144,7 @@ class AutoprotomapProcessor {
             Type messageType, Type objectType,
             ResultHandle message
     ) {
-        var constructor = findAllArgsConstructor(index.getClassByName(objectType.name()));
+        var constructor = findAllArgsConstructor(index, index.getClassByName(objectType.name()));
         if (constructor == null) {
             throw new IllegalStateException("No constructor found for type: " + objectType.name());
         }
@@ -154,10 +186,12 @@ class AutoprotomapProcessor {
         return bytecodeCreator.newInstance(constructor, argMap);
     }
 
-    private MethodInfo findAllArgsConstructor(ClassInfo klass) {
-        var fieldCount = klass.fields().size();
-        var fieldNames = klass.fields().stream().map(f -> stripPrefix(f.name(), FIELD_PREFIX)).sorted().toList();
-        var fieldNameToType = klass.fields().stream().collect(Collectors.toMap(f -> stripPrefix(f.name(), FIELD_PREFIX), FieldInfo::type));
+    private MethodInfo findAllArgsConstructor(Index index, ClassInfo klass) {
+        ArrayList<FieldInfo> fields = findAllFields(index, klass);
+
+        var fieldCount = fields.size();
+        var fieldNames = fields.stream().map(f -> stripPrefix(f.name(), FIELD_PREFIX)).sorted().toList();
+        var fieldNameToType = fields.stream().collect(Collectors.toMap(f -> stripPrefix(f.name(), FIELD_PREFIX), FieldInfo::type));
 
         for (var m : klass.constructors()) {
             if (m.parametersCount() != fieldCount) continue;

@@ -10,6 +10,6 @@ import lombok.Getter;
 @Getter
 public class SimpleObject {
     public int numfield = 0;
-    public String name;
+    private String name;
     public ByteString someBytes;
 }

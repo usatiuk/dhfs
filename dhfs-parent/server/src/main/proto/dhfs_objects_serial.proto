@@ -60,7 +60,7 @@ message PersistentPeerInfoP {
 
 message JKleppmannTreeNodeMetaFileP {
   string name = 1;
-  string fileMirror = 2;
+  string fileIno = 2;
 }
 
 message JKleppmannTreeNodeMetaDirectoryP {
