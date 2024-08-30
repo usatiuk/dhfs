@@ -11,13 +11,16 @@ import io.quarkus.deployment.builditem.ApplicationIndexBuildItem;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
 import io.quarkus.gizmo.*;
 import jakarta.inject.Singleton;
-import org.jboss.jandex.ClassType;
-import org.jboss.jandex.DotName;
-import org.jboss.jandex.Index;
 import org.jboss.jandex.Type;
+import org.jboss.jandex.*;
 import org.objectweb.asm.Opcodes;
 
+import java.util.Objects;
+import java.util.stream.Collectors;
+
 class AutoprotomapProcessor {
+
+    private static final String FIELD_PREFIX = "_";
 
     private static final String FEATURE = "autoprotomap";
 
@@ -40,8 +43,15 @@ class AutoprotomapProcessor {
         return ret;
     }
 
-    public static String capitalize(String str) {
+    private static String capitalize(String str) {
         return str.substring(0, 1).toUpperCase() + str.substring(1);
+    }
+
+    private static String stripPrefix(String str, String prefix) {
+        if (str.startsWith(prefix)) {
+            return str.substring(prefix.length());
+        }
+        return str;
     }
 
     private void generateBuilderUse(Index index,
@@ -56,10 +66,7 @@ class AutoprotomapProcessor {
         var objectClass = index.getClassByName(objectType.name().toString());
 
         for (var f : objectClass.fields()) {
-            var consideredFieldName = f.name();
-
-            if (consideredFieldName.startsWith("_")) // TODO: Configure
-                consideredFieldName = consideredFieldName.substring(1);
+            var consideredFieldName = stripPrefix(f.name(), FIELD_PREFIX);
 
             switch (f.type().kind()) {
                 case CLASS -> {
@@ -93,6 +100,67 @@ class AutoprotomapProcessor {
         }
     }
 
+    private ResultHandle generateConstructorUse(
+            Index index,
+            ProtoIndexBuildItem protoIndex,
+            BytecodeCreator bytecodeCreator,
+            ClassCreator classCreator,
+            Type messageType, Type objectType,
+            ResultHandle message
+    ) {
+        var constructor = findAllArgsConstructor(index.getClassByName(objectType.name()));
+        if (constructor == null) {
+            throw new IllegalStateException("No constructor found for type: " + objectType.name());
+        }
+        var argMap = new ResultHandle[constructor.parametersCount()];
+
+        for (int i = 0; i < argMap.length; i++) {
+            var type = constructor.parameterType(i);
+            var name = constructor.parameterName(i);
+
+            switch (type.kind()) {
+                case CLASS -> {
+                    var nestedProtoType = protoIndex.protoMsgToObj.inverseBidiMap().get(index.getClassByName(type.name()));
+                    var call = MethodDescriptor.ofMethod(messageType.name().toString(), "get" + capitalize(name),
+                            nestedProtoType.name().toString());
+                    var nested = bytecodeCreator.invokeVirtualMethod(call, message);
+                    argMap[i] = generateConstructorUse(index, protoIndex, bytecodeCreator, classCreator, Type.create(nestedProtoType.name(), Type.Kind.CLASS), type, nested);
+                }
+                case PRIMITIVE -> {
+                    var call = MethodDescriptor.ofMethod(messageType.name().toString(), "get" + capitalize(name),
+                            type.name().toString());
+                    argMap[i] = bytecodeCreator.invokeVirtualMethod(call, message);
+                }
+                case WILDCARD_TYPE -> throw new UnsupportedOperationException("Wildcards not supported yet");
+                case PARAMETERIZED_TYPE ->
+                        throw new UnsupportedOperationException("Parametrized types not supported yet");
+                case ARRAY -> throw new UnsupportedOperationException("Arrays not supported yet");
+                default -> throw new IllegalStateException("Unexpected type: " + type);
+            }
+        }
+
+        return bytecodeCreator.newInstance(constructor, argMap);
+    }
+
+    private MethodInfo findAllArgsConstructor(ClassInfo klass) {
+        var fieldCount = klass.fields().size();
+        var fieldNames = klass.fields().stream().map(f -> stripPrefix(f.name(), FIELD_PREFIX)).sorted().toList();
+        var fieldNameToType = klass.fields().stream().collect(Collectors.toMap(f -> stripPrefix(f.name(), FIELD_PREFIX), FieldInfo::type));
+
+        for (var m : klass.constructors()) {
+            if (m.parametersCount() != fieldCount) continue;
+            var parameterNames = m.parameters().stream().map(MethodParameterInfo::name).sorted().toList();
+            if (!Objects.equals(fieldNames, parameterNames)) continue;
+
+            for (var p : m.parameters()) {
+                if (!Objects.equals(fieldNameToType.get(p.name()), p.type())) continue;
+            }
+
+            return m;
+        }
+
+        return null;
+    }
 
     @BuildStep
     void generateProtoSerializer(ApplicationIndexBuildItem jandex, ProtoIndexBuildItem protoIndex, BuildProducer<GeneratedBeanBuildItem> generatedClasses) {
@@ -135,6 +203,19 @@ class AutoprotomapProcessor {
                         var result = method.invokeVirtualMethod(MethodDescriptor.ofMethod(builderType.name().toString(), "build", msgJType.name().toString()), builder);
 
                         method.returnValue(result);
+                    }
+
+                    try (MethodCreator method = classCreator.getMethodCreator("deserialize",
+                            Object.class, Message.class)) {
+                        method.setModifiers(Opcodes.ACC_PUBLIC);
+
+                        var objClassInfo = jandex.getIndex().getClassByName(objJType.name());
+
+                        var arg = method.getMethodParam(0);
+
+                        method.returnValue(
+                                generateConstructorUse(jandex.getIndex(), protoIndex, method, classCreator, msgJType, objJType, arg)
+                        );
                     }
                 }
             }
