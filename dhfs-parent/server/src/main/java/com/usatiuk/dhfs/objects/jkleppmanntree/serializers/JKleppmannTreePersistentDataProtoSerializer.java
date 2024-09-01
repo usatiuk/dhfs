@@ -9,7 +9,6 @@ import com.usatiuk.dhfs.objects.persistence.JKleppmannTreePersistentDataP;
 import com.usatiuk.kleppmanntree.AtomicClock;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
 import com.usatiuk.kleppmanntree.OpMove;
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 

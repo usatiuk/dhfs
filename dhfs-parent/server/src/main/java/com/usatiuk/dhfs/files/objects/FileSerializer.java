@@ -3,7 +3,6 @@ package com.usatiuk.dhfs.files.objects;
 import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.persistence.FileP;
 import com.usatiuk.dhfs.objects.persistence.FsNodeP;
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Singleton;
 
 import java.util.TreeMap;

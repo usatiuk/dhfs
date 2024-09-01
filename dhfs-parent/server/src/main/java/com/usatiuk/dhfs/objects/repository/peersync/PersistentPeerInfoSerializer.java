@@ -4,7 +4,6 @@ import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.persistence.PersistentPeerInfoP;
 import com.usatiuk.dhfs.objects.repository.CertificateTools;
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Singleton;
 
 import java.security.cert.CertificateEncodingException;

@@ -7,7 +7,6 @@ import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeOpLog;
 import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeOpLogP;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
 import com.usatiuk.kleppmanntree.LogRecord;
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Singleton;
 
 import java.util.TreeMap;

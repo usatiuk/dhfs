@@ -7,7 +7,6 @@ import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeNodeMetaP;
 import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeOpP;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
 import com.usatiuk.kleppmanntree.OpMove;
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 

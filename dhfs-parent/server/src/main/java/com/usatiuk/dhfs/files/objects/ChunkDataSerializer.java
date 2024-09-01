@@ -2,7 +2,6 @@ package com.usatiuk.dhfs.files.objects;
 
 import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.persistence.ChunkDataP;
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Singleton;
 
 @Singleton

@@ -4,7 +4,6 @@ import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Singleton;
 
 import java.util.Collections;
