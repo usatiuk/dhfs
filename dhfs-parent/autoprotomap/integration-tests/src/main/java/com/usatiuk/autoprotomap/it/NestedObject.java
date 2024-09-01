@@ -8,7 +8,7 @@ import lombok.Getter;
 @ProtoMirror(NestedObjectProto.class)
 @AllArgsConstructor
 @Getter
-public class NestedObject {
+public class NestedObject extends AbstractObject {
     public SimpleObject object;
     public String _nestedName;
     public ByteString _nestedSomeBytes;

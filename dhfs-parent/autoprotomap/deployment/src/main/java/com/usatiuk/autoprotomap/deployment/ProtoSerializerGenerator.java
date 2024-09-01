@@ -3,7 +3,6 @@ package com.usatiuk.autoprotomap.deployment;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
 import io.quarkus.gizmo.*;
-import lombok.AllArgsConstructor;
 import org.jboss.jandex.Type;
 import org.jboss.jandex.*;
 import org.objectweb.asm.Opcodes;
@@ -109,8 +108,6 @@ public class ProtoSerializerGenerator {
     }
 
     private ResultHandle generateConstructorUse(
-            Index index,
-            ProtoIndexBuildItem protoIndex,
             BytecodeCreator bytecodeCreator,
             ClassCreator classCreator,
             Type messageType, Type objectType,
@@ -141,7 +138,7 @@ public class ProtoSerializerGenerator {
                         var call = MethodDescriptor.ofMethod(messageType.name().toString(), "get" + capitalize(strippedName),
                                 nestedProtoType.name().toString());
                         var nested = bytecodeCreator.invokeVirtualMethod(call, message);
-                        argMap[i] = generateConstructorUse(index, protoIndex, bytecodeCreator, classCreator, Type.create(nestedProtoType.name(), Type.Kind.CLASS), type, nested);
+                        argMap[i] = generateConstructorUse(bytecodeCreator, classCreator, Type.create(nestedProtoType.name(), Type.Kind.CLASS), type, nested);
                     }
                 }
                 case PRIMITIVE -> {
@@ -180,7 +177,76 @@ public class ProtoSerializerGenerator {
         return null;
     }
 
+    public void generateAbstract() {
+        var kids = index.getAllKnownSubclasses(topObjectType.name()).stream()
+                .filter(k -> !k.isAbstract()).toList();
+
+        try (MethodCreator method = classCreator.getMethodCreator("serialize",
+                Message.class, Object.class)) {
+
+            method.setModifiers(Opcodes.ACC_PUBLIC);
+
+            var builderType = Type.create(DotName.createComponentized(topMessageType.name(), "Builder", true), Type.Kind.CLASS);
+
+            var builder = method.invokeStaticMethod(MethodDescriptor.ofMethod(topMessageType.name().toString(), "newBuilder", builderType.name().toString()));
+
+            var arg = method.getMethodParam(0);
+
+            for (var nestedObjClass : kids) {
+                System.out.println("Generating " + nestedObjClass.name() + " serializer for " + topObjectType.name());
+                var nestedMessageClass = protoIndex.protoMsgToObj.inverseBidiMap().get(nestedObjClass);
+                var nestedMessageType = Type.create(nestedMessageClass.name(), Type.Kind.CLASS);
+
+                var nestedObjType = Type.create(nestedObjClass.name(), Type.Kind.CLASS);
+
+                var statement = method.ifTrue(method.instanceOf(arg, nestedObjClass.name().toString()));
+
+                try (var branch = statement.trueBranch()) {
+                    var nestedBuilderType = Type.create(DotName.createComponentized(nestedMessageType.name(), "Builder", true), Type.Kind.CLASS);
+                    var nestedBuilder = branch.invokeVirtualMethod(MethodDescriptor.ofMethod(builderType.name().toString(),
+                            "get" + capitalize(nestedObjType.name().withoutPackagePrefix()) + "Builder",
+                            nestedBuilderType.name().toString()), builder);
+                    generateBuilderUse(branch, nestedBuilder, nestedMessageType, nestedObjType, arg);
+                    var result = branch.invokeVirtualMethod(MethodDescriptor.ofMethod(builderType.name().toString(), "build", topMessageType.name().toString()), builder);
+                    branch.returnValue(result);
+                }
+            }
+            method.throwException(IllegalArgumentException.class, "Unknown object type");
+        }
+
+        try (MethodCreator method = classCreator.getMethodCreator("deserialize",
+                Object.class, Message.class)) {
+            method.setModifiers(Opcodes.ACC_PUBLIC);
+            var arg = method.getMethodParam(0);
+
+            for (var nestedObjClass : kids) {
+                System.out.println("Generating " + nestedObjClass.name() + " deserializer for " + topObjectType.name());
+                var nestedMessageClass = protoIndex.protoMsgToObj.inverseBidiMap().get(nestedObjClass);
+                var nestedMessageType = Type.create(nestedMessageClass.name(), Type.Kind.CLASS);
+
+                var nestedObjType = Type.create(nestedObjClass.name(), Type.Kind.CLASS);
+                var typeCheck = method.invokeVirtualMethod(MethodDescriptor.ofMethod(topMessageType.name().toString(),
+                        "has" + capitalize(nestedObjType.name().withoutPackagePrefix()), boolean.class), arg);
+
+                var statement = method.ifTrue(typeCheck);
+
+                try (var branch = statement.trueBranch()) {
+                    var nestedMessage = branch.invokeVirtualMethod(MethodDescriptor.ofMethod(topMessageType.name().toString(),
+                            "get" + capitalize(nestedObjType.name().withoutPackagePrefix()), nestedMessageType.name().toString()), arg);
+                    branch.returnValue(generateConstructorUse(branch, classCreator, nestedMessageType, nestedObjType, nestedMessage));
+                }
+            }
+            method.throwException(IllegalArgumentException.class, "Unknown object type");
+        }
+    }
+
     public void generate() {
+        var objInfo = index.getClassByName(topObjectType.name());
+        if (objInfo.isAbstract()) {
+            generateAbstract();
+            return;
+        }
+
         try (MethodCreator method = classCreator.getMethodCreator("serialize",
                 Message.class, Object.class)) {
 
@@ -203,13 +269,9 @@ public class ProtoSerializerGenerator {
                 Object.class, Message.class)) {
             method.setModifiers(Opcodes.ACC_PUBLIC);
 
-            var objClassInfo = index.getClassByName(topObjectType.name());
-
             var arg = method.getMethodParam(0);
 
-            method.returnValue(
-                    generateConstructorUse(index, protoIndex, method, classCreator, topMessageType, topObjectType, arg)
-            );
+            method.returnValue(generateConstructorUse(method, classCreator, topMessageType, topObjectType, arg));
         }
 
     }

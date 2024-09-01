@@ -8,7 +8,7 @@ import lombok.Getter;
 @ProtoMirror(SimpleObjectProto.class)
 @AllArgsConstructor
 @Getter
-public class SimpleObject {
+public class SimpleObject extends AbstractObject {
     public int numfield = 0;
     private String name;
     public ByteString someBytes;

@@ -17,3 +17,10 @@ message NestedObjectProto {
   string nestedName = 2;
   bytes nestedSomeBytes = 3;
 }
+
+message AbstractProto {
+  oneof obj {
+    NestedObjectProto nestedObject = 1;
+    SimpleObjectProto simpleObject = 2;
+  }
+}
