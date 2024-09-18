@@ -136,8 +136,8 @@ message JObjectDataP {
     ChunkDataP chunkData = 5;
     PeerDirectoryP peerDirectory = 6;
     PersistentPeerInfoP persistentPeerInfo = 7;
-    JKleppmannTreeNodeP treeNode = 8;
-    JKleppmannTreePersistentDataP kleppmannTreePersistentData = 9;
-    JKleppmannTreeOpLogP kleppmannTreeOpLog = 10;
+    JKleppmannTreeNodeP jKleppmannTreeNode = 8;
+    JKleppmannTreePersistentDataP jKleppmannTreePersistentData = 9;
+    JKleppmannTreeOpLogP jKleppmannTreeOpLog = 10;
   }
 }
