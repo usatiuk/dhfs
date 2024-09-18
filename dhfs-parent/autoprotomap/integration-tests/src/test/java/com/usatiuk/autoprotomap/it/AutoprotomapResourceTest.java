@@ -65,6 +65,15 @@ public class AutoprotomapResourceTest {
     }
 
     @Test
+    public void testAbstractCustom() {
+        var ret = abstractProtoSerializer.serialize(new CustomObject(1234));
+        Assertions.assertEquals(1, ret.getCustomObject().getTest());
+
+        var des = (CustomObject) abstractProtoSerializer.deserialize(ret);
+        Assertions.assertEquals(2, des.getTestNum());
+    }
+
+    @Test
     public void tesAbstractNested() {
         var ret = abstractProtoSerializer.serialize(
                 new NestedObject(

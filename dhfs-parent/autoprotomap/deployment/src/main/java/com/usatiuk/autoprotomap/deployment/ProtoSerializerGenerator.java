@@ -2,12 +2,16 @@ package com.usatiuk.autoprotomap.deployment;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import io.quarkus.gizmo.*;
+import jakarta.inject.Inject;
+import org.apache.commons.lang3.tuple.Pair;
 import org.jboss.jandex.Type;
 import org.jboss.jandex.*;
 import org.objectweb.asm.Opcodes;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
@@ -20,6 +24,7 @@ public class ProtoSerializerGenerator {
     private final Index index;
     private final ProtoIndexBuildItem protoIndex;
     private final ClassCreator classCreator;
+    private final HashSet<Pair<ClassInfo, ClassInfo>> externalSerializers = new HashSet<>();
     private final Type topMessageType;
     private final Type topObjectType;
 
@@ -29,6 +34,24 @@ public class ProtoSerializerGenerator {
         this.classCreator = classCreator;
         this.topMessageType = topMessageType;
         this.topObjectType = topObjectType;
+    }
+
+    private FieldDescriptor getOutsideSerializer(ClassInfo messageClass, ClassInfo objectClass) {
+        var name = messageClass.name().withoutPackagePrefix() + objectClass.name().withoutPackagePrefix() + "serializer";
+        var msgType = io.quarkus.gizmo.Type.classType(messageClass.name());
+        var objType = io.quarkus.gizmo.Type.classType(objectClass.name());
+        var type = io.quarkus.gizmo.Type.ParameterizedType.parameterizedType(
+                io.quarkus.gizmo.Type.classType(ProtoSerializer.class),
+                msgType, objType);
+        var sig = SignatureBuilder.forField().setType(type).build();
+        var fd = FieldDescriptor.of(classCreator.getClassName(), name, ProtoSerializer.class);
+        if (externalSerializers.add(Pair.of(messageClass, objectClass))) {
+            var fc = classCreator.getFieldCreator(fd);
+            fc.addAnnotation(Inject.class);
+            fc.setSignature(sig);
+            fc.setModifiers(Opcodes.ACC_PUBLIC);
+        }
+        return fd;
     }
 
     private void traverseHierarchy(Index index, ClassInfo klass, Consumer<ClassInfo> visitor) {
@@ -194,19 +217,36 @@ public class ProtoSerializerGenerator {
 
             for (var nestedObjClass : kids) {
                 System.out.println("Generating " + nestedObjClass.name() + " serializer for " + topObjectType.name());
-                var nestedMessageClass = protoIndex.protoMsgToObj.inverseBidiMap().get(nestedObjClass);
-                var nestedMessageType = Type.create(nestedMessageClass.name(), Type.Kind.CLASS);
-
                 var nestedObjType = Type.create(nestedObjClass.name(), Type.Kind.CLASS);
+                var nestedMessageClass = protoIndex.protoMsgToObj.inverseBidiMap().get(nestedObjClass);
+                boolean doExternalCall = false;
+                if (nestedMessageClass == null) {
+                    var msgInfo = index.getClassByName(topMessageType.name());
+                    nestedMessageClass = index.getClassByName(msgInfo.method("get" + capitalize(nestedObjType.name().withoutPackagePrefix())).returnType().name());
+                    doExternalCall = true;
+                }
+                var nestedMessageType = Type.create(nestedMessageClass.name(), Type.Kind.CLASS);
 
                 var statement = method.ifTrue(method.instanceOf(arg, nestedObjClass.name().toString()));
 
                 try (var branch = statement.trueBranch()) {
-                    var nestedBuilderType = Type.create(DotName.createComponentized(nestedMessageType.name(), "Builder", true), Type.Kind.CLASS);
-                    var nestedBuilder = branch.invokeVirtualMethod(MethodDescriptor.ofMethod(builderType.name().toString(),
-                            "get" + capitalize(nestedObjType.name().withoutPackagePrefix()) + "Builder",
-                            nestedBuilderType.name().toString()), builder);
-                    generateBuilderUse(branch, nestedBuilder, nestedMessageType, nestedObjType, arg);
+                    if (doExternalCall) {
+                        var externalSerializer = getOutsideSerializer(nestedMessageClass, nestedObjClass);
+                        var serializerLoaded = branch.readInstanceField(externalSerializer, branch.getThis());
+                        var serialized = branch.invokeInterfaceMethod(
+                                MethodDescriptor.ofMethod(ProtoSerializer.class,
+                                        "serialize", Message.class, Object.class),
+                                serializerLoaded, arg);
+                        branch.invokeVirtualMethod(MethodDescriptor.ofMethod(builderType.name().toString(),
+                                "set" + capitalize(nestedObjType.name().withoutPackagePrefix()),
+                                builderType.name().toString(), nestedMessageType.name().toString()), builder, serialized);
+                    } else {
+                        var nestedBuilderType = Type.create(DotName.createComponentized(nestedMessageType.name(), "Builder", true), Type.Kind.CLASS);
+                        var nestedBuilder = branch.invokeVirtualMethod(MethodDescriptor.ofMethod(builderType.name().toString(),
+                                "get" + capitalize(nestedObjType.name().withoutPackagePrefix()) + "Builder",
+                                nestedBuilderType.name().toString()), builder);
+                        generateBuilderUse(branch, nestedBuilder, nestedMessageType, nestedObjType, arg);
+                    }
                     var result = branch.invokeVirtualMethod(MethodDescriptor.ofMethod(builderType.name().toString(), "build", topMessageType.name().toString()), builder);
                     branch.returnValue(result);
                 }
@@ -221,10 +261,18 @@ public class ProtoSerializerGenerator {
 
             for (var nestedObjClass : kids) {
                 System.out.println("Generating " + nestedObjClass.name() + " deserializer for " + topObjectType.name());
+                var nestedObjType = Type.create(nestedObjClass.name(), Type.Kind.CLASS);
+
                 var nestedMessageClass = protoIndex.protoMsgToObj.inverseBidiMap().get(nestedObjClass);
+                boolean doExternalCall = false;
+                if (nestedMessageClass == null) {
+                    var msgInfo = index.getClassByName(topMessageType.name());
+                    nestedMessageClass = index.getClassByName(msgInfo.method("get" + capitalize(nestedObjType.name().withoutPackagePrefix())).returnType().name());
+                    doExternalCall = true;
+                }
+
                 var nestedMessageType = Type.create(nestedMessageClass.name(), Type.Kind.CLASS);
 
-                var nestedObjType = Type.create(nestedObjClass.name(), Type.Kind.CLASS);
                 var typeCheck = method.invokeVirtualMethod(MethodDescriptor.ofMethod(topMessageType.name().toString(),
                         "has" + capitalize(nestedObjType.name().withoutPackagePrefix()), boolean.class), arg);
 
@@ -233,7 +281,16 @@ public class ProtoSerializerGenerator {
                 try (var branch = statement.trueBranch()) {
                     var nestedMessage = branch.invokeVirtualMethod(MethodDescriptor.ofMethod(topMessageType.name().toString(),
                             "get" + capitalize(nestedObjType.name().withoutPackagePrefix()), nestedMessageType.name().toString()), arg);
-                    branch.returnValue(generateConstructorUse(branch, classCreator, nestedMessageType, nestedObjType, nestedMessage));
+                    if (doExternalCall) {
+                        var externalSerializer = getOutsideSerializer(nestedMessageClass, nestedObjClass);
+                        var serializerLoaded = branch.readInstanceField(externalSerializer, branch.getThis());
+                        branch.returnValue(branch.invokeInterfaceMethod(
+                                MethodDescriptor.ofMethod(ProtoSerializer.class,
+                                        "deserialize", Object.class, Message.class),
+                                serializerLoaded, nestedMessage));
+                    } else {
+                        branch.returnValue(generateConstructorUse(branch, classCreator, nestedMessageType, nestedObjType, nestedMessage));
+                    }
                 }
             }
             method.throwException(IllegalArgumentException.class, "Unknown object type");

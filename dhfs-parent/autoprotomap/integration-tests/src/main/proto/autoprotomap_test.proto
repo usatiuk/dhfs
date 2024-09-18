@@ -18,9 +18,14 @@ message NestedObjectProto {
   bytes nestedSomeBytes = 3;
 }
 
+message CustomObjectProto {
+  int64 test = 1;
+}
+
 message AbstractProto {
   oneof obj {
     NestedObjectProto nestedObject = 1;
     SimpleObjectProto simpleObject = 2;
+    CustomObjectProto customObject = 3;
   }
 }
