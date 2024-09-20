@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.files.objects.ChunkData;
 import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
+import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
 import com.usatiuk.kleppmanntree.AlreadyExistsException;
@@ -203,7 +204,7 @@ public class DhfsFileServiceSimpleTestImpl {
     }
 
     @Test
-    void moveOverTest() {
+    void moveOverTest() throws InterruptedException {
         var ret = fileService.create("/moveOverTest1", 777);
         Assertions.assertTrue(ret.isPresent());
         var uuid = ret.get();
@@ -216,12 +217,25 @@ public class DhfsFileServiceSimpleTestImpl {
         fileService.write(uuid2, 0, new byte[]{11, 12, 13, 14, 15, 16, 17, 18, 19, 29});
         Assertions.assertArrayEquals(new byte[]{11, 12, 13, 14, 15, 16, 17, 18, 19, 29}, fileService.read(uuid2, 0, 10).get().toByteArray());
 
+        var oldfile = jObjectManager.get(ret2.get()).orElseThrow(IllegalStateException::new);
+        var chunk = oldfile.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.extractRefs()).stream().toList().get(0);
+        var chunkObj = jObjectManager.get(chunk).orElseThrow(IllegalStateException::new);
+
         Assertions.assertTrue(fileService.rename("/moveOverTest1", "/moveOverTest2"));
         Assertions.assertFalse(fileService.open("/moveOverTest1").isPresent());
         Assertions.assertTrue(fileService.open("/moveOverTest2").isPresent());
 
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
                 fileService.read(fileService.open("/moveOverTest2").get(), 0, 10).get().toByteArray());
+
+        Thread.sleep(1000);
+
+        try {
+            chunkObj.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
+                Assertions.assertFalse(m.getReferrers().contains(uuid));
+                return null;
+            });
+        } catch (DeletedObjectAccessException ignored) {}
     }
 
     @Test
@@ -274,16 +288,5 @@ public class DhfsFileServiceSimpleTestImpl {
 
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
                 fileService.read(fileService.open("/movedTest2").get(), 0, 10).get().toByteArray());
-
-        var newfile = fileService.open("/movedTest2").get();
-
-        // FIXME: No gc!
-//        Thread.sleep(1000);
-//
-//        chunkObj.runWriteLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
-//            Assertions.assertTrue(m.getReferrers().contains(newfile));
-//            Assertions.assertFalse(m.getReferrers().contains(uuid));
-//            return null;
-//        });
     }
 }
