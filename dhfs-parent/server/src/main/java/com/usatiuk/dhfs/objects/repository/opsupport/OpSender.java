@@ -62,6 +62,8 @@ public class OpSender {
                     });
                 }
             } catch (InterruptedException ignored) {
+            } catch (Throwable ex) {
+                Log.error("In op sender: ", ex);
             }
         }
     }
