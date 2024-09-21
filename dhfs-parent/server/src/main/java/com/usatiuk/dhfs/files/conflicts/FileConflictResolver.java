@@ -86,8 +86,10 @@ public class FileConflictResolver implements ConflictResolver {
             if (m.getBestVersion() > newChangelog.values().stream().reduce(0L, Long::sum))
                 throw new StatusRuntimeException(Status.ABORTED.withDescription("Race when conflict resolving"));
 
+            m.setChangelog(newChangelog);
+
             if (wasChanged) {
-                newChangelog.merge(persistentPeerDataService.getSelfUuid(), 1L, Long::sum);
+                m.getChangelog().merge(persistentPeerDataService.getSelfUuid(), 1L, Long::sum);
 
                 if (useHashForChunks)
                     throw new NotImplementedException();
@@ -138,7 +140,6 @@ public class FileConflictResolver implements ConflictResolver {
                 return ret;
             }
 
-            m.setChangelog(newChangelog);
             return null;
         });
 

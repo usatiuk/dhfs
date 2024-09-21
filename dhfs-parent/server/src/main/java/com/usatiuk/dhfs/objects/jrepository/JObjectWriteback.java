@@ -87,7 +87,7 @@ public class JObjectWriteback {
         Log.info("Flushing objects");
         for (var v : toWrite) {
             try {
-                flushOne(v._obj);
+                flushOne(v._obj, v._dataDirty);
             } catch (Exception e) {
                 Log.error("Failed writing object " + v._obj.getMeta().getName(), e);
             }
@@ -102,18 +102,15 @@ public class JObjectWriteback {
 
                 try {
                     _currentSize.addAndGet(-got._size);
-                    flushOne(got._obj);
+                    flushOne(got._obj, got._dataDirty);
                     if (_currentSize.get() <= sizeLimit)
                         synchronized (this) {
                             this.notifyAll();
                         }
                 } catch (Exception e) {
                     try {
-                        got._obj.runReadLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
-                            var size = got._obj.estimateSize();
-                            _currentSize.addAndGet(size);
-                            _writeQueue.add(new QueueEntry(got._obj, size));
-                            return null;
+                        got._obj.runReadLockedVoid(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
+                            doAdd(got._obj, got._dataDirty);
                         });
                         Log.error("Failed writing object " + got._obj.getMeta().getName() + ", will retry.", e);
                     } catch (DeletedObjectAccessException ignored) {
@@ -129,23 +126,23 @@ public class JObjectWriteback {
         Log.info("Writeback thread exiting");
     }
 
-    private void flushOne(JObject<?> obj) {
+    private void flushOne(JObject<?> obj, boolean dataChanged) {
         if (obj.getMeta().isDeleted()) {
             // FIXME
             jObjectTxManager.executeTx(() -> {
                 obj.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, data, b, i) -> {
-                    flushOneImmediate(m, data);
+                    flushOneImmediate(m, data, dataChanged);
                     return null;
                 });
             });
         } else
             obj.runReadLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, data) -> {
-                flushOneImmediate(m, data);
+                flushOneImmediate(m, data, dataChanged);
                 return null;
             });
     }
 
-    private <T extends JObjectData> void flushOneImmediate(ObjectMetadata m, T data) {
+    private <T extends JObjectData> void flushOneImmediate(ObjectMetadata m, T data, boolean dataChanged) {
         Log.trace("Flushing " + m.getName());
         m.markWritten();
         if (m.isDeleted()) {
@@ -158,22 +155,24 @@ public class JObjectWriteback {
             return;
         }
         // Can be unnecessary
-        if (m.isHaveLocalCopy() && data != null)
+        if (m.isHaveLocalCopy() && (data != null && dataChanged))
             objectPersistentStore.writeObjectDirect(m.getName(), metaProtoSerializer.serialize(m), dataProtoSerializer.serialize(data));
-        else if (m.isHaveLocalCopy() && data == null)
+        else if (m.isHaveLocalCopy() && !dataChanged)
             objectPersistentStore.writeObjectMetaDirect(m.getName(), metaProtoSerializer.serialize(m));
         else if (!m.isHaveLocalCopy())
             objectPersistentStore.writeObjectDirect(m.getName(), metaProtoSerializer.serialize(m), null);
+        else
+            throw new IllegalStateException("Unexpected object flush combination");
     }
 
     public void remove(JObject<?> object) {
-        var got = _writeQueue.remove(new QueueEntry(object, 0));
+        var got = _writeQueue.remove(new QueueEntry(object, 0, false));
         if (got == null) return;
         _currentSize.addAndGet(-got._size);
     }
 
     // Object should be at least read-locked
-    public void markDirty(JObject<?> object) {
+    public void markDirty(JObject<?> object, boolean dataChanged) {
         if (object.getMeta().isDeleted() && !object.getMeta().isWritten()) {
             remove(object);
             return;
@@ -211,7 +210,7 @@ public class JObjectWriteback {
             if (!finished) {
                 Log.error("Timed out waiting for writeback to drain");
                 try {
-                    flushOneImmediate(object.getMeta(), object.getData());
+                    flushOneImmediate(object.getMeta(), object.getData(), dataChanged);
                     return;
                 } catch (Exception e) {
                     Log.error("Failed writing object " + object.getMeta().getName(), e);
@@ -225,9 +224,19 @@ public class JObjectWriteback {
             }
         }
 
-        var size = object.estimateSize();
+        doAdd(object, dataChanged);
+    }
 
-        var old = _writeQueue.readd(new QueueEntry(object, size));
+    private void doAdd(JObject<?> object, boolean dirtyData) {
+        var size = object.estimateSize();
+        // FIXME: queueEntry twice
+        var old = _writeQueue.merge(new QueueEntry(object, 0, false), (prev) -> {
+            boolean newDataDirty = false;
+            if (prev != null)
+                newDataDirty |= prev._dataDirty;
+            newDataDirty |= dirtyData;
+            return new QueueEntry(object, size, newDataDirty);
+        });
 
         if (old != null)
             _currentSize.addAndGet(size - old._size);
@@ -238,12 +247,15 @@ public class JObjectWriteback {
     private class QueueEntry {
         private final JObject<?> _obj;
         private final long _size;
+        private final boolean _dataDirty;
 
-        private QueueEntry(JObject<?> obj, long size) {
+        private QueueEntry(JObject<?> obj, long size, boolean dataDirty) {
             _obj = obj;
             _size = size;
+            _dataDirty = dataDirty;
         }
 
+        // FIXME: That's a little bit of a hack
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;

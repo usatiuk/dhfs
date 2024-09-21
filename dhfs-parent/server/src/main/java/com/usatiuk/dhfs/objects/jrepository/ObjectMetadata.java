@@ -187,7 +187,7 @@ public class ObjectMetadata implements Serializable {
         return headerBuilder.build();
     }
 
-    public int externalHash() {
+    public int changelogHash() {
         int res = Objects.hashCode(_changelog);
         res = 31 * res + Objects.hashCode(_haveLocalCopy);
         return res;

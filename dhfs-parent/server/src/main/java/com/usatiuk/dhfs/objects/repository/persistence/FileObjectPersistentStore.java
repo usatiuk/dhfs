@@ -291,15 +291,21 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         try (var rf = new RandomAccessFile(path.toFile(), "rw");
              var ch = rf.getChannel()) {
             int len = Math.toIntExact(rf.length());
-            var buf = UninitializedByteBuffer.allocateUninitialized(META_BLOCK_SIZE);
-            fillBuffer(buf, rf.getChannel());
-
-            buf.flip();
-            buf.position(8);
-            int metaOff = Math.toIntExact(buf.getLong());
 
             int metaSize = meta.getSerializedSize() + 16;
             int dataSize;
+            int metaOff;
+
+            if (len != 0) {
+                var buf = UninitializedByteBuffer.allocateUninitialized(META_BLOCK_SIZE);
+                fillBuffer(buf, rf.getChannel());
+
+                buf.flip();
+                buf.position(8);
+                metaOff = Math.toIntExact(buf.getLong());
+            } else {
+                metaOff = -1;
+            }
 
             if (metaOff > 0) {
                 dataSize = metaOff - META_BLOCK_SIZE;

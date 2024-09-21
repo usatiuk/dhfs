@@ -6,6 +6,7 @@ import lombok.Getter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.function.Function;
 
 public class HashSetDelayedBlockingQueue<T> {
     private final LinkedHashMap<T, SetElement<T>> _set = new LinkedHashMap<>();
@@ -42,6 +43,27 @@ public class HashSetDelayedBlockingQueue<T> {
             if (_closed) throw new IllegalStateException("Adding to a queue that is closed!");
 
             SetElement<T> old = _set.putLast(el, new SetElement<>(el, System.currentTimeMillis()));
+            this.notify();
+
+            if (old != null)
+                return old.el();
+            else
+                return null;
+        }
+    }
+
+    // Merges the object with the old one
+    // Returns the old object, or null
+    public T merge(T el, Function<T, T> transformer) {
+        synchronized (this) {
+            if (_closed) throw new IllegalStateException("Adding to a queue that is closed!");
+
+            var old = _set.get(el);
+
+            var next = new SetElement<>(transformer.apply(old != null ? old.el : null), System.currentTimeMillis());
+
+            _set.putLast(el, next);
+
             this.notify();
 
             if (old != null)

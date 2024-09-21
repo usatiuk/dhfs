@@ -87,21 +87,19 @@ public class JObjectTxManager {
                 throw new IllegalStateException("Only working with unique-direct objects for now");
 
             boolean metaChanged = !Objects.equals(obj.getValue().snapshot.meta(), metaProtoSerializer.serialize(obj.getKey().getMeta()));
-            boolean externalHashChanged = obj.getValue().snapshot.externalHash() != obj.getKey().getMeta().externalHash();
+            boolean dataChanged = obj.getValue().snapshot.changelogHash() != obj.getKey().getMeta().changelogHash();
 
             // FIXME: hasDataChanged is a bit broken here
             notifyWrite(obj.getKey(),
                     obj.getValue()._forceInvalidated || metaChanged,
-                    obj.getValue()._forceInvalidated || externalHashChanged,
-                    obj.getValue()._forceInvalidated || metaChanged);
+                    obj.getValue()._forceInvalidated || dataChanged);
 
             obj.getKey().rLock();
-            obj.getKey().rwUnlock();
 
             try {
-                // This relies on the fact that we always flush data if we have it
-                if (metaChanged || obj.getValue()._forceInvalidated)
-                    jObjectWriteback.markDirty(obj.getKey());
+                obj.getKey().rwUnlock();
+                if (metaChanged || dataChanged || obj.getValue()._forceInvalidated)
+                    jObjectWriteback.markDirty(obj.getKey(), dataChanged || obj.getValue()._forceInvalidated);
             } finally {
                 obj.getKey().rUnlock();
             }
@@ -127,21 +125,30 @@ public class JObjectTxManager {
         for (var obj : state._writeObjects.entrySet()) {
             Log.debug("Committing " + obj.getKey().getMeta().getName() + " deleted=" + obj.getKey().getMeta().isDeleted() + " deletion-candidate=" + obj.getKey().getMeta().isDeletionCandidate());
 
-            var newExternalHash = obj.getKey().getMeta().externalHash();
-
-            // FIXME
-            notifyWrite(obj.getKey(),
-                    obj.getValue() == null || !Objects.equals(obj.getValue().meta(), metaProtoSerializer.serialize(obj.getKey().getMeta())),
-                    obj.getValue() == null || newExternalHash != obj.getValue().externalHash(),
-                    obj.getValue() == null || (obj.getValue().data() == null) != (obj.getKey().getData() == null) ||
-                            (obj.getKey().getData() != null &&
-                                    !Objects.equals(obj.getValue().data(), dataProtoSerializer.serialize(obj.getKey().getData())))
-            );
+            var dataDiff = obj.getValue().snapshot == null
+                    || obj.getKey().getMeta().changelogHash() != obj.getValue().snapshot.changelogHash()
+                    || obj.getValue()._forceInvalidated;
 
             if (refVerification) {
-                var oldRefs = (obj.getValue() == null || obj.getValue().data() == null)
+                boolean dataDiffReal = obj.getValue().snapshot == null
+                        || (obj.getValue().snapshot.data() == null) != (obj.getKey().getData() == null)
+                        || (obj.getKey().getData() != null &&
+                        !Objects.equals(obj.getValue().snapshot.data(), dataProtoSerializer.serialize(obj.getKey().getData())));
+
+                if (dataDiffReal && !dataDiff)
+                    throw new IllegalStateException("Data diff not equal for " + obj.getKey().getMeta().getName() + " " + obj.getKey().getData());
+                if (dataDiff && !dataDiffReal)
+                    Log.warn("Useless update for " + obj.getKey().getMeta().getName());
+            }
+
+            notifyWrite(obj.getKey(),
+                    obj.getValue().snapshot == null || !Objects.equals(obj.getValue().snapshot.meta(), metaProtoSerializer.serialize(obj.getKey().getMeta())),
+                    obj.getValue().snapshot == null || dataDiff);
+
+            if (refVerification) {
+                var oldRefs = (obj.getValue().snapshot == null || obj.getValue().snapshot.data() == null)
                         ? null
-                        : ((JObjectData) dataProtoSerializer.deserialize(obj.getValue().data())).extractRefs();
+                        : ((JObjectData) dataProtoSerializer.deserialize(obj.getValue().snapshot.data())).extractRefs();
                 verifyRefs(obj.getKey(), oldRefs);
             }
         }
@@ -152,11 +159,15 @@ public class JObjectTxManager {
 
         state._writeObjects.forEach((key, value) -> {
             try {
+                var dataDiff = value.snapshot == null
+                        || key.getMeta().changelogHash() != value.snapshot.changelogHash()
+                        || value._forceInvalidated;
+
                 key.getMeta().setLastModifiedTx(bundle.getId());
                 if (key.getMeta().isDeleted()) {
                     bundle.delete(key);
                     latch.countDown();
-                } else if (key.getMeta().isHaveLocalCopy() && key.getData() != null) {
+                } else if (key.getMeta().isHaveLocalCopy() && (key.getData() != null && dataDiff)) {
                     _serializerThreads.execute(() -> {
                         try {
                             bundle.commit(key,
@@ -170,7 +181,7 @@ public class JObjectTxManager {
                             latch.countDown();
                         }
                     });
-                } else if (key.getMeta().isHaveLocalCopy() && key.getData() == null) {
+                } else if (key.getMeta().isHaveLocalCopy() && !dataDiff) {
                     bundle.commitMetaChange(key,
                             metaProtoSerializer.serialize(key.getMeta())
                     );
@@ -181,6 +192,8 @@ public class JObjectTxManager {
                             null
                     );
                     latch.countDown();
+                } else {
+                    throw new IllegalStateException("Unexpected object flush combination");
                 }
             } catch (Exception e) {
                 Log.error("Error committing object " + key.getMeta().getName(), e);
@@ -209,12 +222,10 @@ public class JObjectTxManager {
         return bundle.getId();
     }
 
-    private <T extends JObjectData> void notifyWrite(JObject<?> obj, boolean metaChanged,
-                                                     boolean externalChanged, boolean hasDataChanged) {
+    private <T extends JObjectData> void notifyWrite(JObject<?> obj, boolean metaChanged, boolean hasDataChanged) {
         jObjectLRU.updateSize(obj);
-        //FIXME: externalChanged/hasDataChanged? but the other one is broken right now
-        jObjectManager.runWriteListeners(obj, metaChanged, externalChanged);
-        if (externalChanged && obj.getMeta().isHaveLocalCopy()) {
+        jObjectManager.runWriteListeners(obj, metaChanged, hasDataChanged);
+        if (hasDataChanged && obj.getMeta().isHaveLocalCopy()) {
             invalidationQueueService.pushInvalidationToAll(obj);
         }
     }
@@ -256,8 +267,8 @@ public class JObjectTxManager {
                     continue;
                 }
                 obj.getKey().rollback(
-                        metaProtoSerializer.deserialize(obj.getValue().meta()),
-                        obj.getValue().data() != null ? dataProtoSerializer.deserialize(obj.getValue().data()) : null);
+                        metaProtoSerializer.deserialize(obj.getValue().snapshot.meta()),
+                        obj.getValue().snapshot.data() != null ? dataProtoSerializer.deserialize(obj.getValue().snapshot.data()) : null);
                 obj.getKey().updateDeletionState();
             } finally {
                 obj.getKey().rwUnlock();
@@ -342,9 +353,6 @@ public class JObjectTxManager {
     }
 
     public void forceInvalidate(JObject<?> obj) {
-        if (!obj.getMeta().getKnownClass().isAnnotationPresent(NoTransaction.class))
-            return;
-
         var state = _state.get();
 
         if (state == null)
@@ -353,6 +361,12 @@ public class JObjectTxManager {
         obj.assertRwLock();
 
         var got = state._directObjects.get(obj);
+        if (got != null) {
+            got._forceInvalidated = true;
+            return;
+        }
+
+        got = state._writeObjects.get(obj);
         if (got != null)
             got._forceInvalidated = true;
     }
@@ -374,26 +388,26 @@ public class JObjectTxManager {
                 ? new JObjectSnapshot(
                 metaProtoSerializer.serialize(obj.getMeta()),
                 (noTx || obj.getData() == null) ? null : dataProtoSerializer.serialize(obj.getData()),
-                obj.getMeta().externalHash())
+                obj.getMeta().changelogHash())
                 : null;
 
         if (noTx)
-            state._directObjects.put(obj, new TxState.DirectObjectState(snapshot));
+            state._directObjects.put(obj, new TxState.TxObjectState(snapshot));
         else
-            state._writeObjects.put(obj, snapshot);
+            state._writeObjects.put(obj, new TxState.TxObjectState(snapshot));
     }
 
     private class TxState {
         private final long _id = _transientTxId.incrementAndGet();
-        private final HashMap<JObject<?>, JObjectSnapshot> _writeObjects = new HashMap<>();
-        private final HashMap<JObject<?>, DirectObjectState> _directObjects = new HashMap<>();
+        private final HashMap<JObject<?>, TxObjectState> _writeObjects = new HashMap<>();
+        private final HashMap<JObject<?>, TxObjectState> _directObjects = new HashMap<>();
         private final ArrayList<Consumer<String>> _callbacks = new ArrayList<>();
 
-        private static class DirectObjectState {
+        private static class TxObjectState {
             final JObjectSnapshot snapshot;
             boolean _forceInvalidated = false;
 
-            private DirectObjectState(JObjectSnapshot snapshot) {this.snapshot = snapshot;}
+            private TxObjectState(JObjectSnapshot snapshot) {this.snapshot = snapshot;}
         }
     }
 }
