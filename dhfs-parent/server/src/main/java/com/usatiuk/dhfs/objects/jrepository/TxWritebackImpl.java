@@ -238,19 +238,12 @@ public class TxWritebackImpl implements TxWriteback {
 
     @Override
     public void fence(long bundleId) {
-        var synchronizer = new Object();
-        asyncFence(bundleId, () -> {
-            synchronized (synchronizer) {
-                synchronizer.notifyAll();
-            }
-        });
-        synchronized (synchronizer) {
-            if (_lastWrittenTx.get() >= bundleId) return;
-            try {
-                synchronizer.wait();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+        var latch = new CountDownLatch(1);
+        asyncFence(bundleId, latch::countDown);
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
     }
 
