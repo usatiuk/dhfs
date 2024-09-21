@@ -45,8 +45,8 @@ public class JObjectTxManager {
     TxWriteback txWriteback;
     @ConfigProperty(name = "dhfs.objects.ref_verification")
     boolean refVerification;
-    private ExecutorService _serializerThreads;
-    private AtomicLong _transientTxId = new AtomicLong();
+    private final ExecutorService _serializerThreads;
+    private final AtomicLong _transientTxId = new AtomicLong();
 
     public JObjectTxManager() {
         BasicThreadFactory factory = new BasicThreadFactory.Builder()
