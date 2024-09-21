@@ -12,6 +12,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
+import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
@@ -22,7 +23,7 @@ import java.util.concurrent.TimeUnit;
 
 @ApplicationScoped
 public class JObjectRefProcessor {
-    private final HashSetDelayedBlockingQueue<SoftJObject<?>> _quickCandidates = new HashSetDelayedBlockingQueue<>(0);
+    private final HashSetDelayedBlockingQueue<Pair<SoftJObject<?>, SoftJObject<?>>> _quickCandidates = new HashSetDelayedBlockingQueue<>(0);
     private final HashSetDelayedBlockingQueue<String> _candidates;
     private final HashSetDelayedBlockingQueue<String> _canDeleteRetries;
     private final HashSet<String> _movablesInProcessing = new HashSet<>();
@@ -85,8 +86,8 @@ public class JObjectRefProcessor {
         }
     }
 
-    public void putQuickDeletionCandidate(SoftJObject<?> obj) {
-        _quickCandidates.add(obj);
+    public void putQuickDeletionCandidate(SoftJObject<?> from, SoftJObject<?> obj) {
+        _quickCandidates.add(Pair.of(from, obj));
     }
 
     public void putDeletionCandidate(String name) {
@@ -181,24 +182,56 @@ public class JObjectRefProcessor {
         try {
             while (!Thread.interrupted()) {
                 String next = null;
-                SoftJObject<?> nextObj = null;
+                Pair<SoftJObject<?>, SoftJObject<?>> nextQuick = null;
 
-                while (next == null && nextObj == null) {
-                    nextObj = _quickCandidates.tryGet();
+                while (next == null && nextQuick == null) {
+                    nextQuick = _quickCandidates.tryGet();
 
-                    if (nextObj != null) break;
+                    if (nextQuick != null) break;
 
                     next = _canDeleteRetries.tryGet();
                     if (next == null)
                         next = _candidates.tryGet();
                     if (next == null)
-                        nextObj = _quickCandidates.get(canDeleteRetryDelay);
+                        nextQuick = _quickCandidates.get(canDeleteRetryDelay);
                 }
 
                 JObject<?> target;
 
-                if (nextObj != null) {
-                    target = nextObj.get();
+                if (nextQuick != null) {
+                    var fromSoft = nextQuick.getLeft();
+                    var toSoft = nextQuick.getRight();
+
+                    var from = nextQuick.getLeft().get();
+                    var to = nextQuick.getRight().get();
+
+                    if (from != null && !from.getMeta().isDeleted()) {
+                        Log.warn("Quick delete failed for " + from.getMeta().getName() + " -> " + toSoft.getName());
+                        continue;
+                    }
+
+                    if (to == null) {
+                        Log.warn("Quick delete object missing: " + toSoft.getName());
+                        continue;
+                    }
+
+                    target = to;
+
+                    jObjectTxManager.executeTx(() -> {
+                        if (from != null)
+                            from.rwLock();
+                        try {
+                            try {
+                                to.rwLock();
+                                to.getMeta().removeRef(fromSoft.getName());
+                            } finally {
+                                to.rwUnlock();
+                            }
+                        } finally {
+                            if (from != null)
+                                from.rwUnlock();
+                        }
+                    });
                 } else {
                     target = jObjectManager.get(next).orElse(null);
                 }

@@ -686,7 +686,7 @@ public class JObjectManagerImpl implements JObjectManager {
                     got.rwUnlock();
                 }
             } else {
-                jObjectRefProcessor.putQuickDeletionCandidate(softJObjectFactory.create(got));
+                jObjectRefProcessor.putQuickDeletionCandidate(softJObjectFactory.create(this), softJObjectFactory.create(got));
             }
         }
 

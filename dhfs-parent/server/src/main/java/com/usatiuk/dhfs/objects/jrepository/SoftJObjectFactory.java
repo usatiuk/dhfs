@@ -50,6 +50,10 @@ public class SoftJObjectFactory {
             }
         }
 
+        @Override
+        public String getName() {
+            return _objName;
+        }
 
         @Override
         public boolean equals(Object o) {
