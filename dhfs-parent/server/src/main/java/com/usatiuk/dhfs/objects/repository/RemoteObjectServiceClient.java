@@ -128,18 +128,20 @@ public class RemoteObjectServiceClient {
         return rpcClientFactory.withObjSyncClient(host, client -> client.indexUpdate(send));
     }
 
-    public OpPushReply pushOp(Op op, String queueName, UUID host) {
-        for (var ref : op.getEscapedRefs()) {
-            jObjectTxManager.executeTx(() -> {
-                jObjectManager.get(ref).ifPresent(JObject::markSeen);
-            });
+    public OpPushReply pushOps(List<Op> ops, String queueName, UUID host) {
+        for (Op op : ops) {
+            for (var ref : op.getEscapedRefs()) {
+                jObjectTxManager.executeTx(() -> {
+                    jObjectManager.get(ref).ifPresent(JObject::markSeen);
+                });
+            }
         }
-        var msg = OpPushMsg.newBuilder()
+        var builder = OpPushMsg.newBuilder()
                 .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
-                .setQueueId(queueName)
-                .setMsg(opProtoSerializer.serialize(op))
-                .build();
-        return rpcClientFactory.withObjSyncClient(host, client -> client.opPush(msg));
+                .setQueueId(queueName);
+        for (var op : ops)
+            builder.addMsg(opProtoSerializer.serialize(op));
+        return rpcClientFactory.withObjSyncClient(host, client -> client.opPush(builder.build()));
     }
 
     public Collection<CanDeleteReply> canDelete(Collection<UUID> targets, String object, Collection<String> ourReferrers) {

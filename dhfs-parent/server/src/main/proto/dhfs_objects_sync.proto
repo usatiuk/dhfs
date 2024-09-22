@@ -94,7 +94,7 @@ message OpPushPayload {
 message OpPushMsg {
   string selfUuid = 10;
   string queueId = 1;
-  OpPushPayload msg = 2;
+  repeated OpPushPayload msg = 2;
 }
 
 message OpPushReply {

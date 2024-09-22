@@ -14,6 +14,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -95,13 +96,20 @@ public class JKleppmannTreeManager {
         }
 
         @Override
-        public Op getPendingOpForHost(UUID host) {
+        public List<Op> getPendingOpsForHost(UUID host, int limit) {
             return _persistentData.get().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
                 if (d.getQueues().containsKey(host)) {
-                    var peeked = d.getQueues().get(host).firstEntry();
-                    return peeked != null ? new JKleppmannTreeOpWrapper(d.getQueues().get(host).firstEntry().getValue()) : null;
+                    var queue = d.getQueues().get(host);
+                    ArrayList<Op> collected = new ArrayList<>();
+
+                    for (var node : queue.entrySet()) {
+                        collected.add(new JKleppmannTreeOpWrapper(node.getValue()));
+                        if (collected.size() >= limit) break;
+                    }
+
+                    return collected;
                 }
-                return null;
+                return List.of();
             });
         }
 

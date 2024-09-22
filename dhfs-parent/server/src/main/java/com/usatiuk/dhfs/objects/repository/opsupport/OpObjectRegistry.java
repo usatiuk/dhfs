@@ -8,6 +8,7 @@ import io.smallrye.common.annotation.Blocking;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -26,12 +27,13 @@ public class OpObjectRegistry {
         });
     }
 
-    public void acceptExternalOp(String objId, UUID from, Op op) {
+    public void acceptExternalOps(String objId, UUID from, List<Op> ops) {
         var got = _objects.get(objId);
         if (got == null)
             throw new StatusRuntimeException(Status.NOT_FOUND.withDescription("Queue with id " + objId + " not registered"));
         got.addToTx();
-        got.acceptExternalOp(from, op);
+        for (Op op : ops)
+            got.acceptExternalOp(from, op);
     }
 
     public void pushBootstrapData(UUID host) {

@@ -163,8 +163,9 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
             throw new StatusRuntimeException(Status.UNAUTHENTICATED);
 
         try {
+            var objs = request.getMsgList().stream().map(opProtoSerializer::deserialize).toList();
             jObjectTxManager.executeTxAndFlush(() -> {
-                opObjectRegistry.acceptExternalOp(request.getQueueId(), UUID.fromString(request.getSelfUuid()), opProtoSerializer.deserialize(request.getMsg()));
+                opObjectRegistry.acceptExternalOps(request.getQueueId(), UUID.fromString(request.getSelfUuid()), objs);
             });
         } catch (Exception e) {
             Log.error(e, e);

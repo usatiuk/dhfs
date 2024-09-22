@@ -12,7 +12,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -30,6 +32,8 @@ public class OpSender {
     JObjectTxManager jObjectTxManager;
     private ExecutorService _executor;
     private volatile boolean _shutdown = false;
+    @ConfigProperty(name = "dhfs.objects.opsender.batch-size")
+    int batchSize;
 
     @Startup
     void init() {
@@ -70,33 +74,27 @@ public class OpSender {
         // Must be peeked before getPendingOpForHost
         var periodicPushOp = obj.getPeriodicPushOp();
 
-        long sendCount = 0;
-        Op op;
+        List<Op> collected = obj.getPendingOpsForHost(host, batchSize);
 
-        while ((op = obj.getPendingOpForHost(host)) != null) {
+        if (!collected.isEmpty()) {
             try {
-                remoteObjectServiceClient.pushOp(op, obj.getId(), host);
-                Op finalOp = op;
+                remoteObjectServiceClient.pushOps(collected, obj.getId(), host);
                 jObjectTxManager.executeTx(() -> {
-                    obj.commitOpForHost(host, finalOp);
+                    for (var op : collected)
+                        obj.commitOpForHost(host, op);
                 });
-                sendCount++;
-            } catch (Exception e) {
+                Log.debug("Sent " + collected.size() + " op updates to " + host + "of" + obj.getId());
+            } catch (Throwable e) {
                 Log.warn("Error sending op to " + host, e);
-                break;
-            }
-        }
-
-        if (sendCount == 0) {
-            if (periodicPushOp == null) return;
-            try {
-                remoteObjectServiceClient.pushOp(periodicPushOp, obj.getId(), host);
-                Log.debug("Sent periodic op update to " + host + "of" + obj.getId());
-            } catch (Exception e) {
-                Log.warn("Error pushing periodic op for " + host + " of " + obj.getId(), e);
             }
         } else {
-            Log.debug("Sent " + sendCount + " op updates to " + host + "of" + obj.getId());
+            if (periodicPushOp == null) return;
+            try {
+                remoteObjectServiceClient.pushOps(List.of(periodicPushOp), obj.getId(), host);
+                Log.debug("Sent periodic op update to " + host + "of" + obj.getId());
+            } catch (Throwable e) {
+                Log.warn("Error pushing periodic op for " + host + " of " + obj.getId(), e);
+            }
         }
     }
 
