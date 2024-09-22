@@ -111,22 +111,18 @@ message JKleppmannTreePersistentDataPTimestampEntry {
   int64 timestamp = 2;
 }
 
-message JKleppmannTreePersistentDataP {
-  string treeName = 1;
-  int64 clock = 2;
-  repeated JKleppmannTreePersistentDataPQueue queues = 3;
-  repeated JKleppmannTreePersistentDataPTimestampEntry peerLog = 4;
-}
-
 message JKleppmannTreeOpLogPEntry {
   int64 clock = 1;
   string uuid = 2;
   bytes serialized = 3;
 }
 
-message JKleppmannTreeOpLogP {
+message JKleppmannTreePersistentDataP {
   string treeName = 1;
-  repeated JKleppmannTreeOpLogPEntry entries = 2;
+  int64 clock = 2;
+  repeated JKleppmannTreePersistentDataPQueue queues = 3;
+  repeated JKleppmannTreePersistentDataPTimestampEntry peerLog = 4;
+  repeated JKleppmannTreeOpLogPEntry opLog = 5;
 }
 
 message JObjectDataP {
@@ -138,6 +134,5 @@ message JObjectDataP {
     PersistentPeerInfoP persistentPeerInfo = 7;
     JKleppmannTreeNodeP jKleppmannTreeNode = 8;
     JKleppmannTreePersistentDataP jKleppmannTreePersistentData = 9;
-    JKleppmannTreeOpLogP jKleppmannTreeOpLog = 10;
   }
 }

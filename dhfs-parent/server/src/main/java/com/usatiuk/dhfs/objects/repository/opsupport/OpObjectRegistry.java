@@ -30,11 +30,14 @@ public class OpObjectRegistry {
         var got = _objects.get(objId);
         if (got == null)
             throw new StatusRuntimeException(Status.NOT_FOUND.withDescription("Queue with id " + objId + " not registered"));
+        got.addToTx();
         got.acceptExternalOp(from, op);
     }
 
     public void pushBootstrapData(UUID host) {
         for (var o : _objects.values()) {
+            // FIXME: Split transactions for objects?
+            o.addToTx();
             o.pushBootstrap(host);
         }
     }

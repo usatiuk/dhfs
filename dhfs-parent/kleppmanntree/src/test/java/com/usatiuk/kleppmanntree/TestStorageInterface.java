@@ -64,4 +64,29 @@ public class TestStorageInterface implements StorageInterface<Long, Long, TestNo
     public PeerTimestampLogInterface<Long, Long> getPeerTimestampLog() {
         return _peerLog;
     }
+
+    @Override
+    public void rLock() {
+
+    }
+
+    @Override
+    public void rUnlock() {
+
+    }
+
+    @Override
+    public void rwLock() {
+
+    }
+
+    @Override
+    public void rwUnlock() {
+
+    }
+
+    @Override
+    public void assertRwLock() {
+
+    }
 }

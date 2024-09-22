@@ -135,8 +135,10 @@ public class JObjectTxManager {
                         || (obj.getKey().getData() != null &&
                         !Objects.equals(obj.getValue().snapshot.data(), dataProtoSerializer.serialize(obj.getKey().getData())));
 
-                if (dataDiffReal && !dataDiff)
-                    throw new IllegalStateException("Data diff not equal for " + obj.getKey().getMeta().getName() + " " + obj.getKey().getData());
+                if (dataDiffReal && !dataDiff && obj.getValue().snapshot.data() != null) {
+                    var msg = "Data diff not equal for " + obj.getKey().getMeta().getName() + " " + obj.getKey().getData() + " before = " + ((obj.getValue().snapshot != null) ? obj.getValue().snapshot.data() : null) + " after = " + ((obj.getKey().getData() != null) ? dataProtoSerializer.serialize(obj.getKey().getData()) : null);
+                    throw new IllegalStateException(msg);
+                }
                 if (dataDiff && !dataDiffReal)
                     Log.warn("Useless update for " + obj.getKey().getMeta().getName());
             }

@@ -22,4 +22,14 @@ public interface StorageInterface<
     LogInterface<TimestampT, PeerIdT, MetaT, NodeIdT> getLog();
 
     PeerTimestampLogInterface<TimestampT, PeerIdT> getPeerTimestampLog();
+
+    void rLock();
+
+    void rUnlock();
+
+    void rwLock();
+
+    void rwUnlock();
+
+    void assertRwLock();
 }

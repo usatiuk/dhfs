@@ -14,4 +14,6 @@ public interface OpObject {
     void acceptExternalOp(UUID from, Op op);
 
     Op getPeriodicPushOp();
+
+    void addToTx();
 }

@@ -3,7 +3,6 @@ package com.usatiuk.kleppmanntree;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Level;
@@ -15,7 +14,6 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     private final PeerInterface<PeerIdT> _peers;
     private final Clock<TimestampT> _clock;
     private final OpRecorder<TimestampT, PeerIdT, MetaT, NodeIdT> _opRecorder;
-    private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
     private HashMap<NodeIdT, WrapperT> _undoCtx = null;
 
     public KleppmannTree(StorageInterface<TimestampT, PeerIdT, MetaT, NodeIdT, WrapperT> storage,
@@ -26,10 +24,6 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         _peers = peers;
         _clock = clock;
         _opRecorder = opRecorder;
-    }
-
-    private void assertRwLock() {
-        assert _lock.isWriteLockedByCurrentThread();
     }
 
     private NodeIdT traverseImpl(NodeIdT fromId, List<String> names) {
@@ -51,25 +45,25 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     public NodeIdT traverse(NodeIdT fromId, List<String> names) {
-        _lock.readLock().lock();
+        _storage.rLock();
         try {
             return traverseImpl(fromId, names.subList(1, names.size()));
         } finally {
-            _lock.readLock().unlock();
+            _storage.rUnlock();
         }
     }
 
     public NodeIdT traverse(List<String> names) {
-        _lock.readLock().lock();
+        _storage.rLock();
         try {
             return traverseImpl(_storage.getRootId(), names);
         } finally {
-            _lock.readLock().unlock();
+            _storage.rUnlock();
         }
     }
 
     private void undoEffect(LogEffect<TimestampT, PeerIdT, MetaT, NodeIdT> effect) {
-        assertRwLock();
+        _storage.assertRwLock();
         if (effect.oldInfo() != null) {
             var node = _storage.getById(effect.childId());
             var oldParent = _storage.getById(effect.oldInfo().oldParent());
@@ -122,7 +116,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     private void doAndPut(OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> op, boolean failCreatingIfExists) {
-        assertRwLock();
+        _storage.assertRwLock();
         var res = doOp(op, failCreatingIfExists);
         _storage.getLog().put(res.op().timestamp(), res);
     }
@@ -194,29 +188,29 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     public void move(NodeIdT newParent, MetaT newMeta, NodeIdT child, boolean failCreatingIfExists) {
-        _lock.writeLock().lock();
+        _storage.rwLock();
         try {
             var createdMove = createMove(newParent, newMeta, child);
             _opRecorder.recordOp(createdMove);
             applyOp(_peers.getSelfId(), createdMove, failCreatingIfExists);
         } finally {
-            _lock.writeLock().unlock();
+            _storage.rwUnlock();
         }
     }
 
     public void applyExternalOp(PeerIdT from, OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> op) {
-        _lock.writeLock().lock();
+        _storage.rwLock();
         try {
             _clock.updateTimestamp(op.timestamp().timestamp());
             applyOp(from, op, false);
         } finally {
-            _lock.writeLock().unlock();
+            _storage.rwUnlock();
         }
     }
 
     // Returns true if the timestamp is newer than what's seen, false otherwise
     private boolean updateTimestampImpl(PeerIdT from, TimestampT newTimestamp) {
-        assertRwLock();
+        _storage.assertRwLock();
         TimestampT oldRef = _storage.getPeerTimestampLog().getForPeer(from);
         if (oldRef != null && oldRef.compareTo(newTimestamp) > 0) { // FIXME?
             LOGGER.warning("Wrong op order: received older than known from " + from.toString());
@@ -227,7 +221,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     public void updateExternalTimestamp(PeerIdT from, TimestampT timestamp) {
-        _lock.writeLock().lock();
+        _storage.rwLock();
         try {
             var gotExt = _storage.getPeerTimestampLog().getForPeer(from);
             var gotSelf = _storage.getPeerTimestampLog().getForPeer(_peers.getSelfId());
@@ -237,12 +231,12 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             updateTimestampImpl(from, timestamp);
             tryTrimLog();
         } finally {
-            _lock.writeLock().unlock();
+            _storage.rwUnlock();
         }
     }
 
     private void applyOp(PeerIdT from, OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> op, boolean failCreatingIfExists) {
-        assertRwLock();
+        _storage.assertRwLock();
 
         if (!updateTimestampImpl(from, op.timestamp().timestamp())) return;
 
@@ -290,12 +284,12 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     private CombinedTimestamp<TimestampT, PeerIdT> getTimestamp() {
-        assertRwLock();
+        _storage.assertRwLock();
         return new CombinedTimestamp<>(_clock.getTimestamp(), _peers.getSelfId());
     }
 
     private <LocalMetaT extends MetaT> OpMove<TimestampT, PeerIdT, LocalMetaT, NodeIdT> createMove(NodeIdT newParent, LocalMetaT newMeta, NodeIdT node) {
-        assertRwLock();
+        _storage.assertRwLock();
         return new OpMove<>(getTimestamp(), newParent, newMeta, node);
     }
 
@@ -316,7 +310,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     private WrapperT getNewNode(TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> desired) {
-        assertRwLock();
+        _storage.assertRwLock();
         if (_undoCtx != null) {
             var node = _undoCtx.get(desired.getId());
             if (node != null) {
@@ -344,7 +338,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     private void applyEffects(OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> sourceOp, List<LogEffect<TimestampT, PeerIdT, MetaT, NodeIdT>> effects) {
-        assertRwLock();
+        _storage.assertRwLock();
         for (var effect : effects) {
             WrapperT oldParentNode = null;
             WrapperT newParentNode;
@@ -394,7 +388,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     private LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> computeEffects(OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> op, boolean failCreatingIfExists) {
-        assertRwLock();
+        _storage.assertRwLock();
         var node = _storage.getById(op.childId());
 
         NodeIdT oldParentId = (node != null && node.getNode().getParent() != null) ? node.getNode().getParent() : null;
@@ -484,7 +478,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     public void walkTree(Consumer<WrapperT> consumer) {
-        _lock.readLock().lock();
+        _storage.rLock();
         try {
             ArrayDeque<NodeIdT> queue = new ArrayDeque<>();
             queue.push(_storage.getRootId());
@@ -502,12 +496,12 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 }
             }
         } finally {
-            _lock.readLock().unlock();
+            _storage.rUnlock();
         }
     }
 
     public Pair<String, NodeIdT> findParent(Function<WrapperT, Boolean> kidPredicate) {
-        _lock.readLock().lock();
+        _storage.rLock();
         try {
             ArrayDeque<NodeIdT> queue = new ArrayDeque<>();
             queue.push(_storage.getRootId());
@@ -531,7 +525,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 }
             }
         } finally {
-            _lock.readLock().unlock();
+            _storage.rUnlock();
         }
         return null;
     }
@@ -539,7 +533,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     public void recordBoostrapFor(PeerIdT host) {
         TreeMap<CombinedTimestamp<TimestampT, PeerIdT>, OpMove<TimestampT, PeerIdT, MetaT, NodeIdT>> result = new TreeMap<>();
 
-        _lock.writeLock().lock();
+        _storage.rwLock();
         try {
             walkTree(node -> {
                 var op = node.getNode().getLastEffectiveOp();
@@ -559,7 +553,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 _opRecorder.recordOpForPeer(host, op);
             }
         } finally {
-            _lock.writeLock().unlock();
+            _storage.rwUnlock();
         }
     }
 }

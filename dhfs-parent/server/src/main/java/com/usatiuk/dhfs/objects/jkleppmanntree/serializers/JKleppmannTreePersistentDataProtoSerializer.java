@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.serializers;
 
 import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
+import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeOpWrapper;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreePersistentData;
@@ -8,6 +9,7 @@ import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeOpP;
 import com.usatiuk.dhfs.objects.persistence.JKleppmannTreePersistentDataP;
 import com.usatiuk.kleppmanntree.AtomicClock;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
+import com.usatiuk.kleppmanntree.LogRecord;
 import com.usatiuk.kleppmanntree.OpMove;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -40,11 +42,17 @@ public class JKleppmannTreePersistentDataProtoSerializer implements ProtoSeriali
             log.put(UUID.fromString(l.getHost()), l.getTimestamp());
         }
 
+        var opLog = new TreeMap<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, String>>();
+        for (var l : message.getOpLogList()) {
+            opLog.put(new CombinedTimestamp<>(l.getClock(), UUID.fromString(l.getUuid())), SerializationHelper.deserialize(l.getSerialized().newInput()));
+        }
+
         return new JKleppmannTreePersistentData(
                 message.getTreeName(),
                 new AtomicClock(message.getClock()),
                 queues,
-                log
+                log,
+                opLog
         );
     }
 
@@ -63,6 +71,10 @@ public class JKleppmannTreePersistentDataProtoSerializer implements ProtoSeriali
         }
         for (var peerLogEntry : object.getPeerTimestampLog().entrySet()) {
             builder.addPeerLogBuilder().setHost(peerLogEntry.getKey().toString()).setTimestamp(peerLogEntry.getValue());
+        }
+        for (var e : object.getLog().entrySet()) {
+            builder.addOpLogBuilder().setClock(e.getKey().timestamp()).setUuid(e.getKey().nodeId().toString())
+                    .setSerialized(SerializationHelper.serialize(e.getValue()));
         }
         return builder.build();
     }

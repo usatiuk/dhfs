@@ -57,9 +57,7 @@ public class OpSender {
             try {
                 var got = _queue.get();
                 for (var h : remoteHostManager.getAvailableHosts()) {
-                    jObjectTxManager.executeTxAndFlush(() -> {
-                        sendForHost(got, h);
-                    });
+                    sendForHost(got, h);
                 }
             } catch (InterruptedException ignored) {
             } catch (Throwable ex) {
@@ -78,7 +76,10 @@ public class OpSender {
         while ((op = obj.getPendingOpForHost(host)) != null) {
             try {
                 remoteObjectServiceClient.pushOp(op, obj.getId(), host);
-                obj.commitOpForHost(host, op);
+                Op finalOp = op;
+                jObjectTxManager.executeTx(() -> {
+                    obj.commitOpForHost(host, finalOp);
+                });
                 sendCount++;
             } catch (Exception e) {
                 Log.warn("Error sending op to " + host, e);
