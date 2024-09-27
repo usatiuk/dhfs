@@ -86,7 +86,7 @@ message JKleppmannTreePeriodicPushOpP {
 
 message OpPushPayload {
   oneof payload {
-    dhfs.objects.persistence.JKleppmannTreeOpP jKleppmannTreeOp = 1;
+    dhfs.objects.persistence.JKleppmannTreeOpP jKleppmannTreeOpWrapper = 1;
     JKleppmannTreePeriodicPushOpP jKleppmannTreePeriodicPushOp = 2;
   }
 }

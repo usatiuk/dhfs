@@ -69,8 +69,8 @@ message JKleppmannTreeNodeMetaDirectoryP {
 
 message JKleppmannTreeNodeMetaP {
   oneof meta {
-    JKleppmannTreeNodeMetaFileP file = 1;
-    JKleppmannTreeNodeMetaDirectoryP dir = 2;
+    JKleppmannTreeNodeMetaFileP jKleppmannTreeNodeMetaFile = 1;
+    JKleppmannTreeNodeMetaDirectoryP jKleppmannTreeNodeMetaDirectory = 2;
   }
 }
 
