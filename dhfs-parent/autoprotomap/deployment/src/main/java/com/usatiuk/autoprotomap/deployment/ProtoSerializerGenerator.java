@@ -17,6 +17,7 @@ import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.usatiuk.autoprotomap.deployment.Constants.*;
 
@@ -201,8 +202,9 @@ public class ProtoSerializerGenerator {
     }
 
     public void generateAbstract() {
-        var kids = index.getAllKnownSubclasses(topObjectType.name()).stream()
-                .filter(k -> !k.isAbstract()).toList();
+        var kids = Stream.concat(index.getAllKnownSubclasses(topObjectType.name()).stream(),
+                        index.getAllKnownImplementors(topObjectType.name()).stream())
+                .filter(k -> !k.isAbstract() && !k.isInterface()).toList();
 
         try (MethodCreator method = classCreator.getMethodCreator("serialize",
                 Message.class, Object.class)) {
@@ -299,7 +301,7 @@ public class ProtoSerializerGenerator {
 
     public void generate() {
         var objInfo = index.getClassByName(topObjectType.name());
-        if (objInfo.isAbstract()) {
+        if (objInfo.isAbstract() || objInfo.isInterface()) {
             generateAbstract();
             return;
         }
