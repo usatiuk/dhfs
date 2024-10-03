@@ -268,9 +268,11 @@ public class DhfsFusex3IT {
         Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo test1 >> /root/dhfs_default/fuse/testf").getExitCode());
         client.unpauseContainerCmd(container2.getContainerId()).exec();
         client.unpauseContainerCmd(container3.getContainerId()).exec();
+        Log.warn("Waiting for connections");
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
         waitingConsumer3.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
+        Log.warn("Connected");
 
         Thread.sleep(20000);
         for (var c : List.of(container1, container2, container3)) {
