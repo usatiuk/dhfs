@@ -46,7 +46,7 @@ public abstract class JObject<T extends JObjectData> {
 
     public abstract void assertRwLock();
 
-    public abstract void discardData();
+    public abstract void doDelete();
 
     public abstract void markSeen();
 

@@ -255,14 +255,13 @@ public class JObjectRefProcessor {
                                 target.tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
 
                             Log.debug("Deleting " + m.getName());
-                            m.markDeleted();
 
                             Collection<String> extracted = null;
                             if (!target.getMeta().getKnownClass().isAnnotationPresent(Leaf.class) && target.getData() != null)
                                 extracted = target.getData().extractRefs();
                             Collection<String> saved = target.getMeta().getSavedRefs();
 
-                            target.discardData();
+                            target.doDelete();
 
                             if (saved != null)
                                 for (var r : saved) deleteRef(target, r);

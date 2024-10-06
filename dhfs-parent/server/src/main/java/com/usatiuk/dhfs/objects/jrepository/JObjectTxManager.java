@@ -38,8 +38,6 @@ public class JObjectTxManager {
     @Inject
     JObjectManager jObjectManager;
     @Inject
-    JObjectWriteback jObjectWriteback;
-    @Inject
     InvalidationQueueService invalidationQueueService;
     @Inject
     TxWriteback txWriteback;
@@ -71,39 +69,7 @@ public class JObjectTxManager {
         Log.debug("Dropping " + obj.getMeta().getName() + " from " + state._id);
         obj.assertRwLock();
         state._writeObjects.remove(obj);
-        state._directObjects.remove(obj);
         obj.rwUnlock();
-    }
-
-    private void flushDirect() {
-        var state = _state.get();
-        if (state == null)
-            throw new IllegalStateException("Transaction not running");
-
-        for (var obj : state._directObjects.entrySet()) {
-            Log.trace("Flushing direct " + obj.getKey().getMeta().getName());
-
-            if (!obj.getKey().getMeta().getKnownClass().isAnnotationPresent(AssumedUnique.class))
-                throw new IllegalStateException("Only working with unique-direct objects for now");
-
-            boolean metaChanged = !Objects.equals(obj.getValue().snapshot.meta(), metaProtoSerializer.serialize(obj.getKey().getMeta()));
-            boolean dataChanged = obj.getValue().snapshot.changelogHash() != obj.getKey().getMeta().changelogHash();
-
-            // FIXME: hasDataChanged is a bit broken here
-            notifyWrite(obj.getKey(),
-                    obj.getValue()._forceInvalidated || metaChanged,
-                    obj.getValue()._forceInvalidated || dataChanged);
-
-            obj.getKey().rLock();
-
-            try {
-                obj.getKey().rwUnlock();
-                if (metaChanged || dataChanged || obj.getValue()._forceInvalidated)
-                    jObjectWriteback.markDirty(obj.getKey(), dataChanged || obj.getValue()._forceInvalidated);
-            } finally {
-                obj.getKey().rUnlock();
-            }
-        }
     }
 
     // Returns Id of bundle to wait for, or -1 if there was nothing written
@@ -115,7 +81,6 @@ public class JObjectTxManager {
         if (state._writeObjects.isEmpty()) {
 //            Log.trace("Empty transaction " + state._id);
             state._callbacks.forEach(c -> c.accept(null));
-            flushDirect();
             _state.remove();
             return -1;
         }
@@ -213,7 +178,6 @@ public class JObjectTxManager {
         }
 
         state._writeObjects.forEach((key, value) -> key.rwUnlock());
-        flushDirect();
 
         state._callbacks.forEach(s -> txWriteback.asyncFence(bundle.getId(), () -> s.accept(null)));
 
@@ -276,8 +240,6 @@ public class JObjectTxManager {
                 obj.getKey().rwUnlock();
             }
         }
-
-        flushDirect();
 
         state._callbacks.forEach(c -> c.accept(message != null ? message : "Unknown error"));
         Log.debug("Rollback of " + state._id + " done");
@@ -362,13 +324,7 @@ public class JObjectTxManager {
 
         obj.assertRwLock();
 
-        var got = state._directObjects.get(obj);
-        if (got != null) {
-            got._forceInvalidated = true;
-            return;
-        }
-
-        got = state._writeObjects.get(obj);
+        var got = state._writeObjects.get(obj);
         if (got != null)
             got._forceInvalidated = true;
     }
@@ -384,25 +340,19 @@ public class JObjectTxManager {
         obj.assertRwLock();
         obj.rwLock();
 
-        boolean noTx = obj.getMeta().getKnownClass().isAnnotationPresent(NoTransaction.class);
-
         var snapshot = copy
                 ? new JObjectSnapshot(
                 metaProtoSerializer.serialize(obj.getMeta()),
-                (noTx || obj.getData() == null) ? null : dataProtoSerializer.serialize(obj.getData()),
+                (obj.getData() == null) ? null : dataProtoSerializer.serialize(obj.getData()),
                 obj.getMeta().changelogHash())
                 : null;
 
-        if (noTx)
-            state._directObjects.put(obj, new TxState.TxObjectState(snapshot));
-        else
-            state._writeObjects.put(obj, new TxState.TxObjectState(snapshot));
+        state._writeObjects.put(obj, new TxState.TxObjectState(snapshot));
     }
 
     private class TxState {
         private final long _id = _transientTxId.incrementAndGet();
         private final HashMap<JObject<?>, TxObjectState> _writeObjects = new HashMap<>();
-        private final HashMap<JObject<?>, TxObjectState> _directObjects = new HashMap<>();
         private final ArrayList<Consumer<String>> _callbacks = new ArrayList<>();
 
         private static class TxObjectState {

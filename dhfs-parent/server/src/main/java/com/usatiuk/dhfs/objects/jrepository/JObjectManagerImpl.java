@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
-import com.google.common.collect.Streams;
 import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
@@ -463,7 +462,13 @@ public class JObjectManagerImpl implements JObjectManager {
 
         public boolean tryRLock() {
             try {
-                return _lock.readLock().tryLock(lockTimeoutSecs, TimeUnit.SECONDS);
+                if (!_lock.readLock().tryLock(lockTimeoutSecs, TimeUnit.SECONDS))
+                    return false;
+                if (_metaPart.isDeleted()) {
+                    _lock.readLock().unlock();
+                    throw new DeletedObjectAccessException();
+                }
+                return true;
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -479,6 +484,9 @@ public class JObjectManagerImpl implements JObjectManager {
                         return false;
                 }
                 try {
+                    if (_metaPart.isDeleted())
+                        throw new DeletedObjectAccessException();
+
                     if (_lock.writeLock().getHoldCount() == 1) {
                         jObjectTxManager.addToTx(this, txCopy);
                     }
@@ -559,8 +567,6 @@ public class JObjectManagerImpl implements JObjectManager {
 
             rLock();
             try {
-                if (_metaPart.isDeleted())
-                    throw new DeletedObjectAccessException();
                 return fn.apply(_metaPart, _dataPart.get());
             } finally {
                 rUnlock();
@@ -598,10 +604,9 @@ public class JObjectManagerImpl implements JObjectManager {
         }
 
         @Override
-        public void discardData() {
+        public void doDelete() {
             assertRwLock();
-            if (!getMeta().isDeleted())
-                throw new IllegalStateException("Expected to be deleted when discarding data");
+            getMeta().markDeleted();
             _dataPart.set(null);
             _metaPart.setHaveLocalCopy(false);
             _metaPart.setSavedRefs(new HashSet<>());
@@ -659,7 +664,7 @@ public class JObjectManagerImpl implements JObjectManager {
                 if (getMeta().getSavedRefs() != null)
                     refs = getMeta().getSavedRefs().stream();
                 if (getData() != null)
-                    refs = Streams.concat(refs, getData().extractRefs().stream());
+                    refs = Stream.concat(refs, getData().extractRefs().stream());
 
                 refs.forEach(r -> {
                     Log.trace("Hydrating ref after undelete " + r + " for " + getMeta().getName());
@@ -669,8 +674,10 @@ public class JObjectManagerImpl implements JObjectManager {
             }
 
             if (getMeta().isDeletionCandidate() && !getMeta().isDeleted()) {
-                if (!getMeta().isSeen()) tryQuickDelete();
-                else jObjectRefProcessor.putDeletionCandidate(getMeta().getName());
+                if (!getMeta().isSeen())
+                    tryQuickDelete();
+                else
+                    jObjectRefProcessor.putDeletionCandidate(getMeta().getName());
                 return true;
             }
             return false;
@@ -698,14 +705,12 @@ public class JObjectManagerImpl implements JObjectManager {
             if (Log.isTraceEnabled())
                 Log.trace("Quick delete of: " + getMeta().getName());
 
-            getMeta().markDeleted();
-
             Collection<String> extracted = null;
             if (!getMeta().getKnownClass().isAnnotationPresent(Leaf.class) && getData() != null)
                 extracted = getData().extractRefs();
             Collection<String> saved = getMeta().getSavedRefs();
 
-            discardData();
+            doDelete();
 
             if (saved != null)
                 for (var r : saved) quickDeleteRef(r);

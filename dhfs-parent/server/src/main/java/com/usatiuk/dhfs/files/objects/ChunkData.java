@@ -5,7 +5,6 @@ import com.usatiuk.dhfs.files.conflicts.NoOpConflictResolver;
 import com.usatiuk.dhfs.objects.jrepository.AssumedUnique;
 import com.usatiuk.dhfs.objects.jrepository.JObjectData;
 import com.usatiuk.dhfs.objects.jrepository.Leaf;
-import com.usatiuk.dhfs.objects.jrepository.NoTransaction;
 import com.usatiuk.dhfs.objects.persistence.ChunkDataP;
 import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import net.openhft.hashing.LongTupleHashFunction;
@@ -18,7 +17,6 @@ import java.util.stream.Collectors;
 
 @AssumedUnique
 @Leaf
-@NoTransaction
 public class ChunkData extends JObjectData {
     final ChunkDataP _data;
 
