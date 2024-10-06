@@ -206,7 +206,7 @@ public class JObjectManagerImpl implements JObjectManager {
                         return (object.getClass().isAnnotationPresent(PushResolution.class)
                                 && object.getClass().isAnnotationPresent(AssumedUnique.class)
                                 && finalRet.getData() == null && !finalRet.getMeta().isHaveLocalCopy())
-                                || (parent.isEmpty() && !m.isLocked()) || (parent.isPresent() && !m.checkRef(parent.get()));
+                                || (parent.isEmpty() && !m.isFrozen()) || (parent.isPresent() && !m.checkRef(parent.get()));
                     });
                 } catch (DeletedObjectAccessException dex) {
                     shouldWrite = true;
@@ -222,10 +222,10 @@ public class JObjectManagerImpl implements JObjectManager {
 
                         if (parent.isPresent()) {
                             m.addRef(parent.get());
-                            if (m.isLocked())
-                                m.unlock();
+                            if (m.isFrozen())
+                                m.unfreeze();
                         } else {
-                            m.lock();
+                            m.freeze();
                         }
 
                         return null;
@@ -297,8 +297,8 @@ public class JObjectManagerImpl implements JObjectManager {
                     if (!shouldWrite) return;
 
                     got.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, i) -> {
-                        if (m.isLocked())
-                            m.unlock();
+                        if (m.isFrozen())
+                            m.unfreeze();
                         m.addRef(s);
                         return true;
                     });
@@ -455,8 +455,8 @@ public class JObjectManagerImpl implements JObjectManager {
             _metaPart.narrowClass(data.getClass());
             _dataPart.set((T) data);
             _metaPart.setHaveLocalCopy(true);
-            if (!_metaPart.isLocked())
-                _metaPart.lock();
+            if (!_metaPart.isFrozen())
+                _metaPart.freeze();
             hydrateRefs();
         }
 

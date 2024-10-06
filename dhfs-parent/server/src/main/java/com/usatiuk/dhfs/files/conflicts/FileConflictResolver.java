@@ -133,7 +133,7 @@ public class FileConflictResolver implements ConflictResolver {
                                     }));
                     }
                 } catch (Exception e) {
-                    ret.getMeta().unlock();
+                    ret.getMeta().unfreeze();
                     ret.rwUnlock();
                     return null;
                 }
@@ -154,7 +154,7 @@ public class FileConflictResolver implements ConflictResolver {
 
             var nodeId = tree.getNewNodeId();
             newJFile.getMeta().addRef(nodeId);
-            newJFile.getMeta().unlock();
+            newJFile.getMeta().unfreeze();
             newJFile.rwUnlock();
             locked = false;
 
@@ -173,7 +173,7 @@ public class FileConflictResolver implements ConflictResolver {
             Log.error("Error when creating new file for " + ours.getMeta().getName(), e);
         } finally {
             if (locked) {
-                newJFile.getMeta().unlock();
+                newJFile.getMeta().unfreeze();
                 newJFile.getMeta().getReferrersMutable().clear();
                 newJFile.rwUnlock();
             }

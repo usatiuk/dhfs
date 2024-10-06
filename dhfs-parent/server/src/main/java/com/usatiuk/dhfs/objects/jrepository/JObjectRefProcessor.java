@@ -240,7 +240,7 @@ public class JObjectRefProcessor {
                 try {
                     jObjectTxManager.executeTx(() -> {
                         target.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, v, i) -> {
-                            if (m.isLocked()) return null;
+                            if (m.isFrozen()) return null;
                             if (m.isDeleted()) return null;
                             if (!m.isDeletionCandidate()) return null;
                             if (m.isSeen() && !m.isOnlyLocal()) {

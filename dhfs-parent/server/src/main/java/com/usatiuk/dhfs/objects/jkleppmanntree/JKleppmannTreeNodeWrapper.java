@@ -38,7 +38,7 @@ public class JKleppmannTreeNodeWrapper implements TreeNodeWrapper<Long, UUID, JK
     @Override
     public void lock() {
         _backing.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
-            m.lock();
+            m.freeze();
             return null;
         });
     }
@@ -46,7 +46,7 @@ public class JKleppmannTreeNodeWrapper implements TreeNodeWrapper<Long, UUID, JK
     @Override
     public void unlock() {
         _backing.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
-            m.unlock();
+            m.unfreeze();
             return null;
         });
     }

@@ -39,7 +39,7 @@ public class ObjectMetadata implements Serializable {
     @Setter
     private Set<String> _savedRefs = Collections.emptySet();
     @Getter
-    private boolean _locked = false;
+    private boolean _frozen = false;
     @Getter
     @Setter
     private volatile boolean _haveLocalCopy = false;
@@ -103,17 +103,17 @@ public class ObjectMetadata implements Serializable {
         return !_referrers.isEmpty();
     }
 
-    public void lock() {
-        if (_locked) throw new IllegalArgumentException("Already locked");
+    public void freeze() {
+        if (_frozen) throw new IllegalArgumentException("Already frozen");
         _confirmedDeletes.clear();
-        Log.info("Locking " + getName());
-        _locked = true;
+        Log.trace("Freezing " + getName());
+        _frozen = true;
     }
 
-    public void unlock() {
-        if (!_locked) throw new IllegalArgumentException("Already unlocked");
-        Log.info("Unlocking " + getName());
-        _locked = false;
+    public void unfreeze() {
+        if (!_frozen) throw new IllegalArgumentException("Already unfrozen");
+        Log.trace("Unfreezing " + getName());
+        _frozen = false;
     }
 
     public boolean checkRef(String from) {
@@ -144,7 +144,7 @@ public class ObjectMetadata implements Serializable {
     }
 
     public boolean isDeletionCandidate() {
-        return !isLocked() && !isReferred();
+        return !isFrozen() && !isReferred();
     }
 
     public Long getOurVersion() {
