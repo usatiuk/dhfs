@@ -484,8 +484,9 @@ public class JObjectManagerImpl implements JObjectManager {
                         return false;
                 }
                 try {
-                    if (_metaPart.isDeleted())
-                        throw new DeletedObjectAccessException();
+                    // TODO: Fix putImpl
+//                    if (_metaPart.isDeleted())
+//                        throw new DeletedObjectAccessException();
 
                     if (_lock.writeLock().getHoldCount() == 1) {
                         jObjectTxManager.addToTx(this, txCopy);
