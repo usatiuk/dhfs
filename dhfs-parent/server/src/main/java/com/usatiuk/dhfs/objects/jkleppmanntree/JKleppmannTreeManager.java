@@ -14,10 +14,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
@@ -125,7 +122,7 @@ public class JKleppmannTreeManager {
             _persistentData.get().runWriteLockedVoid(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
                 _persistentData.get().bumpVer();
                 var got = d.getQueues().get(host).pollFirstEntry().getValue();
-                if (jop.getOp() != got) {
+                if (!Objects.equals(jop.getOp(), got)) {
                     throw new IllegalArgumentException("Committed op push was not the oldest");
                 }
             });
