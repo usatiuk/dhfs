@@ -38,7 +38,7 @@ public class JObjectManagerImpl implements JObjectManager {
     private final MultiValuedMap<Class<? extends JObjectData>, WriteListenerFn> _metaWriteListeners
             = new ArrayListValuedHashMap<>();
     private final ConcurrentHashMap<String, NamedWeakReference> _map = new ConcurrentHashMap<>();
-    private final ReferenceQueue<JObject<?>> _refQueue = new ReferenceQueue<>();
+    private final ReferenceQueue<JObjectImpl<?>> _refQueue = new ReferenceQueue<>();
     @Inject
     ObjectPersistentStore objectPersistentStore;
     @Inject
@@ -70,7 +70,7 @@ public class JObjectManagerImpl implements JObjectManager {
     private Thread _refCleanupThread;
 
     @Override
-    public void runWriteListeners(com.usatiuk.dhfs.objects.jrepository.JObject<?> obj, boolean metaChanged, boolean dataChanged) {
+    public void runWriteListeners(JObject<?> obj, boolean metaChanged, boolean dataChanged) {
         if (metaChanged)
             for (var t : _metaWriteListeners.keySet()) { // FIXME:?
                 if (t.isAssignableFrom(obj.getMeta().getKnownClass()))
@@ -119,7 +119,7 @@ public class JObjectManagerImpl implements JObjectManager {
         Log.info("Ref cleanup thread exiting");
     }
 
-    private JObject<?> getFromMap(String key) {
+    private JObjectImpl<?> getFromMap(String key) {
         var ret = _map.get(key);
         if (ret != null && ret.get() != null) {
             return ret.get();
@@ -128,7 +128,7 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     @Override
-    public Optional<com.usatiuk.dhfs.objects.jrepository.JObject<?>> get(String name) {
+    public Optional<JObject<?>> get(String name) {
         {
             var inMap = getFromMap(name);
             if (inMap != null) {
@@ -154,8 +154,8 @@ public class JObjectManagerImpl implements JObjectManager {
             return Optional.empty();
         }
 
-        JObject<?> ret = null;
-        var newObj = new JObject<>((ObjectMetadata) meta);
+        JObjectImpl<?> ret = null;
+        var newObj = new JObjectImpl<>((ObjectMetadata) meta);
         while (ret == null) {
             var ref = _map.computeIfAbsent(name, k -> new NamedWeakReference(newObj, _refQueue));
             if (ref.get() == null) _map.remove(name, ref);
@@ -169,26 +169,26 @@ public class JObjectManagerImpl implements JObjectManager {
     public Collection<String> findAll() {
         var out = _map.values().stream().map(WeakReference::get)
                 .filter(Objects::nonNull)
-                .map(JObject::getMeta).map(ObjectMetadata::getName)
+                .map(JObjectImpl::getMeta).map(ObjectMetadata::getName)
                 .collect(Collectors.toCollection((Supplier<LinkedHashSet<String>>) LinkedHashSet::new));
         out.addAll(objectPersistentStore.findAllObjects());
         return out;
     }
 
-    public <D extends JObjectData> JObject<D> putImpl(D object, Optional<String> parent, boolean lock) {
+    public <D extends JObjectData> JObjectImpl<D> putImpl(D object, Optional<String> parent, boolean lock) {
         while (true) {
-            JObject<?> ret;
-            JObject<?> newObj = null;
+            JObjectImpl<?> ret;
+            JObjectImpl<?> newObj = null;
             try {
                 ret = getFromMap(object.getName());
                 if (ret != null) {
                     if (!object.getClass().isAnnotationPresent(AssumedUnique.class))
                         throw new IllegalArgumentException("Trying to insert different object with same key");
                 } else {
-                    newObj = new JObject<D>(object.getName(), persistentPeerDataService.getSelfUuid(), object);
+                    newObj = new JObjectImpl<D>(object.getName(), persistentPeerDataService.getSelfUuid(), object);
                     newObj.rwLock();
                     while (ret == null) {
-                        JObject<?> finalNewObj = newObj;
+                        JObjectImpl<?> finalNewObj = newObj;
                         var ref = _map.computeIfAbsent(object.getName(), k -> new NamedWeakReference(finalNewObj, _refQueue));
                         if (ref.get() == null) _map.remove(object.getName(), ref);
                         else ret = ref.get();
@@ -198,7 +198,7 @@ public class JObjectManagerImpl implements JObjectManager {
                         continue;
                     }
                 }
-                JObject<D> finalRet = (JObject<D>) ret;
+                JObjectImpl<D> finalRet = (JObjectImpl<D>) ret;
 
                 boolean shouldWrite = false;
                 try {
@@ -242,21 +242,21 @@ public class JObjectManagerImpl implements JObjectManager {
             }
             if (newObj != null && !lock)
                 newObj.rwUnlock();
-            return (JObject<D>) ret;
+            return (JObjectImpl<D>) ret;
         }
     }
 
     @Override
-    public <D extends JObjectData> JObject<D> putLocked(D object, Optional<String> parent) {
+    public <D extends JObjectData> JObjectImpl<D> putLocked(D object, Optional<String> parent) {
         return putImpl(object, parent, true);
     }
 
     @Override
-    public <D extends JObjectData> JObject<D> put(D object, Optional<String> parent) {
+    public <D extends JObjectData> JObjectImpl<D> put(D object, Optional<String> parent) {
         return putImpl(object, parent, false);
     }
 
-    public com.usatiuk.dhfs.objects.jrepository.JObject<?> getOrPutImpl(String name, Class<? extends JObjectData> klass, Optional<String> parent, boolean lock) {
+    public JObject<?> getOrPutImpl(String name, Class<? extends JObjectData> klass, Optional<String> parent, boolean lock) {
         while (true) {
             var got = get(name).orElse(null);
 
@@ -306,8 +306,8 @@ public class JObjectManagerImpl implements JObjectManager {
                 return got;
             }
 
-            JObject<?> ret = null;
-            var created = new JObject<>(new ObjectMetadata(name, false, klass));
+            JObjectImpl<?> ret = null;
+            var created = new JObjectImpl<>(new ObjectMetadata(name, false, klass));
             created.rwLock();
             while (ret == null) {
                 var ref = _map.computeIfAbsent(name, k -> new NamedWeakReference(created, _refQueue));
@@ -331,32 +331,32 @@ public class JObjectManagerImpl implements JObjectManager {
     }
 
     @Override
-    public com.usatiuk.dhfs.objects.jrepository.JObject<?> getOrPutLocked(String name, Class<? extends JObjectData> klass, Optional<String> parent) {
+    public JObject<?> getOrPutLocked(String name, Class<? extends JObjectData> klass, Optional<String> parent) {
         return getOrPutImpl(name, klass, parent, true);
     }
 
     @Override
-    public com.usatiuk.dhfs.objects.jrepository.JObject<?> getOrPut(String name, Class<? extends JObjectData> klass, Optional<String> parent) {
+    public JObject<?> getOrPut(String name, Class<? extends JObjectData> klass, Optional<String> parent) {
         return getOrPutImpl(name, klass, parent, false);
     }
 
-    private static class NamedWeakReference extends WeakReference<JObject<?>> {
+    private static class NamedWeakReference extends WeakReference<JObjectImpl<?>> {
         @Getter
         final String _key;
 
-        public NamedWeakReference(JObject<?> target, ReferenceQueue<JObject<?>> q) {
+        public NamedWeakReference(JObjectImpl<?> target, ReferenceQueue<JObjectImpl<?>> q) {
             super(target, q);
             this._key = target.getMeta().getName();
         }
     }
 
-    public class JObject<T extends JObjectData> extends com.usatiuk.dhfs.objects.jrepository.JObject<T> {
+    public class JObjectImpl<T extends JObjectData> extends JObject<T> {
         private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
         private final AtomicReference<T> _dataPart = new AtomicReference<>();
         private ObjectMetadata _metaPart;
 
         // Create a new object
-        protected JObject(String name, UUID selfUuid, T obj) {
+        protected JObjectImpl(String name, UUID selfUuid, T obj) {
             _metaPart = new ObjectMetadata(name, false, obj.getClass());
             _metaPart.setHaveLocalCopy(true);
             _dataPart.set(obj);
@@ -366,7 +366,7 @@ public class JObjectManagerImpl implements JObjectManager {
         }
 
         // Create an object from existing metadata
-        protected JObject(ObjectMetadata objectMetadata) {
+        protected JObjectImpl(ObjectMetadata objectMetadata) {
             _metaPart = objectMetadata;
             if (Log.isTraceEnabled())
                 Log.trace("new JObject (ext): " + getMeta().getName());
