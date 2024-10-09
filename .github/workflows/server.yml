@@ -170,7 +170,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           path: downloaded-libs
 
@@ -203,19 +203,19 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download server package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: DHFS Server Package
           path: dhfs-package-downloaded
 
       - name: Download webui
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: Webui
           path: webui-dist-downloaded
 
       - name: Download native libs
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: NativeLibs
           path: dhfs-native-downloaded
@@ -301,17 +301,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: DHFS Server Package
           path: dhfs-package-downloaded
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Webui
           path: webui-dist-downloaded
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: NativeLibs
           path: dhfs-native-downloaded
