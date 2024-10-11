@@ -395,7 +395,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
 
 
-            file.rwLockNoCopy();
+            // FIXME:
+            file.rwLock();
             try {
                 file.tryResolve(JObjectManager.ResolutionStrategy.REMOTE);
                 // FIXME:

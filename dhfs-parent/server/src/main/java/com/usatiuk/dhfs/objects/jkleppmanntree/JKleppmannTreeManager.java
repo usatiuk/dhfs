@@ -373,15 +373,20 @@ public class JKleppmannTreeManager {
                     _persistentData.get().assertRwLock();
                     _persistentData.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
                     _persistentData.get().mutate(new JMutator<>() {
+                        Long old;
+
                         @Override
                         public boolean mutate(JKleppmannTreePersistentData object) {
-                            var old = object.getPeerTimestampLog().put(peerId, timestamp);
-                            return Objects.equals(old, timestamp);
+                            old = object.getPeerTimestampLog().put(peerId, timestamp);
+                            return !Objects.equals(old, timestamp);
                         }
 
                         @Override
                         public void revert(JKleppmannTreePersistentData object) {
-                            object.getPeerTimestampLog().remove(peerId, timestamp);
+                            if (old != null)
+                                object.getPeerTimestampLog().put(peerId, old);
+                            else
+                                object.getPeerTimestampLog().remove(peerId, timestamp);
                         }
                     });
                 }

@@ -112,14 +112,14 @@ public class JObjectTxManager {
                 var rev = dataProtoSerializer.serialize(obj.getKey().getData());
 
                 if (obj.getValue().snapshot.data() != null && !Objects.equals(rev, obj.getValue().snapshot.data()))
-                    throw new IllegalStateException("Mutator could not be reverted for object " + obj.getKey().getMeta().getName());
+                    throw new IllegalStateException("Mutator could not be reverted for object " + obj.getKey().getMeta().getName() + "\n old = " + obj.getValue().snapshot.data() + "\n reverted = " + rev + "\n");
 
                 for (var mut : obj.getValue()._mutators)
                     applyMutator(obj.getKey(), mut);
 
                 var cur2 = dataProtoSerializer.serialize(obj.getKey().getData());
                 if (!Objects.equals(cur, cur2))
-                    throw new IllegalStateException("Mutator could not be reapplied for object " + obj.getKey().getMeta().getName());
+                    throw new IllegalStateException("Mutator could not be reapplied for object " + obj.getKey().getMeta().getName() + "\n old = " + cur + "\n reapplied = " + cur2 + "\n");
             }
 
             notifyWrite(obj.getKey(),
@@ -370,8 +370,7 @@ public class JObjectTxManager {
                 (obj.getData() == null) ? null : dataProtoSerializer.serialize(obj.getData()),
                 obj.getMeta().changelogHash())
                 : new JObjectSnapshot(
-                metaProtoSerializer.serialize(obj.getMeta()), refVerification ? null :
-                (obj.getData() == null) ? null : dataProtoSerializer.serialize(obj.getData()),
+                metaProtoSerializer.serialize(obj.getMeta()), (!refVerification || (obj.getData() == null)) ? null : dataProtoSerializer.serialize(obj.getData()),
                 obj.getMeta().changelogHash());
 
         state._writeObjects.put(obj, new TxState.TxObjectState(snapshot, copy));
