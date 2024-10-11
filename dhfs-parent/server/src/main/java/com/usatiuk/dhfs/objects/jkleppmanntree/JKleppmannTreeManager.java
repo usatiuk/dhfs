@@ -122,7 +122,7 @@ public class JKleppmannTreeManager {
             _persistentData.get().assertRwLock();
             _persistentData.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
 
-            var got = _persistentData.get().getData().getQueues().get(host).pollFirstEntry().getValue();
+            var got = _persistentData.get().getData().getQueues().get(host).firstEntry().getValue();
             if (!Objects.equals(jop.getOp(), got))
                 throw new IllegalArgumentException("Committed op push was not the oldest");
 
@@ -494,15 +494,20 @@ public class JKleppmannTreeManager {
                     _persistentData.get().assertRwLock();
                     _persistentData.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
                     _persistentData.get().mutate(new JMutator<>() {
+                        LogRecord<Long, UUID, JKleppmannTreeNodeMeta, String> old;
+
                         @Override
                         public boolean mutate(JKleppmannTreePersistentData object) {
-                            var old = object.getLog().put(timestamp, record);
+                            old = object.getLog().put(timestamp, record);
                             return !Objects.equals(old, record);
                         }
 
                         @Override
                         public void revert(JKleppmannTreePersistentData object) {
-                            object.getLog().remove(timestamp, record);
+                            if (old != null)
+                                object.getLog().put(timestamp, old);
+                            else
+                                object.getLog().remove(timestamp, record);
                         }
                     });
                 }
