@@ -62,6 +62,7 @@ public class JKleppmannTreePersistentDataProtoSerializer implements ProtoSeriali
                 .setTreeName(object.getTreeName())
                 .setClock(object.getClock().peekTimestamp());
         for (var q : object.getQueues().entrySet()) {
+            if (q.getValue().isEmpty()) continue;
             var qb = builder.addQueuesBuilder();
             qb.setNode(q.getKey().toString());
             for (var e : q.getValue().entrySet()) {
