@@ -80,6 +80,7 @@ public class OpSender {
             try {
                 remoteObjectServiceClient.pushOps(collected, obj.getId(), host);
                 jObjectTxManager.executeTx(() -> {
+                    obj.addToTx();
                     for (var op : collected)
                         obj.commitOpForHost(host, op);
                 });

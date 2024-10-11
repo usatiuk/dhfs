@@ -12,10 +12,7 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -106,6 +103,23 @@ public class JObjectTxManager {
                 }
                 if (dataDiff && !dataDiffReal)
                     Log.warn("Useless update for " + obj.getKey().getMeta().getName());
+            }
+
+            if (refVerification && !obj.getValue()._copy) {
+                var cur = dataProtoSerializer.serialize(obj.getKey().getData());
+                for (var mut : obj.getValue()._mutators.reversed())
+                    revertMutator(obj.getKey(), mut);
+                var rev = dataProtoSerializer.serialize(obj.getKey().getData());
+
+                if (obj.getValue().snapshot.data() != null && !Objects.equals(rev, obj.getValue().snapshot.data()))
+                    throw new IllegalStateException("Mutator could not be reverted for object " + obj.getKey().getMeta().getName());
+
+                for (var mut : obj.getValue()._mutators)
+                    applyMutator(obj.getKey(), mut);
+
+                var cur2 = dataProtoSerializer.serialize(obj.getKey().getData());
+                if (!Objects.equals(cur, cur2))
+                    throw new IllegalStateException("Mutator could not be reapplied for object " + obj.getKey().getMeta().getName());
             }
 
             notifyWrite(obj.getKey(),
@@ -219,6 +233,14 @@ public class JObjectTxManager {
         }
     }
 
+    private <T extends JObjectData> void applyMutator(JObject<?> obj, JMutator<T> mutator) {
+        mutator.mutate((T) obj.getData());
+    }
+
+    private <T extends JObjectData> void revertMutator(JObject<?> obj, JMutator<T> mutator) {
+        mutator.revert((T) obj.getData());
+    }
+
     public void rollback(String message) {
         var state = _state.get();
         if (state == null)
@@ -228,13 +250,15 @@ public class JObjectTxManager {
         for (var obj : state._writeObjects.entrySet()) {
             Log.debug("Rollback of " + obj.getKey().getMeta().getName());
             try {
-                if (obj.getValue() == null) {
-                    Log.warn("Skipped rollback of " + obj.getKey().getMeta().getName());
-                    continue;
+                if (obj.getValue()._copy) {
+                    obj.getKey().rollback(
+                            metaProtoSerializer.deserialize(obj.getValue().snapshot.meta()),
+                            obj.getValue().snapshot.data() != null ? dataProtoSerializer.deserialize(obj.getValue().snapshot.data()) : null);
+                } else {
+                    for (var mut : obj.getValue()._mutators.reversed())
+                        revertMutator(obj.getKey(), mut);
+                    obj.getKey().rollback(metaProtoSerializer.deserialize(obj.getValue().snapshot.meta()), obj.getKey().getData());
                 }
-                obj.getKey().rollback(
-                        metaProtoSerializer.deserialize(obj.getValue().snapshot.meta()),
-                        obj.getValue().snapshot.data() != null ? dataProtoSerializer.deserialize(obj.getValue().snapshot.data()) : null);
                 obj.getKey().updateDeletionState();
             } finally {
                 obj.getKey().rwUnlock();
@@ -345,9 +369,29 @@ public class JObjectTxManager {
                 metaProtoSerializer.serialize(obj.getMeta()),
                 (obj.getData() == null) ? null : dataProtoSerializer.serialize(obj.getData()),
                 obj.getMeta().changelogHash())
-                : null;
+                : new JObjectSnapshot(
+                metaProtoSerializer.serialize(obj.getMeta()), refVerification ? null :
+                (obj.getData() == null) ? null : dataProtoSerializer.serialize(obj.getData()),
+                obj.getMeta().changelogHash());
 
-        state._writeObjects.put(obj, new TxState.TxObjectState(snapshot));
+        state._writeObjects.put(obj, new TxState.TxObjectState(snapshot, copy));
+    }
+
+    <T extends JObjectData> void addMutator(JObject<T> obj, JMutator<? super T> mut) {
+        var state = _state.get();
+
+        if (state == null)
+            throw new IllegalStateException("Transaction not running");
+
+        obj.assertRwLock();
+
+        //TODO: Asserts for rwLock/rwLockNoCopy?
+
+        var got = state._writeObjects.get(obj);
+        if (got == null) throw new IllegalStateException("Object not in transaction");
+        if (got._copy)
+            throw new IllegalStateException("Mutating object locked with copy?");
+        got._mutators.addLast(mut);
     }
 
     private class TxState {
@@ -357,9 +401,14 @@ public class JObjectTxManager {
 
         private static class TxObjectState {
             final JObjectSnapshot snapshot;
+            final List<JMutator<?>> _mutators = new LinkedList<>();
             boolean _forceInvalidated = false;
+            final boolean _copy;
 
-            private TxObjectState(JObjectSnapshot snapshot) {this.snapshot = snapshot;}
+            private TxObjectState(JObjectSnapshot snapshot, boolean copy) {
+                this.snapshot = snapshot;
+                _copy = copy;
+            }
         }
     }
 }

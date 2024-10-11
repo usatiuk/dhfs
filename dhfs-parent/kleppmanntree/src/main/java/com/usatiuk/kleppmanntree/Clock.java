@@ -5,5 +5,5 @@ public interface Clock<TimestampT extends Comparable<TimestampT>> {
 
     TimestampT peekTimestamp();
 
-    void updateTimestamp(TimestampT receivedTimestamp);
+    TimestampT updateTimestamp(TimestampT receivedTimestamp);
 }

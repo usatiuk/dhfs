@@ -14,7 +14,9 @@ public class TestClock implements Clock<Long> {
     }
 
     @Override
-    public void updateTimestamp(Long receivedTimestamp) {
+    public Long updateTimestamp(Long receivedTimestamp) {
+        var old = max;
         max = Math.max(max, receivedTimestamp) + 1;
+        return old;
     }
 }

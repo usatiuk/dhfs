@@ -595,6 +595,18 @@ public class JObjectManagerImpl implements JObjectManager {
             }
         }
 
+        @Override
+        public void mutate(JMutator<? super T> mutator) {
+            assertRwLock();
+
+            if (getData() == null) throw new IllegalStateException("Resolve before mutate!");
+
+            if (mutator.mutate(getData())) {
+                bumpVer();
+                jObjectTxManager.addMutator(this, mutator);
+            }
+        }
+
         public boolean tryResolve(ResolutionStrategy resolutionStrategy) {
             if (resolutionStrategy == ResolutionStrategy.LOCAL_ONLY ||
                     resolutionStrategy == ResolutionStrategy.REMOTE)

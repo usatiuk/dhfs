@@ -28,6 +28,8 @@ public abstract class JObject<T extends JObjectData> {
         });
     }
 
+    public abstract void mutate(JMutator<? super T> mutator);
+
     public abstract boolean tryResolve(JObjectManager.ResolutionStrategy resolutionStrategy);
 
     public abstract void externalResolution(JObjectData data);

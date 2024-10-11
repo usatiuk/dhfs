@@ -14,13 +14,24 @@ public class AtomicClock implements Clock<Long>, Serializable {
         return ++_max;
     }
 
+    // FIXME:
+    public void ungetTimestamp() {
+        --_max;
+    }
+
+    public void setTimestamp(Long timestamp) {
+        _max = timestamp;
+    }
+
     @Override
     public Long peekTimestamp() {
         return _max;
     }
 
     @Override
-    public void updateTimestamp(Long receivedTimestamp) {
+    public Long updateTimestamp(Long receivedTimestamp) {
+        var old = _max;
         _max = Math.max(_max, receivedTimestamp) + 1;
+        return old;
     }
 }

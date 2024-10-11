@@ -50,11 +50,22 @@ public class JKleppmannTreePersistentData extends JObjectData {
         _queues.get(host).put(opMove.timestamp(), opMove);
     }
 
+    public void removeOp(UUID host, OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> opMove) {
+        _queues.get(host).remove(opMove.timestamp(), opMove);
+    }
+
     public void recordOp(Collection<UUID> hosts, OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> opMove) {
         for (var u : hosts) {
             recordOp(u, opMove);
         }
     }
+
+    public void removeOp(Collection<UUID> hosts, OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> opMove) {
+        for (var u : hosts) {
+            removeOp(u, opMove);
+        }
+    }
+
 
     @Override
     public String getName() {
