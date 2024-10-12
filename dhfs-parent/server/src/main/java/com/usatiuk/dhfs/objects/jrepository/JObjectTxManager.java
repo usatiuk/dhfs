@@ -367,9 +367,12 @@ public class JObjectTxManager {
         //TODO: Asserts for rwLock/rwLockNoCopy?
 
         var got = state._writeObjects.get(obj);
-        if (got == null) throw new IllegalStateException("Object not in transaction");
-        if (got._copy)
-            throw new IllegalStateException("Mutating object locked with copy?");
+        if (got == null)
+            throw new IllegalStateException("Object not in transaction");
+        if (got._copy) {
+            Log.trace("Ignoring mutator for copied object: " + obj.getMeta().getName());
+            return;
+        }
         got._mutators.addLast(mut);
     }
 
