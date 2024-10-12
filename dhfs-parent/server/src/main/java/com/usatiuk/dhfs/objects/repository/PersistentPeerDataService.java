@@ -7,6 +7,7 @@ import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerDirectory;
+import com.usatiuk.dhfs.objects.repository.peersync.PeerDirectoryLocal;
 import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
 import com.usatiuk.dhfs.objects.repository.peertrust.PeerTrustManager;
 import io.grpc.Status;
@@ -85,13 +86,23 @@ public class PersistentPeerDataService {
                 var newpd = new PeerDirectory();
                 jObjectManager.put(new PersistentPeerInfo(_selfUuid, getSelfCertificate()), Optional.of(PeerDirectory.PeerDirectoryObjName));
                 newpd.getPeers().add(_selfUuid);
-                var dir = jObjectManager.put(newpd, Optional.empty());
+                jObjectManager.put(newpd, Optional.empty());
+                jObjectManager.put(new PeerDirectoryLocal(), Optional.empty());
             });
         }
 
         if (!shutdownChecker.lastShutdownClean()) {
             _persistentData.getData().getIrregularShutdownCounter().addAndGet(1);
-            _persistentData.getData().getInitialObjSyncDone().clear();
+            jObjectTxManager.executeTx(() -> {
+                getPeerDirectoryLocal().rwLock();
+                getPeerDirectoryLocal().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
+                try {
+                    getPeerDirectoryLocal().getData().getInitialObjSyncDone().clear();
+                    getPeerDirectoryLocal().bumpVer();
+                } finally {
+                    getPeerDirectoryLocal().rwUnlock();
+                }
+            });
         }
 
         jObjectManager.registerWriteListener(PersistentPeerInfo.class, this::pushPeerUpdates);
@@ -123,6 +134,17 @@ public class PersistentPeerDataService {
             Log.error("Error writing persistent hosts data", iex);
             throw new RuntimeException(iex);
         }
+    }
+
+    private JObject<PeerDirectoryLocal> getPeerDirectoryLocal() {
+        var got = jObjectManager.get(PeerDirectoryLocal.PeerDirectoryLocalObjName).orElseThrow(() -> new IllegalStateException("Peer directory not found"));
+        got.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
+            if (d == null) throw new IllegalStateException("Could not resolve peer directory!");
+            if (!(d instanceof PeerDirectoryLocal))
+                throw new IllegalStateException("Peer directory local is of wrong type!");
+            return null;
+        });
+        return (JObject<PeerDirectoryLocal>) got;
     }
 
     private JObject<PeerDirectory> getPeerDirectory() {
@@ -245,8 +267,15 @@ public class PersistentPeerDataService {
                 boolean removedInner = d.getPeers().remove(host);
                 Log.info("Removing host: " + host + (removedInner ? " removed" : " did not exists"));
                 if (removedInner) {
-                    _persistentData.runWriteLocked(pd -> pd.getInitialObjSyncDone().remove(host));
-                    _persistentData.runWriteLocked(pd -> pd.getInitialOpSyncDone().remove(host));
+                    getPeerDirectoryLocal().rwLock();
+                    getPeerDirectoryLocal().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
+                    try {
+                        getPeerDirectoryLocal().getData().getInitialObjSyncDone().remove(host);
+                        getPeerDirectoryLocal().getData().getInitialOpSyncDone().remove(host);
+                        getPeerDirectoryLocal().bumpVer();
+                    } finally {
+                        getPeerDirectoryLocal().rwUnlock();
+                    }
                     getPeer(host).runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (mp, dp, bp, vp) -> {
                         mp.removeRef(m.getName());
                         return null;
@@ -294,11 +323,29 @@ public class PersistentPeerDataService {
 
     // Returns true if host's initial sync wasn't done before, and marks it as done
     public boolean markInitialOpSyncDone(UUID connectedHost) {
-        return _persistentData.runWriteLocked(d -> d.getInitialOpSyncDone().add(connectedHost));
+        return jObjectTxManager.executeTx(() -> {
+            getPeerDirectoryLocal().rwLock();
+            getPeerDirectoryLocal().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
+            try {
+                getPeerDirectoryLocal().bumpVer();
+                return getPeerDirectoryLocal().getData().getInitialOpSyncDone().add(connectedHost);
+            } finally {
+                getPeerDirectoryLocal().rwUnlock();
+            }
+        });
     }
 
     public boolean markInitialObjSyncDone(UUID connectedHost) {
-        return _persistentData.runWriteLocked(d -> d.getInitialObjSyncDone().add(connectedHost));
+        return jObjectTxManager.executeTx(() -> {
+            getPeerDirectoryLocal().rwLock();
+            getPeerDirectoryLocal().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
+            try {
+                getPeerDirectoryLocal().bumpVer();
+                return getPeerDirectoryLocal().getData().getInitialObjSyncDone().add(connectedHost);
+            } finally {
+                getPeerDirectoryLocal().rwUnlock();
+            }
+        });
     }
 
 }

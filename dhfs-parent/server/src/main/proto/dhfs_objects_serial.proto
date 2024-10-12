@@ -136,6 +136,11 @@ message JKleppmannTreePersistentDataP {
   repeated JKleppmannTreeOpLogPEntry opLog = 5;
 }
 
+message PeerDirectoryLocalP {
+  repeated string initialOpSyncDonePeers = 1;
+  repeated string initialObjSyncDonePeers = 2;
+}
+
 message JObjectDataP {
   oneof obj {
     FileP file = 2;
@@ -145,5 +150,6 @@ message JObjectDataP {
     PersistentPeerInfoP persistentPeerInfo = 7;
     JKleppmannTreeNodeP jKleppmannTreeNode = 8;
     JKleppmannTreePersistentDataP jKleppmannTreePersistentData = 9;
+    PeerDirectoryLocalP peerDirectoryLocal = 10;
   }
 }
