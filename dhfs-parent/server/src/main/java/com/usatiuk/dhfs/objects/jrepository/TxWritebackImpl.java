@@ -58,7 +58,7 @@ public class TxWritebackImpl implements TxWriteback {
                     .namingPattern("writeback-commit-%d")
                     .build();
 
-            _commitExecutor = Executors.newFixedThreadPool(8, factory);
+            _commitExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), factory);
         }
         _statusExecutor = Executors.newSingleThreadExecutor();
         _statusExecutor.submit(() -> {

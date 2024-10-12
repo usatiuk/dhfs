@@ -48,8 +48,7 @@ public class JObjectTxManager {
                 .namingPattern("tx-serializer-%d")
                 .build();
 
-        // FIXME:
-        _serializerThreads = Executors.newFixedThreadPool(16, factory);
+        _serializerThreads = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), factory);
     }
 
     public void begin() {

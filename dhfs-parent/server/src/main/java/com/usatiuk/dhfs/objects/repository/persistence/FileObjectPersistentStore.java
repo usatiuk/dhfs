@@ -80,7 +80,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
                     .namingPattern("persistent-commit-%d")
                     .build();
 
-            _flushExecutor = Executors.newFixedThreadPool(8, factory);
+            _flushExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), factory);
         }
 
         tryReplay();
