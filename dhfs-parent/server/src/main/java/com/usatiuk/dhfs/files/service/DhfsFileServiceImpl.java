@@ -474,6 +474,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                                     continue;
                                 }
 
+                                // FIXME: (and test this)
+                                beforeFirst = beforeFirst.headMap(takeLeft.getKey(), false);
                                 start = takeLeft.getKey();
                                 pendingWrites = readChunk(cuuid).concat(pendingWrites);
                                 combinedSize += getChunkSize(cuuid);
@@ -495,6 +497,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                                     continue;
                                 }
 
+                                // FIXME: (and test this)
+                                afterLast = afterLast.tailMap(takeRight.getKey(), false);
                                 pendingWrites = pendingWrites.concat(readChunk(cuuid));
                                 combinedSize += getChunkSize(cuuid);
                                 removedChunks.put(takeRight.getKey(), takeRight.getValue());
