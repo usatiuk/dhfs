@@ -98,13 +98,13 @@ public class TxWritebackImpl implements TxWriteback {
             try {
                 TxBundle bundle = new TxBundle(0);
                 synchronized (_pendingBundles) {
-                    while (_pendingBundles.isEmpty()
-                            || !_pendingBundles.peek()._ready)
+                    while (_pendingBundles.isEmpty() || !_pendingBundles.peek()._ready)
                         _pendingBundles.wait();
+
                     long diff = 0;
                     while (!_pendingBundles.isEmpty() && _pendingBundles.peek()._ready) {
                         var toCompress = _pendingBundles.poll();
-                        diff -= toCompress._size;
+                        diff -= toCompress.calculateTotalSize();
                         bundle.compress(toCompress);
                     }
                     diff += bundle.calculateTotalSize();
@@ -209,13 +209,29 @@ public class TxWritebackImpl implements TxWriteback {
             synchronized (_pendingBundles) {
                 synchronized (_flushWaitSynchronizer) {
                     if (currentSize > sizeLimit) {
+                        if (!_pendingBundles.isEmpty() && _pendingBundles.peek()._ready) {
+                            var target = _pendingBundles.poll();
+
+                            long diff = -target.calculateTotalSize();
+                            while (!_pendingBundles.isEmpty() && _pendingBundles.peek()._ready) {
+                                var toCompress = _pendingBundles.poll();
+                                diff -= toCompress.calculateTotalSize();
+                                target.compress(toCompress);
+                            }
+                            diff += target.calculateTotalSize();
+                            currentSize += diff;
+                            _pendingBundles.addFirst(target);
+                        }
+                    }
+
+                    if (currentSize > sizeLimit) {
                         wait = true;
                         continue;
                     }
                 }
                 synchronized (_notFlushedBundles) {
                     var bundle = new TxBundle(_counter.incrementAndGet());
-                    _pendingBundles.add(bundle);
+                    _pendingBundles.addLast(bundle);
                     _notFlushedBundles.put(bundle.getId(), bundle);
                     return bundle;
                 }
