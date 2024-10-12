@@ -84,7 +84,7 @@ public class OpSender {
                     for (var op : collected)
                         obj.commitOpForHost(host, op);
                 });
-                Log.debug("Sent " + collected.size() + " op updates to " + host + "of" + obj.getId());
+                Log.info("Sent " + collected.size() + " op updates to " + host + "of" + obj.getId());
             } catch (Throwable e) {
                 Log.warn("Error sending op to " + host, e);
             }
