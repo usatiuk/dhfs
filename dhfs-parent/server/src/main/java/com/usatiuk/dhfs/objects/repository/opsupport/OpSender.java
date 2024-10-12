@@ -78,7 +78,9 @@ public class OpSender {
 
         if (!collected.isEmpty()) {
             try {
+                // The peer should finish the call only if it had persisted everything
                 remoteObjectServiceClient.pushOps(collected, obj.getId(), host);
+                // If we crash here, it's ok, the peer will just skip these ops the next time we send them
                 jObjectTxManager.executeTx(() -> {
                     obj.addToTx();
                     for (var op : collected)

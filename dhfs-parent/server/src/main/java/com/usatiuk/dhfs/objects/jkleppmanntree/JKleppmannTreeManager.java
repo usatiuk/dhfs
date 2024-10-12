@@ -9,6 +9,7 @@ import com.usatiuk.dhfs.objects.repository.opsupport.OpObject;
 import com.usatiuk.dhfs.objects.repository.opsupport.OpObjectRegistry;
 import com.usatiuk.dhfs.objects.repository.opsupport.OpSender;
 import com.usatiuk.kleppmanntree.*;
+import com.usatiuk.utils.VoidFn;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -160,9 +161,12 @@ public class JKleppmannTreeManager {
             if (!(op instanceof JKleppmannTreeOpWrapper jop))
                 throw new IllegalArgumentException("Invalid incoming op type for JKleppmannTree: " + op.getClass() + " " + getId());
 
+            JObject<?> fileRef;
             if (jop.getOp().newMeta() instanceof JKleppmannTreeNodeMetaFile f) {
                 var fino = f.getFileIno();
-                jObjectManager.getOrPut(fino, File.class, Optional.of(jop.getOp().childId()));
+                fileRef = jObjectManager.getOrPut(fino, File.class, Optional.of(jop.getOp().childId()));
+            } else {
+                fileRef = null;
             }
 
             if (Log.isTraceEnabled())
@@ -173,6 +177,41 @@ public class JKleppmannTreeManager {
             } catch (Exception e) {
                 Log.error("Error applying external op", e);
                 throw e;
+            } finally {
+                // FIXME:
+                // Fixup the ref if it didn't really get applied
+
+                if ((fileRef == null) && (jop.getOp().newMeta() instanceof JKleppmannTreeNodeMetaFile))
+                    Log.error("Could not create child of pushed op: " + jop.getOp());
+
+                if (jop.getOp().newMeta() instanceof JKleppmannTreeNodeMetaFile f) {
+                    if (fileRef != null) {
+                        var got = jObjectManager.get(jop.getOp().childId()).orElse(null);
+
+                        VoidFn remove = () -> {
+                            fileRef.runWriteLockedVoid(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
+                                m.removeRef(jop.getOp().childId());
+                            });
+                        };
+
+                        if (got == null) {
+                            remove.apply();
+                        } else {
+                            try {
+                                got.rLock();
+                                try {
+                                    got.tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
+                                    if (got.getData() == null || !got.getData().extractRefs().contains(f.getFileIno()))
+                                        remove.apply();
+                                } finally {
+                                    got.rUnlock();
+                                }
+                            } catch (DeletedObjectAccessException dex) {
+                                remove.apply();
+                            }
+                        }
+                    }
+                }
             }
         }
 
