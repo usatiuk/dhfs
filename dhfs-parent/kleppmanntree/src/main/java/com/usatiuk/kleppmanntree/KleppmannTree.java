@@ -544,18 +544,18 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             walkTree(node -> {
                 var op = node.getNode().getLastEffectiveOp();
                 if (node.getNode().getLastEffectiveOp() == null) return;
-                LOGGER.fine("visited bootstrap op for " + host + ": " + op.timestamp().toString() + " " + op.newMeta().getName() + " " + op.childId() + "->" + op.newParentId());
+                LOGGER.info("visited bootstrap op for " + host + ": " + op.timestamp().toString() + " " + op.newMeta().getName() + " " + op.childId() + "->" + op.newParentId());
                 result.put(node.getNode().getLastEffectiveOp().timestamp(), node.getNode().getLastEffectiveOp());
             });
 
             for (var le : _storage.getLog().getAll()) {
                 var op = le.getValue().op();
-                LOGGER.fine("bootstrap op from log for " + host + ": " + op.timestamp().toString() + " " + op.newMeta().getName() + " " + op.childId() + "->" + op.newParentId());
+                LOGGER.info("bootstrap op from log for " + host + ": " + op.timestamp().toString() + " " + op.newMeta().getName() + " " + op.childId() + "->" + op.newParentId());
                 result.put(le.getKey(), le.getValue().op());
             }
 
             for (var op : result.values()) {
-                LOGGER.fine("Recording bootstrap op for " + host + ": " + op.timestamp().toString() + " " + op.newMeta().getName() + " " + op.childId() + "->" + op.newParentId());
+                LOGGER.info("Recording bootstrap op for " + host + ": " + op.timestamp().toString() + " " + op.newMeta().getName() + " " + op.childId() + "->" + op.newParentId());
                 _opRecorder.recordOpForPeer(host, op);
             }
         } finally {
