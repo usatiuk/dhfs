@@ -450,6 +450,11 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     public void commitTxImpl(TxManifest manifest, boolean failIfNotFound) {
         try {
+            if (manifest.getDeleted().isEmpty() && manifest.getWritten().isEmpty()) {
+                Log.debug("Empty manifest, skipping");
+                return;
+            }
+
             putTxManifest(manifest);
 
             var latch = new CountDownLatch(manifest.getWritten().size() + manifest.getDeleted().size());
