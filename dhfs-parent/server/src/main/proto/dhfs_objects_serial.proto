@@ -111,10 +111,21 @@ message JKleppmannTreePersistentDataPTimestampEntry {
   int64 timestamp = 2;
 }
 
+message JKleppmannTreeOpLogEffectP {
+  optional JKleppmannTreeOpP oldEffectiveMove = 1;
+  optional string oldParent = 2;
+  optional JKleppmannTreeNodeMetaP oldMeta = 3;
+  JKleppmannTreeOpP effectiveOp = 4;
+  string newParentId = 5;
+  JKleppmannTreeNodeMetaP newMeta = 6;
+  string selfId = 7;
+}
+
 message JKleppmannTreeOpLogPEntry {
   int64 clock = 1;
   string uuid = 2;
-  bytes serialized = 3;
+  JKleppmannTreeOpP op = 3;
+  repeated JKleppmannTreeOpLogEffectP effects = 4;
 }
 
 message JKleppmannTreePersistentDataP {

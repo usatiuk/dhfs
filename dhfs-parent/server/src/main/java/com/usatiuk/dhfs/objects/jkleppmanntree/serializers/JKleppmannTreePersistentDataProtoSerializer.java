@@ -1,16 +1,13 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.serializers;
 
 import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
-import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeOpWrapper;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreePersistentData;
+import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeOpLogEffectP;
 import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeOpP;
 import com.usatiuk.dhfs.objects.persistence.JKleppmannTreePersistentDataP;
-import com.usatiuk.kleppmanntree.AtomicClock;
-import com.usatiuk.kleppmanntree.CombinedTimestamp;
-import com.usatiuk.kleppmanntree.LogRecord;
-import com.usatiuk.kleppmanntree.OpMove;
+import com.usatiuk.kleppmanntree.*;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
@@ -22,6 +19,8 @@ import java.util.UUID;
 public class JKleppmannTreePersistentDataProtoSerializer implements ProtoSerializer<JKleppmannTreePersistentDataP, JKleppmannTreePersistentData> {
     @Inject
     ProtoSerializer<JKleppmannTreeOpP, JKleppmannTreeOpWrapper> opProtoSerializer;
+    @Inject
+    ProtoSerializer<JKleppmannTreeOpLogEffectP, LogEffect<Long, UUID, JKleppmannTreeNodeMeta, String>> effectProtoSerializer;
 
     @Override
     public JKleppmannTreePersistentData deserialize(JKleppmannTreePersistentDataP message) {
@@ -44,7 +43,9 @@ public class JKleppmannTreePersistentDataProtoSerializer implements ProtoSeriali
 
         var opLog = new TreeMap<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, String>>();
         for (var l : message.getOpLogList()) {
-            opLog.put(new CombinedTimestamp<>(l.getClock(), UUID.fromString(l.getUuid())), SerializationHelper.deserialize(l.getSerialized().newInput()));
+            opLog.put(new CombinedTimestamp<>(l.getClock(), UUID.fromString(l.getUuid())),
+                    new LogRecord<>(opProtoSerializer.deserialize(l.getOp()).getOp(), l.getEffectsList().stream().map(effectProtoSerializer::deserialize).toList())
+            );
         }
 
         return new JKleppmannTreePersistentData(
@@ -74,8 +75,11 @@ public class JKleppmannTreePersistentDataProtoSerializer implements ProtoSeriali
             builder.addPeerLogBuilder().setHost(peerLogEntry.getKey().toString()).setTimestamp(peerLogEntry.getValue());
         }
         for (var e : object.getLog().entrySet()) {
-            builder.addOpLogBuilder().setClock(e.getKey().timestamp()).setUuid(e.getKey().nodeId().toString())
-                    .setSerialized(SerializationHelper.serialize(e.getValue()));
+            builder.addOpLogBuilder()
+                    .setClock(e.getKey().timestamp())
+                    .setUuid(e.getKey().nodeId().toString())
+                    .setOp(opProtoSerializer.serialize(new JKleppmannTreeOpWrapper(e.getValue().op())))
+                    .addAllEffects(e.getValue().effects().stream().map(effectProtoSerializer::serialize).toList());
         }
         return builder.build();
     }
