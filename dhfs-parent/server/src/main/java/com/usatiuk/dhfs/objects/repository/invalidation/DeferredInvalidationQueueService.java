@@ -31,7 +31,7 @@ public class DeferredInvalidationQueueService {
     // FIXME: DB when?
     private DeferredInvalidationQueueData _persistentData = new DeferredInvalidationQueueData();
 
-    void init(@Observes @Priority(300) StartupEvent event) throws IOException {
+    void init(@Observes @Priority(290) StartupEvent event) throws IOException {
         Paths.get(dataRoot).toFile().mkdirs();
         Log.info("Initializing with root " + dataRoot);
         if (Paths.get(dataRoot).resolve(dataFileName).toFile().exists()) {

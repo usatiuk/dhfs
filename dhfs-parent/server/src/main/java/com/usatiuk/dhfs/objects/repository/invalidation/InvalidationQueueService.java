@@ -9,7 +9,7 @@ import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
-import io.quarkus.runtime.Startup;
+import io.quarkus.runtime.StartupEvent;
 import io.vertx.core.impl.ConcurrentHashSet;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -48,8 +48,7 @@ public class InvalidationQueueService {
         _queue = new HashSetDelayedBlockingQueue<>(delay);
     }
 
-    @Startup
-    void init() {
+    void init(@Observes @Priority(300) StartupEvent event) throws InterruptedException {
         BasicThreadFactory factory = new BasicThreadFactory.Builder()
                 .namingPattern("invalidation-%d")
                 .build();
@@ -67,6 +66,10 @@ public class InvalidationQueueService {
         if (!_executor.awaitTermination(30, TimeUnit.SECONDS)) {
             Log.error("Failed to shut down invalidation sender thread");
         }
+        var data = _queue.close();
+        Log.info("Will defer " + data.size() + " invalidations on shutdown");
+        for (var e : data)
+            deferredInvalidationQueueService.defer(e.getLeft(), e.getRight());
     }
 
     private void sender() {
@@ -137,10 +140,6 @@ public class InvalidationQueueService {
             }
         }
         Log.info("Invalidation sender exiting");
-        var data = _queue.close();
-        for (var e : data)
-            deferredInvalidationQueueService.defer(e.getLeft(), e.getRight());
-        Log.info("Invalidation sender exited");
     }
 
     public void pushInvalidationToAll(JObject<?> obj) {
