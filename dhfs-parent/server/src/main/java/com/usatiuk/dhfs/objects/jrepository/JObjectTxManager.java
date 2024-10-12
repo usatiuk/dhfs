@@ -13,8 +13,6 @@ import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
@@ -137,60 +135,41 @@ public class JObjectTxManager {
         }
 
         var bundle = txWriteback.createBundle();
-        var latch = new CountDownLatch(state._writeObjects.size());
-        ConcurrentLinkedQueue<Throwable> errors = new ConcurrentLinkedQueue<>();
 
-        state._writeObjects.forEach((key, value) -> {
-            try {
-                key.getMeta().setLastModifiedTx(bundle.getId());
+        try {
+            for (var e : state._writeObjects.entrySet()) {
+                var key = e.getKey();
+                var value = e.getValue();
                 if (key.getMeta().isDeleted()) {
                     bundle.delete(key);
-                    latch.countDown();
-                    return;
+                    continue;
                 }
 
                 if (!value._dataChanged && !value._metaChanged) {
-                    latch.countDown();
-                    return;
+                    continue;
                 }
 
                 if (key.getMeta().isHaveLocalCopy() && value._dataChanged) {
-                    _serializerThreads.execute(() -> {
-                        try {
-                            bundle.commit(key,
-                                    value._metaSerialized,
-                                    dataProtoSerializer.serialize(key.getData())
-                            );
-                        } catch (Throwable t) {
-                            Log.error("Error serializing " + key.getMeta().getName(), t);
-                            errors.add(t);
-                        } finally {
-                            latch.countDown();
-                        }
-                    });
+                    bundle.commit(key,
+                            value._metaSerialized,
+                            dataProtoSerializer.serialize(key.getData())
+                    );
                 } else if (key.getMeta().isHaveLocalCopy() && !value._dataChanged) {
                     bundle.commitMetaChange(key, value._metaSerialized);
-                    latch.countDown();
                 } else if (!key.getMeta().isHaveLocalCopy()) {
                     bundle.commit(key, value._metaSerialized, null);
-                    latch.countDown();
                 } else {
                     throw new IllegalStateException("Unexpected object flush combination");
                 }
-            } catch (Exception e) {
-                Log.error("Error committing object " + key.getMeta().getName(), e);
             }
-        });
-
-        try {
-            latch.await();
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+        } catch (Exception ex) {
+            Log.error("Error creating tx bundle ", ex);
+            txWriteback.dropBundle(bundle);
+            throw ex;
         }
 
-        if (!errors.isEmpty()) {
-            throw new RuntimeException("Errors when committing!");
-        }
+        for (var e : state._writeObjects.entrySet())
+            e.getKey().getMeta().setLastModifiedTx(bundle.getId());
 
         state._writeObjects.forEach((key, value) -> key.rwUnlock());
 

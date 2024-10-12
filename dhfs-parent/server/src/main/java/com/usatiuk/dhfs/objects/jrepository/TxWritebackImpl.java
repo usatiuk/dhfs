@@ -237,6 +237,18 @@ public class TxWritebackImpl implements TxWriteback {
     }
 
     @Override
+    public void dropBundle(com.usatiuk.dhfs.objects.jrepository.TxBundle bundle) {
+        verifyReady();
+        synchronized (_pendingBundles) {
+            Log.warn("Dropped bundle: " + bundle);
+            _pendingBundles.remove((TxBundle) bundle);
+            synchronized (_flushWaitSynchronizer) {
+                currentSize -= ((TxBundle) bundle).calculateTotalSize();
+            }
+        }
+    }
+
+    @Override
     public void fence(long bundleId) {
         var latch = new CountDownLatch(1);
         asyncFence(bundleId, latch::countDown);

@@ -7,6 +7,8 @@ public interface TxWriteback {
 
     void commitBundle(TxBundle bundle);
 
+    void dropBundle(TxBundle bundle);
+
     void fence(long bundleId);
 
     // Executes callback after bundle with bundleId id has been persisted
