@@ -10,6 +10,7 @@ import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaDirectory;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaFile;
+import com.usatiuk.dhfs.objects.jrepository.JMutator;
 import com.usatiuk.dhfs.objects.jrepository.JObject;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
@@ -388,19 +389,18 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (offset < 0)
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Offset should be more than zero: " + offset));
 
-            var file = jObjectManager.get(fileUuid).orElse(null);
+            // FIXME:
+            var file = (JObject<File>) jObjectManager.get(fileUuid).orElse(null);
             if (file == null) {
                 Log.error("File not found when trying to read: " + fileUuid);
                 return -1L;
             }
 
-
-            // FIXME:
-            file.rwLock();
+            file.rwLockNoCopy();
             try {
                 file.tryResolve(JObjectManager.ResolutionStrategy.REMOTE);
                 // FIXME:
-                if (!(file.getData() instanceof File fData))
+                if (!(file.getData() instanceof File))
                     throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
 
                 if (writeLogging) {
@@ -411,136 +411,131 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 if (size(fileUuid) < offset)
                     truncate(fileUuid, offset);
 
-                var chunksAll = fData.getChunks();
+                // FIXME: Some kind of immutable interface?
+                var chunksAll = Collections.unmodifiableNavigableMap(file.getData().getChunks());
                 var first = chunksAll.floorEntry(offset);
                 var last = chunksAll.lowerEntry(offset + data.size());
-                HashSet<String> removedChunks = new HashSet<>();
+                NavigableMap<Long, String> removedChunks = new TreeMap<>();
 
-                try {
-                    long start = 0;
+                long start = 0;
 
-                    NavigableMap<Long, String> beforeFirst = first != null ? chunksAll.headMap(first.getKey(), false) : Collections.emptyNavigableMap();
-                    NavigableMap<Long, String> afterLast = last != null ? chunksAll.tailMap(last.getKey(), false) : Collections.emptyNavigableMap();
+                NavigableMap<Long, String> beforeFirst = first != null ? chunksAll.headMap(first.getKey(), false) : Collections.emptyNavigableMap();
+                NavigableMap<Long, String> afterLast = last != null ? chunksAll.tailMap(last.getKey(), false) : Collections.emptyNavigableMap();
 
-                    if (first != null && (getChunkSize(first.getValue()) + first.getKey() <= offset)) {
-                        beforeFirst = chunksAll;
-                        afterLast = Collections.emptyNavigableMap();
-                        first = null;
-                        last = null;
-                        start = offset;
-                    } else if (!chunksAll.isEmpty()) {
-                        var between = chunksAll.subMap(first.getKey(), true, last.getKey(), true);
-                        removedChunks.addAll(between.values());
-                        start = first.getKey();
-                        between.clear();
-                    }
-
-                    ByteString pendingWrites = ByteString.empty();
-
-                    if (first != null && first.getKey() < offset) {
-                        var chunkBytes = readChunk(first.getValue());
-                        pendingWrites = pendingWrites.concat(chunkBytes.substring(0, (int) (offset - first.getKey())));
-                    }
-                    pendingWrites = pendingWrites.concat(data);
-
-                    if (last != null) {
-                        var lchunkBytes = readChunk(last.getValue());
-                        if (last.getKey() + lchunkBytes.size() > offset + data.size()) {
-                            var startInFile = offset + data.size();
-                            var startInChunk = startInFile - last.getKey();
-                            pendingWrites = pendingWrites.concat(lchunkBytes.substring((int) startInChunk, lchunkBytes.size()));
-                        }
-                    }
-
-                    int combinedSize = pendingWrites.size();
-
-                    if (targetChunkSize > 0) {
-                        if (combinedSize < (targetChunkSize * writeMergeThreshold)) {
-                            boolean leftDone = false;
-                            boolean rightDone = false;
-                            while (!leftDone && !rightDone) {
-                                if (beforeFirst.isEmpty()) leftDone = true;
-                                if (!beforeFirst.isEmpty() || !leftDone) {
-                                    var takeLeft = beforeFirst.lastEntry();
-
-                                    var cuuid = takeLeft.getValue();
-
-                                    if (getChunkSize(cuuid) >= (targetChunkSize * writeMergeMaxChunkToTake)) {
-                                        leftDone = true;
-                                        continue;
-                                    }
-
-                                    if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * writeMergeLimit)) {
-                                        leftDone = true;
-                                        continue;
-                                    }
-
-                                    beforeFirst.pollLastEntry();
-                                    start = takeLeft.getKey();
-                                    pendingWrites = readChunk(cuuid).concat(pendingWrites);
-                                    combinedSize += getChunkSize(cuuid);
-                                    chunksAll.remove(takeLeft.getKey());
-                                    removedChunks.add(cuuid);
-                                }
-                                if (afterLast.isEmpty()) rightDone = true;
-                                if (!afterLast.isEmpty() && !rightDone) {
-                                    var takeRight = afterLast.firstEntry();
-
-                                    var cuuid = takeRight.getValue();
-
-                                    if (getChunkSize(cuuid) >= (targetChunkSize * writeMergeMaxChunkToTake)) {
-                                        rightDone = true;
-                                        continue;
-                                    }
-
-                                    if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * writeMergeLimit)) {
-                                        rightDone = true;
-                                        continue;
-                                    }
-
-                                    afterLast.pollFirstEntry();
-                                    pendingWrites = pendingWrites.concat(readChunk(cuuid));
-                                    combinedSize += getChunkSize(cuuid);
-                                    chunksAll.remove(takeRight.getKey());
-                                    removedChunks.add(cuuid);
-                                }
-                            }
-                        }
-                    }
-
-                    {
-                        int cur = 0;
-                        while (cur < combinedSize) {
-                            int end;
-
-                            if (targetChunkSize <= 0)
-                                end = combinedSize;
-                            else {
-                                if ((combinedSize - cur) > (targetChunkSize * writeLastChunkLimit)) {
-                                    end = Math.min(cur + targetChunkSize, combinedSize);
-                                } else {
-                                    end = combinedSize;
-                                }
-                            }
-
-                            var thisChunk = pendingWrites.substring(cur, end);
-
-                            ChunkData newChunkData = createChunk(thisChunk);
-                            //FIXME:
-                            jObjectManager.put(newChunkData, Optional.of(file.getMeta().getName()));
-                            chunksAll.put(start, newChunkData.getName());
-
-                            start += thisChunk.size();
-                            cur = end;
-                        }
-                    }
-
-                    file.bumpVer();
-                    fData.setMtime(System.currentTimeMillis());
-                } finally {
-                    cleanupChunks(fData, removedChunks);
-                    updateFileSize((JObject<File>) file);
+                if (first != null && (getChunkSize(first.getValue()) + first.getKey() <= offset)) {
+                    beforeFirst = chunksAll;
+                    afterLast = Collections.emptyNavigableMap();
+                    first = null;
+                    last = null;
+                    start = offset;
+                } else if (!chunksAll.isEmpty()) {
+                    var between = chunksAll.subMap(first.getKey(), true, last.getKey(), true);
+                    removedChunks.putAll(between);
+                    start = first.getKey();
                 }
+
+                ByteString pendingWrites = ByteString.empty();
+
+                if (first != null && first.getKey() < offset) {
+                    var chunkBytes = readChunk(first.getValue());
+                    pendingWrites = pendingWrites.concat(chunkBytes.substring(0, (int) (offset - first.getKey())));
+                }
+                pendingWrites = pendingWrites.concat(data);
+
+                if (last != null) {
+                    var lchunkBytes = readChunk(last.getValue());
+                    if (last.getKey() + lchunkBytes.size() > offset + data.size()) {
+                        var startInFile = offset + data.size();
+                        var startInChunk = startInFile - last.getKey();
+                        pendingWrites = pendingWrites.concat(lchunkBytes.substring((int) startInChunk, lchunkBytes.size()));
+                    }
+                }
+
+                int combinedSize = pendingWrites.size();
+
+                if (targetChunkSize > 0) {
+                    if (combinedSize < (targetChunkSize * writeMergeThreshold)) {
+                        boolean leftDone = false;
+                        boolean rightDone = false;
+                        while (!leftDone && !rightDone) {
+                            if (beforeFirst.isEmpty()) leftDone = true;
+                            if (!beforeFirst.isEmpty() || !leftDone) {
+                                var takeLeft = beforeFirst.lastEntry();
+
+                                var cuuid = takeLeft.getValue();
+
+                                if (getChunkSize(cuuid) >= (targetChunkSize * writeMergeMaxChunkToTake)) {
+                                    leftDone = true;
+                                    continue;
+                                }
+
+                                if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * writeMergeLimit)) {
+                                    leftDone = true;
+                                    continue;
+                                }
+
+                                start = takeLeft.getKey();
+                                pendingWrites = readChunk(cuuid).concat(pendingWrites);
+                                combinedSize += getChunkSize(cuuid);
+                                removedChunks.put(takeLeft.getKey(), takeLeft.getValue());
+                            }
+                            if (afterLast.isEmpty()) rightDone = true;
+                            if (!afterLast.isEmpty() && !rightDone) {
+                                var takeRight = afterLast.firstEntry();
+
+                                var cuuid = takeRight.getValue();
+
+                                if (getChunkSize(cuuid) >= (targetChunkSize * writeMergeMaxChunkToTake)) {
+                                    rightDone = true;
+                                    continue;
+                                }
+
+                                if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * writeMergeLimit)) {
+                                    rightDone = true;
+                                    continue;
+                                }
+
+                                pendingWrites = pendingWrites.concat(readChunk(cuuid));
+                                combinedSize += getChunkSize(cuuid);
+                                removedChunks.put(takeRight.getKey(), takeRight.getValue());
+                            }
+                        }
+                    }
+                }
+
+                NavigableMap<Long, String> newChunks = new TreeMap<>();
+
+                {
+                    int cur = 0;
+                    while (cur < combinedSize) {
+                        int end;
+
+                        if (targetChunkSize <= 0)
+                            end = combinedSize;
+                        else {
+                            if ((combinedSize - cur) > (targetChunkSize * writeLastChunkLimit)) {
+                                end = Math.min(cur + targetChunkSize, combinedSize);
+                            } else {
+                                end = combinedSize;
+                            }
+                        }
+
+                        var thisChunk = pendingWrites.substring(cur, end);
+
+                        ChunkData newChunkData = createChunk(thisChunk);
+                        //FIXME:
+                        jObjectManager.put(newChunkData, Optional.of(file.getMeta().getName()));
+                        newChunks.put(start, newChunkData.getName());
+
+                        start += thisChunk.size();
+                        cur = end;
+                    }
+                }
+
+                file.mutate(new FileChunkMutator(file.getData().getMtime(), System.currentTimeMillis(), removedChunks, newChunks));
+
+                cleanupChunks(file.getData(), removedChunks.values());
+                updateFileSize((JObject<File>) file);
             } finally {
                 file.rwUnlock();
             }
@@ -555,115 +550,119 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (length < 0)
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Length should be more than zero: " + length));
 
-            var file = jObjectManager.get(fileUuid).orElse(null);
+            var file = (JObject<File>) jObjectManager.get(fileUuid).orElse(null);
             if (file == null) {
                 Log.error("File not found when trying to read: " + fileUuid);
                 return false;
             }
 
             if (length == 0) {
+                file.rwLockNoCopy();
                 try {
-                    file.runWriteLocked(JObjectManager.ResolutionStrategy.REMOTE, (m, fileData, bump, i) -> {
-                        if (!(fileData instanceof File f))
-                            throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-                        bump.apply();
-                        var oldChunks = new LinkedHashSet<>(f.getChunks().values());
-                        f.getChunks().clear();
-                        f.setMtime(System.currentTimeMillis());
-                        cleanupChunks(f, oldChunks);
-                        updateFileSize((JObject<File>) file);
-                        return null;
+                    file.tryResolve(JObjectManager.ResolutionStrategy.REMOTE);
+
+                    var oldChunks = Collections.unmodifiableNavigableMap(new TreeMap<>(file.getData().getChunks()));
+
+                    file.mutate(new JMutator<>() {
+                        long oldMtime;
+
+                        @Override
+                        public boolean mutate(File object) {
+                            oldMtime = object.getMtime();
+                            object.getChunks().clear();
+                            return true;
+                        }
+
+                        @Override
+                        public void revert(File object) {
+                            object.setMtime(oldMtime);
+                            object.getChunks().putAll(oldChunks);
+                        }
                     });
+                    cleanupChunks(file.getData(), oldChunks.values());
+                    updateFileSize((JObject<File>) file);
                 } catch (Exception e) {
                     Log.error("Error writing file chunks: " + fileUuid, e);
                     return false;
+                } finally {
+                    file.rwUnlock();
                 }
                 return true;
             }
 
+            file.rwLockNoCopy();
             try {
-                file.runWriteLocked(JObjectManager.ResolutionStrategy.REMOTE, (m, fDataU, bump, i) -> {
-                    if (!(fDataU instanceof File fData))
-                        throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+                file.tryResolve(JObjectManager.ResolutionStrategy.REMOTE);
 
-                    var curSize = size(fileUuid);
-                    if (curSize == length) return null;
+                var curSize = size(fileUuid);
+                if (curSize == length) return true;
 
-                    var chunksAll = fData.getChunks();
+                var chunksAll = Collections.unmodifiableNavigableMap(file.getData().getChunks());
+                NavigableMap<Long, String> removedChunks = new TreeMap<>();
+                NavigableMap<Long, String> newChunks = new TreeMap<>();
 
-                    var removedChunks = new LinkedHashSet<String>();
+                if (curSize < length) {
+                    long combinedSize = (length - curSize);
 
-                    try {
+                    long start = curSize;
 
-                        if (curSize < length) {
-                            long combinedSize = (length - curSize);
+                    // Hack
+                    HashMap<Long, ByteString> zeroCache = new HashMap<>();
 
-                            long start = curSize;
+                    {
+                        long cur = 0;
+                        while (cur < combinedSize) {
+                            long end;
 
-                            // Hack
-                            HashMap<Long, ByteString> zeroCache = new HashMap<>();
-
-                            {
-                                long cur = 0;
-                                while (cur < combinedSize) {
-                                    long end;
-
-                                    if (targetChunkSize <= 0)
-                                        end = combinedSize;
-                                    else {
-                                        if ((combinedSize - cur) > (targetChunkSize * 1.5)) {
-                                            end = cur + targetChunkSize;
-                                        } else {
-                                            end = combinedSize;
-                                        }
-                                    }
-
-                                    if (!zeroCache.containsKey(end - cur))
-                                        zeroCache.put(end - cur, UnsafeByteOperations.unsafeWrap(new byte[Math.toIntExact(end - cur)]));
-
-                                    ChunkData newChunkData = createChunk(zeroCache.get(end - cur));
-                                    //FIXME:
-                                    jObjectManager.put(newChunkData, Optional.of(m.getName()));
-                                    chunksAll.put(start, newChunkData.getName());
-
-                                    start += newChunkData.getSize();
-                                    cur = end;
+                            if (targetChunkSize <= 0)
+                                end = combinedSize;
+                            else {
+                                if ((combinedSize - cur) > (targetChunkSize * 1.5)) {
+                                    end = cur + targetChunkSize;
+                                } else {
+                                    end = combinedSize;
                                 }
                             }
-                        } else {
-                            var tail = chunksAll.lowerEntry(length);
-                            var afterTail = chunksAll.tailMap(tail.getKey(), false);
 
-                            removedChunks.addAll(afterTail.values());
-                            afterTail.clear();
+                            if (!zeroCache.containsKey(end - cur))
+                                zeroCache.put(end - cur, UnsafeByteOperations.unsafeWrap(new byte[Math.toIntExact(end - cur)]));
 
-                            var tailBytes = readChunk(tail.getValue());
-                            var newChunk = tailBytes.substring(0, (int) (length - tail.getKey()));
-
-                            chunksAll.remove(tail.getKey());
-                            removedChunks.add(tail.getValue());
-
-                            ChunkData newChunkData = createChunk(newChunk);
+                            ChunkData newChunkData = createChunk(zeroCache.get(end - cur));
                             //FIXME:
-                            jObjectManager.put(newChunkData, Optional.of(m.getName()));
-                            chunksAll.put(tail.getKey(), newChunkData.getName());
+                            jObjectManager.put(newChunkData, Optional.of(file.getMeta().getName()));
+                            newChunks.put(start, newChunkData.getName());
+
+                            start += newChunkData.getSize();
+                            cur = end;
                         }
-
-                        bump.apply();
-                        fData.setMtime(System.currentTimeMillis());
-                    } finally {
-                        cleanupChunks(fData, removedChunks);
                     }
+                } else {
+                    var tail = chunksAll.lowerEntry(length);
+                    var afterTail = chunksAll.tailMap(tail.getKey(), false);
 
-                    updateFileSize((JObject<File>) file);
+                    removedChunks.put(tail.getKey(), tail.getValue());
+                    removedChunks.putAll(afterTail);
 
-                    return null;
-                });
+                    var tailBytes = readChunk(tail.getValue());
+                    var newChunk = tailBytes.substring(0, (int) (length - tail.getKey()));
+
+                    ChunkData newChunkData = createChunk(newChunk);
+                    //FIXME:
+                    jObjectManager.put(newChunkData, Optional.of(file.getMeta().getName()));
+                    newChunks.put(tail.getKey(), newChunkData.getName());
+                }
+
+                file.mutate(new FileChunkMutator(file.getData().getMtime(), System.currentTimeMillis(), removedChunks, newChunks));
+
+                cleanupChunks(file.getData(), removedChunks.values());
+                updateFileSize((JObject<File>) file);
+                return true;
             } catch (Exception e) {
                 Log.error("Error reading file: " + fileUuid, e);
                 return false;
+            } finally {
+                file.rwUnlock();
             }
-            return true;
         });
     }
 
@@ -749,27 +748,42 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Override
     public void updateFileSize(JObject<File> file) {
         jObjectTxManager.executeTx(() -> {
+            file.rwLockNoCopy();
             try {
-                file.runWriteLocked(JObjectManager.ResolutionStrategy.REMOTE, (fsNodeData, fileData, bump, inv) -> {
-                    if (!(fileData instanceof File fd))
-                        throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+                file.tryResolve(JObjectManager.ResolutionStrategy.REMOTE);
+                if (!(file.getData() instanceof File fd))
+                    throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
 
-                    long realSize = 0;
+                long realSize = 0;
 
-                    var last = fd.getChunks().lastEntry();
-                    if (last != null) {
-                        var lastSize = getChunkSize(last.getValue());
-                        realSize = last.getKey() + lastSize;
-                    }
+                var last = fd.getChunks().lastEntry();
+                if (last != null) {
+                    var lastSize = getChunkSize(last.getValue());
+                    realSize = last.getKey() + lastSize;
+                }
 
-                    if (realSize != fd.getSize()) {
-                        fd.setSize(realSize);
-                        bump.apply();
-                    }
-                    return null;
-                });
+                if (realSize != fd.getSize()) {
+                    long finalRealSize = realSize;
+                    file.mutate(new JMutator<File>() {
+                        long oldSize;
+
+                        @Override
+                        public boolean mutate(File object) {
+                            oldSize = object.getSize();
+                            object.setSize(finalRealSize);
+                            return true;
+                        }
+
+                        @Override
+                        public void revert(File object) {
+                            object.setSize(oldSize);
+                        }
+                    });
+                }
             } catch (Exception e) {
                 Log.error("Error updating file size: " + file.getMeta().getName(), e);
+            } finally {
+                file.rwUnlock();
             }
         });
     }

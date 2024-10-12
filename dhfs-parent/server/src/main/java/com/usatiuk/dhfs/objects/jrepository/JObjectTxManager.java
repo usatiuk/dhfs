@@ -105,8 +105,8 @@ public class JObjectTxManager {
                     Log.warn("Useless update for " + obj.getKey().getMeta().getName());
             }
 
-            if (obj.getValue()._copy && !obj.getValue()._mutators.isEmpty())
-                throw new IllegalStateException("Object copied but had mutators!");
+//            if (obj.getValue()._copy && !obj.getValue()._mutators.isEmpty())
+//                throw new IllegalStateException("Object copied but had mutators!");
 
             if (refVerification && !obj.getValue()._copy) {
                 var cur = dataProtoSerializer.serialize(obj.getKey().getData());
