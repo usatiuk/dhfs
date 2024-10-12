@@ -30,10 +30,10 @@ public class OpSender {
     RemoteObjectServiceClient remoteObjectServiceClient;
     @Inject
     JObjectTxManager jObjectTxManager;
-    private ExecutorService _executor;
-    private volatile boolean _shutdown = false;
     @ConfigProperty(name = "dhfs.objects.opsender.batch-size")
     int batchSize;
+    private ExecutorService _executor;
+    private volatile boolean _shutdown = false;
 
     @Startup
     void init() {

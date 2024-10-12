@@ -22,12 +22,12 @@ import java.util.function.Supplier;
 @ApplicationScoped
 public class JObjectTxManager {
     private final ThreadLocal<TxState> _state = new ThreadLocal<>();
-
+    private final ExecutorService _serializerThreads;
+    private final AtomicLong _transientTxId = new AtomicLong();
     @Inject
     ProtoSerializer<JObjectDataP, JObjectData> dataProtoSerializer;
     @Inject
     ProtoSerializer<ObjectMetadataP, ObjectMetadata> metaProtoSerializer;
-
     @Inject
     JObjectLRU jObjectLRU;
     @Inject
@@ -38,8 +38,6 @@ public class JObjectTxManager {
     TxWriteback txWriteback;
     @ConfigProperty(name = "dhfs.objects.ref_verification")
     boolean refVerification;
-    private final ExecutorService _serializerThreads;
-    private final AtomicLong _transientTxId = new AtomicLong();
 
     public JObjectTxManager() {
         BasicThreadFactory factory = new BasicThreadFactory.Builder()
@@ -384,8 +382,8 @@ public class JObjectTxManager {
         private static class TxObjectState {
             final JObjectSnapshot snapshot;
             final List<JMutator<?>> _mutators = new LinkedList<>();
-            boolean _forceInvalidated = false;
             final boolean _copy;
+            boolean _forceInvalidated = false;
             ObjectMetadataP _metaSerialized;  // Filled in when committing
             boolean _metaChanged = false;  // Filled in when committing
             boolean _dataChanged = false;  // Filled in when committing

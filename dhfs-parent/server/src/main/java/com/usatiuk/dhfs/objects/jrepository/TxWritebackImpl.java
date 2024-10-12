@@ -30,17 +30,17 @@ public class TxWritebackImpl implements TxWriteback {
     private final LinkedHashMap<Long, TxBundle> _notFlushedBundles = new LinkedHashMap<>();
 
     private final Object _flushWaitSynchronizer = new Object();
+    private final AtomicLong _lastWrittenTx = new AtomicLong(-1);
+    private final AtomicLong _counter = new AtomicLong();
+    private final AtomicLong _waitedTotal = new AtomicLong(0);
     @Inject
     ObjectPersistentStore objectPersistentStore;
     @ConfigProperty(name = "dhfs.objects.writeback.limit")
     long sizeLimit;
     private long currentSize = 0;
-    private final AtomicLong _lastWrittenTx = new AtomicLong(-1);
-    private final AtomicLong _counter = new AtomicLong();
     private ExecutorService _writebackExecutor;
     private ExecutorService _commitExecutor;
     private ExecutorService _statusExecutor;
-    private final AtomicLong _waitedTotal = new AtomicLong(0);
     private volatile boolean _ready = false;
 
     void init(@Observes @Priority(110) StartupEvent event) {

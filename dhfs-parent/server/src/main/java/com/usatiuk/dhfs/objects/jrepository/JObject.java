@@ -28,6 +28,25 @@ public abstract class JObject<T extends JObjectData> {
         });
     }
 
+    public <X extends JObjectData> JObject<? extends X> as(Class<X> klass) {
+        if (klass.isAssignableFrom(getMeta().getKnownClass())) return (JObject<? extends X>) this;
+        throw new IllegalStateException("Class mismatch for " + getMeta().getName() + " got: " + getMeta().getKnownClass());
+    }
+
+    public JObject<T> local() {
+        tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
+        if (getData() == null)
+            throw new IllegalStateException("Data missing for " + getMeta().getName());
+        return this;
+    }
+
+    public JObject<T> remote() {
+        tryResolve(JObjectManager.ResolutionStrategy.REMOTE);
+        if (getData() == null)
+            throw new IllegalStateException("Data missing for " + getMeta().getName());
+        return this;
+    }
+
     public abstract void mutate(JMutator<? super T> mutator);
 
     public abstract boolean tryResolve(JObjectManager.ResolutionStrategy resolutionStrategy);
