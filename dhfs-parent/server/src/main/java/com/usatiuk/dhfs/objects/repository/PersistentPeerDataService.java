@@ -73,7 +73,7 @@ public class PersistentPeerDataService {
         _selfUuid = _persistentData.runReadLocked(PersistentRemoteHostsData::getSelfUuid);
 
         if (_persistentData.runReadLocked(d -> d.getSelfCertificate() == null)) {
-            jObjectTxManager.executeTx(() -> {
+            jObjectTxManager.executeTxAndFlush(() -> {
                 _persistentData.runWriteLocked(d -> {
                     try {
                         Log.info("Generating a key pair, please wait");
@@ -97,7 +97,7 @@ public class PersistentPeerDataService {
 
         if (!shutdownChecker.lastShutdownClean()) {
             _persistentData.getData().getIrregularShutdownCounter().addAndGet(1);
-            jObjectTxManager.executeTx(() -> {
+            jObjectTxManager.executeTxAndFlush(() -> {
                 peerDirectoryLocal.get().rwLock();
                 peerDirectoryLocal.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
                 try {
