@@ -94,6 +94,15 @@ public class JKleppmannTreeManager {
         }
 
         @Override
+        public boolean hasPendingOpsForHost(UUID host) {
+            return _persistentData.get()
+                    .runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY,
+                            (m, d) -> d.getQueues().containsKey(host) &&
+                                    !d.getQueues().get(host).isEmpty()
+                    );
+        }
+
+        @Override
         public List<Op> getPendingOpsForHost(UUID host, int limit) {
             return _persistentData.get().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
                 if (d.getQueues().containsKey(host)) {

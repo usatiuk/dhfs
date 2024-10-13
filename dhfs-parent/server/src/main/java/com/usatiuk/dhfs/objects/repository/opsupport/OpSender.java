@@ -74,9 +74,19 @@ public class OpSender {
         // Must be peeked before getPendingOpForHost
         var periodicPushOp = obj.getPeriodicPushOp();
 
-        List<Op> collected = obj.getPendingOpsForHost(host, batchSize);
+        if (!obj.hasPendingOpsForHost(host)) {
+            if (periodicPushOp == null) return;
+            try {
+                remoteObjectServiceClient.pushOps(List.of(periodicPushOp), obj.getId(), host);
+                Log.debug("Sent periodic op update to " + host + "of" + obj.getId());
+            } catch (Throwable e) {
+                Log.warn("Error pushing periodic op for " + host + " of " + obj.getId(), e);
+            }
+            return;
+        }
 
-        if (!collected.isEmpty()) {
+        while (obj.hasPendingOpsForHost(host)) {
+            List<Op> collected = obj.getPendingOpsForHost(host, batchSize);
             try {
                 // The peer should finish the call only if it had persisted everything
                 remoteObjectServiceClient.pushOps(collected, obj.getId(), host);
@@ -89,14 +99,6 @@ public class OpSender {
                 Log.info("Sent " + collected.size() + " op updates to " + host + "of" + obj.getId());
             } catch (Throwable e) {
                 Log.warn("Error sending op to " + host, e);
-            }
-        } else {
-            if (periodicPushOp == null) return;
-            try {
-                remoteObjectServiceClient.pushOps(List.of(periodicPushOp), obj.getId(), host);
-                Log.debug("Sent periodic op update to " + host + "of" + obj.getId());
-            } catch (Throwable e) {
-                Log.warn("Error pushing periodic op for " + host + " of " + obj.getId(), e);
             }
         }
     }

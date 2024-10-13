@@ -85,4 +85,47 @@ public class ResyncIT {
         Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
     }
 
+
+    @Test
+    void manyFiles() throws IOException, InterruptedException, TimeoutException {
+        var ret = container1.execInContainer("/bin/sh", "-c", "for i in $(seq 1 200); do echo $i > /root/dhfs_default/fuse/test$i; done");
+        Assertions.assertEquals(0, ret.getExitCode());
+        var foundWc = container1.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -type f | wc -l");
+        Assertions.assertEquals(200, Integer.valueOf(foundWc.getStdout().strip()));
+
+        ret = container2.execInContainer("/bin/sh", "-c", "for i in $(seq 1 200); do echo $i > /root/dhfs_default/fuse/test-2-$i; done");
+        Assertions.assertEquals(0, ret.getExitCode());
+        foundWc = container2.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -type f | wc -l");
+        Assertions.assertEquals(200, Integer.valueOf(foundWc.getStdout().strip()));
+
+        c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/data/stuff/self_uuid").getStdout();
+        c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/data/stuff/self_uuid").getStdout();
+
+        Assertions.assertDoesNotThrow(() -> UUID.fromString(c1uuid));
+        Assertions.assertDoesNotThrow(() -> UUID.fromString(c2uuid));
+
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Ignoring new address"), 60, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Ignoring new address"), 60, TimeUnit.SECONDS);
+
+        var c1curl = container1.execInContainer("/bin/sh", "-c",
+                "curl --header \"Content-Type: application/json\" " +
+                        "  --request PUT " +
+                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
+                        "  http://localhost:8080/objects-manage/known-peers");
+
+        var c2curl = container2.execInContainer("/bin/sh", "-c",
+                "curl --header \"Content-Type: application/json\" " +
+                        "  --request PUT " +
+                        "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
+                        "  http://localhost:8080/objects-manage/known-peers");
+
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+        Thread.sleep(5000);
+        var foundWc2 = container2.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -type f | wc -l");
+        Assertions.assertEquals(400, Integer.valueOf(foundWc2.getStdout().strip()));
+        foundWc2 = container1.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -type f | wc -l");
+        Assertions.assertEquals(400, Integer.valueOf(foundWc2.getStdout().strip()));
+    }
+
 }
