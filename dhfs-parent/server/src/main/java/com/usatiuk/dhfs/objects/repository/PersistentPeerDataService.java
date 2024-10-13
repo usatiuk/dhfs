@@ -315,13 +315,13 @@ public class PersistentPeerDataService {
                     peerDirectoryLocal.get().local().mutate(new JMutator<PeerDirectoryLocal>() {
                         @Override
                         public boolean mutate(PeerDirectoryLocal object) {
-                            peerDirectoryLocal.get().getData().getInitialOpSyncDone().add(connectedHost);
+                            object.getInitialOpSyncDone().add(connectedHost);
                             return true;
                         }
 
                         @Override
                         public void revert(PeerDirectoryLocal object) {
-                            peerDirectoryLocal.get().getData().getInitialOpSyncDone().remove(connectedHost);
+                            object.getInitialOpSyncDone().remove(connectedHost);
                         }
                     });
                 return !contained;
@@ -342,13 +342,13 @@ public class PersistentPeerDataService {
                     peerDirectoryLocal.get().local().mutate(new JMutator<PeerDirectoryLocal>() {
                         @Override
                         public boolean mutate(PeerDirectoryLocal object) {
-                            peerDirectoryLocal.get().getData().getInitialObjSyncDone().add(connectedHost);
+                            object.getInitialObjSyncDone().add(connectedHost);
                             return true;
                         }
 
                         @Override
                         public void revert(PeerDirectoryLocal object) {
-                            peerDirectoryLocal.get().getData().getInitialObjSyncDone().remove(connectedHost);
+                            object.getInitialObjSyncDone().remove(connectedHost);
                         }
                     });
                 return !contained;

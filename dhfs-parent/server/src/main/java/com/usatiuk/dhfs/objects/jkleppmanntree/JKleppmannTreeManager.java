@@ -139,13 +139,13 @@ public class JKleppmannTreeManager {
             _persistentData.get().mutate(new JMutator<JKleppmannTreePersistentData>() {
                 @Override
                 public boolean mutate(JKleppmannTreePersistentData object) {
-                    _persistentData.get().getData().getQueues().get(host).pollFirstEntry();
+                    object.getQueues().get(host).pollFirstEntry();
                     return true;
                 }
 
                 @Override
                 public void revert(JKleppmannTreePersistentData object) {
-                    _persistentData.get().getData().getQueues().get(host).put(jop.getOp().timestamp(), jop.getOp());
+                    object.getQueues().get(host).put(jop.getOp().timestamp(), jop.getOp());
                 }
             });
 
@@ -241,16 +241,17 @@ public class JKleppmannTreeManager {
             public void recordOp(OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> op) {
                 _persistentData.get().assertRwLock();
                 _persistentData.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
+                var hostUuds = persistentPeerDataService.getHostUuids().stream().toList();
                 _persistentData.get().mutate(new JMutator<JKleppmannTreePersistentData>() {
                     @Override
                     public boolean mutate(JKleppmannTreePersistentData object) {
-                        object.recordOp(persistentPeerDataService.getHostUuids(), op);
+                        object.recordOp(hostUuds, op);
                         return true;
                     }
 
                     @Override
                     public void revert(JKleppmannTreePersistentData object) {
-                        object.removeOp(persistentPeerDataService.getHostUuids(), op);
+                        object.removeOp(hostUuds, op);
                     }
                 });
                 opSender.push(JKleppmannTree.this);
