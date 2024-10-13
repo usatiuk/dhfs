@@ -26,7 +26,7 @@ public class ObjectMetadataSerializer implements ProtoSerializer<ObjectMetadataP
                 .addAllReferrers(object.getReferrers())
                 .putAllChangelog(object.getChangelog().entrySet().stream().collect(Collectors.toMap(e -> e.getKey().toString(), Map.Entry::getValue)))
                 .addAllSavedRefs(object.getSavedRefs() != null ? object.getSavedRefs() : Collections.emptyList())
-                .setLocked(object.isFrozen())
+                .setFrozen(object.isFrozen())
                 .setHaveLocalCopy(object.isHaveLocalCopy())
                 .build();
     }
@@ -47,7 +47,7 @@ public class ObjectMetadataSerializer implements ProtoSerializer<ObjectMetadataP
             obj.getChangelog().putAll(message.getChangelogMap().entrySet().stream().collect(Collectors.toMap(e -> UUID.fromString(e.getKey()), Map.Entry::getValue)));
             if (message.getSavedRefsCount() > 0)
                 obj.setSavedRefs(new LinkedHashSet<>(message.getSavedRefsList()));
-            if (message.getLocked())
+            if (message.getFrozen())
                 obj.freeze();
             if (message.getHaveLocalCopy())
                 obj.setHaveLocalCopy(true);

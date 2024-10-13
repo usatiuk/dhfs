@@ -9,9 +9,9 @@ public interface TreeNodeWrapper<TimestampT extends Comparable<TimestampT>, Peer
 
     void rwUnlock();
 
-    void lock();
+    void freeze();
 
-    void unlock();
+    void unfreeze();
 
     void notifyRef(NodeIdT id);
 

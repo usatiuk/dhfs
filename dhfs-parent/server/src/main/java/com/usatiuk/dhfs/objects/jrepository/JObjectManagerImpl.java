@@ -455,8 +455,6 @@ public class JObjectManagerImpl implements JObjectManager {
             _metaPart.narrowClass(data.getClass());
             _dataPart.set((T) data);
             _metaPart.setHaveLocalCopy(true);
-            if (!_metaPart.isFrozen())
-                _metaPart.freeze();
             hydrateRefs();
         }
 

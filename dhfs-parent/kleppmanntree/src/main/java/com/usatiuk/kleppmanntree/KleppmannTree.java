@@ -93,7 +93,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             node.rwLock();
             try {
                 curParent.getNode().getChildren().remove(node.getNode().getMeta().getName());
-                node.lock();
+                node.freeze();
                 node.getNode().setParent(null);
                 node.getNode().setLastEffectiveOp(null);
                 node.notifyRmRef(curParent.getNode().getId());
@@ -274,7 +274,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                     if (!_undoCtx.isEmpty()) {
                         for (var e : _undoCtx.entrySet()) {
                             LOGGER.log(Level.FINE, "Dropping node " + e.getKey());
-                            e.getValue().unlock();
+                            e.getValue().unfreeze();
                             _storage.removeNode(e.getKey());
                         }
                     }
@@ -328,7 +328,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                     node.getNode().setParent(desired.getParent());
                     node.notifyRef(desired.getParent());
                     node.getNode().setMeta(desired.getMeta());
-                    node.unlock();
+                    node.unfreeze();
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Error while fixing up node " + desired.getId(), e);
                     node.rwUnlock();

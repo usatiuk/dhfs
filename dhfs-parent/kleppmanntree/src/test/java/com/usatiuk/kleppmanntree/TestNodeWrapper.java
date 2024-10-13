@@ -26,12 +26,12 @@ public class TestNodeWrapper implements TreeNodeWrapper<Long, Long, TestNodeMeta
     }
 
     @Override
-    public void lock() {
+    public void freeze() {
 
     }
 
     @Override
-    public void unlock() {
+    public void unfreeze() {
 
     }
 
