@@ -307,10 +307,24 @@ public class PersistentPeerDataService {
     public boolean markInitialOpSyncDone(UUID connectedHost) {
         return jObjectTxManager.executeTx(() -> {
             peerDirectoryLocal.get().rwLock();
-            peerDirectoryLocal.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
             try {
-                peerDirectoryLocal.get().bumpVer();
-                return peerDirectoryLocal.get().getData().getInitialOpSyncDone().add(connectedHost);
+                peerDirectoryLocal.get().local();
+                boolean contained = peerDirectoryLocal.get().getData().getInitialOpSyncDone().contains(connectedHost);
+
+                if (!contained)
+                    peerDirectoryLocal.get().local().mutate(new JMutator<PeerDirectoryLocal>() {
+                        @Override
+                        public boolean mutate(PeerDirectoryLocal object) {
+                            peerDirectoryLocal.get().getData().getInitialOpSyncDone().add(connectedHost);
+                            return true;
+                        }
+
+                        @Override
+                        public void revert(PeerDirectoryLocal object) {
+                            peerDirectoryLocal.get().getData().getInitialOpSyncDone().remove(connectedHost);
+                        }
+                    });
+                return !contained;
             } finally {
                 peerDirectoryLocal.get().rwUnlock();
             }
@@ -320,10 +334,24 @@ public class PersistentPeerDataService {
     public boolean markInitialObjSyncDone(UUID connectedHost) {
         return jObjectTxManager.executeTx(() -> {
             peerDirectoryLocal.get().rwLock();
-            peerDirectoryLocal.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
             try {
-                peerDirectoryLocal.get().bumpVer();
-                return peerDirectoryLocal.get().getData().getInitialObjSyncDone().add(connectedHost);
+                peerDirectoryLocal.get().local();
+                boolean contained = peerDirectoryLocal.get().getData().getInitialObjSyncDone().contains(connectedHost);
+
+                if (!contained)
+                    peerDirectoryLocal.get().local().mutate(new JMutator<PeerDirectoryLocal>() {
+                        @Override
+                        public boolean mutate(PeerDirectoryLocal object) {
+                            peerDirectoryLocal.get().getData().getInitialObjSyncDone().add(connectedHost);
+                            return true;
+                        }
+
+                        @Override
+                        public void revert(PeerDirectoryLocal object) {
+                            peerDirectoryLocal.get().getData().getInitialObjSyncDone().remove(connectedHost);
+                        }
+                    });
+                return !contained;
             } finally {
                 peerDirectoryLocal.get().rwUnlock();
             }
