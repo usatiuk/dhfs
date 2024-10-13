@@ -118,13 +118,13 @@ public class PeerManager {
             return null;
         });
 
-        for (var l : _connectedListeners) {
-            l.apply(host);
-        }
-
         if (wasReachable) return;
 
         Log.info("Connected to " + host);
+
+        for (var l : _connectedListeners) {
+            l.apply(host);
+        }
     }
 
     public void handleConnectionError(UUID host) {

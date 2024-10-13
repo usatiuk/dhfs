@@ -5,6 +5,8 @@ import com.usatiuk.dhfs.objects.repository.PeerManager;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
+import io.quarkus.scheduler.Scheduled;
+import io.smallrye.common.annotation.Blocking;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -41,7 +43,6 @@ public class DeferredInvalidationQueueService {
             Log.warn("Reading invalidation queue from backup");
             _persistentData = SerializationHelper.deserialize(Files.readAllBytes(Paths.get(dataRoot).resolve(dataFileName)));
         }
-
         remoteHostManager.registerConnectEventListener(this::returnForHost);
     }
 
@@ -61,6 +62,14 @@ public class DeferredInvalidationQueueService {
             Log.error("Error writing deferred invalidations data", iex);
             throw new RuntimeException(iex);
         }
+    }
+
+    // FIXME:
+    @Scheduled(every = "15s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    @Blocking
+    void periodicReturn() {
+        for (var reachable : remoteHostManager.getAvailableHosts())
+            returnForHost(reachable);
     }
 
     void returnForHost(UUID host) {
