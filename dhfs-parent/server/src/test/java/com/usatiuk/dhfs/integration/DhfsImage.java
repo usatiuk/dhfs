@@ -80,6 +80,7 @@ public class DhfsImage implements Future<String> {
                                         "-Dcom.usatiuk.dhfs.supportlib.native-path=/libs",
                                         "-Dquarkus.log.category.\"com.usatiuk\".level=TRACE",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
+                                        "-Ddhfs.objects.periodic-push-op-interval=5s",
                                         "-jar", "/app/quarkus-run.jar")
                                 .build())
                 .withFileFromPath("/app", Paths.get(buildPath, "quarkus-app"))

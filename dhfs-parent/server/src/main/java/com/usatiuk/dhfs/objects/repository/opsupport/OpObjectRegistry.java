@@ -45,7 +45,7 @@ public class OpObjectRegistry {
     }
 
 
-    @Scheduled(every = "10s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    @Scheduled(every = "${dhfs.objects.periodic-push-op-interval}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     @Blocking
     void periodicPush() {
         for (var obj : _objects.values()) {
