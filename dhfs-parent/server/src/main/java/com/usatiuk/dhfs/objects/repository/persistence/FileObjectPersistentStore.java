@@ -6,7 +6,7 @@ import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.SerializationHelper;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
-import com.usatiuk.dhfs.supportlib.DhfsSupportNative;
+import com.usatiuk.dhfs.supportlib.DhfsSupport;
 import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
 import com.usatiuk.utils.ByteUtils;
 import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
@@ -51,7 +51,7 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
 @ApplicationScoped
 public class FileObjectPersistentStore implements ObjectPersistentStore {
-    private final int META_BLOCK_SIZE = DhfsSupportNative.PAGE_SIZE;
+    private final int META_BLOCK_SIZE = DhfsSupport.PAGE_SIZE;
     private final Path _root;
     private final Path _txManifest;
     private ExecutorService _flushExecutor;

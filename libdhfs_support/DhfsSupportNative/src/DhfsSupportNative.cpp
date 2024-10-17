@@ -9,10 +9,6 @@
 #include "MemoryHelpers.h"
 
 extern "C" {
-JNIEXPORT void JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_hello(JNIEnv* env, jclass klass) {
-    printf("Hello, World!\n");
-}
-
 JNIEXPORT jlong JNICALL Java_com_usatiuk_dhfs_supportlib_DhfsSupportNative_allocateUninitializedByteBuffer
 (JNIEnv* env, jclass klass, jobjectArray bb, jint size) {
     if (size < 0) {
