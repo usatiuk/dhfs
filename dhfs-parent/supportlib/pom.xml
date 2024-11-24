@@ -83,7 +83,12 @@
                                 ${project.build.outputDirectory}/native-build-local
                             </targetPath>
                             <options>
-                                -DDHFS_LIB_INSTALL=${dhfs.native-libs-dir}
+                                <option>
+                                    -DJAVA_HOME=${java.home}
+                                </option>
+                                <option>
+                                    -DDHFS_LIB_INSTALL=${dhfs.native-libs-dir}
+                                </option>
                             </options>
                         </configuration>
                     </execution>
