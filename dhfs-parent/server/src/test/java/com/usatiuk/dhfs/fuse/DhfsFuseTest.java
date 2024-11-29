@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.fuse;
 
+import com.usatiuk.dhfs.TempDataProfile;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
@@ -12,7 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 class Profiles {
-    public static class DhfsFuseTestProfile implements QuarkusTestProfile {
+    public static class DhfsFuseTestProfile extends TempDataProfile {
     }
 }
 

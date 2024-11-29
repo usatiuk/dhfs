@@ -1,6 +1,8 @@
 package com.usatiuk.dhfs.objects.repository.peerdiscovery;
 
 import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
+import io.quarkus.arc.lookup.LookupIfProperty;
+import io.quarkus.arc.properties.IfBuildProperty;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.Startup;
@@ -13,6 +15,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.net.*;
 
 @ApplicationScoped
+@IfBuildProperty(name = "dhfs.local-discovery", stringValue = "true")
 public class LocalPeerDiscoveryBroadcaster {
 
     @Inject

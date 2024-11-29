@@ -2,6 +2,8 @@ package com.usatiuk.dhfs.objects.repository.peerdiscovery;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.usatiuk.dhfs.objects.repository.PeerManager;
+import io.quarkus.arc.lookup.LookupIfProperty;
+import io.quarkus.arc.properties.IfBuildProperty;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.Startup;
@@ -15,6 +17,7 @@ import java.nio.ByteBuffer;
 import java.util.UUID;
 
 @ApplicationScoped
+@IfBuildProperty(name = "dhfs.local-discovery", stringValue = "true")
 public class LocalPeerDiscoveryClient {
 
     @Inject

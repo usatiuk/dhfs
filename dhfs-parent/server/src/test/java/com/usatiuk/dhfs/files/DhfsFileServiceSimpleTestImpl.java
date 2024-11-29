@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.files;
 
 import com.google.protobuf.ByteString;
+import com.usatiuk.dhfs.TempDataProfile;
 import com.usatiuk.dhfs.files.objects.ChunkData;
 import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
@@ -8,12 +9,10 @@ import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
 import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
 import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
 import com.usatiuk.kleppmanntree.AlreadyExistsException;
-import io.quarkus.test.junit.QuarkusTestProfile;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,32 +22,26 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.awaitility.Awaitility.await;
 
 class Profiles {
-    public static class DhfsFileServiceSimpleTestProfile implements QuarkusTestProfile {
+    public static class DhfsFileServiceSimpleTestProfile extends TempDataProfile {
         @Override
-        public Map<String, String> getConfigOverrides() {
-            var ret = new HashMap<String, String>();
+        protected void getConfigOverrides(Map<String, String> ret) {
             ret.put("dhfs.fuse.enabled", "false");
-            return ret;
         }
     }
 
-    public static class DhfsFileServiceSimpleTestProfileNoChunking implements QuarkusTestProfile {
+    public static class DhfsFileServiceSimpleTestProfileNoChunking extends TempDataProfile {
         @Override
-        public Map<String, String> getConfigOverrides() {
-            var ret = new HashMap<String, String>();
+        protected void getConfigOverrides(Map<String, String> ret) {
             ret.put("dhfs.fuse.enabled", "false");
             ret.put("dhfs.files.target_chunk_size", "-1");
-            return ret;
         }
     }
 
-    public static class DhfsFileServiceSimpleTestProfileSmallChunking implements QuarkusTestProfile {
+    public static class DhfsFileServiceSimpleTestProfileSmallChunking extends TempDataProfile {
         @Override
-        public Map<String, String> getConfigOverrides() {
-            var ret = new HashMap<String, String>();
+        protected void getConfigOverrides(Map<String, String> ret) {
             ret.put("dhfs.fuse.enabled", "false");
             ret.put("dhfs.files.target_chunk_size", "3");
-            return ret;
         }
     }
 }

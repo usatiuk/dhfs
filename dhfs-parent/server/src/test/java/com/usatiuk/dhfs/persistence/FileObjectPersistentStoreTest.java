@@ -1,32 +1,29 @@
 package com.usatiuk.dhfs.persistence;
 
 import com.google.protobuf.ByteString;
+import com.usatiuk.dhfs.TempDataProfile;
 import com.usatiuk.dhfs.objects.persistence.ChunkDataP;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
 import com.usatiuk.dhfs.objects.repository.persistence.FileObjectPersistentStore;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 
 class Profiles {
-    public static class FileObjectPersistentStoreTestProfile implements QuarkusTestProfile {
+    public static class FileObjectPersistentStoreTestProfile extends TempDataProfile {
         @Override
-        public Map<String, String> getConfigOverrides() {
-            var ret = new HashMap<String, String>();
+        protected void getConfigOverrides(Map<String, String> ret) {
             ret.put("quarkus.log.category.\"com.usatiuk.dhfs\".level", "TRACE");
             ret.put("dhfs.fuse.enabled", "false");
             ret.put("dhfs.objects.ref_verification", "true");
-            return ret;
         }
     }
 }
