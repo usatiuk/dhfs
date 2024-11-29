@@ -3,7 +3,12 @@ FROM azul/zulu-openjdk:21-jre-headless
 RUN apt update && apt install -y libfuse2 && apt-get clean
 
 WORKDIR /usr/src/app
-COPY ./dhfs-package-downloaded/. .
+
+COPY ./dhfs-package-downloaded/lib .
+COPY ./dhfs-package-downloaded/*.jar .
+COPY ./dhfs-package-downloaded/app .
+COPY ./dhfs-package-downloaded/quarkus .
+
 WORKDIR /usr/src/app/native-libs
 COPY ./dhfs-native-downloaded/. .
 WORKDIR /usr/src/app/webui
