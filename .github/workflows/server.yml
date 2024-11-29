@@ -63,7 +63,7 @@ jobs:
         if: ${{ always() }}
         with:
           name: Test logs
-          path: dhfs-parent/**/target/*-reports
+          path: ./**/target/*-reports
 
   build-webui:
     runs-on: ubuntu-latest

@@ -161,6 +161,25 @@
                 </configuration>
             </plugin>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <junit.jupiter.execution.parallel.enabled>
+                            true
+                        </junit.jupiter.execution.parallel.enabled>
+                        <junit.jupiter.execution.parallel.mode.default>
+                            concurrent
+                        </junit.jupiter.execution.parallel.mode.default>
+                        <junit.jupiter.execution.parallel.config.dynamic.factor>
+                            0.5
+                        </junit.jupiter.execution.parallel.config.dynamic.factor>
+                        <junit.platform.output.capture.stdout>true</junit.platform.output.capture.stdout>
+                        <junit.platform.output.capture.stderr>true</junit.platform.output.capture.stderr>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+            <plugin>
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>quarkus-maven-plugin</artifactId>
                 <version>${quarkus.platform.version}</version>
