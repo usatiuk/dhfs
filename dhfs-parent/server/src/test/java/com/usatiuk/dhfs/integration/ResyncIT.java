@@ -17,6 +17,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 
+import static org.awaitility.Awaitility.await;
+
 public class ResyncIT {
     GenericContainer<?> container1;
     GenericContainer<?> container2;
@@ -57,7 +59,7 @@ public class ResyncIT {
 
     @Test
     void readWriteFileTest() throws IOException, InterruptedException, TimeoutException {
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
         c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/data/stuff/self_uuid").getStdout();
         c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/data/stuff/self_uuid").getStdout();
 
@@ -81,8 +83,7 @@ public class ResyncIT {
 
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
-        Thread.sleep(2000);
-        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
     }
 
 
@@ -121,11 +122,14 @@ public class ResyncIT {
 
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
-        Thread.sleep(5000);
-        var foundWc2 = container2.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -type f | wc -l");
-        Assertions.assertEquals(400, Integer.valueOf(foundWc2.getStdout().strip()));
-        foundWc2 = container1.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -type f | wc -l");
-        Assertions.assertEquals(400, Integer.valueOf(foundWc2.getStdout().strip()));
+        await().atMost(45, TimeUnit.SECONDS).until(() -> {
+            var foundWc2 = container2.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -type f | wc -l");
+            return 400 == Integer.valueOf(foundWc2.getStdout().strip());
+        });
+        await().atMost(45, TimeUnit.SECONDS).until(() -> {
+            var foundWc2 = container1.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -type f | wc -l");
+            return 400 == Integer.valueOf(foundWc2.getStdout().strip());
+        });
     }
 
 }

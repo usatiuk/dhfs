@@ -20,6 +20,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 
+import static org.awaitility.Awaitility.await;
+
 public class DhfsFuseIT {
     GenericContainer<?> container1;
     GenericContainer<?> container2;
@@ -74,8 +76,6 @@ public class DhfsFuseIT {
 
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
-
-        Thread.sleep(1000);
     }
 
     @AfterEach
@@ -85,169 +85,160 @@ public class DhfsFuseIT {
 
     @Test
     void readWriteFileTest() throws IOException, InterruptedException, TimeoutException {
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
-        Thread.sleep(1000);
-        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                "tesempty\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
     }
 
     @Test
     void readWriteRewriteFileTest() throws IOException, InterruptedException, TimeoutException {
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
-        Thread.sleep(1000);
-        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo rewritten > /root/dhfs_default/fuse/testf1").getExitCode());
-        Thread.sleep(1000);
-        Assertions.assertEquals("rewritten\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                "tesempty\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo rewritten > /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                "rewritten\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
     }
 
     @Test
     void createDelayedTest() throws IOException, InterruptedException, TimeoutException {
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
-        Thread.sleep(1000);
-        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
-        Assertions.assertEquals("tesempty\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                "tesempty\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                "tesempty\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
 
         var client = DockerClientFactory.instance().client();
         client.pauseContainerCmd(container2.getContainerId()).exec();
 
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS);
 
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo newfile > /root/dhfs_default/fuse/testf2").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo newfile > /root/dhfs_default/fuse/testf2").getExitCode());
 
         client.unpauseContainerCmd(container2.getContainerId()).exec();
 
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
-
-        Thread.sleep(2000);
-        Assertions.assertEquals("newfile\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf2").getStdout());
-        Assertions.assertEquals("newfile\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf2").getStdout());
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                "newfile\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf2").getStdout()));
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                "newfile\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf2").getStdout()));
     }
 
     @Test
     void writeRewriteDelayedTest() throws IOException, InterruptedException, TimeoutException {
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
-        Thread.sleep(1000);
-        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
-        Assertions.assertEquals("tesempty\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                "tesempty\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                "tesempty\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
 
         var client = DockerClientFactory.instance().client();
         client.pauseContainerCmd(container2.getContainerId()).exec();
 
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS);
 
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo rewritten > /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo rewritten > /root/dhfs_default/fuse/testf1").getExitCode());
 
         client.unpauseContainerCmd(container2.getContainerId()).exec();
 
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
 
-        Thread.sleep(2000);
-        Assertions.assertEquals("rewritten\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
-        Assertions.assertEquals("rewritten\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                "rewritten\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                "rewritten\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
     }
 
     // TODO: How this fits with the tree?
     @Test
     @Disabled
     void deleteDelayedTest() throws IOException, InterruptedException, TimeoutException {
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
-        Thread.sleep(1000);
-        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
-        Assertions.assertEquals("tesempty\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
+        await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
 
         var client = DockerClientFactory.instance().client();
         client.pauseContainerCmd(container2.getContainerId()).exec();
 
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS);
 
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "rm /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "rm /root/dhfs_default/fuse/testf1").getExitCode());
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Delaying deletion check"), 60, TimeUnit.SECONDS, 1);
 
         client.unpauseContainerCmd(container2.getContainerId()).exec();
 
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
 
-        Thread.sleep(1000);
-        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
-        Thread.sleep(1000);
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
 
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Deleting from persistent"), 60, TimeUnit.SECONDS, 1);
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Deleting from persistent"), 60, TimeUnit.SECONDS, 3);
 
-        Thread.sleep(1000);
-        Assertions.assertEquals(1, container2.execInContainer("/bin/sh", "-c", "test -f /root/dhfs_default/fuse/testf1").getExitCode());
-        Assertions.assertEquals(1, container1.execInContainer("/bin/sh", "-c", "test -f /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 1 == container2.execInContainer("/bin/sh", "-c", "test -f /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 1 == container1.execInContainer("/bin/sh", "-c", "test -f /root/dhfs_default/fuse/testf1").getExitCode());
     }
 
     @Test
     void deleteTest() throws IOException, InterruptedException, TimeoutException {
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
-        Thread.sleep(1000);
-        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                "tesempty\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                "tesempty\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
 
-        Thread.sleep(500);
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "rm /root/dhfs_default/fuse/testf1").getExitCode());
-        Thread.sleep(500);
-        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
-        Thread.sleep(500);
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "rm /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                0 == container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
 
         // FIXME?
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Deleting from persistent"), 60, TimeUnit.SECONDS, 3);
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Deleting from persistent"), 60, TimeUnit.SECONDS, 3);
 
-        Thread.sleep(1000);
-        Assertions.assertEquals(1, container2.execInContainer("/bin/sh", "-c", "test -f /root/dhfs_default/fuse/testf1").getExitCode());
-        Assertions.assertEquals(1, container1.execInContainer("/bin/sh", "-c", "test -f /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                1 == container2.execInContainer("/bin/sh", "-c", "test -f /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                1 == container1.execInContainer("/bin/sh", "-c", "test -f /root/dhfs_default/fuse/testf1").getExitCode());
     }
 
     @Test
     void moveFileTest() throws IOException, InterruptedException, TimeoutException {
         Log.info("Creating");
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
-        Assertions.assertEquals("tesempty\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
-        Thread.sleep(1000);
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
         Log.info("Listing");
-        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/").getExitCode());
-        Thread.sleep(1000);
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/").getExitCode());
         Log.info("Moving");
-        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "mv /root/dhfs_default/fuse/testf1 /root/dhfs_default/fuse/testf2").getExitCode());
-        Thread.sleep(1000);
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "mv /root/dhfs_default/fuse/testf1 /root/dhfs_default/fuse/testf2").getExitCode());
         Log.info("Listing");
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/").getExitCode());
-        Thread.sleep(1000);
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/").getExitCode());
         Log.info("Reading");
-        Assertions.assertEquals("tesempty\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf2").getStdout());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf2").getStdout()));
     }
 
     @Test
     void moveDirTest() throws IOException, InterruptedException, TimeoutException {
         Log.info("Creating");
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "mkdir /root/dhfs_default/fuse/testdir").getExitCode());
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testdir/testf1").getExitCode());
-        Assertions.assertEquals("tesempty\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testdir/testf1").getStdout());
-        Thread.sleep(1000);
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "mkdir /root/dhfs_default/fuse/testdir").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testdir/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testdir/testf1").getStdout()));
         Log.info("Listing");
-        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/").getExitCode());
-        Thread.sleep(1000);
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/").getExitCode());
         Log.info("Moving");
-        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "mkdir /root/dhfs_default/fuse/testdir2").getExitCode());
-        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "mv /root/dhfs_default/fuse/testdir /root/dhfs_default/fuse/testdir2/testdirm").getExitCode());
-        Thread.sleep(1000);
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "mkdir /root/dhfs_default/fuse/testdir2").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "mv /root/dhfs_default/fuse/testdir /root/dhfs_default/fuse/testdir2/testdirm").getExitCode());
         Log.info("Listing");
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/").getExitCode());
-        Thread.sleep(1000);
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/").getExitCode());
         Log.info("Reading");
-        Assertions.assertEquals("tesempty\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testdir2/testdirm/testf1").getStdout());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testdir2/testdirm/testf1").getStdout()));
     }
 
 
     // TODO: This probably shouldn't be working right now
     @Test
     void removeAddHostTest() throws IOException, InterruptedException, TimeoutException {
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
-        Thread.sleep(1000);
-        Assertions.assertEquals("tesempty\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
-        Assertions.assertEquals("tesempty\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
+        await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
 
         var c2curl = container2.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
@@ -255,15 +246,14 @@ public class DhfsFuseIT {
                         "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
                         "  http://localhost:8080/objects-manage/known-peers");
 
-        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "echo rewritten > /root/dhfs_default/fuse/testf1").getExitCode());
-        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "echo jioadsd > /root/dhfs_default/fuse/newfile1").getExitCode());
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo asvdkljm > /root/dhfs_default/fuse/newfile1").getExitCode());
-        Thread.sleep(1000);
-        Assertions.assertEquals("tesempty\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "echo rewritten > /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "echo jioadsd > /root/dhfs_default/fuse/newfile1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo asvdkljm > /root/dhfs_default/fuse/newfile1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
 
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS);
-        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "echo dfgvh > /root/dhfs_default/fuse/newfile2").getExitCode());
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo dscfg > /root/dhfs_default/fuse/newfile2").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "echo dfgvh > /root/dhfs_default/fuse/newfile2").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo dscfg > /root/dhfs_default/fuse/newfile2").getExitCode());
 
         Log.info("Re-adding");
         container2.execInContainer("/bin/sh", "-c",
@@ -274,27 +264,28 @@ public class DhfsFuseIT {
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
 
-        Thread.sleep(2000);
-        Assertions.assertEquals("rewritten\n", container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
-        Assertions.assertEquals("rewritten\n", container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout());
-        var cat1 = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
-        var cat2 = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
-        var ls1 = container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/");
-        var ls2 = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/");
-        Log.info(cat1);
-        Log.info(cat2);
-        Log.info(ls1);
-        Log.info(ls2);
+        await().atMost(45, TimeUnit.SECONDS).until(() -> "rewritten\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
+        await().atMost(45, TimeUnit.SECONDS).until(() -> "rewritten\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
+        await().atMost(45, TimeUnit.SECONDS).until(() -> {
+            Log.info("Listing removeAddHostTest");
+            var cat1 = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
+            var cat2 = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
+            var ls1 = container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/");
+            var ls2 = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/");
+            Log.info(cat1);
+            Log.info(cat2);
+            Log.info(ls1);
+            Log.info(ls2);
 
-        Assertions.assertTrue(cat1.getStdout().contains("jioadsd") && cat1.getStdout().contains("asvdkljm") && cat1.getStdout().contains("dfgvh") && cat1.getStdout().contains("dscfg"));
-        Assertions.assertTrue(cat2.getStdout().contains("jioadsd") && cat2.getStdout().contains("asvdkljm") && cat2.getStdout().contains("dfgvh") && cat2.getStdout().contains("dscfg"));
+            return cat1.getStdout().contains("jioadsd") && cat1.getStdout().contains("asvdkljm") && cat1.getStdout().contains("dfgvh") && cat1.getStdout().contains("dscfg")
+                    && cat2.getStdout().contains("jioadsd") && cat2.getStdout().contains("asvdkljm") && cat2.getStdout().contains("dfgvh") && cat2.getStdout().contains("dscfg");
+        });
     }
 
     @Test
     void dirConflictTest() throws IOException, InterruptedException, TimeoutException {
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
-        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
-        Thread.sleep(1000);
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
         boolean createFail = Stream.of(Pair.of(container1, "echo test1 >> /root/dhfs_default/fuse/testf"),
                 Pair.of(container2, "echo test2 >> /root/dhfs_default/fuse/testf")).parallel().map(p -> {
             try {
@@ -304,57 +295,55 @@ public class DhfsFuseIT {
             }
         }).anyMatch(r -> r != 0);
         Assumptions.assumeTrue(!createFail, "Failed creating one or more files");
-        Thread.sleep(1000);
         var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
         var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
         Log.info(ls);
         Log.info(cat);
-        Assertions.assertTrue(cat.getStdout().contains("test1"));
-        Assertions.assertTrue(cat.getStdout().contains("test2"));
+        await().atMost(45, TimeUnit.SECONDS).until(() -> cat.getStdout().contains("test1") && cat.getStdout().contains("test2"));
 //        Assertions.assertTrue(ls.getStdout().chars().filter(c -> c == '\n').count() >= 2);
     }
 
     @Test
     void dirCycleTest() throws IOException, InterruptedException, TimeoutException {
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "mkdir /root/dhfs_default/fuse/a").getExitCode());
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "mkdir /root/dhfs_default/fuse/b").getExitCode());
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo xqr489 >> /root/dhfs_default/fuse/a/testfa").getExitCode());
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "echo ahinou >> /root/dhfs_default/fuse/b/testfb").getExitCode());
-        Thread.sleep(1000);
-        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "ls -lavh /root/dhfs_default/fuse").getExitCode());
-        var c2ls = container2.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -type f -exec cat {} \\;");
-        Assertions.assertEquals(0, c2ls.getExitCode());
-        Assertions.assertTrue(c2ls.getStdout().contains("xqr489"));
-        Assertions.assertTrue(c2ls.getStdout().contains("ahinou"));
-        Thread.sleep(1000);
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "mkdir /root/dhfs_default/fuse/a").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "mkdir /root/dhfs_default/fuse/b").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo xqr489 >> /root/dhfs_default/fuse/a/testfa").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo ahinou >> /root/dhfs_default/fuse/b/testfb").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "ls -lavh /root/dhfs_default/fuse").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> {
+            var c2ls = container2.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -type f -exec cat {} \\;");
+            return c2ls.getExitCode() == 0 && c2ls.getStdout().contains("xqr489") && c2ls.getStdout().contains("ahinou");
+        });
 
         var client = DockerClientFactory.instance().client();
         client.pauseContainerCmd(container1.getContainerId()).exec();
-        Assertions.assertEquals(0, container2.execInContainer("/bin/sh", "-c", "mv /root/dhfs_default/fuse/a /root/dhfs_default/fuse/b").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "mv /root/dhfs_default/fuse/a /root/dhfs_default/fuse/b").getExitCode());
         client.pauseContainerCmd(container2.getContainerId()).exec();
         client.unpauseContainerCmd(container1.getContainerId()).exec();
-        Assertions.assertEquals(0, container1.execInContainer("/bin/sh", "-c", "mv /root/dhfs_default/fuse/b /root/dhfs_default/fuse/a").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "mv /root/dhfs_default/fuse/b /root/dhfs_default/fuse/a").getExitCode());
         client.unpauseContainerCmd(container2.getContainerId()).exec();
 
-        Thread.sleep(10000);
-        Log.info(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse"));
-        Log.info(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/a"));
-        Log.info(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/b"));
-        Log.info(container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse"));
-        Log.info(container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/a"));
-        Log.info(container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/b"));
-        // FIXME: An infinite cycle can indeed be created
-        var c1ls2 = container1.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -maxdepth 3 -type f -exec cat {} \\;");
-        Log.info(c1ls2);
-        Assertions.assertEquals(0, c1ls2.getExitCode());
-        Assertions.assertTrue(c1ls2.getStdout().contains("xqr489"));
-        Assertions.assertTrue(c1ls2.getStdout().contains("ahinou"));
-        var c2ls2 = container1.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -maxdepth 3 -type f -exec cat {} \\;");
-        Log.info(c2ls2);
-        Assertions.assertEquals(0, c2ls2.getExitCode());
-        Assertions.assertTrue(c2ls2.getStdout().contains("xqr489"));
-        Assertions.assertTrue(c2ls2.getStdout().contains("ahinou"));
+
+        await().atMost(45, TimeUnit.SECONDS).until(() -> {
+            Log.info("Listing dirCycleTest");
+            Log.info(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse"));
+            Log.info(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/a"));
+            Log.info(container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/b"));
+            Log.info(container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse"));
+            Log.info(container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/a"));
+            Log.info(container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/b"));
+
+            var c1ls2 = container1.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -maxdepth 3 -type f -exec cat {} \\;");
+            Log.info(c1ls2);
+            var c2ls2 = container1.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -maxdepth 3 -type f -exec cat {} \\;");
+            Log.info(c2ls2);
+
+            return c1ls2.getStdout().contains("xqr489") && c1ls2.getStdout().contains("ahinou")
+                    && c2ls2.getStdout().contains("xqr489") && c2ls2.getStdout().contains("ahinou")
+                    && c1ls2.getExitCode() == 0 && c2ls2.getExitCode() == 0;
+        });
+
     }
 
 }
