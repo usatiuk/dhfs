@@ -17,7 +17,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static org.awaitility.Awaitility.await;
 
 class Profiles {
     public static class DhfsFileServiceSimpleTestProfile implements QuarkusTestProfile {
@@ -228,14 +231,14 @@ public class DhfsFileServiceSimpleTestImpl {
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
                 fileService.read(fileService.open("/moveOverTest2").get(), 0, 10).get().toByteArray());
 
-        Thread.sleep(1000);
-
-        try {
-            chunkObj.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
-                Assertions.assertFalse(m.getReferrers().contains(uuid));
-                return null;
-            });
-        } catch (DeletedObjectAccessException ignored) {}
+        await().atMost(5, TimeUnit.SECONDS).until(() -> {
+            try {
+                return chunkObj.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY,
+                        (m, d) -> !m.getReferrers().contains(uuid));
+            } catch (DeletedObjectAccessException ignored) {
+                return true;
+            }
+        });
     }
 
     @Test

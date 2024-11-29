@@ -19,6 +19,11 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>com.usatiuk</groupId>
             <artifactId>autoprotomap</artifactId>
             <version>1.0-SNAPSHOT</version>
