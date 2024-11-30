@@ -3,8 +3,6 @@ package com.usatiuk.dhfs.objects.repository.opsupport;
 import com.usatiuk.dhfs.objects.repository.PeerManager;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import io.quarkus.scheduler.Scheduled;
-import io.smallrye.common.annotation.Blocking;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -32,8 +30,11 @@ public class OpObjectRegistry {
         if (got == null)
             throw new StatusRuntimeException(Status.NOT_FOUND.withDescription("Queue with id " + objId + " not registered"));
         got.addToTx();
+        boolean push = false;
         for (Op op : ops)
-            got.acceptExternalOp(from, op);
+            push |= got.acceptExternalOp(from, op);
+        if (push)
+            opSender.push(got);
     }
 
     public void pushBootstrapData(UUID host) {
@@ -41,15 +42,6 @@ public class OpObjectRegistry {
             // FIXME: Split transactions for objects?
             o.addToTx();
             o.pushBootstrap(host);
-        }
-    }
-
-
-    @Scheduled(every = "${dhfs.objects.periodic-push-op-interval}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
-    @Blocking
-    void periodicPush() {
-        for (var obj : _objects.values()) {
-            opSender.push(obj);
         }
     }
 }

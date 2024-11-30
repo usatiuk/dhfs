@@ -161,10 +161,9 @@ public class JKleppmannTreeManager {
         }
 
         @Override
-        public void acceptExternalOp(UUID from, Op op) {
+        public boolean acceptExternalOp(UUID from, Op op) {
             if (op instanceof JKleppmannTreePeriodicPushOp pushOp) {
-                _tree.updateExternalTimestamp(pushOp.getFrom(), pushOp.getTimestamp());
-                return;
+                return _tree.updateExternalTimestamp(pushOp.getFrom(), pushOp.getTimestamp());
             }
 
             if (!(op instanceof JKleppmannTreeOpWrapper jop))
@@ -222,6 +221,7 @@ public class JKleppmannTreeManager {
                     }
                 }
             }
+            return true;
         }
 
         @Override

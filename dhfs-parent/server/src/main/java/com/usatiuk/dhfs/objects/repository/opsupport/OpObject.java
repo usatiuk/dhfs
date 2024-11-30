@@ -14,7 +14,7 @@ public interface OpObject {
 
     void pushBootstrap(UUID host);
 
-    void acceptExternalOp(UUID from, Op op);
+    boolean acceptExternalOp(UUID from, Op op);
 
     Op getPeriodicPushOp();
 

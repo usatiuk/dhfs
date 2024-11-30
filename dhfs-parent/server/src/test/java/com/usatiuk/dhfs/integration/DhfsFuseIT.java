@@ -186,9 +186,11 @@ public class DhfsFuseIT {
         await().atMost(45, TimeUnit.SECONDS).until(() ->
                 "tesempty\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
 
+        Log.info("Deleting");
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "rm /root/dhfs_default/fuse/testf1").getExitCode());
         await().atMost(45, TimeUnit.SECONDS).until(() ->
                 0 == container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
+        Log.info("Deleted");
 
         // FIXME?
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Deleting from persistent"), 60, TimeUnit.SECONDS, 3);
@@ -295,12 +297,13 @@ public class DhfsFuseIT {
             }
         }).anyMatch(r -> r != 0);
         Assumptions.assumeTrue(!createFail, "Failed creating one or more files");
-        var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
-        var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
-        Log.info(ls);
-        Log.info(cat);
-        await().atMost(45, TimeUnit.SECONDS).until(() -> cat.getStdout().contains("test1") && cat.getStdout().contains("test2"));
-//        Assertions.assertTrue(ls.getStdout().chars().filter(c -> c == '\n').count() >= 2);
+        await().atMost(45, TimeUnit.SECONDS).until(() -> {
+            var ls = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
+            var cat = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
+            Log.info(ls);
+            Log.info(cat);
+            return cat.getStdout().contains("test1") && cat.getStdout().contains("test2");
+        });
     }
 
     @Test

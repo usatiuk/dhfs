@@ -220,14 +220,14 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         return true;
     }
 
-    public void updateExternalTimestamp(PeerIdT from, TimestampT timestamp) {
+    public boolean updateExternalTimestamp(PeerIdT from, TimestampT timestamp) {
         _storage.rLock();
         try {
             // TODO: Ideally no point in this separate locking?
             var gotExt = _storage.getPeerTimestampLog().getForPeer(from);
             var gotSelf = _storage.getPeerTimestampLog().getForPeer(_peers.getSelfId());
             if ((gotExt != null && gotExt.compareTo(timestamp) >= 0)
-                    && (gotSelf != null && gotSelf.compareTo(_clock.peekTimestamp()) >= 0)) return;
+                    && (gotSelf != null && gotSelf.compareTo(_clock.peekTimestamp()) >= 0)) return false;
         } finally {
             _storage.rUnlock();
         }
@@ -239,6 +239,8 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         } finally {
             _storage.rwUnlock();
         }
+
+        return true;
     }
 
     private void applyOp(PeerIdT from, OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> op, boolean failCreatingIfExists) {

@@ -35,7 +35,8 @@ public class DhfsFusex3IT {
     String c2uuid;
     String c3uuid;
 
-    long emptyFileCount;
+    // This calculation is somewhat racy, so keep it hardcoded for now
+    long emptyFileCount = 9;
 
     @BeforeEach
     void setup(TestInfo testInfo) throws IOException, InterruptedException, TimeoutException {
@@ -114,8 +115,6 @@ public class DhfsFusex3IT {
         waitingConsumer3.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
-
-        emptyFileCount = Integer.valueOf(container1.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/data/objs -type f | wc -l").getStdout().strip());
     }
 
     private boolean checkEmpty() throws IOException, InterruptedException {
