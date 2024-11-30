@@ -2,7 +2,6 @@ package com.usatiuk.dhfs.fuse;
 
 import com.usatiuk.dhfs.TempDataProfile;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.junit.jupiter.api.Assertions;

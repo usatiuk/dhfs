@@ -2,7 +2,6 @@ package com.usatiuk.dhfs.objects.repository.peerdiscovery;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.usatiuk.dhfs.objects.repository.PeerManager;
-import io.quarkus.arc.lookup.LookupIfProperty;
 import io.quarkus.arc.properties.IfBuildProperty;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;

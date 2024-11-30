@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.objects.repository.peerdiscovery;
 
 import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
-import io.quarkus.arc.lookup.LookupIfProperty;
 import io.quarkus.arc.properties.IfBuildProperty;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;

@@ -13,13 +13,10 @@ import lombok.Setter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serial;
-import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
-public class ObjectMetadata implements Serializable {
-    @Serial
-    private static final long serialVersionUID = 1;
+public class ObjectMetadata {
     @Getter
     private final String _name;
     @Getter

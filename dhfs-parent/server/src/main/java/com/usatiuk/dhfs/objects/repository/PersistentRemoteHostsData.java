@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class PersistentRemoteHostsData implements Serializable {
     @Serial
-    private static final long serialVersionUID = 1;
+    private static final long serialVersionUID = 1L;
 
     @Getter
     private final UUID _selfUuid = UUID.randomUUID();
