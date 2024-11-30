@@ -7,7 +7,7 @@ import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
-import com.usatiuk.utils.VoidFn;
+import com.usatiuk.dhfs.utils.VoidFn;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;

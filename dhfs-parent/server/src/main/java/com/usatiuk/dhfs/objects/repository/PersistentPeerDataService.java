@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.objects.repository;
 
-import com.usatiuk.dhfs.SerializationHelper;
+import com.usatiuk.dhfs.utils.SerializationHelper;
 import com.usatiuk.dhfs.ShutdownChecker;
 import com.usatiuk.dhfs.objects.jrepository.*;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;

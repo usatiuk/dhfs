@@ -10,7 +10,7 @@ import com.usatiuk.dhfs.objects.repository.autosync.AutoSyncProcessor;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.opsupport.Op;
 import com.usatiuk.dhfs.objects.repository.opsupport.OpObjectRegistry;
-import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
+import com.usatiuk.dhfs.utils.StatusRuntimeExceptionNoStacktrace;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.grpc.GrpcService;

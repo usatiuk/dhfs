@@ -15,6 +15,8 @@
         <module>kleppmanntree</module>
         <module>supportlib</module>
         <module>autoprotomap</module>
+        <module>objects</module>
+        <module>utils</module>
     </modules>
 
     <properties>
@@ -53,6 +55,11 @@
                 <artifactId>lombok</artifactId>
                 <version>1.18.34</version>
                 <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>net.openhft</groupId>
+                <artifactId>zero-allocation-hashing</artifactId>
+                <version>0.16</version>
             </dependency>
             <dependency>
                 <groupId>org.awaitility</groupId>

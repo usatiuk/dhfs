@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.objects.jrepository;
 
-import com.usatiuk.utils.VoidFn;
+import com.usatiuk.dhfs.utils.VoidFn;
 
 public abstract class JObject<T extends JObjectData> {
     public abstract ObjectMetadata getMeta();

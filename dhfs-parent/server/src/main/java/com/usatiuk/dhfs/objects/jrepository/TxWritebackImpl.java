@@ -3,7 +3,7 @@ package com.usatiuk.dhfs.objects.jrepository;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
 import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
-import com.usatiuk.utils.VoidFn;
+import com.usatiuk.dhfs.utils.VoidFn;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;

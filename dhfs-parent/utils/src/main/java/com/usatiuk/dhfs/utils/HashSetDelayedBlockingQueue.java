@@ -1,4 +1,4 @@
-package com.usatiuk.utils;
+package com.usatiuk.dhfs.utils;
 
 import jakarta.annotation.Nullable;
 import lombok.Getter;
@@ -11,8 +11,11 @@ import java.util.function.Function;
 public class HashSetDelayedBlockingQueue<T> {
     private final LinkedHashMap<T, SetElement<T>> _set = new LinkedHashMap<>();
     private final Object _sleepSynchronizer = new Object();
-    @Getter
     private long _delay;
+
+    public long getDelay() {
+        return _delay;
+    }
 
     private boolean _closed = false;
 

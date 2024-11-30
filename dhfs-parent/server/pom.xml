@@ -51,7 +51,6 @@
         <dependency>
             <groupId>net.openhft</groupId>
             <artifactId>zero-allocation-hashing</artifactId>
-            <version>0.16</version>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -145,6 +144,16 @@
         <dependency>
             <groupId>com.usatiuk.dhfs</groupId>
             <artifactId>supportlib</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.usatiuk.dhfs</groupId>
+            <artifactId>objects</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.usatiuk.dhfs</groupId>
+            <artifactId>utils</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
     </dependencies>
