@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.objects.repository.invalidation;
 
-import com.usatiuk.dhfs.SerializationHelper;
+import com.usatiuk.dhfs.utils.SerializationHelper;
 import com.usatiuk.dhfs.objects.repository.PeerManager;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;

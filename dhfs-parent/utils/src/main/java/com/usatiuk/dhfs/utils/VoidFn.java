@@ -1,4 +1,4 @@
-package com.usatiuk.utils;
+package com.usatiuk.dhfs.utils;
 
 @FunctionalInterface
 public interface VoidFn {

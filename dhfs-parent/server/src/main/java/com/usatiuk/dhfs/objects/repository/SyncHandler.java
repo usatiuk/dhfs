@@ -8,7 +8,7 @@ import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.opsupport.OpObjectRegistry;
-import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
+import com.usatiuk.dhfs.utils.StatusRuntimeExceptionNoStacktrace;
 import io.grpc.Status;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;

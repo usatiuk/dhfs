@@ -9,7 +9,7 @@ import com.usatiuk.dhfs.objects.repository.opsupport.OpObject;
 import com.usatiuk.dhfs.objects.repository.opsupport.OpObjectRegistry;
 import com.usatiuk.dhfs.objects.repository.opsupport.OpSender;
 import com.usatiuk.kleppmanntree.*;
-import com.usatiuk.utils.VoidFn;
+import com.usatiuk.dhfs.utils.VoidFn;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

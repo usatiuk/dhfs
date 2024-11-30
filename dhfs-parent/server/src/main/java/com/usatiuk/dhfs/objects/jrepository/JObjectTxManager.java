@@ -4,7 +4,7 @@ import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
 import com.usatiuk.dhfs.objects.persistence.ObjectMetadataP;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
-import com.usatiuk.utils.VoidFn;
+import com.usatiuk.dhfs.utils.VoidFn;
 import io.quarkus.logging.Log;
 import jakarta.annotation.Nullable;
 import jakarta.enterprise.context.ApplicationScoped;

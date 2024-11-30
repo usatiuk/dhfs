@@ -1,8 +1,7 @@
-package com.usatiuk.dhfs;
+package com.usatiuk.dhfs.utils;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
-import com.usatiuk.dhfs.files.objects.File;
 import org.apache.commons.io.input.ClassLoaderObjectInputStream;
 import org.apache.commons.lang3.SerializationUtils;
 
@@ -12,10 +11,9 @@ import java.io.InputStream;
 import java.io.Serializable;
 
 public abstract class SerializationHelper {
-
     // Taken from SerializationUtils
     public static <T> T deserialize(final InputStream inputStream) {
-        try (ClassLoaderObjectInputStream in = new ClassLoaderObjectInputStream(File.class.getClassLoader(), inputStream)) {
+        try (ClassLoaderObjectInputStream in = new ClassLoaderObjectInputStream(SerializationHelper.class.getClassLoader(), inputStream)) {
             final T obj = (T) in.readObject();
             return obj;
         } catch (IOException | ClassNotFoundException e) {

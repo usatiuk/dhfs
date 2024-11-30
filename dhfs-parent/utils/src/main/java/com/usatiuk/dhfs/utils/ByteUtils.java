@@ -1,4 +1,4 @@
-package com.usatiuk.utils;
+package com.usatiuk.dhfs.utils;
 
 import java.nio.ByteBuffer;
 

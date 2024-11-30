@@ -3,7 +3,7 @@ package com.usatiuk.dhfs.objects.repository.opsupport;
 import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
 import com.usatiuk.dhfs.objects.repository.PeerManager;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
-import com.usatiuk.utils.HashSetDelayedBlockingQueue;
+import com.usatiuk.dhfs.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.Startup;

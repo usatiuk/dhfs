@@ -3,7 +3,7 @@ package com.usatiuk.dhfs.objects.repository.autosync;
 import com.usatiuk.dhfs.objects.jrepository.*;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerDirectory;
 import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
-import com.usatiuk.utils.HashSetDelayedBlockingQueue;
+import com.usatiuk.dhfs.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.Startup;
