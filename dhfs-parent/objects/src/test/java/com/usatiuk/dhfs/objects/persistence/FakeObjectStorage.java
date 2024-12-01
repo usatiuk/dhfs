@@ -31,13 +31,6 @@ public class FakeObjectStorage implements ObjectPersistentStore {
     }
 
     @Override
-    public void writeObjectDirect(JObjectKey name, JData object) {
-        synchronized (this) {
-            _objects.put(name, (TestData) object);
-        }
-    }
-
-    @Override
     public void writeObject(JObjectKey name, JData object) {
         synchronized (this) {
             _pending.put(name, (TestData) object);
