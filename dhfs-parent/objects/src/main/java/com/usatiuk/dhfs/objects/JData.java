@@ -1,11 +1,8 @@
 package com.usatiuk.dhfs.objects;
 
-import java.util.function.Function;
-
+// The base class for JObject data
+// Only one instance of this exists per key, the instance in the manager is canonical
+// When committing a transaction, the instance is checked against it, if it isn't the same, a race occurred.
 public interface JData {
     JObjectKey getKey();
-
-    JData bindCopy();
-
-    Function<JObjectInterface, JObject> binder();
 }

@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects.persistence;
 
+import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
-import com.usatiuk.dhfs.objects.JData;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
 import com.usatiuk.dhfs.utils.ByteUtils;
@@ -43,14 +43,14 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 //   rest of metadata
 
 @ApplicationScoped
-public class SerializingFileObjectPersistentStore implements ObjectPersistentStore {
+public class FileObjectPersistentStore implements ObjectPersistentStore {
     private final Path _root;
     private final Path _txManifest;
     private ExecutorService _flushExecutor;
     private RandomAccessFile _txFile;
     private volatile boolean _ready = false;
 
-    public SerializingFileObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.persistence.files.root") String root) {
+    public FileObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.persistence.files.root") String root) {
         this._root = Path.of(root).resolve("objects");
         _txManifest = Path.of(root).resolve("cur-tx-manifest");
     }
@@ -135,7 +135,7 @@ public class SerializingFileObjectPersistentStore implements ObjectPersistentSto
 
     @Nonnull
     @Override
-    public Optional<JData> readObject(JObjectKey name) {
+    public Optional<ByteString> readObject(JObjectKey name) {
         verifyReady();
         var path = getObjPath(name);
         try (var rf = new RandomAccessFile(path.toFile(), "r")) {
@@ -146,10 +146,9 @@ public class SerializingFileObjectPersistentStore implements ObjectPersistentSto
             var bs = UnsafeByteOperations.unsafeWrap(buf);
             // This way, the input will be considered "immutable" which would allow avoiding copies
             // when parsing byte arrays
-            var ch = bs.newCodedInput();
-            ch.enableAliasing(true);
-//            return JObjectDataP.parseFrom(ch);
-            return null;
+//            var ch = bs.newCodedInput();
+//            ch.enableAliasing(true);
+            return Optional.of(bs);
         } catch (EOFException | FileNotFoundException | NoSuchFileException fx) {
             return Optional.empty();
         } catch (IOException e) {
@@ -169,13 +168,9 @@ public class SerializingFileObjectPersistentStore implements ObjectPersistentSto
             throw new EOFException();
     }
 
-    private void writeObjectImpl(Path path, JData data, boolean sync) throws IOException {
+    private void writeObjectImpl(Path path, ByteString data, boolean sync) throws IOException {
         try (var fsb = new FileOutputStream(path.toFile(), false)) {
-//            int dataSize =  data.getSerializedSize();
-            int dataSize = 0;
-
-//            if (fsb.getChannel().write(metaBb.limit(META_BLOCK_SIZE)) != META_BLOCK_SIZE)
-//                throw new IOException("Could not write to file");
+            data.writeTo(fsb);
 
             if (sync) {
                 fsb.flush();
@@ -185,19 +180,7 @@ public class SerializingFileObjectPersistentStore implements ObjectPersistentSto
     }
 
     @Override
-    public void writeObjectDirect(JObjectKey name, JData data) {
-        verifyReady();
-        try {
-            var path = getObjPath(name);
-            writeObjectImpl(path, data, false);
-        } catch (IOException e) {
-            Log.error("Error writing file " + name, e);
-            throw new StatusRuntimeExceptionNoStacktrace(Status.INTERNAL);
-        }
-    }
-
-    @Override
-    public void writeObject(JObjectKey name, JData obj) {
+    public void writeObject(JObjectKey name, ByteString obj) {
         verifyReady();
         try {
             var tmpPath = getTmpObjPath(name);
@@ -206,7 +189,6 @@ public class SerializingFileObjectPersistentStore implements ObjectPersistentSto
             Log.error("Error writing new file " + name, e);
         }
     }
-
 
     private TxManifest readTxManifest() {
         try {
@@ -322,12 +304,6 @@ public class SerializingFileObjectPersistentStore implements ObjectPersistentSto
             Log.error("Error deleting file " + path, e);
             throw new StatusRuntimeExceptionNoStacktrace(Status.INTERNAL);
         }
-    }
-
-    @Override
-    public void deleteObjectDirect(JObjectKey name) {
-        verifyReady();
-        deleteImpl(getObjPath(name));
     }
 
     @Override
