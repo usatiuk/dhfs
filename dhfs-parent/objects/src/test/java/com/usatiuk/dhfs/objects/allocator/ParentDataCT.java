@@ -22,7 +22,7 @@ public class ParentDataCT extends ChangeTrackerBase<Parent> implements Parent {
         onChange();
     }
 
-    public ParentDataCT(ParentDataNormal normal) {
+    public ParentDataCT(Parent normal) {
         _name = normal.getKey();
         _kidKey = normal.getKidKey();
         _lastName = normal.getLastName();

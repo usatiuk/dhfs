@@ -188,6 +188,13 @@ public class JObjectManager {
                     if (current.lastWriteTx > tx.getId()) {
                         throw new IllegalStateException("Transaction race");
                     }
+
+                    var newWrapper = new JDataWrapper<>(record.copy().wrapped());
+                    newWrapper.lock.writeLock().lock();
+                    if (!_objects.replace(record.copy().wrapped().getKey(), current, newWrapper)) {
+                        throw new IllegalStateException("Object changed during transaction");
+                    }
+                    toUnlock.add(newWrapper.lock.writeLock()::unlock);
                 } else if (record instanceof TxRecord.TxObjectRecordNew<?> created) {
                     var wrapper = new JDataWrapper<>(created.created());
                     wrapper.lock.writeLock().lock();
@@ -204,8 +211,7 @@ public class JObjectManager {
             for (var record : toFlush) {
                 Log.trace("Flushing " + record.toString());
 
-                if (!record.copy().isModified())
-                    continue;
+                assert record.copy().isModified();
 
                 var obj = record.copy().wrapped();
                 var key = obj.getKey();

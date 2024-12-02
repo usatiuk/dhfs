@@ -41,50 +41,91 @@ public class ObjectsTest {
     }
 
     @Test
+    void editObject() {
+        {
+            txm.begin();
+            var newParent = alloc.create(Parent.class, new JObjectKey("Parent3"));
+            newParent.setLastName("John");
+            curTx.putObject(newParent);
+            txm.commit();
+        }
+
+        {
+            txm.begin();
+            var parent = curTx.getObject(Parent.class, new JObjectKey("Parent3"), LockingStrategy.OPTIMISTIC).orElse(null);
+            Assertions.assertEquals("John", parent.getLastName());
+            parent.setLastName("John2");
+            txm.commit();
+        }
+
+        {
+            txm.begin();
+            var parent = curTx.getObject(Parent.class, new JObjectKey("Parent3"), LockingStrategy.WRITE).orElse(null);
+            Assertions.assertEquals("John2", parent.getLastName());
+            parent.setLastName("John3");
+            txm.commit();
+        }
+
+        {
+            txm.begin();
+            var parent = curTx.getObject(Parent.class, new JObjectKey("Parent3"), LockingStrategy.READ_ONLY).orElse(null);
+            Assertions.assertEquals("John3", parent.getLastName());
+            txm.commit();
+        }
+    }
+
+    @Test
     void createObjectConflict() throws InterruptedException {
         AtomicBoolean thread1Failed = new AtomicBoolean(true);
         AtomicBoolean thread2Failed = new AtomicBoolean(true);
 
         var signal = new Semaphore(0);
+        var signalFin = new Semaphore(2);
 
-        new Thread(() -> {
-            Log.warn("Thread 1");
-            txm.begin();
-            var newParent = alloc.create(Parent.class, new JObjectKey("Parent2"));
-            newParent.setLastName("John");
-            curTx.putObject(newParent);
-            try {
-                signal.acquire();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-            Log.warn("Thread 1 commit");
-            txm.commit();
-            thread1Failed.set(false);
-        }).start();
 
-        new Thread(() -> {
-            Log.warn("Thread 2");
-            txm.begin();
-            var newParent = alloc.create(Parent.class, new JObjectKey("Parent2"));
-            newParent.setLastName("John2");
-            curTx.putObject(newParent);
+        Just.run(() -> {
             try {
+                signalFin.acquire();
+                Log.warn("Thread 1");
+                txm.begin();
+                var newParent = alloc.create(Parent.class, new JObjectKey("Parent2"));
+                newParent.setLastName("John");
+                curTx.putObject(newParent);
                 signal.acquire();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+                Log.warn("Thread 1 commit");
+                txm.commit();
+                thread1Failed.set(false);
+                signal.release();
+                return null;
+            } finally {
+                signalFin.release();
             }
-            Log.warn("Thread 2 commit");
-            txm.commit();
-            thread2Failed.set(false);
-        }).start();
+        });
+        Just.run(() -> {
+            try {
+                signalFin.acquire();
+                Log.warn("Thread 2");
+                txm.begin();
+                var newParent = alloc.create(Parent.class, new JObjectKey("Parent2"));
+                newParent.setLastName("John2");
+                curTx.putObject(newParent);
+                signal.acquire();
+                Log.warn("Thread 2 commit");
+                txm.commit();
+                thread2Failed.set(false);
+                signal.release();
+                return null;
+            } finally {
+                signalFin.release();
+            }
+        });
 
         signal.release(2);
-
-        Thread.sleep(500);
+        signalFin.acquire(2);
 
         txm.begin();
         var got = curTx.getObject(Parent.class, new JObjectKey("Parent2"), LockingStrategy.READ_ONLY).orElse(null);
+        txm.commit();
 
         if (!thread1Failed.get()) {
             Assertions.assertTrue(thread2Failed.get());
@@ -94,6 +135,7 @@ public class ObjectsTest {
         } else {
             Assertions.fail("No thread succeeded");
         }
+
     }
 
 //    @Test
