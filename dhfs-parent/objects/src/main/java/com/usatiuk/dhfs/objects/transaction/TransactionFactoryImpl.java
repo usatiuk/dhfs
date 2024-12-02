@@ -49,26 +49,39 @@ public class TransactionFactoryImpl implements TransactionFactory {
 
             switch (strategy) {
                 case READ_ONLY: {
-                    read.getLock().readLock().lock();
-                    var view = objectAllocator.unmodifiable(read.get());
+                    read.lock().readLock().lock();
+                    var view = objectAllocator.unmodifiable(read.data());
                     _objects.put(key, new TxRecord.TxObjectRecordRead<>(read, view));
                     return Optional.of(view);
                 }
-                case WRITE:
                 case OPTIMISTIC: {
-                    var copy = objectAllocator.copy(read.get());
-
-                    switch (strategy) {
-                        case WRITE:
-                            read.getLock().writeLock().lock();
-                            _objects.put(key, new TxRecord.TxObjectRecordCopyLock<>(read, copy));
-                            break;
-                        case OPTIMISTIC:
-                            _objects.put(key, new TxRecord.TxObjectRecordCopyNoLock<>(read.get(), copy));
-                            break;
-                    }
-
+                    var copy = objectAllocator.copy(read.data());
+                    _objects.put(key, new TxRecord.TxObjectRecordCopyNoLock<>(read.data(), copy));
                     return Optional.of(copy.wrapped());
+                }
+                case WRITE: {
+                    read.lock().writeLock().lock();
+                    while (true) {
+                        try {
+                            var readAgain = _source.get(type, key).orElse(null);
+                            if (readAgain == null) {
+                                read.lock().writeLock().unlock();
+                                return Optional.empty();
+                            }
+                            if (!Objects.equals(read, readAgain)) {
+                                read.lock().writeLock().unlock();
+                                read = readAgain;
+                                read.lock().writeLock().lock();
+                                continue;
+                            }
+                            var copy = objectAllocator.copy(read.data());
+                            _objects.put(key, new TxRecord.TxObjectRecordCopyLock<>(read, copy));
+                            return Optional.of(copy.wrapped());
+                        } catch (Throwable e) {
+                            read.lock().writeLock().unlock();
+                            throw e;
+                        }
+                    }
                 }
                 default:
                     throw new IllegalArgumentException("Unknown locking strategy");

@@ -92,23 +92,16 @@ public class JObjectManager {
         }
     }
 
+    private record TransactionObjectImpl<T extends JData>
+            (T data, ReadWriteLock lock)
+            implements TransactionObjectSource.TransactionObject<T> {}
+
     private final TransactionObjectSource _objSource = new TransactionObjectSource() {
         @Override
         public <T extends JData> Optional<TransactionObject<T>> get(Class<T> type, JObjectKey key) {
             var got = JObjectManager.this.get(type, key);
             if (got == null) return Optional.empty();
-            return Optional.of(new TransactionObject<>() {
-                @Override
-                public T get() {
-                    return got.getLeft();
-                }
-
-                @Override
-                public ReadWriteLock getLock() {
-                    return got.getRight().lock;
-                }
-            });
-
+            return Optional.of(new TransactionObjectImpl<>(got.getLeft(), got.getRight().lock));
         }
     };
 
@@ -131,10 +124,10 @@ public class JObjectManager {
                 Log.trace("Processing entry " + entry.toString());
                 switch (entry) {
                     case TxRecord.TxObjectRecordRead<?> read -> {
-                        toUnlock.add(read.original().getLock().readLock()::unlock);
+                        toUnlock.add(read.original().lock().readLock()::unlock);
                     }
                     case TxRecord.TxObjectRecordCopyLock<?> copy -> {
-                        toUnlock.add(copy.original().getLock().writeLock()::unlock);
+                        toUnlock.add(copy.original().lock().writeLock()::unlock);
                         if (copy.copy().isModified()) {
                             toFlush.add(copy);
                         }
@@ -176,7 +169,7 @@ public class JObjectManager {
                     throw new IllegalStateException("Object not found during transaction");
                 } else if (current != null) {
                     var old = switch (record) {
-                        case TxRecord.TxObjectRecordCopyLock<?> copy -> copy.original().get();
+                        case TxRecord.TxObjectRecordCopyLock<?> copy -> copy.original().data();
                         case TxRecord.TxObjectRecordCopyNoLock<?> copy -> copy.original();
                         default -> throw new IllegalStateException("Unexpected value: " + record);
                     };
