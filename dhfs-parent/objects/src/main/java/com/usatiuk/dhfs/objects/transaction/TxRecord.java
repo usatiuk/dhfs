@@ -43,7 +43,7 @@ public class TxRecord {
 
                 @Override
                 public boolean isModified() {
-                    return false;
+                    return true;
                 }
             };
         }

@@ -16,7 +16,7 @@ public class KidDataCT extends ChangeTrackerBase<Kid> implements Kid {
         onChange();
     }
 
-    public KidDataCT(KidDataNormal normal) {
+    public KidDataCT(Kid normal) {
         _key = normal.getKey();
         _name = normal.getName();
     }

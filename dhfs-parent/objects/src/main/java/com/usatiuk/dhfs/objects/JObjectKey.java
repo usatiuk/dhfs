@@ -1,4 +1,6 @@
 package com.usatiuk.dhfs.objects;
 
-public record JObjectKey(String name) {
+import java.io.Serializable;
+
+public record JObjectKey(String name) implements Serializable {
 }

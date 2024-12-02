@@ -22,13 +22,13 @@ public class TestObjectAllocator implements ObjectAllocator {
 
     @Override
     public <T extends JData> ChangeTrackingJData<T> copy(T obj) {
-        if (obj instanceof ChangeTrackerBase<?>) {
-            throw new IllegalArgumentException("Cannot copy a ChangeTrackerBase object");
-        }
+//        if (obj instanceof ChangeTrackerBase<?>) {
+//            throw new IllegalArgumentException("Cannot copy a ChangeTrackerBase object");
+//        }
 
         return switch (obj) {
-            case KidDataNormal kid -> (ChangeTrackingJData<T>) new KidDataCT(kid);
-            case ParentDataNormal parent -> (ChangeTrackingJData<T>) new ParentDataCT(parent);
+            case Kid kid -> (ChangeTrackingJData<T>) new KidDataCT(kid);
+            case Parent parent -> (ChangeTrackingJData<T>) new ParentDataCT(parent);
             default -> throw new IllegalStateException("Unexpected value: " + obj);
         };
     }
