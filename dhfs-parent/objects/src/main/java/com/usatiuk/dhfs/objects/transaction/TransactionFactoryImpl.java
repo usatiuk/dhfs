@@ -3,12 +3,14 @@ package com.usatiuk.dhfs.objects.transaction;
 import com.usatiuk.dhfs.objects.JData;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.ObjectAllocator;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.AccessLevel;
 import lombok.Getter;
 
 import java.util.*;
 
+@ApplicationScoped
 public class TransactionFactoryImpl implements TransactionFactory {
     @Inject
     ObjectAllocator objectAllocator;

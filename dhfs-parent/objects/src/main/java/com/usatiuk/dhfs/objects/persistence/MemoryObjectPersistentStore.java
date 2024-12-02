@@ -1,8 +1,10 @@
 package com.usatiuk.dhfs.objects.persistence;
 
-import com.usatiuk.dhfs.objects.JData;
+import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.JObjectKey;
-import com.usatiuk.dhfs.objects.test.objs.TestData;
+import io.quarkus.arc.lookup.LookupIfProperty;
+import io.quarkus.arc.properties.IfBuildProperty;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import javax.annotation.Nonnull;
 import java.util.Collection;
@@ -10,9 +12,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-public class FakeObjectStorage implements ObjectPersistentStore {
-    private final Map<JObjectKey, TestData> _objects = new HashMap<>();
-    private final Map<JObjectKey, TestData> _pending = new HashMap<>();
+@ApplicationScoped
+@IfBuildProperty(name = "dhfs.objects.persistence", stringValue = "memory")
+public class MemoryObjectPersistentStore implements ObjectPersistentStore {
+    private final Map<JObjectKey, ByteString> _objects = new HashMap<>();
+    private final Map<JObjectKey, ByteString> _pending = new HashMap<>();
 
     @Nonnull
     @Override
@@ -24,16 +28,16 @@ public class FakeObjectStorage implements ObjectPersistentStore {
 
     @Nonnull
     @Override
-    public Optional<JData> readObject(JObjectKey name) {
+    public Optional<ByteString> readObject(JObjectKey name) {
         synchronized (this) {
             return Optional.ofNullable(_objects.get(name));
         }
     }
 
     @Override
-    public void writeObject(JObjectKey name, JData object) {
+    public void writeObject(JObjectKey name, ByteString object) {
         synchronized (this) {
-            _pending.put(name, (TestData) object);
+            _pending.put(name, object);
         }
     }
 
@@ -46,13 +50,6 @@ public class FakeObjectStorage implements ObjectPersistentStore {
             for (JObjectKey key : names.getDeleted()) {
                 _objects.remove(key);
             }
-        }
-    }
-
-    @Override
-    public void deleteObjectDirect(JObjectKey name) {
-        synchronized (this) {
-            _objects.remove(name);
         }
     }
 
