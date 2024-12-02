@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.objects.persistence;
 
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.common.JObjectKey;
 
 import java.io.Serializable;
 import java.util.List;

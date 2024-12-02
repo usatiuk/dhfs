@@ -2,13 +2,12 @@ package com.usatiuk.dhfs.objects.persistence;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.common.JObjectKey;
 import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
 import com.usatiuk.dhfs.utils.ByteUtils;
 import com.usatiuk.dhfs.utils.SerializationHelper;
 import com.usatiuk.dhfs.utils.StatusRuntimeExceptionNoStacktrace;
 import io.grpc.Status;
-import io.quarkus.arc.lookup.LookupIfProperty;
 import io.quarkus.arc.properties.IfBuildProperty;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;

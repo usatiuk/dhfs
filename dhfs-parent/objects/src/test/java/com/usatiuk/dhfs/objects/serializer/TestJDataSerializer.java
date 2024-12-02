@@ -2,9 +2,9 @@ package com.usatiuk.dhfs.objects.serializer;
 
 
 import com.google.protobuf.ByteString;
-import com.usatiuk.dhfs.objects.JData;
 import com.usatiuk.dhfs.objects.ObjectSerializer;
 import com.usatiuk.dhfs.utils.SerializationHelper;
+import com.usatiuk.objects.common.JData;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.io.Serializable;

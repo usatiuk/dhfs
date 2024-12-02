@@ -1,8 +1,8 @@
 package com.usatiuk.dhfs.objects.transaction;
 
-import com.usatiuk.dhfs.objects.JData;
-import com.usatiuk.dhfs.objects.JObjectKey;
-import com.usatiuk.dhfs.objects.ObjectAllocator;
+import com.usatiuk.objects.common.JData;
+import com.usatiuk.objects.common.JObjectKey;
+import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 
 public class TxRecord {
     public interface TxObjectRecord<T> {
@@ -50,7 +50,7 @@ public class TxRecord {
     }
 
     public record TxObjectRecordCopyLock<T extends JData>(TransactionObjectSource.TransactionObject<T> original,
-                                                          ObjectAllocator.ChangeTrackingJData<T> copy)
+                                                                                     ObjectAllocator.ChangeTrackingJData<T> copy)
             implements TxObjectRecordWrite<T> {
         @Override
         public T getIfStrategyCompatible(JObjectKey key, LockingStrategy strategy) {

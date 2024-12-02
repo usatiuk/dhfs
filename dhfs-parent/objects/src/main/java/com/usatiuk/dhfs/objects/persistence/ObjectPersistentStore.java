@@ -1,8 +1,7 @@
 package com.usatiuk.dhfs.objects.persistence;
 
 import com.google.protobuf.ByteString;
-import com.usatiuk.dhfs.objects.JData;
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.common.JObjectKey;
 
 import javax.annotation.Nonnull;
 import java.util.Collection;

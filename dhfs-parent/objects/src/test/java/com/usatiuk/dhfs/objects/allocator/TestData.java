@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects.allocator;
 
-import com.usatiuk.dhfs.objects.JData;
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.common.JData;
+import com.usatiuk.objects.common.JObjectKey;
 
 public abstract class TestData implements JData {
     private boolean _changed = false;

@@ -2,6 +2,8 @@ package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
+import com.usatiuk.objects.common.JData;
+import com.usatiuk.objects.common.JObjectKey;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 

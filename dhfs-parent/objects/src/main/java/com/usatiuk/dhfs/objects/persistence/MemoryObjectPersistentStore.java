@@ -1,8 +1,7 @@
 package com.usatiuk.dhfs.objects.persistence;
 
 import com.google.protobuf.ByteString;
-import com.usatiuk.dhfs.objects.JObjectKey;
-import io.quarkus.arc.lookup.LookupIfProperty;
+import com.usatiuk.objects.common.JObjectKey;
 import io.quarkus.arc.properties.IfBuildProperty;
 import jakarta.enterprise.context.ApplicationScoped;
 
