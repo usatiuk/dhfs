@@ -1,4 +1,7 @@
-package com.usatiuk.dhfs.objects;
+package com.usatiuk.objects.alloc.runtime;
+
+import com.usatiuk.objects.common.JData;
+import com.usatiuk.objects.common.JObjectKey;
 
 public interface ObjectAllocator {
     <T extends JData> T create(Class<T> type, JObjectKey key);

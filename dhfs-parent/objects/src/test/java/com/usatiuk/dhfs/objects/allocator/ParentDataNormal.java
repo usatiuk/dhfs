@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects.allocator;
 
-import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.data.Parent;
+import com.usatiuk.objects.common.JObjectKey;
 import lombok.Getter;
 import lombok.Setter;
 

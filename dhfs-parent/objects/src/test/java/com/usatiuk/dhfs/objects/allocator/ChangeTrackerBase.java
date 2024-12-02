@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects.allocator;
 
-import com.usatiuk.dhfs.objects.JData;
-import com.usatiuk.dhfs.objects.ObjectAllocator;
+import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
+import com.usatiuk.objects.common.JData;
 import lombok.Getter;
 
 import java.io.Serializable;

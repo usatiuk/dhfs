@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.objects.data;
 
-import com.usatiuk.dhfs.objects.JData;
+import com.usatiuk.objects.common.JData;
 
 public interface Kid extends JData {
     String getName();

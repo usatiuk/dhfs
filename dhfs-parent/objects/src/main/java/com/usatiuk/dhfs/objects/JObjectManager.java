@@ -8,6 +8,9 @@ import com.usatiuk.dhfs.objects.transaction.TransactionPrivate;
 import com.usatiuk.dhfs.objects.transaction.TxRecord;
 import com.usatiuk.dhfs.utils.DataLocker;
 import com.usatiuk.dhfs.utils.VoidFn;
+import com.usatiuk.objects.common.JData;
+import com.usatiuk.objects.common.JObjectKey;
+import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -21,7 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-// Manages all access to JData objects.
+// Manages all access to com.usatiuk.objects.common.JData objects.
 // In particular, it serves as a source of truth for what is committed to the backing storage.
 // All data goes through it, it is responsible for transaction atomicity
 @ApplicationScoped

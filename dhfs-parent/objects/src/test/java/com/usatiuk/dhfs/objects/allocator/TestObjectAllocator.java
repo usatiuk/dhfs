@@ -1,10 +1,10 @@
 package com.usatiuk.dhfs.objects.allocator;
 
-import com.usatiuk.dhfs.objects.JData;
-import com.usatiuk.dhfs.objects.JObjectKey;
-import com.usatiuk.dhfs.objects.ObjectAllocator;
+import com.usatiuk.objects.common.JData;
+import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import com.usatiuk.dhfs.objects.data.Kid;
 import com.usatiuk.dhfs.objects.data.Parent;
+import com.usatiuk.objects.common.JObjectKey;
 import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped

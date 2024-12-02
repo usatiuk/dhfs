@@ -1,8 +1,8 @@
 package com.usatiuk.dhfs.objects.transaction;
 
-import com.usatiuk.dhfs.objects.JData;
-import com.usatiuk.dhfs.objects.JObjectKey;
-import com.usatiuk.dhfs.objects.ObjectAllocator;
+import com.usatiuk.objects.common.JData;
+import com.usatiuk.objects.common.JObjectKey;
+import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.AccessLevel;

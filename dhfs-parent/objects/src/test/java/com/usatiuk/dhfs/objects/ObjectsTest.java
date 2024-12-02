@@ -2,6 +2,8 @@ package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.data.Parent;
 import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
+import com.usatiuk.objects.common.JObjectKey;
+import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import io.quarkus.logging.Log;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
