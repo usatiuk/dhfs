@@ -1,21 +1,21 @@
 package com.usatiuk.objects.alloc.it;
 
-import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.is;
-
-import org.junit.jupiter.api.Test;
-
+import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
+import com.usatiuk.objects.common.JObjectKey;
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 @QuarkusTest
 public class ObjectsAllocResourceTest {
+    @Inject
+    ObjectAllocator objectAllocator;
 
     @Test
-    public void testHelloEndpoint() {
-        given()
-                .when().get("/objects-alloc")
-                .then()
-                .statusCode(200)
-                .body(is("Hello objects-alloc"));
+    void testCreateObject() {
+        var newObject = objectAllocator.create(TestJDataEmpty.class, new JObjectKey("TestJDataEmptyKey"));
+        Assertions.assertNotNull(newObject);
+        Assertions.assertEquals("TestJDataEmptyKey", newObject.getKey().name());
     }
 }
