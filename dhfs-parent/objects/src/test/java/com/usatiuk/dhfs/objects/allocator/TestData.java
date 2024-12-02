@@ -1,4 +1,4 @@
-package com.usatiuk.dhfs.objects.test.objs;
+package com.usatiuk.dhfs.objects.allocator;
 
 import com.usatiuk.dhfs.objects.JData;
 import com.usatiuk.dhfs.objects.JObjectKey;

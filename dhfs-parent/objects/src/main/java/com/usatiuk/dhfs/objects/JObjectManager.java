@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.persistence.ObjectPersistentStore;
+import com.usatiuk.dhfs.objects.persistence.TxManifest;
 import com.usatiuk.dhfs.objects.transaction.TransactionFactory;
 import com.usatiuk.dhfs.objects.transaction.TransactionObjectSource;
 import com.usatiuk.dhfs.objects.transaction.TransactionPrivate;
@@ -14,9 +15,7 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import java.lang.ref.Cleaner;
 import java.lang.ref.WeakReference;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -114,7 +113,9 @@ public class JObjectManager {
     };
 
     public TransactionPrivate createTransaction() {
-        return transactionFactory.createTransaction(_txCounter.getAndIncrement(), _objSource);
+        var counter = _txCounter.getAndIncrement();
+        Log.trace("Creating transaction " + counter);
+        return transactionFactory.createTransaction(counter, _objSource);
     }
 
 
@@ -123,8 +124,11 @@ public class JObjectManager {
         var toFlush = new LinkedList<TxRecord.TxObjectRecordWrite<?>>();
         var toLock = new ArrayList<TxRecord.TxObjectRecordCopyNoLock<?>>();
 
+        Log.trace("Committing transaction " + tx.getId());
+
         try {
             for (var entry : tx.drain()) {
+                Log.trace("Processing entry " + entry.toString());
                 switch (entry) {
                     case TxRecord.TxObjectRecordRead<?> read -> {
                         toUnlock.add(read.original().getLock().readLock()::unlock);
@@ -148,7 +152,11 @@ public class JObjectManager {
                 }
             }
 
+            toLock.sort(Comparator.comparingInt(a -> System.identityHashCode(a.original())));
+
             for (var record : toLock) {
+                Log.trace("Locking " + record.toString());
+
                 var found = _objects.get(record.original().getKey());
 
                 if (found.get() != record.original()) {
@@ -160,15 +168,65 @@ public class JObjectManager {
             }
 
             for (var record : toFlush) {
+                Log.trace("Processing flush entry " + record.toString());
+
                 var current = _objects.get(record.copy().wrapped().getKey());
 
+                if (current == null && !(record instanceof TxRecord.TxObjectRecordNew<?>)) {
+                    throw new IllegalStateException("Object not found during transaction");
+                } else if (current != null) {
+                    var old = switch (record) {
+                        case TxRecord.TxObjectRecordCopyLock<?> copy -> copy.original().get();
+                        case TxRecord.TxObjectRecordCopyNoLock<?> copy -> copy.original();
+                        default -> throw new IllegalStateException("Unexpected value: " + record);
+                    };
 
-                assert current == null && record instanceof TxRecord.TxObjectRecordNew<?> || current == record.copy().wrapped();
+                    if (current.get() != old) {
+                        throw new IllegalStateException("Object changed during transaction");
+                    }
 
-                if (current.get() != )
-
+                    if (current.lastWriteTx > tx.getId()) {
+                        throw new IllegalStateException("Transaction race");
+                    }
+                } else if (record instanceof TxRecord.TxObjectRecordNew<?> created) {
+                    var wrapper = new JDataWrapper<>(created.created());
+                    wrapper.lock.writeLock().lock();
+                    var old = _objects.putIfAbsent(created.created().getKey(), wrapper);
+                    if (old != null)
+                        throw new IllegalStateException("Object already exists");
+                    toUnlock.add(wrapper.lock.writeLock()::unlock);
+                } else {
+                    throw new IllegalStateException("Object not found during transaction");
+                }
             }
 
+            // Have all locks now
+            for (var record : toFlush) {
+                Log.trace("Flushing " + record.toString());
+
+                if (!record.copy().isModified())
+                    continue;
+
+                var obj = record.copy().wrapped();
+                var key = obj.getKey();
+                var data = objectSerializer.serialize(obj);
+                objectStorage.writeObject(key, data);
+                _objects.get(key).lastWriteTx = tx.getId(); // FIXME:
+            }
+
+            Log.trace("Flushing transaction " + tx.getId());
+
+            objectStorage.commitTx(new TxManifest() {
+                @Override
+                public List<JObjectKey> getWritten() {
+                    return toFlush.stream().map(r -> r.copy().wrapped().getKey()).toList();
+                }
+
+                @Override
+                public List<JObjectKey> getDeleted() {
+                    return List.of();
+                }
+            });
         } catch (Throwable t) {
             Log.error("Error when committing transaction", t);
             throw t;

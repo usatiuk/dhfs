@@ -8,6 +8,8 @@ import com.usatiuk.dhfs.utils.ByteUtils;
 import com.usatiuk.dhfs.utils.SerializationHelper;
 import com.usatiuk.dhfs.utils.StatusRuntimeExceptionNoStacktrace;
 import io.grpc.Status;
+import io.quarkus.arc.lookup.LookupIfProperty;
+import io.quarkus.arc.properties.IfBuildProperty;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -43,6 +45,7 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 //   rest of metadata
 
 @ApplicationScoped
+@IfBuildProperty(name = "dhfs.objects.persistence", stringValue = "files")
 public class FileObjectPersistentStore implements ObjectPersistentStore {
     private final Path _root;
     private final Path _txManifest;
