@@ -8,9 +8,9 @@ import com.usatiuk.dhfs.objects.transaction.TransactionPrivate;
 import com.usatiuk.dhfs.objects.transaction.TxRecord;
 import com.usatiuk.dhfs.utils.DataLocker;
 import com.usatiuk.dhfs.utils.VoidFn;
+import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import com.usatiuk.objects.common.runtime.JData;
 import com.usatiuk.objects.common.runtime.JObjectKey;
-import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -106,6 +106,43 @@ public class JObjectManager {
             if (got == null) return Optional.empty();
             return Optional.of(new TransactionObjectImpl<>(got.getLeft(), got.getRight().lock));
         }
+
+        private <T extends JData> Optional<TransactionObject<T>> getLocked(Class<T> type, JObjectKey key, boolean write) {
+            var read = get(type, key).orElse(null);
+            if (read == null) return Optional.empty();
+            var lock = write ? read.lock().writeLock() : read.lock().readLock();
+            lock.lock();
+            while (true) {
+                try {
+                    var readAgain = get(type, key).orElse(null);
+                    if (readAgain == null) {
+                        lock.unlock();
+                        return Optional.empty();
+                    }
+                    if (!Objects.equals(read, readAgain)) {
+                        lock.unlock();
+                        read = readAgain;
+                        lock = write ? read.lock().writeLock() : read.lock().readLock();
+                        lock.lock();
+                        continue;
+                    }
+                    return Optional.of(new TransactionObjectImpl<>(read.data(), read.lock()));
+                } catch (Throwable e) {
+                    lock.unlock();
+                    throw e;
+                }
+            }
+        }
+
+        @Override
+        public <T extends JData> Optional<TransactionObject<T>> getReadLocked(Class<T> type, JObjectKey key) {
+            return getLocked(type, key, false);
+        }
+
+        @Override
+        public <T extends JData> Optional<TransactionObject<T>> getWriteLocked(Class<T> type, JObjectKey key) {
+            return getLocked(type, key, true);
+        }
     };
 
     public TransactionPrivate createTransaction() {
@@ -113,7 +150,6 @@ public class JObjectManager {
         Log.trace("Creating transaction " + counter);
         return transactionFactory.createTransaction(counter, _objSource);
     }
-
 
     public void commit(TransactionPrivate tx) {
         var toUnlock = new LinkedList<VoidFn>();
