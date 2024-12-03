@@ -14,4 +14,8 @@ public interface TransactionObjectSource {
     }
 
     <T extends JData> Optional<TransactionObject<T>> get(Class<T> type, JObjectKey key);
+
+    <T extends JData> Optional<TransactionObject<T>> getReadLocked(Class<T> type, JObjectKey key);
+
+    <T extends JData> Optional<TransactionObject<T>> getWriteLocked(Class<T> type, JObjectKey key);
 }

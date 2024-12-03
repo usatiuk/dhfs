@@ -1,8 +1,8 @@
 package com.usatiuk.dhfs.objects.transaction;
 
+import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import com.usatiuk.objects.common.runtime.JData;
 import com.usatiuk.objects.common.runtime.JObjectKey;
-import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.AccessLevel;
@@ -49,9 +49,12 @@ public class TransactionFactoryImpl implements TransactionFactory {
 
             switch (strategy) {
                 case READ_ONLY: {
-                    read.lock().readLock().lock();
-                    var view = objectAllocator.unmodifiable(read.data());
-                    _objects.put(key, new TxRecord.TxObjectRecordRead<>(read, view));
+                    var locked = _source.getReadLocked(type, key).orElse(null);
+                    if (locked == null) {
+                        return Optional.empty();
+                    }
+                    var view = objectAllocator.unmodifiable(locked.data());
+                    _objects.put(key, new TxRecord.TxObjectRecordRead<>(locked, view));
                     return Optional.of(view);
                 }
                 case OPTIMISTIC: {
@@ -60,28 +63,13 @@ public class TransactionFactoryImpl implements TransactionFactory {
                     return Optional.of(copy.wrapped());
                 }
                 case WRITE: {
-                    read.lock().writeLock().lock();
-                    while (true) {
-                        try {
-                            var readAgain = _source.get(type, key).orElse(null);
-                            if (readAgain == null) {
-                                read.lock().writeLock().unlock();
-                                return Optional.empty();
-                            }
-                            if (!Objects.equals(read, readAgain)) {
-                                read.lock().writeLock().unlock();
-                                read = readAgain;
-                                read.lock().writeLock().lock();
-                                continue;
-                            }
-                            var copy = objectAllocator.copy(read.data());
-                            _objects.put(key, new TxRecord.TxObjectRecordCopyLock<>(read, copy));
-                            return Optional.of(copy.wrapped());
-                        } catch (Throwable e) {
-                            read.lock().writeLock().unlock();
-                            throw e;
-                        }
+                    var locked = _source.getWriteLocked(type, key).orElse(null);
+                    if (locked == null) {
+                        return Optional.empty();
                     }
+                    var copy = objectAllocator.copy(locked.data());
+                    _objects.put(key, new TxRecord.TxObjectRecordCopyLock<>(locked, copy));
+                    return Optional.of(copy.wrapped());
                 }
                 default:
                     throw new IllegalArgumentException("Unknown locking strategy");
