@@ -2,7 +2,7 @@ package com.usatiuk.dhfs.objects.persistence;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
-import com.usatiuk.objects.common.JObjectKey;
+import com.usatiuk.objects.common.runtime.JObjectKey;
 import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
 import com.usatiuk.dhfs.utils.ByteUtils;
 import com.usatiuk.dhfs.utils.SerializationHelper;

@@ -1,7 +1,7 @@
 package com.usatiuk.objects.alloc.runtime;
 
-import com.usatiuk.objects.common.JData;
-import com.usatiuk.objects.common.JObjectKey;
+import com.usatiuk.objects.common.runtime.JData;
+import com.usatiuk.objects.common.runtime.JObjectKey;
 
 public interface ObjectAllocator {
     <T extends JData> T create(Class<T> type, JObjectKey key);

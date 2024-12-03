@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects;
 
 import com.google.protobuf.ByteString;
-import com.usatiuk.objects.common.JData;
+import com.usatiuk.objects.common.runtime.JData;
 
 public interface ObjectSerializer<T extends JData> {
     ByteString serialize(T obj);
