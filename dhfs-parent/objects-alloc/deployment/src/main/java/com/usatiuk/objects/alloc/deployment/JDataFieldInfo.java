@@ -1,6 +1,6 @@
 package com.usatiuk.objects.alloc.deployment;
 
-import org.jboss.jandex.Type;
+import org.jboss.jandex.DotName;
 
-public record JDataFieldInfo(String name, Type type) {
+public record JDataFieldInfo(String name, DotName type) {
 }

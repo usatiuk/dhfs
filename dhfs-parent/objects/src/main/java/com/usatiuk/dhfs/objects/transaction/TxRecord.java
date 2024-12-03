@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects.transaction;
 
-import com.usatiuk.objects.common.JData;
-import com.usatiuk.objects.common.JObjectKey;
+import com.usatiuk.objects.common.runtime.JData;
+import com.usatiuk.objects.common.runtime.JObjectKey;
 import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 
 public class TxRecord {

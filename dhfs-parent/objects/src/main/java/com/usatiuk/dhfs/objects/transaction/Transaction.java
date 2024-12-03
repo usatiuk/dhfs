@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects.transaction;
 
-import com.usatiuk.objects.common.JData;
-import com.usatiuk.objects.common.JObjectKey;
+import com.usatiuk.objects.common.runtime.JData;
+import com.usatiuk.objects.common.runtime.JObjectKey;
 
 import java.util.Optional;
 

@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.objects;
 
-import com.usatiuk.objects.common.JData;
+import com.usatiuk.objects.common.runtime.JData;
 
 public interface TxBundle {
     long getId();
