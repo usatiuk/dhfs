@@ -2,10 +2,7 @@ package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.persistence.ObjectPersistentStore;
 import com.usatiuk.dhfs.objects.persistence.TxManifest;
-import com.usatiuk.dhfs.objects.transaction.TransactionFactory;
-import com.usatiuk.dhfs.objects.transaction.TransactionObjectSource;
-import com.usatiuk.dhfs.objects.transaction.TransactionPrivate;
-import com.usatiuk.dhfs.objects.transaction.TxRecord;
+import com.usatiuk.dhfs.objects.transaction.*;
 import com.usatiuk.dhfs.utils.DataLocker;
 import com.usatiuk.dhfs.utils.VoidFn;
 import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
@@ -14,7 +11,6 @@ import com.usatiuk.objects.common.runtime.JObjectKey;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.apache.commons.lang3.tuple.Pair;
 
 import java.lang.ref.Cleaner;
 import java.lang.ref.WeakReference;
@@ -46,7 +42,7 @@ public class JObjectManager {
         private static final Cleaner CLEANER = Cleaner.create();
 
         final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-        long lastWriteTx = 0;
+        long lastWriteTx = -1;
 
         public JDataWrapper(T referent) {
             super(referent);
@@ -55,9 +51,21 @@ public class JObjectManager {
                 _objects.remove(key, this);
             });
         }
+
+        @Override
+        public String toString() {
+            return "JDataWrapper{" +
+                    "ref=" + get() +
+                    ", lock=" + lock +
+                    ", lastWriteTx=" + lastWriteTx +
+                    '}';
+        }
     }
 
-    private <T extends JData> Pair<T, JDataWrapper<T>> get(Class<T> type, JObjectKey key) {
+    private record WrapperRet<T extends JData>(T obj, JDataWrapper<T> wrapper) {
+    }
+
+    private <T extends JData> WrapperRet<T> get(Class<T> type, JObjectKey key) {
         while (true) {
             {
                 var got = _objects.get(key);
@@ -65,7 +73,7 @@ public class JObjectManager {
                 if (got != null) {
                     var ref = got.get();
                     if (type.isInstance(ref)) {
-                        return Pair.of(type.cast(ref), (JDataWrapper<T>) got);
+                        return new WrapperRet<>((T) ref, (JDataWrapper<T>) got);
                     } else if (ref == null) {
                         _objects.remove(key, got);
                     } else {
@@ -82,10 +90,10 @@ public class JObjectManager {
                 var got = objectSerializer.deserialize(read);
 
                 if (type.isInstance(got)) {
-                    var wrapper = new JDataWrapper<T>((T) got);
+                    var wrapper = new JDataWrapper<>((T) got);
                     var old = _objects.putIfAbsent(key, wrapper);
                     if (old != null) continue;
-                    return Pair.of(type.cast(got), wrapper);
+                    return new WrapperRet<>((T) got, wrapper);
                 } else if (got == null) {
                     return null;
                 } else {
@@ -95,60 +103,96 @@ public class JObjectManager {
         }
     }
 
+
+    private <T extends JData> WrapperRet<T> getLocked(Class<T> type, JObjectKey key, boolean write) {
+        var read = get(type, key);
+        if (read == null) return null;
+        var lock = write ? read.wrapper().lock.writeLock() : read.wrapper().lock.readLock();
+        lock.lock();
+        while (true) {
+            try {
+                var readAgain = get(type, key);
+                if (readAgain == null) {
+                    lock.unlock();
+                    return null;
+                }
+                if (!Objects.equals(read, readAgain)) {
+                    lock.unlock();
+                    read = readAgain;
+                    lock = write ? read.wrapper().lock.writeLock() : read.wrapper().lock.readLock();
+                    lock.lock();
+                    continue;
+                }
+                return read;
+            } catch (Throwable e) {
+                lock.unlock();
+                throw e;
+            }
+        }
+    }
+
     private record TransactionObjectImpl<T extends JData>
             (T data, ReadWriteLock lock)
-            implements TransactionObjectSource.TransactionObject<T> {}
+            implements TransactionObjectSource.TransactionObject<T> {
+    }
 
-    private final TransactionObjectSource _objSource = new TransactionObjectSource() {
+    private class TransactionObjectSourceImpl implements TransactionObjectSource {
+        private final long _txId;
+
+        private TransactionObjectSourceImpl(long txId) {
+            _txId = txId;
+        }
+
         @Override
         public <T extends JData> Optional<TransactionObject<T>> get(Class<T> type, JObjectKey key) {
             var got = JObjectManager.this.get(type, key);
             if (got == null) return Optional.empty();
-            return Optional.of(new TransactionObjectImpl<>(got.getLeft(), got.getRight().lock));
-        }
-
-        private <T extends JData> Optional<TransactionObject<T>> getLocked(Class<T> type, JObjectKey key, boolean write) {
-            var read = get(type, key).orElse(null);
-            if (read == null) return Optional.empty();
-            var lock = write ? read.lock().writeLock() : read.lock().readLock();
-            lock.lock();
-            while (true) {
-                try {
-                    var readAgain = get(type, key).orElse(null);
-                    if (readAgain == null) {
-                        lock.unlock();
-                        return Optional.empty();
-                    }
-                    if (!Objects.equals(read, readAgain)) {
-                        lock.unlock();
-                        read = readAgain;
-                        lock = write ? read.lock().writeLock() : read.lock().readLock();
-                        lock.lock();
-                        continue;
-                    }
-                    return Optional.of(new TransactionObjectImpl<>(read.data(), read.lock()));
-                } catch (Throwable e) {
-                    lock.unlock();
-                    throw e;
-                }
-            }
+            return Optional.of(new TransactionObjectImpl<>(got.obj(), got.wrapper().lock));
         }
 
         @Override
         public <T extends JData> Optional<TransactionObject<T>> getReadLocked(Class<T> type, JObjectKey key) {
-            return getLocked(type, key, false);
+            var got = JObjectManager.this.getLocked(type, key, false);
+            if (got == null) return Optional.empty();
+            return Optional.of(new TransactionObjectImpl<>(got.obj(), got.wrapper().lock));
         }
 
         @Override
         public <T extends JData> Optional<TransactionObject<T>> getWriteLocked(Class<T> type, JObjectKey key) {
-            return getLocked(type, key, true);
+            var got = JObjectManager.this.getLocked(type, key, true);
+            if (got == null) return Optional.empty();
+            return Optional.of(new TransactionObjectImpl<>(got.obj(), got.wrapper().lock));
         }
-    };
+
+        @Override
+        public <T extends JData> Optional<TransactionObject<T>> getReadLockedSerializable(Class<T> type, JObjectKey key) {
+            var got = JObjectManager.this.getLocked(type, key, false);
+            if (got == null) return Optional.empty();
+            if (got.wrapper().lastWriteTx >= _txId) {
+                got.wrapper().lock.readLock().unlock();
+                throw new IllegalStateException("Serialization race");
+            }
+            return Optional.of(new TransactionObjectImpl<>(got.obj(), got.wrapper().lock));
+        }
+
+        @Override
+        public <T extends JData> Optional<TransactionObject<T>> getWriteLockedSerializable(Class<T> type, JObjectKey key) {
+            var got = JObjectManager.this.getLocked(type, key, true);
+            if (got == null) return Optional.empty();
+            if (got.wrapper().lastWriteTx >= _txId) {
+                got.wrapper().lock.writeLock().unlock();
+                throw new IllegalStateException("Serialization race");
+            }
+            return Optional.of(new TransactionObjectImpl<>(got.obj(), got.wrapper().lock));
+        }
+    }
+
+    ;
 
     public TransactionPrivate createTransaction() {
         var counter = _txCounter.getAndIncrement();
         Log.trace("Creating transaction " + counter);
-        return transactionFactory.createTransaction(counter, _objSource);
+        return transactionFactory.createTransaction(counter, new TransactionObjectSourceImpl(counter));
     }
 
     public void commit(TransactionPrivate tx) {
@@ -162,10 +206,16 @@ public class JObjectManager {
             for (var entry : tx.drain()) {
                 Log.trace("Processing entry " + entry.toString());
                 switch (entry) {
-                    case TxRecord.TxObjectRecordRead<?> read -> {
-                        toUnlock.add(read.original().lock().readLock()::unlock);
-                    }
+                    case TxRecord.TxObjectRecordRead<?> read -> toUnlock.add(read.original().lock().readLock()::unlock);
+                    case TxRecord.TxObjectRecordReadSerializable<?> read ->
+                            toUnlock.add(read.original().lock().readLock()::unlock);
                     case TxRecord.TxObjectRecordCopyLock<?> copy -> {
+                        toUnlock.add(copy.original().lock().writeLock()::unlock);
+                        if (copy.copy().isModified()) {
+                            toFlush.add(copy);
+                        }
+                    }
+                    case TxRecord.TxObjectRecordCopyLockSerializable<?> copy -> { // FIXME
                         toUnlock.add(copy.original().lock().writeLock()::unlock);
                         if (copy.copy().isModified()) {
                             toFlush.add(copy);
@@ -189,14 +239,17 @@ public class JObjectManager {
             for (var record : toLock) {
                 Log.trace("Locking " + record.toString());
 
-                var found = _objects.get(record.original().getKey());
+                var got = getLocked(record.original().getClass(), record.original().getKey(), true);
 
-                if (found.get() != record.original()) {
-                    throw new IllegalStateException("Object changed during transaction");
+                if (got == null) {
+                    throw new IllegalStateException("Object not found");
                 }
 
-                found.lock.writeLock().lock();
-                toUnlock.add(found.lock.writeLock()::unlock);
+                toUnlock.add(got.wrapper().lock.writeLock()::unlock);
+
+                if (got.obj() != record.original()) {
+                    throw new IllegalStateException("Object changed during transaction");
+                }
             }
 
             for (var record : toFlush) {
@@ -209,15 +262,23 @@ public class JObjectManager {
                 } else if (current != null) {
                     var old = switch (record) {
                         case TxRecord.TxObjectRecordCopyLock<?> copy -> copy.original().data();
+                        case TxRecord.TxObjectRecordCopyLockSerializable<?> copy -> copy.original().data();
                         case TxRecord.TxObjectRecordCopyNoLock<?> copy -> copy.original();
                         default -> throw new IllegalStateException("Unexpected value: " + record);
                     };
 
                     if (current.get() != old) {
+                        assert record instanceof TxRecord.TxObjectRecordCopyNoLock;
                         throw new IllegalStateException("Object changed during transaction");
                     }
 
-                    if (current.lastWriteTx > tx.getId()) {
+                    // In case of NoLock write, the instance is replaced and the following shouldn't happen
+                    // It can happen without serializable writes, as then the read of object to transaction
+                    // can happen after another transaction had read, changed and committed it.
+                    if (record instanceof TxRecord.TxObjectRecordCopyLockSerializable
+                            && current.lastWriteTx > tx.getId()) {
+                        assert false;
+                        // Shouldn't happen as we should check for serialization in the tx object source
                         throw new IllegalStateException("Transaction race");
                     }
 
@@ -241,7 +302,7 @@ public class JObjectManager {
 
             // Have all locks now
             for (var record : toFlush) {
-                Log.trace("Flushing " + record.toString());
+                Log.trace("Flushing " + record.toString() + " " + _objects.get(record.copy().wrapped().getKey()).toString());
 
                 assert record.copy().isModified();
 
