@@ -15,6 +15,11 @@ public class CurrentTransaction implements Transaction {
     TransactionManager transactionManager;
 
     @Override
+    public long getId() {
+        return transactionManager.current().getId();
+    }
+
+    @Override
     public <T extends JData> Optional<T> getObject(Class<T> type, JObjectKey key, LockingStrategy strategy) {
         return transactionManager.current().getObject(type, key, strategy);
     }

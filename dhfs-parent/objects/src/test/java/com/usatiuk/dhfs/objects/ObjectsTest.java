@@ -50,19 +50,19 @@ public class ObjectsTest {
     void createCreateObject() {
         {
             txm.begin();
-            var newParent = alloc.create(Parent.class, new JObjectKey("Parent"));
+            var newParent = alloc.create(Parent.class, new JObjectKey("Parent7"));
             newParent.setLastName("John");
             curTx.putObject(newParent);
             txm.commit();
         }
         Assertions.assertThrows(Exception.class, () -> txm.run(() -> {
-            var newParent = alloc.create(Parent.class, new JObjectKey("Parent"));
+            var newParent = alloc.create(Parent.class, new JObjectKey("Parent7"));
             newParent.setLastName("John2");
             curTx.putObject(newParent);
         }));
         {
             txm.begin();
-            var parent = curTx.getObject(Parent.class, new JObjectKey("Parent")).orElse(null);
+            var parent = curTx.getObject(Parent.class, new JObjectKey("Parent7")).orElse(null);
             Assertions.assertEquals("John", parent.getLastName());
             txm.commit();
         }
