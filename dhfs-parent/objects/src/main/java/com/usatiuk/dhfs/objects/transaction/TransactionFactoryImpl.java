@@ -41,34 +41,47 @@ public class TransactionFactoryImpl implements TransactionFactory {
                 return Optional.of(type.cast(compatible));
             }
 
-            var read = _source.get(type, key).orElse(null);
-
-            if (read == null) {
-                return Optional.empty();
-            }
-
             switch (strategy) {
-                case READ_ONLY: {
-                    var locked = _source.getReadLocked(type, key).orElse(null);
+                case READ:
+                case READ_SERIALIZABLE: {
+                    var locked = strategy == LockingStrategy.READ_SERIALIZABLE
+                            ? _source.getReadLockedSerializable(type, key).orElse(null)
+                            : _source.getReadLocked(type, key).orElse(null);
                     if (locked == null) {
                         return Optional.empty();
                     }
                     var view = objectAllocator.unmodifiable(locked.data());
-                    _objects.put(key, new TxRecord.TxObjectRecordRead<>(locked, view));
+                    _objects.put(key,
+                            strategy == LockingStrategy.READ_SERIALIZABLE
+                                    ? new TxRecord.TxObjectRecordReadSerializable<>(locked, view)
+                                    : new TxRecord.TxObjectRecordRead<>(locked, view)
+                    );
                     return Optional.of(view);
                 }
                 case OPTIMISTIC: {
+                    var read = _source.get(type, key).orElse(null);
+
+                    if (read == null) {
+                        return Optional.empty();
+                    }
                     var copy = objectAllocator.copy(read.data());
                     _objects.put(key, new TxRecord.TxObjectRecordCopyNoLock<>(read.data(), copy));
                     return Optional.of(copy.wrapped());
                 }
-                case WRITE: {
-                    var locked = _source.getWriteLocked(type, key).orElse(null);
+                case WRITE:
+                case WRITE_SERIALIZABLE: {
+                    var locked = strategy == LockingStrategy.WRITE_SERIALIZABLE
+                            ? _source.getWriteLockedSerializable(type, key).orElse(null)
+                            : _source.getWriteLocked(type, key).orElse(null);
                     if (locked == null) {
                         return Optional.empty();
                     }
                     var copy = objectAllocator.copy(locked.data());
-                    _objects.put(key, new TxRecord.TxObjectRecordCopyLock<>(locked, copy));
+                    _objects.put(key,
+                            strategy == LockingStrategy.WRITE_SERIALIZABLE
+                                    ? new TxRecord.TxObjectRecordCopyLockSerializable<>(locked, copy)
+                                    : new TxRecord.TxObjectRecordCopyLock<>(locked, copy)
+                    );
                     return Optional.of(copy.wrapped());
                 }
                 default:

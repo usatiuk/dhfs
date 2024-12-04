@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.dhfs.objects.transaction.TransactionPrivate;
+import com.usatiuk.dhfs.objects.transaction.TxRecord;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -43,6 +44,17 @@ public class TransactionManagerImpl implements TransactionManager {
 
     @Override
     public void rollback() {
+        var tx = _currentTransaction.get();
+        for (var o : tx.drain()) {
+            switch (o) {
+                case TxRecord.TxObjectRecordRead<?> r -> r.original().lock().readLock().unlock();
+                case TxRecord.TxObjectRecordReadSerializable<?> r -> r.original().lock().readLock().unlock();
+                case TxRecord.TxObjectRecordCopyLock<?> r -> r.original().lock().writeLock().unlock();
+                case TxRecord.TxObjectRecordCopyLockSerializable<?> r -> r.original().lock().writeLock().unlock();
+                default -> {
+                }
+            }
+        }
         _currentTransaction.remove();
     }
 

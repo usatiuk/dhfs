@@ -18,7 +18,18 @@ public class TxRecord {
             implements TxObjectRecord<T> {
         @Override
         public T getIfStrategyCompatible(JObjectKey key, LockingStrategy strategy) {
-            if (strategy == LockingStrategy.READ_ONLY)
+            if (strategy == LockingStrategy.READ)
+                return copy;
+            return null;
+        }
+    }
+
+    public record TxObjectRecordReadSerializable<T extends JData>(TransactionObjectSource.TransactionObject<T> original,
+                                                                  T copy)
+            implements TxObjectRecord<T> {
+        @Override
+        public T getIfStrategyCompatible(JObjectKey key, LockingStrategy strategy) {
+            if (strategy == LockingStrategy.READ_SERIALIZABLE)
                 return copy;
             return null;
         }
@@ -50,11 +61,23 @@ public class TxRecord {
     }
 
     public record TxObjectRecordCopyLock<T extends JData>(TransactionObjectSource.TransactionObject<T> original,
-                                                                                     ObjectAllocator.ChangeTrackingJData<T> copy)
+                                                          ObjectAllocator.ChangeTrackingJData<T> copy)
             implements TxObjectRecordWrite<T> {
         @Override
         public T getIfStrategyCompatible(JObjectKey key, LockingStrategy strategy) {
             if (strategy == LockingStrategy.WRITE || strategy == LockingStrategy.OPTIMISTIC)
+                return copy.wrapped();
+            return null;
+        }
+    }
+
+    public record TxObjectRecordCopyLockSerializable<T extends JData>(
+            TransactionObjectSource.TransactionObject<T> original,
+            ObjectAllocator.ChangeTrackingJData<T> copy)
+            implements TxObjectRecordWrite<T> {
+        @Override
+        public T getIfStrategyCompatible(JObjectKey key, LockingStrategy strategy) {
+            if (strategy == LockingStrategy.WRITE_SERIALIZABLE)
                 return copy.wrapped();
             return null;
         }
