@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.objects;
 
+import com.google.common.collect.Streams;
 import com.usatiuk.dhfs.objects.persistence.ObjectPersistentStore;
 import com.usatiuk.dhfs.objects.persistence.TxManifest;
 import com.usatiuk.dhfs.objects.transaction.*;
@@ -42,7 +43,7 @@ public class JObjectManager {
         private static final Cleaner CLEANER = Cleaner.create();
 
         final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-        long lastWriteTx = -1;
+        long lastWriteTx = -1; // FIXME: This should be persistent
 
         public JDataWrapper(T referent) {
             super(referent);
@@ -77,7 +78,7 @@ public class JObjectManager {
                     } else if (ref == null) {
                         _objects.remove(key, got);
                     } else {
-                        throw new IllegalArgumentException("Object type mismatch");
+                        throw new IllegalArgumentException("Object type mismatch: " + ref.getClass() + " vs " + type);
                     }
                 }
             }
@@ -85,7 +86,7 @@ public class JObjectManager {
             //noinspection unused
             try (var readLock = _storageReadLocker.lock(key)) {
                 var read = objectStorage.readObject(key).orElse(null);
-                if (read == null) throw new IllegalArgumentException("Object not found");
+                if (read == null) throw new IllegalArgumentException("Object not found: " + key);
 
                 var got = objectSerializer.deserialize(read);
 
@@ -97,7 +98,7 @@ public class JObjectManager {
                 } else if (got == null) {
                     return null;
                 } else {
-                    throw new IllegalArgumentException("Object type mismatch");
+                    throw new IllegalArgumentException("Object type mismatch: " + got.getClass() + " vs " + type);
                 }
             }
         }
@@ -133,7 +134,7 @@ public class JObjectManager {
 
     private record TransactionObjectImpl<T extends JData>
             (T data, ReadWriteLock lock)
-            implements TransactionObjectSource.TransactionObject<T> {
+            implements TransactionObject<T> {
     }
 
     private class TransactionObjectSourceImpl implements TransactionObjectSource {
@@ -151,32 +152,7 @@ public class JObjectManager {
         }
 
         @Override
-        public <T extends JData> Optional<TransactionObject<T>> getReadLocked(Class<T> type, JObjectKey key) {
-            var got = JObjectManager.this.getLocked(type, key, false);
-            if (got == null) return Optional.empty();
-            return Optional.of(new TransactionObjectImpl<>(got.obj(), got.wrapper().lock));
-        }
-
-        @Override
         public <T extends JData> Optional<TransactionObject<T>> getWriteLocked(Class<T> type, JObjectKey key) {
-            var got = JObjectManager.this.getLocked(type, key, true);
-            if (got == null) return Optional.empty();
-            return Optional.of(new TransactionObjectImpl<>(got.obj(), got.wrapper().lock));
-        }
-
-        @Override
-        public <T extends JData> Optional<TransactionObject<T>> getReadLockedSerializable(Class<T> type, JObjectKey key) {
-            var got = JObjectManager.this.getLocked(type, key, false);
-            if (got == null) return Optional.empty();
-            if (got.wrapper().lastWriteTx >= _txId) {
-                got.wrapper().lock.readLock().unlock();
-                throw new IllegalStateException("Serialization race");
-            }
-            return Optional.of(new TransactionObjectImpl<>(got.obj(), got.wrapper().lock));
-        }
-
-        @Override
-        public <T extends JData> Optional<TransactionObject<T>> getWriteLockedSerializable(Class<T> type, JObjectKey key) {
             var got = JObjectManager.this.getLocked(type, key, true);
             if (got == null) return Optional.empty();
             if (got.wrapper().lastWriteTx >= _txId) {
@@ -187,8 +163,6 @@ public class JObjectManager {
         }
     }
 
-    ;
-
     public TransactionPrivate createTransaction() {
         var counter = _txCounter.getAndIncrement();
         Log.trace("Creating transaction " + counter);
@@ -198,7 +172,9 @@ public class JObjectManager {
     public void commit(TransactionPrivate tx) {
         var toUnlock = new LinkedList<VoidFn>();
         var toFlush = new LinkedList<TxRecord.TxObjectRecordWrite<?>>();
-        var toLock = new ArrayList<TxRecord.TxObjectRecordCopyNoLock<?>>();
+        var toPut = new LinkedList<TxRecord.TxObjectRecordNew<?>>();
+        var toLock = new ArrayList<TxRecord.TxObjectRecordOptimistic<?>>();
+        var dependencies = new LinkedList<TransactionObject<?>>();
 
         Log.trace("Committing transaction " + tx.getId());
 
@@ -206,29 +182,22 @@ public class JObjectManager {
             for (var entry : tx.drain()) {
                 Log.trace("Processing entry " + entry.toString());
                 switch (entry) {
-                    case TxRecord.TxObjectRecordRead<?> read -> toUnlock.add(read.original().lock().readLock()::unlock);
-                    case TxRecord.TxObjectRecordReadSerializable<?> read ->
-                            toUnlock.add(read.original().lock().readLock()::unlock);
                     case TxRecord.TxObjectRecordCopyLock<?> copy -> {
                         toUnlock.add(copy.original().lock().writeLock()::unlock);
+                        dependencies.add(copy.original());
                         if (copy.copy().isModified()) {
                             toFlush.add(copy);
                         }
                     }
-                    case TxRecord.TxObjectRecordCopyLockSerializable<?> copy -> { // FIXME
-                        toUnlock.add(copy.original().lock().writeLock()::unlock);
+                    case TxRecord.TxObjectRecordOptimistic<?> copy -> {
+                        toLock.add(copy);
+                        dependencies.add(copy.original());
                         if (copy.copy().isModified()) {
-                            toFlush.add(copy);
-                        }
-                    }
-                    case TxRecord.TxObjectRecordCopyNoLock<?> copy -> {
-                        if (copy.copy().isModified()) {
-                            toLock.add(copy);
                             toFlush.add(copy);
                         }
                     }
                     case TxRecord.TxObjectRecordNew<?> created -> {
-                        toFlush.add(created);
+                        toPut.add(created);
                     }
                     default -> throw new IllegalStateException("Unexpected value: " + entry);
                 }
@@ -239,86 +208,77 @@ public class JObjectManager {
             for (var record : toLock) {
                 Log.trace("Locking " + record.toString());
 
-                var got = getLocked(record.original().getClass(), record.original().getKey(), true);
+                var got = getLocked(record.original().data().getClass(), record.original().data().getKey(), true);
 
                 if (got == null) {
-                    throw new IllegalStateException("Object not found");
+                    throw new IllegalStateException("Object " + record.original().data().getKey() + " not found");
                 }
 
                 toUnlock.add(got.wrapper().lock.writeLock()::unlock);
 
-                if (got.obj() != record.original()) {
-                    throw new IllegalStateException("Object changed during transaction");
+                if (got.obj() != record.original().data()) {
+                    throw new IllegalStateException("Object changed during transaction: " + got.obj() + " vs " + record.original().data());
                 }
             }
 
-            for (var record : toFlush) {
-                Log.trace("Processing flush entry " + record.toString());
+            for (var dep : dependencies) {
+                Log.trace("Checking dependency " + dep.toString());
+                var current = _objects.get(dep.data().getKey());
 
-                var current = _objects.get(record.copy().wrapped().getKey());
+                if (current.get() != dep.data()) {
+                    throw new IllegalStateException("Object changed during transaction: " + current.get() + " vs " + dep.data());
+                }
 
-                if (current == null && !(record instanceof TxRecord.TxObjectRecordNew<?>)) {
-                    throw new IllegalStateException("Object not found during transaction");
-                } else if (current != null) {
-                    var old = switch (record) {
-                        case TxRecord.TxObjectRecordCopyLock<?> copy -> copy.original().data();
-                        case TxRecord.TxObjectRecordCopyLockSerializable<?> copy -> copy.original().data();
-                        case TxRecord.TxObjectRecordCopyNoLock<?> copy -> copy.original();
-                        default -> throw new IllegalStateException("Unexpected value: " + record);
-                    };
-
-                    if (current.get() != old) {
-                        assert record instanceof TxRecord.TxObjectRecordCopyNoLock;
-                        throw new IllegalStateException("Object changed during transaction");
-                    }
-
-                    // In case of NoLock write, the instance is replaced and the following shouldn't happen
-                    // It can happen without serializable writes, as then the read of object to transaction
-                    // can happen after another transaction had read, changed and committed it.
-                    if (record instanceof TxRecord.TxObjectRecordCopyLockSerializable
-                            && current.lastWriteTx > tx.getId()) {
-                        assert false;
-                        // Shouldn't happen as we should check for serialization in the tx object source
-                        throw new IllegalStateException("Transaction race");
-                    }
-
-                    var newWrapper = new JDataWrapper<>(record.copy().wrapped());
-                    newWrapper.lock.writeLock().lock();
-                    if (!_objects.replace(record.copy().wrapped().getKey(), current, newWrapper)) {
-                        throw new IllegalStateException("Object changed during transaction");
-                    }
-                    toUnlock.add(newWrapper.lock.writeLock()::unlock);
-                } else if (record instanceof TxRecord.TxObjectRecordNew<?> created) {
-                    var wrapper = new JDataWrapper<>(created.created());
-                    wrapper.lock.writeLock().lock();
-                    var old = _objects.putIfAbsent(created.created().getKey(), wrapper);
-                    if (old != null)
-                        throw new IllegalStateException("Object already exists");
-                    toUnlock.add(wrapper.lock.writeLock()::unlock);
-                } else {
-                    throw new IllegalStateException("Object not found during transaction");
+                if (current.lastWriteTx >= tx.getId()) {
+                    throw new IllegalStateException("Serialization hazard: " + current.lastWriteTx + " vs " + tx.getId());
                 }
             }
 
-            // Have all locks now
-            for (var record : toFlush) {
-                Log.trace("Flushing " + record.toString() + " " + _objects.get(record.copy().wrapped().getKey()).toString());
+            for (var put : toPut) {
+                Log.trace("Putting new object " + put.toString());
+                var wrapper = new JDataWrapper<>(put.created());
+                wrapper.lock.writeLock().lock();
+                var old = _objects.putIfAbsent(put.created().getKey(), wrapper);
+                if (old != null)
+                    throw new IllegalStateException("Object already exists: " + old.get());
+                toUnlock.add(wrapper.lock.writeLock()::unlock);
+            }
 
+            for (var record : toFlush) {
+                Log.trace("Flushing changed " + record.toString());
+                var current = _objects.get(record.original().data().getKey());
                 assert record.copy().isModified();
 
-                var obj = record.copy().wrapped();
+                var newWrapper = new JDataWrapper<>(record.copy().wrapped());
+                newWrapper.lock.writeLock().lock();
+                if (!_objects.replace(record.copy().wrapped().getKey(), current, newWrapper)) {
+                    assert false;
+                    throw new IllegalStateException("Object changed during transaction after locking: " + current.get() + " vs " + record.copy().wrapped());
+                }
+                toUnlock.add(newWrapper.lock.writeLock()::unlock);
+            }
+
+            Log.tracef("Flushing transaction %d to storage", tx.getId());
+
+            var written = Streams.concat(toFlush.stream().map(f -> f.copy().wrapped()),
+                    toPut.stream().map(TxRecord.TxObjectRecordNew::created)).toList();
+
+            // Really flushing to storage
+            written.forEach(obj -> {
+                Log.trace("Flushing object " + obj.getKey());
                 var key = obj.getKey();
                 var data = objectSerializer.serialize(obj);
                 objectStorage.writeObject(key, data);
                 _objects.get(key).lastWriteTx = tx.getId(); // FIXME:
-            }
+            });
 
-            Log.trace("Flushing transaction " + tx.getId());
+            Log.tracef("Committing transaction %d to storage", tx.getId());
 
             objectStorage.commitTx(new TxManifest() {
                 @Override
                 public List<JObjectKey> getWritten() {
-                    return toFlush.stream().map(r -> r.copy().wrapped().getKey()).toList();
+                    // FIXME:
+                    return written.stream().map(JData::getKey).toList();
                 }
 
                 @Override

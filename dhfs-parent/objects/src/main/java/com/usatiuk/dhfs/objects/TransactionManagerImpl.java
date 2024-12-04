@@ -47,10 +47,7 @@ public class TransactionManagerImpl implements TransactionManager {
         var tx = _currentTransaction.get();
         for (var o : tx.drain()) {
             switch (o) {
-                case TxRecord.TxObjectRecordRead<?> r -> r.original().lock().readLock().unlock();
-                case TxRecord.TxObjectRecordReadSerializable<?> r -> r.original().lock().readLock().unlock();
                 case TxRecord.TxObjectRecordCopyLock<?> r -> r.original().lock().writeLock().unlock();
-                case TxRecord.TxObjectRecordCopyLockSerializable<?> r -> r.original().lock().writeLock().unlock();
                 default -> {
                 }
             }
