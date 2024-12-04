@@ -12,6 +12,6 @@ public interface Transaction {
     <T extends JData> void putObject(JData obj);
 
     default <T extends JData> Optional<T> getObject(Class<T> type, JObjectKey key) {
-        return getObject(type, key, LockingStrategy.READ);
+        return getObject(type, key, LockingStrategy.OPTIMISTIC);
     }
 }

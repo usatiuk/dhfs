@@ -1,5 +1,6 @@
 package com.usatiuk.objects.alloc.deployment;
 
+import com.usatiuk.objects.alloc.runtime.ChangeTrackingJData;
 import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import com.usatiuk.objects.common.runtime.JData;
 import com.usatiuk.objects.common.runtime.JObjectKey;
@@ -120,7 +121,7 @@ class ObjectsAllocProcessor {
         for (var item : jDataItems) {
             try (ClassCreator classCreator = ClassCreator.builder()
                     .className(getCTClassName(item.klass).toString())
-                    .interfaces(JData.class, ObjectAllocator.ChangeTrackingJData.class)
+                    .interfaces(JData.class, ChangeTrackingJData.class)
                     .interfaces(item.klass.name().toString())
                     .interfaces(Serializable.class)
                     .classOutput(gizmoAdapter)
@@ -192,7 +193,7 @@ class ObjectsAllocProcessor {
         for (var item : jDataItems) {
             try (ClassCreator classCreator = ClassCreator.builder()
                     .className(getImmutableClassName(item.klass).toString())
-                    .interfaces(JData.class, ObjectAllocator.ChangeTrackingJData.class)
+                    .interfaces(JData.class, ChangeTrackingJData.class)
                     .interfaces(item.klass.name().toString())
                     .interfaces(Serializable.class)
                     .classOutput(gizmoAdapter)
@@ -357,7 +358,7 @@ class ObjectsAllocProcessor {
                 methodCreator.throwException(IllegalArgumentException.class, "Unknown type");
             }
 
-            try (MethodCreator methodCreator = classCreator.getMethodCreator("copy", ObjectAllocator.ChangeTrackingJData.class, JData.class)) {
+            try (MethodCreator methodCreator = classCreator.getMethodCreator("copy", ChangeTrackingJData.class, JData.class)) {
                 matchClass(methodCreator, methodCreator.getMethodParam(0), classes, (type, branch, value) -> {
                     branch.returnValue(branch.newInstance(MethodDescriptor.ofConstructor(getCTClassName(type).toString(), type.name().toString()), value));
                 });

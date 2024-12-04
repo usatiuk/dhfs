@@ -9,8 +9,9 @@ import io.quarkus.logging.Log;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
@@ -39,7 +40,29 @@ public class ObjectsTest {
 
         {
             txm.begin();
-            var parent = curTx.getObject(Parent.class, new JObjectKey("Parent"), LockingStrategy.READ).orElse(null);
+            var parent = curTx.getObject(Parent.class, new JObjectKey("Parent")).orElse(null);
+            Assertions.assertEquals("John", parent.getLastName());
+            txm.commit();
+        }
+    }
+
+    @Test
+    void createCreateObject() {
+        {
+            txm.begin();
+            var newParent = alloc.create(Parent.class, new JObjectKey("Parent"));
+            newParent.setLastName("John");
+            curTx.putObject(newParent);
+            txm.commit();
+        }
+        Assertions.assertThrows(Exception.class, () -> txm.run(() -> {
+            var newParent = alloc.create(Parent.class, new JObjectKey("Parent"));
+            newParent.setLastName("John2");
+            curTx.putObject(newParent);
+        }));
+        {
+            txm.begin();
+            var parent = curTx.getObject(Parent.class, new JObjectKey("Parent")).orElse(null);
             Assertions.assertEquals("John", parent.getLastName());
             txm.commit();
         }
@@ -73,7 +96,7 @@ public class ObjectsTest {
 
         {
             txm.begin();
-            var parent = curTx.getObject(Parent.class, new JObjectKey("Parent3"), LockingStrategy.READ).orElse(null);
+            var parent = curTx.getObject(Parent.class, new JObjectKey("Parent3")).orElse(null);
             Assertions.assertEquals("John3", parent.getLastName());
             txm.commit();
         }
@@ -123,7 +146,7 @@ public class ObjectsTest {
         latch.await();
 
         txm.begin();
-        var got = curTx.getObject(Parent.class, new JObjectKey("Parent2"), LockingStrategy.READ).orElse(null);
+        var got = curTx.getObject(Parent.class, new JObjectKey("Parent2")).orElse(null);
         txm.commit();
 
         if (!thread1Failed.get()) {
@@ -136,11 +159,13 @@ public class ObjectsTest {
         }
     }
 
-    @Test
-    void editConflict() throws InterruptedException {
+    @ParameterizedTest
+    @EnumSource(LockingStrategy.class)
+    void editConflict(LockingStrategy strategy) throws InterruptedException {
+        String key = "Parent4" + strategy.name();
         {
             txm.begin();
-            var newParent = alloc.create(Parent.class, new JObjectKey("Parent4"));
+            var newParent = alloc.create(Parent.class, new JObjectKey(key));
             newParent.setLastName("John3");
             curTx.putObject(newParent);
             txm.commit();
@@ -157,7 +182,7 @@ public class ObjectsTest {
                 Log.warn("Thread 1");
                 txm.begin();
                 barrier.await();
-                var parent = curTx.getObject(Parent.class, new JObjectKey("Parent4"), LockingStrategy.OPTIMISTIC).orElse(null);
+                var parent = curTx.getObject(Parent.class, new JObjectKey(key), strategy).orElse(null);
                 parent.setLastName("John");
                 Log.warn("Thread 1 commit");
                 txm.commit();
@@ -172,7 +197,7 @@ public class ObjectsTest {
                 Log.warn("Thread 2");
                 txm.begin();
                 barrier.await();
-                var parent = curTx.getObject(Parent.class, new JObjectKey("Parent4"), LockingStrategy.OPTIMISTIC).orElse(null);
+                var parent = curTx.getObject(Parent.class, new JObjectKey(key), strategy).orElse(null);
                 parent.setLastName("John2");
                 Log.warn("Thread 2 commit");
                 txm.commit();
@@ -186,7 +211,7 @@ public class ObjectsTest {
         latchEnd.await();
 
         txm.begin();
-        var got = curTx.getObject(Parent.class, new JObjectKey("Parent4"), LockingStrategy.READ).orElse(null);
+        var got = curTx.getObject(Parent.class, new JObjectKey(key)).orElse(null);
         txm.commit();
 
         if (!thread1Failed.get()) {
@@ -201,128 +226,6 @@ public class ObjectsTest {
         Assertions.assertTrue(thread1Failed.get() || thread2Failed.get());
     }
 
-    @Test
-    void editLock() throws InterruptedException {
-        {
-            txm.begin();
-            var newParent = alloc.create(Parent.class, new JObjectKey("Parent5"));
-            newParent.setLastName("John3");
-            curTx.putObject(newParent);
-            txm.commit();
-        }
-
-        AtomicBoolean thread1Failed = new AtomicBoolean(true);
-        AtomicBoolean thread2Failed = new AtomicBoolean(true);
-
-        var barrier = new CyclicBarrier(2);
-        var latch = new CountDownLatch(2);
-
-        Just.run(() -> {
-            try {
-                Log.warn("Thread 1");
-                txm.begin();
-                barrier.await();
-                var parent = curTx.getObject(Parent.class, new JObjectKey("Parent5"), LockingStrategy.WRITE).orElse(null);
-                parent.setLastName("John");
-                Log.warn("Thread 1 commit");
-                txm.commit();
-                thread1Failed.set(false);
-                return null;
-            } finally {
-                latch.countDown();
-            }
-        });
-        Just.run(() -> {
-            try {
-                Log.warn("Thread 2");
-                txm.begin();
-                barrier.await();
-                var parent = curTx.getObject(Parent.class, new JObjectKey("Parent5"), LockingStrategy.WRITE).orElse(null);
-                parent.setLastName("John2");
-                Log.warn("Thread 2 commit");
-                txm.commit();
-                thread2Failed.set(false);
-                return null;
-            } finally {
-                latch.countDown();
-            }
-        });
-
-        latch.await();
-
-        txm.begin();
-        var got = curTx.getObject(Parent.class, new JObjectKey("Parent5"), LockingStrategy.READ).orElse(null);
-        txm.commit();
-
-        Assertions.assertTrue(!thread1Failed.get() && !thread2Failed.get());
-        Assertions.assertTrue(got.getLastName().equals("John") || got.getLastName().equals("John2"));
-    }
-
-    @Test
-    @Disabled // Doesn't work as "lastWrittenTx" is not persistent
-    void editLockSerializable() throws InterruptedException {
-        {
-            txm.begin();
-            var newParent = alloc.create(Parent.class, new JObjectKey("Parent6"));
-            newParent.setLastName("John3");
-            curTx.putObject(newParent);
-            txm.commit();
-        }
-
-        AtomicBoolean thread1Failed = new AtomicBoolean(true);
-        AtomicBoolean thread2Failed = new AtomicBoolean(true);
-
-        var barrier = new CyclicBarrier(2);
-        var latchEnd = new CountDownLatch(2);
-
-        Just.run(() -> {
-            try {
-                Log.warn("Thread 1");
-                txm.begin();
-                barrier.await();
-                var parent = curTx.getObject(Parent.class, new JObjectKey("Parent6"), LockingStrategy.WRITE_SERIALIZABLE).orElse(null);
-                parent.setLastName("John");
-                Log.warn("Thread 1 commit");
-                txm.commit();
-                thread1Failed.set(false);
-                return null;
-            } finally {
-                latchEnd.countDown();
-            }
-        });
-        Just.run(() -> {
-            try {
-                Log.warn("Thread 2");
-                txm.begin();
-                barrier.await();
-                var parent = curTx.getObject(Parent.class, new JObjectKey("Parent6"), LockingStrategy.WRITE_SERIALIZABLE).orElse(null);
-                parent.setLastName("John2");
-                Log.warn("Thread 2 commit");
-                txm.commit();
-                thread2Failed.set(false);
-                return null;
-            } finally {
-                latchEnd.countDown();
-            }
-        });
-
-        latchEnd.await();
-
-        txm.begin();
-        var got = curTx.getObject(Parent.class, new JObjectKey("Parent6"), LockingStrategy.READ).orElse(null);
-        txm.commit();
-
-        if (!thread1Failed.get()) {
-            Assertions.assertTrue(thread2Failed.get());
-            Assertions.assertEquals("John", got.getLastName());
-        } else if (!thread2Failed.get()) {
-            Assertions.assertEquals("John2", got.getLastName());
-        } else {
-            Assertions.fail("No thread succeeded");
-        }
-
-        Assertions.assertTrue(thread1Failed.get() || thread2Failed.get());
-    }
 //    }
 //
 //    @Test
