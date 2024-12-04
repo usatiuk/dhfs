@@ -12,6 +12,40 @@ public class ObjectAllocIT {
     @Inject
     ObjectAllocator objectAllocator;
 
+    @Inject
+    DummyVersionProvider dummyVersionProvider;
+
+    @Test
+    void testCreateVersion() {
+        dummyVersionProvider.setVersion(1);
+        var newObject = objectAllocator.create(TestJDataEmpty.class, new JObjectKey("TestJDataEmptyKey"));
+        Assertions.assertNotNull(newObject);
+        Assertions.assertEquals("TestJDataEmptyKey", newObject.getKey().name());
+        Assertions.assertEquals(1, newObject.getVersion());
+    }
+
+    @Test
+    void testCopyVersion() {
+        dummyVersionProvider.setVersion(1);
+        var newObject = objectAllocator.create(TestJDataAssorted.class, new JObjectKey("TestJDataAssorted"));
+        newObject.setLastName("1");
+        Assertions.assertNotNull(newObject);
+        Assertions.assertEquals("TestJDataAssorted", newObject.getKey().name());
+        Assertions.assertEquals(1, newObject.getVersion());
+
+        dummyVersionProvider.setVersion(2);
+        var copyObject = objectAllocator.copy(newObject);
+        Assertions.assertNotNull(copyObject);
+        Assertions.assertFalse(copyObject.isModified());
+        Assertions.assertEquals("1", copyObject.wrapped().getLastName());
+        Assertions.assertEquals(2, copyObject.wrapped().getVersion());
+        Assertions.assertEquals(1, newObject.getVersion());
+        copyObject.wrapped().setLastName("2");
+        Assertions.assertTrue(copyObject.isModified());
+        Assertions.assertEquals("2", copyObject.wrapped().getLastName());
+        Assertions.assertEquals("1", newObject.getLastName());
+    }
+
     @Test
     void testCreateObject() {
         var newObject = objectAllocator.create(TestJDataEmpty.class, new JObjectKey("TestJDataEmptyKey"));

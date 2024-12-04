@@ -3,6 +3,7 @@ package com.usatiuk.objects.alloc.deployment;
 import com.usatiuk.objects.alloc.runtime.ChangeTrackingJData;
 import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import com.usatiuk.objects.common.runtime.JData;
+import com.usatiuk.objects.common.runtime.JDataAllocVersionProvider;
 import com.usatiuk.objects.common.runtime.JObjectKey;
 import io.quarkus.arc.deployment.GeneratedBeanBuildItem;
 import io.quarkus.arc.deployment.GeneratedBeanGizmoAdaptor;
@@ -12,6 +13,7 @@ import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.builditem.ApplicationIndexBuildItem;
 import io.quarkus.deployment.builditem.GeneratedClassBuildItem;
 import io.quarkus.gizmo.*;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.apache.commons.lang3.tuple.Pair;
 import org.jboss.jandex.ClassInfo;
@@ -20,6 +22,7 @@ import org.jboss.jandex.MethodInfo;
 
 import java.io.Serializable;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -41,6 +44,8 @@ class ObjectsAllocProcessor {
     }
 
     private static final String KEY_NAME = "key";
+    private static final String VERSION_NAME = "version";
+    private static final List<String> SPECIAL_FIELDS = List.of(KEY_NAME, VERSION_NAME);
 
     String propNameToFieldName(String name) {
         return name;
@@ -79,35 +84,24 @@ class ObjectsAllocProcessor {
                     .build()) {
 
 
-                var fieldsMap = item.fields.values().stream().map(jDataFieldInfo -> {
-                    var fc = classCreator.getFieldCreator(propNameToFieldName(jDataFieldInfo.name()), jDataFieldInfo.type().toString());
-
-                    if (jDataFieldInfo.name().equals(KEY_NAME)) {
-                        fc.setModifiers(PRIVATE | FINAL);
-                    } else {
-                        fc.setModifiers(PRIVATE);
-                    }
-
-                    try (var getter = classCreator.getMethodCreator(propNameToGetterName(jDataFieldInfo.name()), jDataFieldInfo.type().toString())) {
-                        getter.returnValue(getter.readInstanceField(fc.getFieldDescriptor(), getter.getThis()));
-                    }
-                    return Pair.of(jDataFieldInfo, fc.getFieldDescriptor());
-                }).collect(Collectors.toUnmodifiableMap(Pair::getLeft, Pair::getRight));
+                var fieldsMap = createFields(item, classCreator);
 
                 for (var field : fieldsMap.values()) {
-                    if (field.getName().equals(KEY_NAME)) {
-                        try (var constructor = classCreator.getConstructorCreator(JObjectKey.class)) {
-                            constructor.invokeSpecialMethod(MethodDescriptor.ofConstructor(Object.class), constructor.getThis());
-                            constructor.writeInstanceField(field, constructor.getThis(), constructor.getMethodParam(0));
-                            constructor.returnVoid();
-                        }
-                    } else {
+                    if (!SPECIAL_FIELDS.contains(field.getName())) {
                         try (var setter = classCreator.getMethodCreator(propNameToSetterName(field.getName()), void.class, field.getType())) {
                             setter.writeInstanceField(field, setter.getThis(), setter.getMethodParam(0));
                             setter.returnVoid();
                         }
                     }
                 }
+
+                try (var constructor = classCreator.getConstructorCreator(JObjectKey.class, long.class)) {
+                    constructor.invokeSpecialMethod(MethodDescriptor.ofConstructor(Object.class), constructor.getThis());
+                    constructor.writeInstanceField(fieldsMap.get(KEY_NAME), constructor.getThis(), constructor.getMethodParam(0));
+                    constructor.writeInstanceField(fieldsMap.get(VERSION_NAME), constructor.getThis(), constructor.getMethodParam(1));
+                    constructor.returnVoid();
+                }
+
             }
         }
     }
@@ -146,23 +140,10 @@ class ObjectsAllocProcessor {
                     wrapped.returnValue(wrapped.getThis());
                 }
 
-                var fieldsMap = item.fields.values().stream().map(jDataFieldInfo -> {
-                    var fc = classCreator.getFieldCreator(propNameToFieldName(jDataFieldInfo.name()), jDataFieldInfo.type().toString());
-
-                    if (jDataFieldInfo.name().equals(KEY_NAME)) {
-                        fc.setModifiers(PRIVATE | FINAL);
-                    } else {
-                        fc.setModifiers(PRIVATE);
-                    }
-
-                    try (var getter = classCreator.getMethodCreator(propNameToGetterName(jDataFieldInfo.name()), jDataFieldInfo.type().toString())) {
-                        getter.returnValue(getter.readInstanceField(fc.getFieldDescriptor(), getter.getThis()));
-                    }
-                    return Pair.of(jDataFieldInfo, fc.getFieldDescriptor());
-                }).collect(Collectors.toUnmodifiableMap(Pair::getLeft, Pair::getRight));
+                var fieldsMap = createFields(item, classCreator);
 
                 for (var field : fieldsMap.values()) {
-                    if (!field.getName().equals(KEY_NAME)) {
+                    if (!SPECIAL_FIELDS.contains(field.getName())) {
                         try (var setter = classCreator.getMethodCreator(propNameToSetterName(field.getName()), void.class, field.getType())) {
                             setter.writeInstanceField(field, setter.getThis(), setter.getMethodParam(0));
                             setter.invokeVirtualMethod(MethodDescriptor.ofMethod(classCreator.getClassName(), ON_CHANGE_METHOD_NAME, void.class), setter.getThis());
@@ -171,15 +152,17 @@ class ObjectsAllocProcessor {
                     }
                 }
 
-                try (var constructor = classCreator.getConstructorCreator(item.klass.name().toString())) {
+                try (var constructor = classCreator.getConstructorCreator(item.klass.name().toString(), long.class.getName())) {
                     constructor.invokeSpecialMethod(MethodDescriptor.ofConstructor(Object.class), constructor.getThis());
                     constructor.writeInstanceField(modified.getFieldDescriptor(), constructor.getThis(), constructor.load(false));
                     for (var field : fieldsMap.values()) {
-                        constructor.writeInstanceField(field, constructor.getThis(), constructor.invokeInterfaceMethod(
-                                MethodDescriptor.ofMethod(item.klass.name().toString(), propNameToGetterName(field.getName()), field.getType()),
-                                constructor.getMethodParam(0)
-                        ));
+                        if (!Objects.equals(field.getName(), VERSION_NAME))
+                            constructor.writeInstanceField(field, constructor.getThis(), constructor.invokeInterfaceMethod(
+                                    MethodDescriptor.ofMethod(item.klass.name().toString(), propNameToGetterName(field.getName()), field.getType()),
+                                    constructor.getMethodParam(0)
+                            ));
                     }
+                    constructor.writeInstanceField(fieldsMap.get(VERSION_NAME), constructor.getThis(), constructor.getMethodParam(1));
                     constructor.returnVoid();
                 }
             }
@@ -199,20 +182,7 @@ class ObjectsAllocProcessor {
                     .classOutput(gizmoAdapter)
                     .build()) {
 
-                var fieldsMap = item.fields.values().stream().map(jDataFieldInfo -> {
-                    var fc = classCreator.getFieldCreator(propNameToFieldName(jDataFieldInfo.name()), jDataFieldInfo.type().toString());
-
-                    if (jDataFieldInfo.name().equals(KEY_NAME)) {
-                        fc.setModifiers(PRIVATE | FINAL);
-                    } else {
-                        fc.setModifiers(PRIVATE);
-                    }
-
-                    try (var getter = classCreator.getMethodCreator(propNameToGetterName(jDataFieldInfo.name()), jDataFieldInfo.type().toString())) {
-                        getter.returnValue(getter.readInstanceField(fc.getFieldDescriptor(), getter.getThis()));
-                    }
-                    return Pair.of(jDataFieldInfo, fc.getFieldDescriptor());
-                }).collect(Collectors.toUnmodifiableMap(Pair::getLeft, Pair::getRight));
+                var fieldsMap = createFields(item, classCreator);
 
                 for (var field : fieldsMap.values()) {
                     try (var setter = classCreator.getMethodCreator(propNameToSetterName(field.getName()), void.class, field.getType())) {
@@ -233,6 +203,23 @@ class ObjectsAllocProcessor {
             }
         }
 
+    }
+
+    private Map<String, FieldDescriptor> createFields(JDataInfoBuildItem item, ClassCreator classCreator) {
+        return item.fields.values().stream().map(jDataFieldInfo -> {
+            var fc = classCreator.getFieldCreator(propNameToFieldName(jDataFieldInfo.name()), jDataFieldInfo.type().toString());
+
+            if (SPECIAL_FIELDS.contains(jDataFieldInfo.name())) {
+                fc.setModifiers(PRIVATE | FINAL);
+            } else {
+                fc.setModifiers(PRIVATE);
+            }
+
+            try (var getter = classCreator.getMethodCreator(propNameToGetterName(jDataFieldInfo.name()), jDataFieldInfo.type().toString())) {
+                getter.returnValue(getter.readInstanceField(fc.getFieldDescriptor(), getter.getThis()));
+            }
+            return Pair.of(jDataFieldInfo, fc.getFieldDescriptor());
+        }).collect(Collectors.toUnmodifiableMap(i -> i.getLeft().name(), Pair::getRight));
     }
 
     List<ClassInfo> collectInterfaces(ClassInfo type, ApplicationIndexBuildItem jandex) {
@@ -275,6 +262,7 @@ class ObjectsAllocProcessor {
                 System.out.println("Missing key getter for " + item.jData);
                 // FIXME!: No matter what, I couldn't get JData to get indexed by jandex
                 fields.put(KEY_NAME, new JDataFieldInfo(KEY_NAME, DotName.createSimple(JObjectKey.class)));
+                fields.put(VERSION_NAME, new JDataFieldInfo(VERSION_NAME, DotName.createSimple(long.class)));
             }
 
             // Find pairs of getters and setters
@@ -351,16 +339,25 @@ class ObjectsAllocProcessor {
 
             classCreator.addAnnotation(Singleton.class);
 
+            var versionProvider = classCreator.getFieldCreator("versionProvider", JDataAllocVersionProvider.class);
+            versionProvider.addAnnotation(Inject.class);
+            versionProvider.setModifiers(PUBLIC);
+
+            Function<BytecodeCreator, ResultHandle> loadVersion = (block) -> block.invokeInterfaceMethod(
+                    MethodDescriptor.ofMethod(JDataAllocVersionProvider.class, "getVersion", long.class),
+                    block.readInstanceField(versionProvider.getFieldDescriptor(), block.getThis())
+            );
+
             try (MethodCreator methodCreator = classCreator.getMethodCreator("create", JData.class, Class.class, JObjectKey.class)) {
                 matchClassTag(methodCreator, methodCreator.getMethodParam(0), classes, (type, branch, value) -> {
-                    branch.returnValue(branch.newInstance(MethodDescriptor.ofConstructor(getDataClassName(type).toString(), JObjectKey.class), branch.getMethodParam(1)));
+                    branch.returnValue(branch.newInstance(MethodDescriptor.ofConstructor(getDataClassName(type).toString(), JObjectKey.class, long.class), branch.getMethodParam(1), loadVersion.apply(branch)));
                 });
                 methodCreator.throwException(IllegalArgumentException.class, "Unknown type");
             }
 
             try (MethodCreator methodCreator = classCreator.getMethodCreator("copy", ChangeTrackingJData.class, JData.class)) {
                 matchClass(methodCreator, methodCreator.getMethodParam(0), classes, (type, branch, value) -> {
-                    branch.returnValue(branch.newInstance(MethodDescriptor.ofConstructor(getCTClassName(type).toString(), type.name().toString()), value));
+                    branch.returnValue(branch.newInstance(MethodDescriptor.ofConstructor(getCTClassName(type).toString(), type.name().toString(), long.class.getName()), value, loadVersion.apply(branch)));
                 });
                 methodCreator.throwException(IllegalArgumentException.class, "Unknown type");
             }
