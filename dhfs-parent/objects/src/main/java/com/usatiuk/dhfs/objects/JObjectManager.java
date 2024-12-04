@@ -43,7 +43,6 @@ public class JObjectManager {
         private static final Cleaner CLEANER = Cleaner.create();
 
         final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-        long lastWriteTx = -1; // FIXME: This should be persistent
 
         public JDataWrapper(T referent) {
             super(referent);
@@ -58,7 +57,6 @@ public class JObjectManager {
             return "JDataWrapper{" +
                     "ref=" + get() +
                     ", lock=" + lock +
-                    ", lastWriteTx=" + lastWriteTx +
                     '}';
         }
     }
@@ -155,7 +153,7 @@ public class JObjectManager {
         public <T extends JData> Optional<TransactionObject<T>> getWriteLocked(Class<T> type, JObjectKey key) {
             var got = JObjectManager.this.getLocked(type, key, true);
             if (got == null) return Optional.empty();
-            if (got.wrapper().lastWriteTx >= _txId) {
+            if (got.obj.getVersion() >= _txId) {
                 got.wrapper().lock.writeLock().unlock();
                 throw new IllegalStateException("Serialization race");
             }
@@ -170,7 +168,9 @@ public class JObjectManager {
     }
 
     public void commit(TransactionPrivate tx) {
+        // This also holds the weak references
         var toUnlock = new LinkedList<VoidFn>();
+
         var toFlush = new LinkedList<TxRecord.TxObjectRecordWrite<?>>();
         var toPut = new LinkedList<TxRecord.TxObjectRecordNew<?>>();
         var toLock = new ArrayList<TxRecord.TxObjectRecordOptimistic<?>>();
@@ -223,14 +223,13 @@ public class JObjectManager {
 
             for (var dep : dependencies) {
                 Log.trace("Checking dependency " + dep.toString());
-                var current = _objects.get(dep.data().getKey());
+                var current = _objects.get(dep.data().getKey()).get();
 
-                if (current.get() != dep.data()) {
-                    throw new IllegalStateException("Object changed during transaction: " + current.get() + " vs " + dep.data());
-                }
+                // Checked above
+                assert current == dep.data();
 
-                if (current.lastWriteTx >= tx.getId()) {
-                    throw new IllegalStateException("Serialization hazard: " + current.lastWriteTx + " vs " + tx.getId());
+                if (current.getVersion() >= tx.getId()) {
+                    throw new IllegalStateException("Serialization hazard: " + current.getVersion() + " vs " + tx.getId());
                 }
             }
 
@@ -252,7 +251,7 @@ public class JObjectManager {
                 var newWrapper = new JDataWrapper<>(record.copy().wrapped());
                 newWrapper.lock.writeLock().lock();
                 if (!_objects.replace(record.copy().wrapped().getKey(), current, newWrapper)) {
-                    assert false;
+                    assert false; // Should not happen, as the object is locked
                     throw new IllegalStateException("Object changed during transaction after locking: " + current.get() + " vs " + record.copy().wrapped());
                 }
                 toUnlock.add(newWrapper.lock.writeLock()::unlock);
@@ -266,10 +265,10 @@ public class JObjectManager {
             // Really flushing to storage
             written.forEach(obj -> {
                 Log.trace("Flushing object " + obj.getKey());
+                assert obj.getVersion() == tx.getId();
                 var key = obj.getKey();
                 var data = objectSerializer.serialize(obj);
                 objectStorage.writeObject(key, data);
-                _objects.get(key).lastWriteTx = tx.getId(); // FIXME:
             });
 
             Log.tracef("Committing transaction %d to storage", tx.getId());
