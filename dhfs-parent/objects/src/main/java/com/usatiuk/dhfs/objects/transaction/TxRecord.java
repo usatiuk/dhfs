@@ -9,6 +9,13 @@ public class TxRecord {
         T getIfStrategyCompatible(JObjectKey key, LockingStrategy strategy);
     }
 
+    public record TxObjectRecordMissing<T extends JData>(JObjectKey key) implements TxObjectRecord<T> {
+        @Override
+        public T getIfStrategyCompatible(JObjectKey key, LockingStrategy strategy) {
+            return null;
+        }
+    }
+
     public interface TxObjectRecordWrite<T extends JData> extends TxObjectRecord<T> {
         TransactionObject<T> original();
 

@@ -24,6 +24,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 // Manages all access to com.usatiuk.objects.common.runtime.JData objects.
 // In particular, it serves as a source of truth for what is committed to the backing storage.
 // All data goes through it, it is responsible for transaction atomicity
+// TODO: persistent tx id
 @ApplicationScoped
 public class JObjectManager {
     @Inject
@@ -173,28 +174,26 @@ public class JObjectManager {
 
         var toFlush = new LinkedList<TxRecord.TxObjectRecordWrite<?>>();
         var toPut = new LinkedList<TxRecord.TxObjectRecordNew<?>>();
-        var toLock = new ArrayList<TxRecord.TxObjectRecordOptimistic<?>>();
+        var toLock = new ArrayList<TransactionObject<?>>();
         var dependencies = new LinkedList<TransactionObject<?>>();
 
         Log.trace("Committing transaction " + tx.getId());
 
+        // For existing objects:
+        // Check that their version is not higher than the version of transaction being committed
+        // TODO: check deletions, inserts
+
         try {
-            for (var entry : tx.drain()) {
-                Log.trace("Processing entry " + entry.toString());
+            for (var entry : tx.writes()) {
+                Log.trace("Processing write " + entry.toString());
                 switch (entry) {
                     case TxRecord.TxObjectRecordCopyLock<?> copy -> {
                         toUnlock.add(copy.original().lock().writeLock()::unlock);
-                        dependencies.add(copy.original());
-                        if (copy.copy().isModified()) {
-                            toFlush.add(copy);
-                        }
+                        toFlush.add(copy);
                     }
                     case TxRecord.TxObjectRecordOptimistic<?> copy -> {
-                        toLock.add(copy);
-                        dependencies.add(copy.original());
-                        if (copy.copy().isModified()) {
-                            toFlush.add(copy);
-                        }
+                        toLock.add(copy.original());
+                        toFlush.add(copy);
                     }
                     case TxRecord.TxObjectRecordNew<?> created -> {
                         toPut.add(created);
@@ -203,21 +202,35 @@ public class JObjectManager {
                 }
             }
 
-            toLock.sort(Comparator.comparingInt(a -> System.identityHashCode(a.original())));
+            for (var entry : tx.reads().entrySet()) {
+                Log.trace("Processing read " + entry.toString());
+                switch (entry.getValue()) {
+                    case ReadTrackingObjectSource.TxReadObjectNone<?> none -> {
+                        // TODO: Check this
+                    }
+                    case ReadTrackingObjectSource.TxReadObjectSome<?>(var obj) -> {
+                        toLock.add(obj);
+                        dependencies.add(obj);
+                    }
+                    default -> throw new IllegalStateException("Unexpected value: " + entry);
+                }
+            }
+
+            toLock.sort(Comparator.comparingInt(System::identityHashCode));
 
             for (var record : toLock) {
                 Log.trace("Locking " + record.toString());
 
-                var got = getLocked(record.original().data().getClass(), record.original().data().getKey(), true);
+                var got = getLocked(record.data().getClass(), record.data().getKey(), true);
 
                 if (got == null) {
-                    throw new IllegalStateException("Object " + record.original().data().getKey() + " not found");
+                    throw new IllegalStateException("Object " + record.data().getKey() + " not found");
                 }
 
                 toUnlock.add(got.wrapper().lock.writeLock()::unlock);
 
-                if (got.obj() != record.original().data()) {
-                    throw new IllegalStateException("Object changed during transaction: " + got.obj() + " vs " + record.original().data());
+                if (got.obj() != record.data()) {
+                    throw new IllegalStateException("Object changed during transaction: " + got.obj() + " vs " + record.data());
                 }
             }
 
@@ -244,9 +257,13 @@ public class JObjectManager {
             }
 
             for (var record : toFlush) {
+                if (!record.copy().isModified()) {
+                    Log.trace("Not changed " + record.toString());
+                    continue;
+                }
+
                 Log.trace("Flushing changed " + record.toString());
                 var current = _objects.get(record.original().data().getKey());
-                assert record.copy().isModified();
 
                 var newWrapper = new JDataWrapper<>(record.copy().wrapped());
                 newWrapper.lock.writeLock().lock();

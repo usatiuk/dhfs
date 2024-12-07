@@ -18,13 +18,13 @@ public class TransactionFactoryImpl implements TransactionFactory {
     private class TransactionImpl implements TransactionPrivate {
         @Getter(AccessLevel.PUBLIC)
         private final long _id;
-        private final TransactionObjectSource _source;
+        private final ReadTrackingObjectSource _source;
 
         private final Map<JObjectKey, TxRecord.TxObjectRecord<?>> _objects = new HashMap<>();
 
         private TransactionImpl(long id, TransactionObjectSource source) {
             _id = id;
-            _source = source;
+            _source = new ReadTrackingObjectSource(source);
         }
 
         @Override
@@ -75,8 +75,13 @@ public class TransactionFactoryImpl implements TransactionFactory {
         }
 
         @Override
-        public Collection<TxRecord.TxObjectRecord<?>> drain() {
+        public Collection<TxRecord.TxObjectRecord<?>> writes() {
             return Collections.unmodifiableCollection(_objects.values());
+        }
+
+        @Override
+        public Map<JObjectKey, ReadTrackingObjectSource.TxReadObject<?>> reads() {
+            return _source.getRead();
         }
     }
 

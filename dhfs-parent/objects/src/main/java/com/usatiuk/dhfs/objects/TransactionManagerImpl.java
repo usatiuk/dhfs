@@ -45,7 +45,7 @@ public class TransactionManagerImpl implements TransactionManager {
     @Override
     public void rollback() {
         var tx = _currentTransaction.get();
-        for (var o : tx.drain()) {
+        for (var o : tx.writes()) {
             switch (o) {
                 case TxRecord.TxObjectRecordCopyLock<?> r -> r.original().lock().writeLock().unlock();
                 default -> {
