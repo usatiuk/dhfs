@@ -13,6 +13,10 @@ public interface TransactionManager {
     void rollback();
 
     default <T> T run(Supplier<T> supplier) {
+        if (current() != null) {
+            return supplier.get();
+        }
+
         begin();
         try {
             var ret = supplier.get();
@@ -25,6 +29,11 @@ public interface TransactionManager {
     }
 
     default void run(VoidFn fn) {
+        if (current() != null) {
+            fn.apply();
+            return;
+        }
+
         begin();
         try {
             fn.apply();

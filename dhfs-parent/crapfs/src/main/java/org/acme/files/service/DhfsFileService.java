@@ -72,6 +72,7 @@ public class DhfsFileService {
 
         return txm.run(() -> {
             var file = alloc.create(File.class, new JObjectKey(path));
+            file.setChunks(new TreeMap<>());
             curTx.putObject(file);
             return Optional.of(path);
         });

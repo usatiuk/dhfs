@@ -13,6 +13,7 @@ import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.io.Serializable;
 import java.lang.ref.Cleaner;
 import java.lang.ref.WeakReference;
 import java.util.*;
@@ -85,7 +86,7 @@ public class JObjectManager {
             //noinspection unused
             try (var readLock = _storageReadLocker.lock(key)) {
                 var read = objectStorage.readObject(key).orElse(null);
-                if (read == null) throw new IllegalArgumentException("Object not found: " + key);
+                if (read == null) return null;
 
                 var got = objectSerializer.deserialize(read);
 
@@ -166,6 +167,27 @@ public class JObjectManager {
         var counter = _txCounter.getAndIncrement();
         Log.trace("Creating transaction " + counter);
         return transactionFactory.createTransaction(counter, new TransactionObjectSourceImpl(counter));
+    }
+
+    // FIXME:
+    private static class SimpleTxManifest implements Serializable, TxManifest {
+        private final List<JObjectKey> _written;
+        private final List<JObjectKey> _deleted;
+
+        public SimpleTxManifest(List<JObjectKey> written, List<JObjectKey> deleted) {
+            _written = written;
+            _deleted = deleted;
+        }
+
+        @Override
+        public List<JObjectKey> getWritten() {
+            return _written;
+        }
+
+        @Override
+        public List<JObjectKey> getDeleted() {
+            return _deleted;
+        }
     }
 
     public void commit(TransactionPrivate tx) {
@@ -290,18 +312,7 @@ public class JObjectManager {
 
             Log.tracef("Committing transaction %d to storage", tx.getId());
 
-            objectStorage.commitTx(new TxManifest() {
-                @Override
-                public List<JObjectKey> getWritten() {
-                    // FIXME:
-                    return written.stream().map(JData::getKey).toList();
-                }
-
-                @Override
-                public List<JObjectKey> getDeleted() {
-                    return List.of();
-                }
-            });
+            objectStorage.commitTx(new SimpleTxManifest(written.stream().map(JData::getKey).toList(), Collections.emptyList()));
         } catch (Throwable t) {
             Log.error("Error when committing transaction", t);
             throw t;
