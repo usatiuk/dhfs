@@ -19,7 +19,6 @@
         <module>utils</module>
         <module>objects-alloc</module>
         <module>objects-common</module>
-        <module>crapfs</module>
     </modules>
 
     <properties>
