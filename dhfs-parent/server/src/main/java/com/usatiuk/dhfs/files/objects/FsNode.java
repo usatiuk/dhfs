@@ -1,43 +1,19 @@
 package com.usatiuk.dhfs.files.objects;
 
-import com.usatiuk.dhfs.objects.jrepository.JObjectData;
-import lombok.Getter;
-import lombok.Setter;
+import com.usatiuk.objects.common.runtime.JData;
 
-import java.io.Serial;
-import java.util.UUID;
+import java.io.Serializable;
 
-public abstract class FsNode extends JObjectData {
-    @Serial
-    private static final long serialVersionUID = 1;
+public interface FsNode extends JData, Serializable {
+    long getMode();
 
-    @Getter
-    final UUID _uuid;
-    @Getter
-    @Setter
-    private long _mode;
-    @Getter
-    @Setter
-    private long _ctime;
-    @Getter
-    @Setter
-    private long _mtime;
+    void setMode(long mode);
 
-    protected FsNode(UUID uuid) {
-        this._uuid = uuid;
-        this._ctime = System.currentTimeMillis();
-        this._mtime = this._ctime;
-    }
+    long getCtime();
 
-    protected FsNode(UUID uuid, long mode) {
-        this._uuid = uuid;
-        this._mode = mode;
-        this._ctime = System.currentTimeMillis();
-        this._mtime = this._ctime;
-    }
+    void setCtime(long ctime);
 
-    @Override
-    public String getName() {
-        return _uuid.toString();
-    }
+    long getMtime();
+
+    void setMtime(long mtime);
 }

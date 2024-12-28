@@ -3,49 +3,49 @@ package com.usatiuk.dhfs.files.service;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.files.objects.File;
-import com.usatiuk.dhfs.objects.jrepository.JObject;
+import com.usatiuk.objects.common.runtime.JObjectKey;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.Optional;
 
 public interface DhfsFileService {
-    Optional<String> open(String name);
+    Optional<JObjectKey> open(String name);
 
-    Optional<String> create(String name, long mode);
+    Optional<JObjectKey> create(String name, long mode);
 
-    Pair<String, String> inoToParent(String ino);
+    Pair<String, JObjectKey> inoToParent(JObjectKey ino);
 
     void mkdir(String name, long mode);
 
-    Optional<GetattrRes> getattr(String name);
+    Optional<GetattrRes> getattr(JObjectKey name);
 
-    Boolean chmod(String name, long mode);
+    Boolean chmod(JObjectKey name, long mode);
 
     void unlink(String name);
 
     Boolean rename(String from, String to);
 
-    Boolean setTimes(String fileUuid, long atimeMs, long mtimeMs);
+    Boolean setTimes(JObjectKey fileUuid, long atimeMs, long mtimeMs);
 
     Iterable<String> readDir(String name);
 
-    void updateFileSize(JObject<File> file);
+    void updateFileSize(File file);
 
-    Long size(String f);
+    Long size(JObjectKey f);
 
-    Optional<ByteString> read(String fileUuid, long offset, int length);
+    Optional<ByteString> read(JObjectKey fileUuid, long offset, int length);
 
-    Long write(String fileUuid, long offset, ByteString data);
+    Long write(JObjectKey fileUuid, long offset, ByteString data);
 
-    default Long write(String fileUuid, long offset, byte[] data) {
+    default Long write(JObjectKey fileUuid, long offset, byte[] data) {
         return write(fileUuid, offset, UnsafeByteOperations.unsafeWrap(data));
     }
 
-    Boolean truncate(String fileUuid, long length);
+    Boolean truncate(JObjectKey fileUuid, long length);
 
-    String readlink(String uuid);
+    String readlink(JObjectKey uuid);
 
-    ByteString readlinkBS(String uuid);
+    ByteString readlinkBS(JObjectKey uuid);
 
-    String symlink(String oldpath, String newpath);
+    JObjectKey symlink(String oldpath, String newpath);
 }

@@ -154,7 +154,7 @@ class ObjectsAllocProcessor {
 
                 try (var constructor = classCreator.getConstructorCreator(item.klass.name().toString(), long.class.getName())) {
                     constructor.invokeSpecialMethod(MethodDescriptor.ofConstructor(Object.class), constructor.getThis());
-                    constructor.writeInstanceField(modified.getFieldDescriptor(), constructor.getThis(), constructor.load(false));
+                    constructor.writeInstanceField(modified.getFieldDescriptor(), constructor.getThis(), constructor.load(true)); // FIXME:
                     for (var field : fieldsMap.values()) {
                         if (!Objects.equals(field.getName(), VERSION_NAME))
                             constructor.writeInstanceField(field, constructor.getThis(), constructor.invokeInterfaceMethod(
@@ -239,6 +239,7 @@ class ObjectsAllocProcessor {
     Map<String, MethodInfo> collectMethods(List<ClassInfo> types) {
         return types.stream()
                 .flatMap(x -> x.methods().stream())
+                .filter(x -> x.name().startsWith("get") || x.name().startsWith("set"))
                 .collect(Collectors.toMap(MethodInfo::name, x -> x));
     }
 

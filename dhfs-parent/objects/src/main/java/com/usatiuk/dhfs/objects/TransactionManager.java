@@ -44,6 +44,13 @@ public interface TransactionManager {
         }
     }
 
+    default void executeTx(VoidFn fn) {
+        run(fn);
+    }
+
+    default <T> T executeTx(Supplier<T> supplier) {
+        return run(supplier);
+    }
 
     Transaction current();
 }

@@ -1,13 +1,12 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree;
 
-import com.usatiuk.dhfs.objects.repository.opsupport.Op;
 import lombok.Getter;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
-public class JKleppmannTreePeriodicPushOp implements Op {
+public class JKleppmannTreePeriodicPushOp  {
     @Getter
     private final UUID _from;
     @Getter
@@ -18,8 +17,8 @@ public class JKleppmannTreePeriodicPushOp implements Op {
         _timestamp = timestamp;
     }
 
-    @Override
-    public Collection<String> getEscapedRefs() {
-        return List.of();
-    }
+//    @Override
+//    public Collection<String> getEscapedRefs() {
+//        return List.of();
+//    }
 }

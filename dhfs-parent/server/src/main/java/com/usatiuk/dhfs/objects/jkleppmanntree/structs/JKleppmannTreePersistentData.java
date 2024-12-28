@@ -1,88 +1,53 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
-import com.usatiuk.dhfs.objects.jrepository.JObjectData;
-import com.usatiuk.dhfs.objects.jrepository.OnlyLocal;
-import com.usatiuk.dhfs.objects.repository.ConflictResolver;
 import com.usatiuk.kleppmanntree.AtomicClock;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
 import com.usatiuk.kleppmanntree.LogRecord;
 import com.usatiuk.kleppmanntree.OpMove;
-import lombok.Getter;
+import com.usatiuk.objects.common.runtime.JData;
+import com.usatiuk.objects.common.runtime.JObjectKey;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.TreeMap;
+import java.util.UUID;
 
-@OnlyLocal
-public class JKleppmannTreePersistentData extends JObjectData {
-    private final String _treeName;
-    @Getter
-    private final AtomicClock _clock;
-    @Getter
-    private final HashMap<UUID, TreeMap<CombinedTimestamp<Long, UUID>, OpMove<Long, UUID, JKleppmannTreeNodeMeta, String>>> _queues;
-    @Getter
-    private final HashMap<UUID, Long> _peerTimestampLog;
-    @Getter
-    private final TreeMap<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, String>> _log;
+public interface JKleppmannTreePersistentData extends JData {
+    AtomicClock getClock();
 
-    public JKleppmannTreePersistentData(String treeName, AtomicClock clock,
-                                        HashMap<UUID, TreeMap<CombinedTimestamp<Long, UUID>, OpMove<Long, UUID, JKleppmannTreeNodeMeta, String>>> queues,
-                                        HashMap<UUID, Long> peerTimestampLog, TreeMap<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, String>> log) {
-        _treeName = treeName;
-        _clock = clock;
-        _queues = queues;
-        _peerTimestampLog = peerTimestampLog;
-        _log = log;
+    void setClock(AtomicClock clock);
+
+    HashMap<UUID, TreeMap<CombinedTimestamp<Long, UUID>, OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>>> getQueues();
+
+    void setQueues(HashMap<UUID, TreeMap<CombinedTimestamp<Long, UUID>, OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>>> queues);
+
+    HashMap<UUID, Long> getPeerTimestampLog();
+
+    void setPeerTimestampLog(HashMap<UUID, Long> peerTimestampLog);
+
+    TreeMap<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>> getLog();
+
+    void setLog(TreeMap<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>> log);
+
+    default void recordOp(UUID host, OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> opMove) {
+        getQueues().computeIfAbsent(host, h -> new TreeMap<>());
+        getQueues().get(host).put(opMove.timestamp(), opMove);
     }
 
-    public JKleppmannTreePersistentData(String treeName) {
-        _treeName = treeName;
-        _clock = new AtomicClock(1);
-        _queues = new HashMap<>();
-        _peerTimestampLog = new HashMap<>();
-        _log = new TreeMap<>();
+    default void removeOp(UUID host, OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> opMove) {
+        getQueues().get(host).remove(opMove.timestamp(), opMove);
     }
 
-    public static String nameFromTreeName(String treeName) {
-        return treeName + "_pd";
-    }
-
-    public void recordOp(UUID host, OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> opMove) {
-        _queues.computeIfAbsent(host, h -> new TreeMap<>());
-        _queues.get(host).put(opMove.timestamp(), opMove);
-    }
-
-    public void removeOp(UUID host, OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> opMove) {
-        _queues.get(host).remove(opMove.timestamp(), opMove);
-    }
-
-    public void recordOp(Collection<UUID> hosts, OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> opMove) {
+    default void recordOp(Collection<UUID> hosts, OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> opMove) {
         for (var u : hosts) {
             recordOp(u, opMove);
         }
     }
 
-    public void removeOp(Collection<UUID> hosts, OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> opMove) {
+    default void removeOp(Collection<UUID> hosts, OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> opMove) {
         for (var u : hosts) {
             removeOp(u, opMove);
         }
     }
 
-
-    @Override
-    public String getName() {
-        return nameFromTreeName(_treeName);
-    }
-
-    public String getTreeName() {
-        return _treeName;
-    }
-
-    @Override
-    public Class<? extends ConflictResolver> getConflictResolver() {
-        return null;
-    }
-
-    @Override
-    public Collection<String> extractRefs() {
-        return List.of();
-    }
 }

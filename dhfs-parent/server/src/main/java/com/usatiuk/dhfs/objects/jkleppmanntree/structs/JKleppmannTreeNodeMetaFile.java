@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
 import com.usatiuk.autoprotomap.runtime.ProtoMirror;
 import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeNodeMetaFileP;
+import com.usatiuk.objects.common.runtime.JObjectKey;
 import lombok.Getter;
 
 import java.util.Objects;
@@ -9,9 +10,9 @@ import java.util.Objects;
 @ProtoMirror(JKleppmannTreeNodeMetaFileP.class)
 public class JKleppmannTreeNodeMetaFile extends JKleppmannTreeNodeMeta {
     @Getter
-    private final String _fileIno;
+    private final JObjectKey _fileIno;
 
-    public JKleppmannTreeNodeMetaFile(String name, String fileIno) {
+    public JKleppmannTreeNodeMetaFile(String name, JObjectKey fileIno) {
         super(name);
         _fileIno = fileIno;
     }

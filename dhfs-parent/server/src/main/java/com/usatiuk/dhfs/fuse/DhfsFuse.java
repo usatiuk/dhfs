@@ -5,7 +5,6 @@ import com.sun.security.auth.module.UnixSystem;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
 import com.usatiuk.dhfs.files.service.DirectoryNotEmptyException;
 import com.usatiuk.dhfs.files.service.GetattrRes;
-import com.usatiuk.dhfs.objects.repository.persistence.ObjectPersistentStore;
 import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
 import com.usatiuk.kleppmanntree.AlreadyExistsException;
 import io.grpc.Status;
@@ -38,8 +37,6 @@ import static jnr.posix.FileStat.*;
 public class DhfsFuse extends FuseStubFS {
     private static final int blksize = 1048576;
     private static final int iosize = 1048576;
-    @Inject
-    ObjectPersistentStore persistentStore; // FIXME?
     @ConfigProperty(name = "dhfs.fuse.root")
     String root;
     @ConfigProperty(name = "dhfs.fuse.enabled")
@@ -100,9 +97,10 @@ public class DhfsFuse extends FuseStubFS {
         try {
             stbuf.f_frsize.set(blksize);
             stbuf.f_bsize.set(blksize);
-            stbuf.f_blocks.set(persistentStore.getTotalSpace() / blksize); // total data blocks in file system
-            stbuf.f_bfree.set(persistentStore.getFreeSpace() / blksize);  // free blocks in fs
-            stbuf.f_bavail.set(persistentStore.getUsableSpace() / blksize); // avail blocks in fs
+            // FIXME:
+            stbuf.f_blocks.set(1024 * 1024 * 1024 / blksize); // total data blocks in file system
+            stbuf.f_bfree.set(1024 * 1024 * 1024 / blksize);  // free blocks in fs
+            stbuf.f_bavail.set(1024 * 1024 * 1024 / blksize); // avail blocks in fs
             stbuf.f_files.set(1000); //FIXME:
             stbuf.f_ffree.set(Integer.MAX_VALUE - 2000); //FIXME:
             stbuf.f_favail.set(Integer.MAX_VALUE - 2000); //FIXME:

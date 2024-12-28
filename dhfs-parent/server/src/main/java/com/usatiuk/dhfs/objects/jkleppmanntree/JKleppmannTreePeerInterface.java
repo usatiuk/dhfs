@@ -1,25 +1,21 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree;
 
-import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.kleppmanntree.PeerInterface;
-import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 @Singleton
 public class JKleppmannTreePeerInterface implements PeerInterface<UUID> {
-    @Inject
-    PersistentPeerDataService persistentPeerDataService;
-
     @Override
     public UUID getSelfId() {
-        return persistentPeerDataService.getSelfUuid();
+        return UUID.nameUUIDFromBytes("1".getBytes());
     }
 
     @Override
     public Collection<UUID> getAllPeers() {
-        return persistentPeerDataService.getHostUuidsAndSelf();
+        return List.of(getSelfId());
     }
 }
