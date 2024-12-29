@@ -42,6 +42,7 @@ public class JKleppmannTreeManager {
                 data.setQueues(new HashMap<>());
                 data.setLog(new TreeMap<>());
                 data.setPeerTimestampLog(new HashMap<>());
+                data.setFrozen(true);
                 curTx.put(data);
             }
             return new JKleppmannTree(data);
@@ -81,8 +82,8 @@ public class JKleppmannTreeManager {
             _tree.move(newParent, newMeta, node);
         }
 
-        public void trash(JKleppmannTreeNodeMeta newMeta, JObjectKey node) {
-            _tree.move(_storageInterface.getTrashId(), newMeta.withName(node.name()), node);
+        public void trash(JKleppmannTreeNodeMeta newMeta, JObjectKey nodeKey) {
+            _tree.move(_storageInterface.getTrashId(), newMeta.withName(nodeKey.toString()), nodeKey);
         }
 
 //        @Override

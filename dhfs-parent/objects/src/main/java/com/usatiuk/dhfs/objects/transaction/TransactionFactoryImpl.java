@@ -82,25 +82,26 @@ public class TransactionFactoryImpl implements TransactionFactory {
                         _newObjects.remove(key);
                     }
                     case TxRecord.TxObjectRecordCopyLock<?> copyLockRecord -> {
-                        _objects.put(key, new TxRecord.TxObjectRecordDeleted<>(copyLockRecord.original()));
-                        _newObjects.put(key, new TxRecord.TxObjectRecordDeleted<>(copyLockRecord.original()));
+                        _objects.put(key, new TxRecord.TxObjectRecordDeleted<>(copyLockRecord));
+                        _newObjects.put(key, new TxRecord.TxObjectRecordDeleted<>(copyLockRecord));
                     }
                     case TxRecord.TxObjectRecordOptimistic<?> optimisticRecord -> {
-                        _objects.put(key, new TxRecord.TxObjectRecordDeleted<>(optimisticRecord.original()));
-                        _newObjects.put(key, new TxRecord.TxObjectRecordDeleted<>(optimisticRecord.original()));
+                        _objects.put(key, new TxRecord.TxObjectRecordDeleted<>(optimisticRecord));
+                        _newObjects.put(key, new TxRecord.TxObjectRecordDeleted<>(optimisticRecord));
                     }
                     case TxRecord.TxObjectRecordDeleted<?> deletedRecord -> {
                         return;
                     }
                     default -> throw new IllegalStateException("Unexpected value: " + got);
                 }
+                return;
             }
 
             var read = _source.get(JData.class, key).orElse(null);
             if (read == null) {
                 return;
             }
-            _objects.put(key, new TxRecord.TxObjectRecordDeleted<>(read));
+            _objects.put(key, new TxRecord.TxObjectRecordDeleted<>(read)); // FIXME:
             _newObjects.put(key, new TxRecord.TxObjectRecordDeleted<>(read));
         }
 

@@ -11,6 +11,10 @@ public interface JDataRefcounted extends JData {
 
     void setRefsFrom(Collection<JObjectKey> refs);
 
+    boolean getFrozen();
+
+    void setFrozen(boolean frozen);
+
     default Collection<JObjectKey> collectRefsTo() {
         return List.of();
     }

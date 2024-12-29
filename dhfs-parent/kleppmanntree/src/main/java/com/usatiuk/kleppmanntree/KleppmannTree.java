@@ -375,7 +375,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
 
                         newParentNode.getNode().getChildren().put(effect.newMeta().getName(), effect.childId());
                         if (effect.newParentId().equals(_storage.getTrashId()) &&
-                                !Objects.equals(effect.newMeta().getName(), effect.childId()))
+                                !Objects.equals(effect.newMeta().getName(), effect.childId().toString()))
                             throw new IllegalArgumentException("Move to trash should have id of node as name");
                         node.getNode().setParent(effect.newParentId());
                         node.getNode().setMeta(effect.newMeta());

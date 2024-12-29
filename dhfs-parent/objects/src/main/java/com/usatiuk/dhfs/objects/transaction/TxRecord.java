@@ -35,7 +35,8 @@ public class TxRecord {
         }
     }
 
-    public record TxObjectRecordDeleted<T extends JData>(TransactionObject<T> original) implements TxObjectRecord<T> {
+    public record TxObjectRecordDeleted<T extends JData>(TransactionObject<T> original,
+                                                         T current) implements TxObjectRecord<T> {
         @Override
         public T getIfStrategyCompatible(JObjectKey key, LockingStrategy strategy) {
             return null;
@@ -44,6 +45,14 @@ public class TxRecord {
         @Override
         public JObjectKey getKey() {
             return original.data().getKey();
+        }
+
+        public TxObjectRecordDeleted(TxObjectRecordWrite<T> original) {
+            this(original.original(), original.copy().wrapped());
+        }
+
+        public TxObjectRecordDeleted(TransactionObject<T> original) {
+            this(original, original.data());
         }
     }
 

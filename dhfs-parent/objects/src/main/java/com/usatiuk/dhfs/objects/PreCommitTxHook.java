@@ -12,4 +12,8 @@ public interface PreCommitTxHook {
 
     default void onDelete(JObjectKey key, JData cur) {
     }
+
+    default int getPriority() {
+        return 0;
+    }
 }

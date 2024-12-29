@@ -37,8 +37,12 @@ public class JObjectManager {
     ObjectAllocator objectAllocator;
     @Inject
     TransactionFactory transactionFactory;
-    @Inject
-    Instance<PreCommitTxHook> preCommitTxHooks;
+
+    private final List<PreCommitTxHook> _preCommitTxHooks;
+
+    JObjectManager(Instance<PreCommitTxHook> preCommitTxHooks) {
+        _preCommitTxHooks = preCommitTxHooks.stream().sorted(Comparator.comparingInt(PreCommitTxHook::getPriority)).toList();
+    }
 
     private final DataLocker _storageReadLocker = new DataLocker();
     private final ConcurrentHashMap<JObjectKey, JDataWrapper<?>> _objects = new ConcurrentHashMap<>();
@@ -228,7 +232,7 @@ public class JObjectManager {
                         case TxRecord.TxObjectRecordNew<?> created -> {
                             toPut.add(created);
                         }
-                        case TxRecord.TxObjectRecordDeleted deleted -> {
+                        case TxRecord.TxObjectRecordDeleted<?> deleted -> {
                             toLock.add(deleted.getKey());
                             toDelete.add(deleted.getKey());
                         }
@@ -264,7 +268,7 @@ public class JObjectManager {
                     toUnlock.add(got.wrapper().lock.writeLock()::unlock);
                 }
 
-                for (var hook : preCommitTxHooks) {
+                for (var hook : _preCommitTxHooks) {
                     for (var entry : drained) {
                         Log.trace("Running pre-commit hook " + hook.getClass() + " for" + entry.toString());
                         switch (entry) {
@@ -278,7 +282,7 @@ public class JObjectManager {
                                 hook.onCreate(created.getKey(), created.created());
                             }
                             case TxRecord.TxObjectRecordDeleted<?> deleted -> {
-                                hook.onDelete(deleted.getKey(), deleted.original().data());
+                                hook.onDelete(deleted.getKey(), deleted.current());
                             }
                             default -> throw new IllegalStateException("Unexpected value: " + entry);
                         }

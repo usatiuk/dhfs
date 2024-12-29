@@ -60,4 +60,9 @@ public class RefcounterTxHook implements PreCommitTxHook {
             referenced.setRefsFrom(CollectionUtils.subtract(referenced.getRefsFrom(), Set.of(key)));
         }
     }
+
+    @Override
+    public int getPriority() {
+        return 100;
+    }
 }
