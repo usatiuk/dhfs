@@ -77,7 +77,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     private ChunkData createChunk(ByteString bytes) {
         var newChunk = objectAllocator.create(ChunkData.class, new JObjectKey(UUID.randomUUID().toString()));
         newChunk.setData(bytes);
-        curTx.putObject(newChunk);
+        curTx.put(newChunk);
         return newChunk;
     }
 
@@ -89,21 +89,21 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     private JKleppmannTreeNode getDirEntry(String name) {
         var res = getTree().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
         if (res == null) throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
-        var ret = curTx.getObject(JKleppmannTreeNode.class, res).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
+        var ret = curTx.get(JKleppmannTreeNode.class, res).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
         return ret;
     }
 
     private Optional<JKleppmannTreeNode> getDirEntryOpt(String name) {
         var res = getTree().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
         if (res == null) return Optional.empty();
-        var ret = curTx.getObject(JKleppmannTreeNode.class, res);
+        var ret = curTx.get(JKleppmannTreeNode.class, res);
         return ret;
     }
 
     @Override
     public Optional<GetattrRes> getattr(JObjectKey uuid) {
         return jObjectTxManager.executeTx(() -> {
-            var ref = curTx.getObject(JData.class, uuid).orElse(null);
+            var ref = curTx.get(JData.class, uuid).orElse(null);
             if (ref == null) return Optional.empty();
             GetattrRes ret;
             if (ref instanceof File f) {
@@ -159,7 +159,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             f.setCtime(f.getMtime());
             f.setSymlink(false);
             f.setChunks(new TreeMap<>());
-            curTx.putObject(f);
+            curTx.put(f);
 
             try {
                 getTree().move(parent.getKey(), new JKleppmannTreeNodeMetaFile(fname, f.getKey()), getTree().getNewNodeId());
@@ -231,7 +231,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Override
     public Boolean chmod(JObjectKey uuid, long mode) {
         return jObjectTxManager.executeTx(() -> {
-            var dent = curTx.getObject(JData.class, uuid).orElseThrow(() -> new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND));
+            var dent = curTx.get(JData.class, uuid).orElseThrow(() -> new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND));
 
             if (dent instanceof JKleppmannTreeNode) {
                 return true;
@@ -265,7 +265,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (offset < 0)
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Offset should be more than zero: " + offset));
 
-            var file = curTx.getObject(File.class, fileUuid).orElse(null);
+            var file = curTx.get(File.class, fileUuid).orElse(null);
             if (file == null) {
                 Log.error("File not found when trying to read: " + fileUuid);
                 return Optional.empty();
@@ -325,7 +325,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     }
 
     private ByteString readChunk(JObjectKey uuid) {
-        var chunkRead = curTx.getObject(ChunkData.class, uuid).orElse(null);
+        var chunkRead = curTx.get(ChunkData.class, uuid).orElse(null);
 
         if (chunkRead == null) {
             Log.error("Chunk requested not found: " + uuid);
@@ -364,7 +364,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Offset should be more than zero: " + offset));
 
             // FIXME:
-            var file = curTx.getObject(File.class, fileUuid).orElse(null);
+            var file = curTx.get(File.class, fileUuid).orElse(null);
             if (file == null) {
                 Log.error("File not found when trying to write: " + fileUuid);
                 return -1L;
@@ -515,7 +515,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (length < 0)
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Length should be more than zero: " + length));
 
-            var file = curTx.getObject(File.class, fileUuid).orElse(null);
+            var file = curTx.get(File.class, fileUuid).orElse(null);
             if (file == null) {
                 Log.error("File not found when trying to write: " + fileUuid);
                 return false;
@@ -602,7 +602,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Override
     public ByteString readlinkBS(JObjectKey uuid) {
         return jObjectTxManager.executeTx(() -> {
-            var fileOpt = curTx.getObject(File.class, uuid).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("File not found when trying to readlink: " + uuid)));
+            var fileOpt = curTx.get(File.class, uuid).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("File not found when trying to readlink: " + uuid)));
             return read(uuid, 0, Math.toIntExact(size(uuid))).get();
         });
     }
@@ -635,7 +635,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Override
     public Boolean setTimes(JObjectKey fileUuid, long atimeMs, long mtimeMs) {
         return jObjectTxManager.executeTx(() -> {
-            var file = curTx.getObject(File.class, fileUuid).orElseThrow(
+            var file = curTx.get(File.class, fileUuid).orElseThrow(
                     () -> new StatusRuntimeException(Status.NOT_FOUND.withDescription(
                             "File not found for setTimes: " + fileUuid))
             );
@@ -665,7 +665,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Override
     public Long size(JObjectKey uuid) {
         return jObjectTxManager.executeTx(() -> {
-            var read = curTx.getObject(File.class, uuid)
+            var read = curTx.get(File.class, uuid)
                     .orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
             return read.getSize();

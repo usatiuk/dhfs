@@ -35,14 +35,14 @@ public class JKleppmannTreeManager {
 
     public JKleppmannTree getTree(JObjectKey name) {
         return txManager.executeTx(() -> {
-            var data = curTx.getObject(JKleppmannTreePersistentData.class, name).orElse(null);
+            var data = curTx.get(JKleppmannTreePersistentData.class, name).orElse(null);
             if (data == null) {
                 data = objectAllocator.create(JKleppmannTreePersistentData.class, name);
                 data.setClock(new AtomicClock(1L));
                 data.setQueues(new HashMap<>());
                 data.setLog(new TreeMap<>());
                 data.setPeerTimestampLog(new HashMap<>());
-                curTx.putObject(data);
+                curTx.put(data);
             }
             return new JKleppmannTree(data);
 //            opObjectRegistry.registerObject(tree);
@@ -291,13 +291,13 @@ public class JKleppmannTreeManager {
             private final PeerLogWrapper _peerLogWrapper = new PeerLogWrapper();
 
             public JKleppmannTreeStorageInterface() {
-                if (curTx.getObject(JKleppmannTreeNode.class, getRootId()).isEmpty()) {
+                if (curTx.get(JKleppmannTreeNode.class, getRootId()).isEmpty()) {
                     var rootNode = objectAllocator.create(JKleppmannTreeNode.class, getRootId());
                     rootNode.setNode(new TreeNode<>(getRootId(), null, new JKleppmannTreeNodeMetaDirectory("")));
-                    curTx.putObject(rootNode);
+                    curTx.put(rootNode);
                     var trashNode = objectAllocator.create(JKleppmannTreeNode.class, getTrashId());
                     trashNode.setNode(new TreeNode<>(getTrashId(), null, new JKleppmannTreeNodeMetaDirectory("")));
-                    curTx.putObject(trashNode);
+                    curTx.put(trashNode);
                 }
             }
 
@@ -318,7 +318,7 @@ public class JKleppmannTreeManager {
 
             @Override
             public JKleppmannTreeNodeWrapper getById(JObjectKey id) {
-                var got = curTx.getObject(JKleppmannTreeNode.class, id);
+                var got = curTx.get(JKleppmannTreeNode.class, id);
                 if (got.isEmpty()) return null;
                 return new JKleppmannTreeNodeWrapper(got.get());
             }
@@ -327,7 +327,7 @@ public class JKleppmannTreeManager {
             public JKleppmannTreeNodeWrapper createNewNode(TreeNode<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> node) {
                 var created = objectAllocator.create(JKleppmannTreeNode.class, node.getId());
                 created.setNode(node);
-                curTx.putObject(created);
+                curTx.put(created);
                 return new JKleppmannTreeNodeWrapper(created);
             }
 

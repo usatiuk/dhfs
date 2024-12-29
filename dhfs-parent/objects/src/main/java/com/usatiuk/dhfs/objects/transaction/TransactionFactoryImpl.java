@@ -28,7 +28,7 @@ public class TransactionFactoryImpl implements TransactionFactory {
         }
 
         @Override
-        public <T extends JData> Optional<T> getObject(Class<T> type, JObjectKey key, LockingStrategy strategy) {
+        public <T extends JData> Optional<T> get(Class<T> type, JObjectKey key, LockingStrategy strategy) {
             var got = _objects.get(key);
             if (got != null) {
                 var compatible = got.getIfStrategyCompatible(key, strategy);
@@ -66,12 +66,12 @@ public class TransactionFactoryImpl implements TransactionFactory {
         }
 
         @Override
-        public void deleteObject(JObjectKey key) {
+        public void delete(JObjectKey key) {
             _objects.put(key, new TxRecord.TxObjectRecordDeleted(key));
         }
 
         @Override
-        public void putObject(JData obj) {
+        public void put(JData obj) {
             if (_objects.containsKey(obj.getKey())) {
                 throw new IllegalArgumentException("Object already exists in transaction");
             }

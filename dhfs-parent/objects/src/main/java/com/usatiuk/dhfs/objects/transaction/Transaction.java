@@ -9,13 +9,13 @@ import java.util.Optional;
 public interface Transaction {
     long getId();
 
-    <T extends JData> Optional<T> getObject(Class<T> type, JObjectKey key, LockingStrategy strategy);
+    <T extends JData> Optional<T> get(Class<T> type, JObjectKey key, LockingStrategy strategy);
 
-    <T extends JData> void putObject(JData obj);
+    <T extends JData> void put(JData obj);
 
-    void deleteObject(JObjectKey key);
+    void delete(JObjectKey key);
 
-    default <T extends JData> Optional<T> getObject(Class<T> type, JObjectKey key) {
-        return getObject(type, key, LockingStrategy.OPTIMISTIC);
+    default <T extends JData> Optional<T> get(Class<T> type, JObjectKey key) {
+        return get(type, key, LockingStrategy.OPTIMISTIC);
     }
 }

@@ -20,17 +20,17 @@ public class CurrentTransaction implements Transaction {
     }
 
     @Override
-    public <T extends JData> Optional<T> getObject(Class<T> type, JObjectKey key, LockingStrategy strategy) {
-        return transactionManager.current().getObject(type, key, strategy);
+    public <T extends JData> Optional<T> get(Class<T> type, JObjectKey key, LockingStrategy strategy) {
+        return transactionManager.current().get(type, key, strategy);
     }
 
     @Override
-    public void deleteObject(JObjectKey key) {
-        transactionManager.current().deleteObject(key);
+    public void delete(JObjectKey key) {
+        transactionManager.current().delete(key);
     }
 
     @Override
-    public <T extends JData> void putObject(JData obj) {
-        transactionManager.current().putObject(obj);
+    public <T extends JData> void put(JData obj) {
+        transactionManager.current().put(obj);
     }
 }
