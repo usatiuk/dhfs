@@ -31,6 +31,13 @@ public class TxRecord {
         }
     }
 
+    public record TxObjectRecordDeleted(JObjectKey key) implements TxObjectRecord<JData> {
+        @Override
+        public JData getIfStrategyCompatible(JObjectKey key, LockingStrategy strategy) {
+            return null;
+        }
+    }
+
     public record TxObjectRecordCopyLock<T extends JData>(TransactionObject<T> original,
                                                           ChangeTrackingJData<T> copy)
             implements TxObjectRecordWrite<T> {

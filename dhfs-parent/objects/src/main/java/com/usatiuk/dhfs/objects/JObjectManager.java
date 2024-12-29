@@ -196,7 +196,8 @@ public class JObjectManager {
 
         var toFlush = new LinkedList<TxRecord.TxObjectRecordWrite<?>>();
         var toPut = new LinkedList<TxRecord.TxObjectRecordNew<?>>();
-        var toLock = new ArrayList<TransactionObject<?>>();
+        var toDelete = new LinkedList<JObjectKey>();
+        var toLock = new ArrayList<JObjectKey>();
         var dependencies = new LinkedList<TransactionObject<?>>();
 
         Log.trace("Committing transaction " + tx.getId());
@@ -214,11 +215,15 @@ public class JObjectManager {
                         toFlush.add(copy);
                     }
                     case TxRecord.TxObjectRecordOptimistic<?> copy -> {
-                        toLock.add(copy.original());
+                        toLock.add(copy.original().data().getKey());
                         toFlush.add(copy);
                     }
                     case TxRecord.TxObjectRecordNew<?> created -> {
                         toPut.add(created);
+                    }
+                    case TxRecord.TxObjectRecordDeleted deleted -> {
+                        toLock.add(deleted.key());
+                        toDelete.add(deleted.key());
                     }
                     default -> throw new IllegalStateException("Unexpected value: " + entry);
                 }
@@ -231,7 +236,7 @@ public class JObjectManager {
                         // TODO: Check this
                     }
                     case ReadTrackingObjectSource.TxReadObjectSome<?>(var obj) -> {
-                        toLock.add(obj);
+                        toLock.add(obj.data().getKey());
                         dependencies.add(obj);
                     }
                     default -> throw new IllegalStateException("Unexpected value: " + entry);
@@ -240,28 +245,23 @@ public class JObjectManager {
 
             toLock.sort(Comparator.comparingInt(System::identityHashCode));
 
-            for (var record : toLock) {
-                Log.trace("Locking " + record.toString());
+            for (var key : toLock) {
+                Log.trace("Locking " + key.toString());
 
-                var got = getLocked(record.data().getClass(), record.data().getKey(), true);
+                var got = getLocked(JData.class, key, true);
 
                 if (got == null) {
-                    throw new IllegalStateException("Object " + record.data().getKey() + " not found");
+                    throw new IllegalStateException("Object " + key + " not found");
                 }
 
                 toUnlock.add(got.wrapper().lock.writeLock()::unlock);
-
-                if (got.obj() != record.data()) {
-                    throw new IllegalStateException("Object changed during transaction: " + got.obj() + " vs " + record.data());
-                }
             }
 
             for (var dep : dependencies) {
                 Log.trace("Checking dependency " + dep.toString());
                 var current = _objects.get(dep.data().getKey()).get();
 
-                // Checked above
-                assert current == dep.data();
+                if (current == null) continue; // FIXME? Does this matter much for deletion
 
                 if (current.getVersion() >= tx.getId()) {
                     throw new IllegalStateException("Serialization hazard: " + current.getVersion() + " vs " + tx.getId());
@@ -312,7 +312,11 @@ public class JObjectManager {
 
             Log.tracef("Committing transaction %d to storage", tx.getId());
 
-            objectStorage.commitTx(new SimpleTxManifest(written.stream().map(JData::getKey).toList(), Collections.emptyList()));
+            objectStorage.commitTx(new SimpleTxManifest(written.stream().map(JData::getKey).toList(), toDelete));
+
+            for (var del : toDelete) {
+                _objects.remove(del);
+            }
         } catch (Throwable t) {
             Log.error("Error when committing transaction", t);
             throw t;

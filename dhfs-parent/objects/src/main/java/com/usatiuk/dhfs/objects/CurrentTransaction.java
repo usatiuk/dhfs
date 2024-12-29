@@ -25,6 +25,11 @@ public class CurrentTransaction implements Transaction {
     }
 
     @Override
+    public void deleteObject(JObjectKey key) {
+        transactionManager.current().deleteObject(key);
+    }
+
+    @Override
     public <T extends JData> void putObject(JData obj) {
         transactionManager.current().putObject(obj);
     }

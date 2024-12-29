@@ -47,6 +47,37 @@ public class ObjectsTest {
     }
 
     @Test
+    void createDeleteObject() {
+        {
+            txm.begin();
+            var newParent = alloc.create(Parent.class, new JObjectKey("Parent"));
+            newParent.setLastName("John");
+            curTx.putObject(newParent);
+            txm.commit();
+        }
+
+        {
+            txm.begin();
+            var parent = curTx.getObject(Parent.class, new JObjectKey("Parent")).orElse(null);
+            Assertions.assertEquals("John", parent.getLastName());
+            txm.commit();
+        }
+
+        {
+            txm.begin();
+            curTx.deleteObject(new JObjectKey("Parent"));
+            txm.commit();
+        }
+
+        {
+            txm.begin();
+            var parent = curTx.getObject(Parent.class, new JObjectKey("Parent")).orElse(null);
+            Assertions.assertNull(parent);
+            txm.commit();
+        }
+    }
+
+    @Test
     void createCreateObject() {
         {
             txm.begin();

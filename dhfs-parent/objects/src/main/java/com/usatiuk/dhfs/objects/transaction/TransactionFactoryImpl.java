@@ -66,6 +66,11 @@ public class TransactionFactoryImpl implements TransactionFactory {
         }
 
         @Override
+        public void deleteObject(JObjectKey key) {
+            _objects.put(key, new TxRecord.TxObjectRecordDeleted(key));
+        }
+
+        @Override
         public void putObject(JData obj) {
             if (_objects.containsKey(obj.getKey())) {
                 throw new IllegalArgumentException("Object already exists in transaction");

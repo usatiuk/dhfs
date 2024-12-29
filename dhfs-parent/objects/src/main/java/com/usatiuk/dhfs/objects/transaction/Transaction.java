@@ -13,6 +13,8 @@ public interface Transaction {
 
     <T extends JData> void putObject(JData obj);
 
+    void deleteObject(JObjectKey key);
+
     default <T extends JData> Optional<T> getObject(Class<T> type, JObjectKey key) {
         return getObject(type, key, LockingStrategy.OPTIMISTIC);
     }
