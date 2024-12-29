@@ -24,6 +24,7 @@ public class TransactionFactoryImpl implements TransactionFactory {
         private final ReadTrackingObjectSource _source;
 
         private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _objects = new HashMap<>();
+        private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _newObjects = new HashMap<>();
 
         private TransactionImpl(long id, TransactionObjectSource source) {
             _id = id;
@@ -52,6 +53,7 @@ public class TransactionFactoryImpl implements TransactionFactory {
                     }
                     var copy = objectAllocator.copy(read.data());
                     _objects.put(key, new TxRecord.TxObjectRecordOptimistic<>(read, copy));
+                    _newObjects.put(key, new TxRecord.TxObjectRecordOptimistic<>(read, copy));
                     return Optional.of(copy.wrapped());
                 }
                 case WRITE: {
@@ -61,6 +63,7 @@ public class TransactionFactoryImpl implements TransactionFactory {
                     }
                     var copy = objectAllocator.copy(locked.data());
                     _objects.put(key, new TxRecord.TxObjectRecordCopyLock<>(locked, copy));
+                    _newObjects.put(key, new TxRecord.TxObjectRecordCopyLock<>(locked, copy));
                     return Optional.of(copy.wrapped());
                 }
                 default:
@@ -76,12 +79,15 @@ public class TransactionFactoryImpl implements TransactionFactory {
                 switch (got) {
                     case TxRecord.TxObjectRecordNew<?> created -> {
                         _objects.remove(key);
+                        _newObjects.remove(key);
                     }
                     case TxRecord.TxObjectRecordCopyLock<?> copyLockRecord -> {
                         _objects.put(key, new TxRecord.TxObjectRecordDeleted<>(copyLockRecord.original()));
+                        _newObjects.put(key, new TxRecord.TxObjectRecordDeleted<>(copyLockRecord.original()));
                     }
                     case TxRecord.TxObjectRecordOptimistic<?> optimisticRecord -> {
                         _objects.put(key, new TxRecord.TxObjectRecordDeleted<>(optimisticRecord.original()));
+                        _newObjects.put(key, new TxRecord.TxObjectRecordDeleted<>(optimisticRecord.original()));
                     }
                     case TxRecord.TxObjectRecordDeleted<?> deletedRecord -> {
                         return;
@@ -95,6 +101,7 @@ public class TransactionFactoryImpl implements TransactionFactory {
                 return;
             }
             _objects.put(key, new TxRecord.TxObjectRecordDeleted<>(read));
+            _newObjects.put(key, new TxRecord.TxObjectRecordDeleted<>(read));
         }
 
         @Override
@@ -104,17 +111,18 @@ public class TransactionFactoryImpl implements TransactionFactory {
             }
 
             _objects.put(obj.getKey(), new TxRecord.TxObjectRecordNew<>(obj));
+            _newObjects.put(obj.getKey(), new TxRecord.TxObjectRecordNew<>(obj));
         }
 
         @Override
-        public Collection<TxRecord.TxObjectRecord<?>> drainWrites() {
-            var ret = _objects;
-            _objects = new HashMap<>();
+        public Collection<TxRecord.TxObjectRecord<?>> drainNewWrites() {
+            var ret = _newObjects;
+            _newObjects = new HashMap<>();
             return ret.values();
         }
 
         @Override
-        public Map<JObjectKey, ReadTrackingObjectSource.TxReadObject<?>> drainReads() {
+        public Map<JObjectKey, ReadTrackingObjectSource.TxReadObject<?>> reads() {
             return _source.getRead();
         }
     }

@@ -210,7 +210,7 @@ public class JObjectManager {
 
         try {
             Collection<TxRecord.TxObjectRecord<?>> drained;
-            while (!(drained = tx.drainWrites()).isEmpty()) {
+            while (!(drained = tx.drainNewWrites()).isEmpty()) {
                 Log.trace("Commit iteration with " + drained.size() + " records");
                 var toLock = new ArrayList<JObjectKey>();
 
@@ -236,7 +236,7 @@ public class JObjectManager {
                     }
                 }
 
-                for (var entry : tx.drainReads().entrySet()) {
+                for (var entry : tx.reads().entrySet()) {
                     Log.trace("Processing read " + entry.toString());
                     switch (entry.getValue()) {
                         case ReadTrackingObjectSource.TxReadObjectNone<?> none -> {

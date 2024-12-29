@@ -77,6 +77,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     private ChunkData createChunk(ByteString bytes) {
         var newChunk = objectAllocator.create(ChunkData.class, new JObjectKey(UUID.randomUUID().toString()));
         newChunk.setData(bytes);
+        newChunk.setRefsFrom(List.of());
         curTx.put(newChunk);
         return newChunk;
     }
@@ -159,6 +160,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             f.setCtime(f.getMtime());
             f.setSymlink(false);
             f.setChunks(new TreeMap<>());
+            f.setRefsFrom(List.of());
             curTx.put(f);
 
             try {
@@ -622,6 +624,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             File f = objectAllocator.create(File.class, new JObjectKey(fuuid.toString()));
             f.setSymlink(true);
+            f.setRefsFrom(List.of());
             ChunkData newChunkData = createChunk(UnsafeByteOperations.unsafeWrap(oldpath.getBytes(StandardCharsets.UTF_8)));
 
             f.getChunks().put(0L, newChunkData.getKey());

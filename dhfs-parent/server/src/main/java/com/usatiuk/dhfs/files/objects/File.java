@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.files.objects;
 
 import com.usatiuk.objects.common.runtime.JObjectKey;
 
+import java.util.Collection;
 import java.util.NavigableMap;
 
 public interface File extends FsNode {
@@ -16,4 +17,9 @@ public interface File extends FsNode {
     long getSize();
 
     void setSize(long size);
+
+    @Override
+    default Collection<JObjectKey> collectRefsTo() {
+        return getChunks().values().stream().toList();
+    }
 }

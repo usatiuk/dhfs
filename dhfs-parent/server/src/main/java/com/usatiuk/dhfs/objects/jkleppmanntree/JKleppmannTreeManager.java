@@ -294,8 +294,10 @@ public class JKleppmannTreeManager {
                 if (curTx.get(JKleppmannTreeNode.class, getRootId()).isEmpty()) {
                     var rootNode = objectAllocator.create(JKleppmannTreeNode.class, getRootId());
                     rootNode.setNode(new TreeNode<>(getRootId(), null, new JKleppmannTreeNodeMetaDirectory("")));
+                    rootNode.setRefsFrom(List.of());
                     curTx.put(rootNode);
                     var trashNode = objectAllocator.create(JKleppmannTreeNode.class, getTrashId());
+                    trashNode.setRefsFrom(List.of());
                     trashNode.setNode(new TreeNode<>(getTrashId(), null, new JKleppmannTreeNodeMetaDirectory("")));
                     curTx.put(trashNode);
                 }
@@ -303,12 +305,12 @@ public class JKleppmannTreeManager {
 
             @Override
             public JObjectKey getRootId() {
-                return new JObjectKey(_treeName + "_jt_root");
+                return new JObjectKey(_treeName.name() + "_jt_root");
             }
 
             @Override
             public JObjectKey getTrashId() {
-                return new JObjectKey(_treeName + "_jt_trash");
+                return new JObjectKey(_treeName.name() + "_jt_trash");
             }
 
             @Override
@@ -327,6 +329,7 @@ public class JKleppmannTreeManager {
             public JKleppmannTreeNodeWrapper createNewNode(TreeNode<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> node) {
                 var created = objectAllocator.create(JKleppmannTreeNode.class, node.getId());
                 created.setNode(node);
+                created.setRefsFrom(List.of());
                 curTx.put(created);
                 return new JKleppmannTreeNodeWrapper(created);
             }

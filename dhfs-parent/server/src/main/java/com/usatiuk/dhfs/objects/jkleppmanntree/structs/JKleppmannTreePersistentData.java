@@ -1,18 +1,15 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
+import com.usatiuk.dhfs.objects.JDataRefcounted;
 import com.usatiuk.kleppmanntree.AtomicClock;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
 import com.usatiuk.kleppmanntree.LogRecord;
 import com.usatiuk.kleppmanntree.OpMove;
-import com.usatiuk.objects.common.runtime.JData;
 import com.usatiuk.objects.common.runtime.JObjectKey;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.TreeMap;
-import java.util.UUID;
+import java.util.*;
 
-public interface JKleppmannTreePersistentData extends JData {
+public interface JKleppmannTreePersistentData extends JDataRefcounted {
     AtomicClock getClock();
 
     void setClock(AtomicClock clock);
@@ -50,4 +47,8 @@ public interface JKleppmannTreePersistentData extends JData {
         }
     }
 
+    @Override
+    default Collection<JObjectKey> collectRefsTo() {
+        return List.of(new JObjectKey(getKey().name() + "_jt_trash"), new JObjectKey(getKey().name() + "_jt_root"));
+    }
 }

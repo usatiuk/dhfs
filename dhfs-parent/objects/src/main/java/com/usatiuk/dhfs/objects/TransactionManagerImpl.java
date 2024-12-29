@@ -46,7 +46,7 @@ public class TransactionManagerImpl implements TransactionManager {
     public void rollback() {
         var tx = _currentTransaction.get();
         // Works only before commit was called
-        for (var o : tx.drainWrites()) {
+        for (var o : tx.drainNewWrites()) {
             switch (o) {
                 case TxRecord.TxObjectRecordCopyLock<?> r -> r.original().lock().writeLock().unlock();
                 default -> {
