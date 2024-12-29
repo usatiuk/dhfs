@@ -7,7 +7,7 @@ import java.util.Map;
 
 // The transaction interface actually used by user code to retrieve objects
 public interface TransactionPrivate extends Transaction {
-    Collection<TxRecord.TxObjectRecord<?>> writes();
+    Collection<TxRecord.TxObjectRecord<?>> drainWrites();
 
-    Map<JObjectKey, ReadTrackingObjectSource.TxReadObject<?>> reads();
+    Map<JObjectKey, ReadTrackingObjectSource.TxReadObject<?>> drainReads();
 }

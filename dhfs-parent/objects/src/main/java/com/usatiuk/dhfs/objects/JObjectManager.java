@@ -11,6 +11,7 @@ import com.usatiuk.objects.common.runtime.JData;
 import com.usatiuk.objects.common.runtime.JObjectKey;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 import java.io.Serializable;
@@ -36,6 +37,8 @@ public class JObjectManager {
     ObjectAllocator objectAllocator;
     @Inject
     TransactionFactory transactionFactory;
+    @Inject
+    Instance<PreCommitTxHook> preCommitTxHooks;
 
     private final DataLocker _storageReadLocker = new DataLocker();
     private final ConcurrentHashMap<JObjectKey, JDataWrapper<?>> _objects = new ConcurrentHashMap<>();
@@ -191,77 +194,108 @@ public class JObjectManager {
     }
 
     public void commit(TransactionPrivate tx) {
+        Log.trace("Committing transaction " + tx.getId());
+
         // This also holds the weak references
         var toUnlock = new LinkedList<VoidFn>();
 
         var toFlush = new LinkedList<TxRecord.TxObjectRecordWrite<?>>();
         var toPut = new LinkedList<TxRecord.TxObjectRecordNew<?>>();
         var toDelete = new LinkedList<JObjectKey>();
-        var toLock = new ArrayList<JObjectKey>();
         var dependencies = new LinkedList<TransactionObject<?>>();
-
-        Log.trace("Committing transaction " + tx.getId());
 
         // For existing objects:
         // Check that their version is not higher than the version of transaction being committed
         // TODO: check deletions, inserts
 
         try {
-            for (var entry : tx.writes()) {
-                Log.trace("Processing write " + entry.toString());
-                switch (entry) {
-                    case TxRecord.TxObjectRecordCopyLock<?> copy -> {
-                        toUnlock.add(copy.original().lock().writeLock()::unlock);
-                        toFlush.add(copy);
-                    }
-                    case TxRecord.TxObjectRecordOptimistic<?> copy -> {
-                        toLock.add(copy.original().data().getKey());
-                        toFlush.add(copy);
-                    }
-                    case TxRecord.TxObjectRecordNew<?> created -> {
-                        toPut.add(created);
-                    }
-                    case TxRecord.TxObjectRecordDeleted deleted -> {
-                        toLock.add(deleted.key());
-                        toDelete.add(deleted.key());
-                    }
-                    default -> throw new IllegalStateException("Unexpected value: " + entry);
-                }
-            }
+            Collection<TxRecord.TxObjectRecord<?>> drained;
+            while (!(drained = tx.drainWrites()).isEmpty()) {
+                Log.trace("Commit iteration with " + drained.size() + " records");
+                var toLock = new ArrayList<JObjectKey>();
 
-            for (var entry : tx.reads().entrySet()) {
-                Log.trace("Processing read " + entry.toString());
-                switch (entry.getValue()) {
-                    case ReadTrackingObjectSource.TxReadObjectNone<?> none -> {
-                        // TODO: Check this
+                for (var entry : drained) {
+                    Log.trace("Processing write " + entry.toString());
+                    switch (entry) {
+                        case TxRecord.TxObjectRecordCopyLock<?> copy -> {
+                            toUnlock.add(copy.original().lock().writeLock()::unlock);
+                            toFlush.add(copy);
+                        }
+                        case TxRecord.TxObjectRecordOptimistic<?> copy -> {
+                            toLock.add(copy.original().data().getKey());
+                            toFlush.add(copy);
+                        }
+                        case TxRecord.TxObjectRecordNew<?> created -> {
+                            toPut.add(created);
+                        }
+                        case TxRecord.TxObjectRecordDeleted deleted -> {
+                            toLock.add(deleted.getKey());
+                            toDelete.add(deleted.getKey());
+                        }
+                        default -> throw new IllegalStateException("Unexpected value: " + entry);
                     }
-                    case ReadTrackingObjectSource.TxReadObjectSome<?>(var obj) -> {
-                        toLock.add(obj.data().getKey());
-                        dependencies.add(obj);
-                    }
-                    default -> throw new IllegalStateException("Unexpected value: " + entry);
-                }
-            }
-
-            toLock.sort(Comparator.comparingInt(System::identityHashCode));
-
-            for (var key : toLock) {
-                Log.trace("Locking " + key.toString());
-
-                var got = getLocked(JData.class, key, true);
-
-                if (got == null) {
-                    throw new IllegalStateException("Object " + key + " not found");
                 }
 
-                toUnlock.add(got.wrapper().lock.writeLock()::unlock);
+                for (var entry : tx.drainReads().entrySet()) {
+                    Log.trace("Processing read " + entry.toString());
+                    switch (entry.getValue()) {
+                        case ReadTrackingObjectSource.TxReadObjectNone<?> none -> {
+                            // TODO: Check this
+                        }
+                        case ReadTrackingObjectSource.TxReadObjectSome<?>(var obj) -> {
+                            toLock.add(obj.data().getKey());
+                            dependencies.add(obj);
+                        }
+                        default -> throw new IllegalStateException("Unexpected value: " + entry);
+                    }
+                }
+
+                toLock.sort(Comparator.comparingInt(System::identityHashCode));
+
+                for (var key : toLock) {
+                    Log.trace("Locking " + key.toString());
+
+                    var got = getLocked(JData.class, key, true);
+
+                    if (got == null) {
+                        throw new IllegalStateException("Object " + key + " not found");
+                    }
+
+                    toUnlock.add(got.wrapper().lock.writeLock()::unlock);
+                }
+
+                for (var hook : preCommitTxHooks) {
+                    for (var entry : drained) {
+                        Log.trace("Running pre-commit hook " + hook.getClass() + " for" + entry.toString());
+                        switch (entry) {
+                            case TxRecord.TxObjectRecordCopyLock<?> copy -> {
+                                hook.onChange(copy.getKey(), copy.original().data(), copy.copy().wrapped());
+                            }
+                            case TxRecord.TxObjectRecordOptimistic<?> copy -> {
+                                hook.onChange(copy.getKey(), copy.original().data(), copy.copy().wrapped());
+                            }
+                            case TxRecord.TxObjectRecordNew<?> created -> {
+                                hook.onCreate(created.getKey(), created.created());
+                            }
+                            case TxRecord.TxObjectRecordDeleted<?> deleted -> {
+                                hook.onDelete(deleted.getKey(), deleted.original().data());
+                            }
+                            default -> throw new IllegalStateException("Unexpected value: " + entry);
+                        }
+                    }
+                }
             }
 
             for (var dep : dependencies) {
                 Log.trace("Checking dependency " + dep.toString());
                 var current = _objects.get(dep.data().getKey()).get();
 
-                if (current == null) continue; // FIXME? Does this matter much for deletion
+                // Check that the object we have locked is really the one in the map
+                // Note that current can be null, not only if it doesn't exist, but
+                // also for example in the case when it was changed and then garbage collected
+                if (dep.data() != current) {
+                    throw new IllegalStateException("Serialization hazard: " + dep.data() + " vs " + current);
+                }
 
                 if (current.getVersion() >= tx.getId()) {
                     throw new IllegalStateException("Serialization hazard: " + current.getVersion() + " vs " + tx.getId());

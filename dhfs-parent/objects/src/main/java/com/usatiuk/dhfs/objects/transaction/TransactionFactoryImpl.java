@@ -8,7 +8,10 @@ import jakarta.inject.Inject;
 import lombok.AccessLevel;
 import lombok.Getter;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 
 @ApplicationScoped
 public class TransactionFactoryImpl implements TransactionFactory {
@@ -20,7 +23,7 @@ public class TransactionFactoryImpl implements TransactionFactory {
         private final long _id;
         private final ReadTrackingObjectSource _source;
 
-        private final Map<JObjectKey, TxRecord.TxObjectRecord<?>> _objects = new HashMap<>();
+        private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _objects = new HashMap<>();
 
         private TransactionImpl(long id, TransactionObjectSource source) {
             _id = id;
@@ -67,7 +70,31 @@ public class TransactionFactoryImpl implements TransactionFactory {
 
         @Override
         public void delete(JObjectKey key) {
-            _objects.put(key, new TxRecord.TxObjectRecordDeleted(key));
+            // FIXME
+            var got = _objects.get(key);
+            if (got != null) {
+                switch (got) {
+                    case TxRecord.TxObjectRecordNew<?> created -> {
+                        _objects.remove(key);
+                    }
+                    case TxRecord.TxObjectRecordCopyLock<?> copyLockRecord -> {
+                        _objects.put(key, new TxRecord.TxObjectRecordDeleted<>(copyLockRecord.original()));
+                    }
+                    case TxRecord.TxObjectRecordOptimistic<?> optimisticRecord -> {
+                        _objects.put(key, new TxRecord.TxObjectRecordDeleted<>(optimisticRecord.original()));
+                    }
+                    case TxRecord.TxObjectRecordDeleted<?> deletedRecord -> {
+                        return;
+                    }
+                    default -> throw new IllegalStateException("Unexpected value: " + got);
+                }
+            }
+
+            var read = _source.get(JData.class, key).orElse(null);
+            if (read == null) {
+                return;
+            }
+            _objects.put(key, new TxRecord.TxObjectRecordDeleted<>(read));
         }
 
         @Override
@@ -80,12 +107,14 @@ public class TransactionFactoryImpl implements TransactionFactory {
         }
 
         @Override
-        public Collection<TxRecord.TxObjectRecord<?>> writes() {
-            return Collections.unmodifiableCollection(_objects.values());
+        public Collection<TxRecord.TxObjectRecord<?>> drainWrites() {
+            var ret = _objects;
+            _objects = new HashMap<>();
+            return ret.values();
         }
 
         @Override
-        public Map<JObjectKey, ReadTrackingObjectSource.TxReadObject<?>> reads() {
+        public Map<JObjectKey, ReadTrackingObjectSource.TxReadObject<?>> drainReads() {
             return _source.getRead();
         }
     }

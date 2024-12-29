@@ -7,19 +7,18 @@ import com.usatiuk.objects.common.runtime.JObjectKey;
 public class TxRecord {
     public interface TxObjectRecord<T> {
         T getIfStrategyCompatible(JObjectKey key, LockingStrategy strategy);
-    }
 
-    public record TxObjectRecordMissing<T extends JData>(JObjectKey key) implements TxObjectRecord<T> {
-        @Override
-        public T getIfStrategyCompatible(JObjectKey key, LockingStrategy strategy) {
-            return null;
-        }
+        JObjectKey getKey();
     }
 
     public interface TxObjectRecordWrite<T extends JData> extends TxObjectRecord<T> {
         TransactionObject<T> original();
 
         ChangeTrackingJData<T> copy();
+
+        default JObjectKey getKey() {
+            return original().data().getKey();
+        }
     }
 
     public record TxObjectRecordNew<T extends JData>(T created) implements TxObjectRecord<T> {
@@ -29,12 +28,22 @@ public class TxRecord {
                 return created;
             return null;
         }
+
+        @Override
+        public JObjectKey getKey() {
+            return created.getKey();
+        }
     }
 
-    public record TxObjectRecordDeleted(JObjectKey key) implements TxObjectRecord<JData> {
+    public record TxObjectRecordDeleted<T extends JData>(TransactionObject<T> original) implements TxObjectRecord<T> {
         @Override
-        public JData getIfStrategyCompatible(JObjectKey key, LockingStrategy strategy) {
+        public T getIfStrategyCompatible(JObjectKey key, LockingStrategy strategy) {
             return null;
+        }
+
+        @Override
+        public JObjectKey getKey() {
+            return original.data().getKey();
         }
     }
 
