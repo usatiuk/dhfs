@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.objects.transaction;
 
+import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import com.usatiuk.objects.common.runtime.JData;
 import com.usatiuk.objects.common.runtime.JObjectKey;
@@ -34,8 +35,8 @@ public class TransactionFactoryImpl implements TransactionFactory {
         @Override
         public <T extends JData> Optional<T> get(Class<T> type, JObjectKey key, LockingStrategy strategy) {
             return switch (strategy) {
-                case OPTIMISTIC -> _source.get(type, key).data();
-                case WRITE -> _source.getWriteLocked(type, key).data();
+                case OPTIMISTIC -> _source.get(type, key).data().map(JDataVersionedWrapper::data);
+                case WRITE -> _source.getWriteLocked(type, key).data().map(JDataVersionedWrapper::data);
             };
         }
 

@@ -31,7 +31,7 @@ public class JObjectManager {
     @Inject
     ObjectPersistentStore objectStorage;
     @Inject
-    ObjectSerializer<JData> objectSerializer;
+    ObjectSerializer<JDataVersionedWrapper> objectSerializer;
     @Inject
     ObjectAllocator objectAllocator;
     @Inject
@@ -47,12 +47,12 @@ public class JObjectManager {
     private final ConcurrentHashMap<JObjectKey, JDataWrapper<?>> _objects = new ConcurrentHashMap<>();
     private final AtomicLong _txCounter = new AtomicLong();
 
-    private class JDataWrapper<T extends JData> extends WeakReference<T> {
+    private class JDataWrapper<T extends JData> extends WeakReference<JDataVersionedWrapper<T>> {
         private static final Cleaner CLEANER = Cleaner.create();
 
-        public JDataWrapper(T referent) {
+        public JDataWrapper(JDataVersionedWrapper<T> referent) {
             super(referent);
-            var key = referent.getKey();
+            var key = referent.data().getKey();
             CLEANER.register(referent, () -> {
                 _objects.remove(key, this);
             });
@@ -66,17 +66,17 @@ public class JObjectManager {
         }
     }
 
-    private <T extends JData> T get(Class<T> type, JObjectKey key) {
+    private <T extends JData> JDataVersionedWrapper<T> get(Class<T> type, JObjectKey key) {
         while (true) {
             {
                 var got = _objects.get(key);
 
                 if (got != null) {
                     var ref = got.get();
-                    if (type.isInstance(ref)) {
-                        return type.cast(ref);
-                    } else if (ref == null) {
+                    if (ref == null) {
                         _objects.remove(key, got);
+                    } else if (type.isInstance(ref.data())) {
+                        return (JDataVersionedWrapper<T>) ref;
                     } else {
                         throw new IllegalArgumentException("Object type mismatch: " + ref.getClass() + " vs " + type);
                     }
@@ -93,11 +93,11 @@ public class JObjectManager {
 
                 if (read == null) return null;
 
-                if (type.isInstance(read)) {
-                    var wrapper = new JDataWrapper<>(type.cast(read));
+                if (type.isInstance(read.data())) {
+                    var wrapper = new JDataWrapper<>((JDataVersionedWrapper<T>) read);
                     var old = _objects.put(key, wrapper);
                     assert old == null;
-                    return type.cast(read);
+                    return read;
                 } else {
                     throw new IllegalArgumentException("Object type mismatch: " + read.getClass() + " vs " + type);
                 }
@@ -106,12 +106,12 @@ public class JObjectManager {
     }
 
     private record TransactionObjectNoLock<T extends JData>
-            (Optional<T> data)
+            (Optional<JDataVersionedWrapper<T>> data)
             implements TransactionObject<T> {
     }
 
     private record TransactionObjectLocked<T extends JData>
-            (Optional<T> data, AutoCloseableNoThrow lock)
+            (Optional<JDataVersionedWrapper<T>> data, AutoCloseableNoThrow lock)
             implements TransactionObject<T> {
     }
 
@@ -210,7 +210,7 @@ public class JObjectManager {
                         if (dep == null) {
                             throw new IllegalStateException("No dependency for " + key);
                         }
-                        yield dep.data.orElse(null);
+                        yield dep.data.map(JDataVersionedWrapper::data).orElse(null);
                     }
                     default -> {
                         throw new IllegalStateException("Unexpected value: " + current.get(key));
@@ -254,7 +254,6 @@ public class JObjectManager {
                 }
             }
 
-            // FIXME: lock leak
             for (var read : tx.reads().entrySet()) {
                 addDependency.accept(read.getKey());
                 if (read.getValue() instanceof TransactionObjectLocked<?> locked) {
@@ -265,10 +264,10 @@ public class JObjectManager {
             for (var dep : dependenciesLocked.entrySet()) {
                 Log.trace("Checking dependency " + dep.getKey());
 
-                if (dep.getValue().data.isEmpty()) continue;
+                if (dep.getValue().data().isEmpty()) continue;
 
-                if (dep.getValue().data.get().getVersion() >= tx.getId()) {
-                    throw new IllegalStateException("Serialization hazard: " + dep.getValue().data.get().getVersion() + " vs " + tx.getId());
+                if (dep.getValue().data().get().version() >= tx.getId()) {
+                    throw new IllegalStateException("Serialization hazard: " + dep.getValue().data().get().version() + " vs " + tx.getId());
                 }
             }
 
@@ -282,9 +281,10 @@ public class JObjectManager {
                     case TxRecord.TxObjectRecordWrite<?> write -> {
                         Log.trace("Flushing object " + action.getKey());
                         toWrite.add(action.getKey());
-                        var data = objectSerializer.serialize(write.data());
+                        var wrapped = new JDataVersionedWrapper<>(write.data(), tx.getId());
+                        var data = objectSerializer.serialize(wrapped);
                         objectStorage.writeObject(action.getKey(), data);
-                        _objects.put(action.getKey(), new JDataWrapper<>(write.data()));
+                        _objects.put(action.getKey(), new JDataWrapper<>(wrapped));
                     }
                     case TxRecord.TxObjectRecordDeleted deleted -> {
                         Log.trace("Deleting object " + action.getKey());
