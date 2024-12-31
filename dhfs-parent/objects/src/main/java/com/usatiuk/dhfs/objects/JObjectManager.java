@@ -5,7 +5,6 @@ import com.usatiuk.dhfs.objects.persistence.TxManifest;
 import com.usatiuk.dhfs.objects.transaction.*;
 import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
 import com.usatiuk.dhfs.utils.DataLocker;
-import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import com.usatiuk.objects.common.runtime.JData;
 import com.usatiuk.objects.common.runtime.JObjectKey;
 import io.quarkus.logging.Log;
@@ -33,8 +32,6 @@ public class JObjectManager {
     @Inject
     ObjectSerializer<JDataVersionedWrapper> objectSerializer;
     @Inject
-    ObjectAllocator objectAllocator;
-    @Inject
     TransactionFactory transactionFactory;
 
     private final List<PreCommitTxHook> _preCommitTxHooks;
@@ -52,7 +49,7 @@ public class JObjectManager {
 
         public JDataWrapper(JDataVersionedWrapper<T> referent) {
             super(referent);
-            var key = referent.data().getKey();
+            var key = referent.data().key();
             CLEANER.register(referent, () -> {
                 _objects.remove(key, this);
             });

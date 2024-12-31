@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.objects.transaction;
 
 import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
-import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import com.usatiuk.objects.common.runtime.JData;
 import com.usatiuk.objects.common.runtime.JObjectKey;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -16,9 +15,6 @@ import java.util.Optional;
 
 @ApplicationScoped
 public class TransactionFactoryImpl implements TransactionFactory {
-    @Inject
-    ObjectAllocator objectAllocator;
-
     private class TransactionImpl implements TransactionPrivate {
         @Getter(AccessLevel.PUBLIC)
         private final long _id;
@@ -68,8 +64,8 @@ public class TransactionFactoryImpl implements TransactionFactory {
         public void put(JData obj) {
 //            get(JData.class, obj.getKey(), LockingStrategy.OPTIMISTIC);
 
-            _writes.put(obj.getKey(), new TxRecord.TxObjectRecordWrite<>(obj));
-            _newWrites.put(obj.getKey(), new TxRecord.TxObjectRecordWrite<>(obj));
+            _writes.put(obj.key(), new TxRecord.TxObjectRecordWrite<>(obj));
+            _newWrites.put(obj.key(), new TxRecord.TxObjectRecordWrite<>(obj));
         }
 
         @Override

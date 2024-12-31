@@ -3,7 +3,6 @@ package com.usatiuk.dhfs.objects;
 import com.usatiuk.dhfs.objects.data.Parent;
 import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
-import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import com.usatiuk.objects.common.runtime.JObjectKey;
 import io.quarkus.logging.Log;
 import io.quarkus.test.junit.QuarkusTest;
@@ -25,23 +24,19 @@ public class ObjectsTest {
     @Inject
     Transaction curTx;
 
-    @Inject
-    ObjectAllocator alloc;
-
     @Test
     void createObject() {
         {
             txm.begin();
-            var newParent = alloc.create(Parent.class, new JObjectKey("Parent"));
-            newParent.setLastName("John");
+            var newParent = new Parent(JObjectKey.of("Parent"), "John");
             curTx.put(newParent);
             txm.commit();
         }
 
         {
             txm.begin();
-            var parent = curTx.get(Parent.class, new JObjectKey("Parent")).orElse(null);
-            Assertions.assertEquals("John", parent.getLastName());
+            var parent = curTx.get(Parent.class, JObjectKey.of("Parent")).orElse(null);
+            Assertions.assertEquals("John", parent.name());
             txm.commit();
         }
     }
@@ -50,28 +45,27 @@ public class ObjectsTest {
     void createDeleteObject() {
         {
             txm.begin();
-            var newParent = alloc.create(Parent.class, new JObjectKey("Parent"));
-            newParent.setLastName("John");
+            var newParent = new Parent(JObjectKey.of("Parent2"), "John");
             curTx.put(newParent);
             txm.commit();
         }
 
         {
             txm.begin();
-            var parent = curTx.get(Parent.class, new JObjectKey("Parent")).orElse(null);
-            Assertions.assertEquals("John", parent.getLastName());
+            var parent = curTx.get(Parent.class, JObjectKey.of("Parent2")).orElse(null);
+            Assertions.assertEquals("John", parent.name());
             txm.commit();
         }
 
         {
             txm.begin();
-            curTx.delete(new JObjectKey("Parent"));
+            curTx.delete(new JObjectKey("Parent2"));
             txm.commit();
         }
 
         {
             txm.begin();
-            var parent = curTx.get(Parent.class, new JObjectKey("Parent")).orElse(null);
+            var parent = curTx.get(Parent.class, new JObjectKey("Parent2")).orElse(null);
             Assertions.assertNull(parent);
             txm.commit();
         }
@@ -81,22 +75,20 @@ public class ObjectsTest {
     void createCreateObject() {
         {
             txm.begin();
-            var newParent = alloc.create(Parent.class, new JObjectKey("Parent7"));
-            newParent.setLastName("John");
+            var newParent = new Parent(JObjectKey.of("Parent7"), "John");
             curTx.put(newParent);
             txm.commit();
         }
         {
             txm.begin();
-            var newParent = alloc.create(Parent.class, new JObjectKey("Parent7"));
-            newParent.setLastName("John2");
+            var newParent = new Parent(JObjectKey.of("Parent7"), "John2");
             curTx.put(newParent);
             txm.commit();
         }
         {
             txm.begin();
             var parent = curTx.get(Parent.class, new JObjectKey("Parent7")).orElse(null);
-            Assertions.assertEquals("John2", parent.getLastName());
+            Assertions.assertEquals("John2", parent.name());
             txm.commit();
         }
     }
@@ -105,8 +97,7 @@ public class ObjectsTest {
     void editObject() {
         {
             txm.begin();
-            var newParent = alloc.create(Parent.class, new JObjectKey("Parent3"));
-            newParent.setLastName("John");
+            var newParent = new Parent(JObjectKey.of("Parent3"), "John");
             curTx.put(newParent);
             txm.commit();
         }
@@ -114,23 +105,23 @@ public class ObjectsTest {
         {
             txm.begin();
             var parent = curTx.get(Parent.class, new JObjectKey("Parent3"), LockingStrategy.OPTIMISTIC).orElse(null);
-            Assertions.assertEquals("John", parent.getLastName());
-            parent.setLastName("John2");
+            Assertions.assertEquals("John", parent.name());
+            curTx.put(parent.toBuilder().name("John2").build());
             txm.commit();
         }
 
         {
             txm.begin();
             var parent = curTx.get(Parent.class, new JObjectKey("Parent3"), LockingStrategy.WRITE).orElse(null);
-            Assertions.assertEquals("John2", parent.getLastName());
-            parent.setLastName("John3");
+            Assertions.assertEquals("John2", parent.name());
+            curTx.put(parent.toBuilder().name("John3").build());
             txm.commit();
         }
 
         {
             txm.begin();
             var parent = curTx.get(Parent.class, new JObjectKey("Parent3")).orElse(null);
-            Assertions.assertEquals("John3", parent.getLastName());
+            Assertions.assertEquals("John3", parent.name());
             txm.commit();
         }
     }
@@ -148,8 +139,7 @@ public class ObjectsTest {
                 Log.warn("Thread 1");
                 txm.begin();
                 barrier.await();
-                var newParent = alloc.create(Parent.class, new JObjectKey("Parent2"));
-                newParent.setLastName("John");
+                var newParent = new Parent(JObjectKey.of("Parent2"), "John");
                 curTx.put(newParent);
                 Log.warn("Thread 1 commit");
                 txm.commit();
@@ -164,8 +154,7 @@ public class ObjectsTest {
                 Log.warn("Thread 2");
                 txm.begin();
                 barrier.await();
-                var newParent = alloc.create(Parent.class, new JObjectKey("Parent2"));
-                newParent.setLastName("John2");
+                var newParent = new Parent(JObjectKey.of("Parent2"), "John2");
                 curTx.put(newParent);
                 Log.warn("Thread 2 commit");
                 txm.commit();
@@ -184,9 +173,9 @@ public class ObjectsTest {
 
         if (!thread1Failed.get()) {
             Assertions.assertTrue(thread2Failed.get());
-            Assertions.assertEquals("John", got.getLastName());
+            Assertions.assertEquals("John", got.name());
         } else if (!thread2Failed.get()) {
-            Assertions.assertEquals("John2", got.getLastName());
+            Assertions.assertEquals("John2", got.name());
         } else {
             Assertions.fail("No thread succeeded");
         }
@@ -198,8 +187,7 @@ public class ObjectsTest {
         String key = "Parent4" + strategy.name();
         {
             txm.begin();
-            var newParent = alloc.create(Parent.class, new JObjectKey(key));
-            newParent.setLastName("John3");
+            var newParent = new Parent(JObjectKey.of(key), "John3");
             curTx.put(newParent);
             txm.commit();
         }
@@ -216,7 +204,7 @@ public class ObjectsTest {
                 txm.begin();
                 barrier.await();
                 var parent = curTx.get(Parent.class, new JObjectKey(key), strategy).orElse(null);
-                parent.setLastName("John");
+                curTx.put(parent.toBuilder().name("John").build());
                 Log.warn("Thread 1 commit");
                 txm.commit();
                 thread1Failed.set(false);
@@ -231,7 +219,7 @@ public class ObjectsTest {
                 txm.begin();
                 barrier.await();
                 var parent = curTx.get(Parent.class, new JObjectKey(key), strategy).orElse(null);
-                parent.setLastName("John2");
+                curTx.put(parent.toBuilder().name("John2").build());
                 Log.warn("Thread 2 commit");
                 txm.commit();
                 thread2Failed.set(false);
@@ -249,9 +237,9 @@ public class ObjectsTest {
 
         if (!thread1Failed.get()) {
             Assertions.assertTrue(thread2Failed.get());
-            Assertions.assertEquals("John", got.getLastName());
+            Assertions.assertEquals("John", got.name());
         } else if (!thread2Failed.get()) {
-            Assertions.assertEquals("John2", got.getLastName());
+            Assertions.assertEquals("John2", got.name());
         } else {
             Assertions.fail("No thread succeeded");
         }

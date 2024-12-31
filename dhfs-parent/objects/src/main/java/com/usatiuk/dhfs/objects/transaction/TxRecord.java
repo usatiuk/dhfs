@@ -11,7 +11,7 @@ public class TxRecord {
     public record TxObjectRecordWrite<T extends JData>(JData data) implements TxObjectRecord<T> {
         @Override
         public JObjectKey key() {
-            return data.getKey();
+            return data.key();
         }
     }
 

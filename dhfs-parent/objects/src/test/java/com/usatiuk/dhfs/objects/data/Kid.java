@@ -1,9 +1,9 @@
 package com.usatiuk.dhfs.objects.data;
 
 import com.usatiuk.objects.common.runtime.JData;
+import com.usatiuk.objects.common.runtime.JObjectKey;
+import lombok.Builder;
 
-public interface Kid extends JData {
-    String getName();
-
-    void setName(String name);
+@Builder(toBuilder = true)
+public record Kid(JObjectKey key, String name) implements JData {
 }
