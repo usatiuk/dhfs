@@ -23,8 +23,8 @@ public class TransactionFactoryImpl implements TransactionFactory {
         private final long _id;
         private final ReadTrackingObjectSource _source;
 
-        private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _objects = new HashMap<>();
-        private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _newObjects = new HashMap<>();
+        private final Map<JObjectKey, TxRecord.TxObjectRecord<?>> _writes = new HashMap<>();
+        private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _newWrites = new HashMap<>();
 
         private TransactionImpl(long id, TransactionObjectSource source) {
             _id = id;
@@ -33,97 +33,53 @@ public class TransactionFactoryImpl implements TransactionFactory {
 
         @Override
         public <T extends JData> Optional<T> get(Class<T> type, JObjectKey key, LockingStrategy strategy) {
-            var got = _objects.get(key);
-            if (got != null) {
-                var compatible = got.getIfStrategyCompatible(key, strategy);
-                if (compatible == null) {
-                    throw new IllegalArgumentException("Locking strategy mismatch");
-                }
-                if (!type.isInstance(compatible)) {
-                    throw new IllegalArgumentException("Object type mismatch");
-                }
-                return Optional.of(type.cast(compatible));
-            }
-
-            switch (strategy) {
-                case OPTIMISTIC: {
-                    var read = _source.get(type, key).orElse(null);
-                    if (read == null) {
-                        return Optional.empty();
-                    }
-                    var copy = objectAllocator.copy(read.data());
-                    _objects.put(key, new TxRecord.TxObjectRecordOptimistic<>(read, copy));
-                    _newObjects.put(key, new TxRecord.TxObjectRecordOptimistic<>(read, copy));
-                    return Optional.of(copy.wrapped());
-                }
-                case WRITE: {
-                    var locked = _source.getWriteLocked(type, key).orElse(null);
-                    if (locked == null) {
-                        return Optional.empty();
-                    }
-                    var copy = objectAllocator.copy(locked.data());
-                    _objects.put(key, new TxRecord.TxObjectRecordCopyLock<>(locked, copy));
-                    _newObjects.put(key, new TxRecord.TxObjectRecordCopyLock<>(locked, copy));
-                    return Optional.of(copy.wrapped());
-                }
-                default:
-                    throw new IllegalArgumentException("Unknown locking strategy");
-            }
+            return switch (strategy) {
+                case OPTIMISTIC -> _source.get(type, key).data();
+                case WRITE -> _source.getWriteLocked(type, key).data();
+            };
         }
 
         @Override
         public void delete(JObjectKey key) {
+//            get(JData.class, key, LockingStrategy.OPTIMISTIC);
+
             // FIXME
-            var got = _objects.get(key);
+            var got = _writes.get(key);
             if (got != null) {
                 switch (got) {
-                    case TxRecord.TxObjectRecordNew<?> created -> {
-                        _objects.remove(key);
-                        _newObjects.remove(key);
-                    }
-                    case TxRecord.TxObjectRecordCopyLock<?> copyLockRecord -> {
-                        _objects.put(key, new TxRecord.TxObjectRecordDeleted<>(copyLockRecord));
-                        _newObjects.put(key, new TxRecord.TxObjectRecordDeleted<>(copyLockRecord));
-                    }
-                    case TxRecord.TxObjectRecordOptimistic<?> optimisticRecord -> {
-                        _objects.put(key, new TxRecord.TxObjectRecordDeleted<>(optimisticRecord));
-                        _newObjects.put(key, new TxRecord.TxObjectRecordDeleted<>(optimisticRecord));
-                    }
-                    case TxRecord.TxObjectRecordDeleted<?> deletedRecord -> {
+                    case TxRecord.TxObjectRecordDeleted deleted -> {
                         return;
                     }
-                    default -> throw new IllegalStateException("Unexpected value: " + got);
+                    default -> {
+                    }
                 }
-                return;
             }
-
-            var read = _source.get(JData.class, key).orElse(null);
-            if (read == null) {
-                return;
-            }
-            _objects.put(key, new TxRecord.TxObjectRecordDeleted<>(read)); // FIXME:
-            _newObjects.put(key, new TxRecord.TxObjectRecordDeleted<>(read));
+//
+//            var read = _source.get(JData.class, key).orElse(null);
+//            if (read == null) {
+//                return;
+//            }
+            _writes.put(key, new TxRecord.TxObjectRecordDeleted(key)); // FIXME:
+            _newWrites.put(key, new TxRecord.TxObjectRecordDeleted(key));
         }
 
         @Override
         public void put(JData obj) {
-            if (_objects.containsKey(obj.getKey())) {
-                throw new IllegalArgumentException("Object already exists in transaction");
-            }
+//            get(JData.class, obj.getKey(), LockingStrategy.OPTIMISTIC);
 
-            _objects.put(obj.getKey(), new TxRecord.TxObjectRecordNew<>(obj));
-            _newObjects.put(obj.getKey(), new TxRecord.TxObjectRecordNew<>(obj));
+            _writes.put(obj.getKey(), new TxRecord.TxObjectRecordWrite<>(obj));
+            _newWrites.put(obj.getKey(), new TxRecord.TxObjectRecordWrite<>(obj));
         }
 
         @Override
         public Collection<TxRecord.TxObjectRecord<?>> drainNewWrites() {
-            var ret = _newObjects;
-            _newObjects = new HashMap<>();
+            var ret = _newWrites;
+            _newWrites = new HashMap<>();
             return ret.values();
         }
 
         @Override
-        public Map<JObjectKey, ReadTrackingObjectSource.TxReadObject<?>> reads() {
+        public Map<JObjectKey, TransactionObject<?>> reads() {
             return _source.getRead();
         }
     }

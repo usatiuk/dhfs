@@ -1,11 +1,10 @@
 package com.usatiuk.dhfs.objects;
 
-import com.google.common.collect.Streams;
 import com.usatiuk.dhfs.objects.persistence.ObjectPersistentStore;
 import com.usatiuk.dhfs.objects.persistence.TxManifest;
 import com.usatiuk.dhfs.objects.transaction.*;
+import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
 import com.usatiuk.dhfs.utils.DataLocker;
-import com.usatiuk.dhfs.utils.VoidFn;
 import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import com.usatiuk.objects.common.runtime.JData;
 import com.usatiuk.objects.common.runtime.JObjectKey;
@@ -20,8 +19,8 @@ import java.lang.ref.WeakReference;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 // Manages all access to com.usatiuk.objects.common.runtime.JData objects.
 // In particular, it serves as a source of truth for what is committed to the backing storage.
@@ -44,14 +43,12 @@ public class JObjectManager {
         _preCommitTxHooks = preCommitTxHooks.stream().sorted(Comparator.comparingInt(PreCommitTxHook::getPriority)).toList();
     }
 
-    private final DataLocker _storageReadLocker = new DataLocker();
+    private final DataLocker _objLocker = new DataLocker();
     private final ConcurrentHashMap<JObjectKey, JDataWrapper<?>> _objects = new ConcurrentHashMap<>();
     private final AtomicLong _txCounter = new AtomicLong();
 
     private class JDataWrapper<T extends JData> extends WeakReference<T> {
         private static final Cleaner CLEANER = Cleaner.create();
-
-        final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
         public JDataWrapper(T referent) {
             super(referent);
@@ -65,15 +62,11 @@ public class JObjectManager {
         public String toString() {
             return "JDataWrapper{" +
                     "ref=" + get() +
-                    ", lock=" + lock +
                     '}';
         }
     }
 
-    private record WrapperRet<T extends JData>(T obj, JDataWrapper<T> wrapper) {
-    }
-
-    private <T extends JData> WrapperRet<T> get(Class<T> type, JObjectKey key) {
+    private <T extends JData> T get(Class<T> type, JObjectKey key) {
         while (true) {
             {
                 var got = _objects.get(key);
@@ -81,7 +74,7 @@ public class JObjectManager {
                 if (got != null) {
                     var ref = got.get();
                     if (type.isInstance(ref)) {
-                        return new WrapperRet<>((T) ref, (JDataWrapper<T>) got);
+                        return type.cast(ref);
                     } else if (ref == null) {
                         _objects.remove(key, got);
                     } else {
@@ -91,57 +84,46 @@ public class JObjectManager {
             }
 
             //noinspection unused
-            try (var readLock = _storageReadLocker.lock(key)) {
-                var read = objectStorage.readObject(key).orElse(null);
+            try (var readLock = _objLocker.lock(key)) {
+                if (_objects.containsKey(key)) continue;
+
+                var read = objectStorage.readObject(key)
+                        .map(objectSerializer::deserialize)
+                        .orElse(null);
+
                 if (read == null) return null;
 
-                var got = objectSerializer.deserialize(read);
-
-                if (type.isInstance(got)) {
-                    var wrapper = new JDataWrapper<>((T) got);
-                    var old = _objects.putIfAbsent(key, wrapper);
-                    if (old != null) continue;
-                    return new WrapperRet<>((T) got, wrapper);
-                } else if (got == null) {
-                    return null;
+                if (type.isInstance(read)) {
+                    var wrapper = new JDataWrapper<>(type.cast(read));
+                    var old = _objects.put(key, wrapper);
+                    assert old == null;
+                    return type.cast(read);
                 } else {
-                    throw new IllegalArgumentException("Object type mismatch: " + got.getClass() + " vs " + type);
+                    throw new IllegalArgumentException("Object type mismatch: " + read.getClass() + " vs " + type);
                 }
             }
         }
     }
 
-
-    private <T extends JData> WrapperRet<T> getLocked(Class<T> type, JObjectKey key, boolean write) {
-        var read = get(type, key);
-        if (read == null) return null;
-        var lock = write ? read.wrapper().lock.writeLock() : read.wrapper().lock.readLock();
-        lock.lock();
-        while (true) {
-            try {
-                var readAgain = get(type, key);
-                if (readAgain == null) {
-                    lock.unlock();
-                    return null;
-                }
-                if (!Objects.equals(read, readAgain)) {
-                    lock.unlock();
-                    read = readAgain;
-                    lock = write ? read.wrapper().lock.writeLock() : read.wrapper().lock.readLock();
-                    lock.lock();
-                    continue;
-                }
-                return read;
-            } catch (Throwable e) {
-                lock.unlock();
-                throw e;
-            }
-        }
-    }
-
-    private record TransactionObjectImpl<T extends JData>
-            (T data, ReadWriteLock lock)
+    private record TransactionObjectNoLock<T extends JData>
+            (Optional<T> data)
             implements TransactionObject<T> {
+    }
+
+    private record TransactionObjectLocked<T extends JData>
+            (Optional<T> data, AutoCloseableNoThrow lock)
+            implements TransactionObject<T> {
+    }
+
+    private <T extends JData> TransactionObjectNoLock<T> getObj(Class<T> type, JObjectKey key) {
+        var got = get(type, key);
+        return new TransactionObjectNoLock<>(Optional.ofNullable(got));
+    }
+
+    private <T extends JData> TransactionObjectLocked<T> getObjLock(Class<T> type, JObjectKey key) {
+        var lock = _objLocker.lock(key);
+        var got = get(type, key);
+        return new TransactionObjectLocked<>(Optional.ofNullable(got), lock);
     }
 
     private class TransactionObjectSourceImpl implements TransactionObjectSource {
@@ -152,21 +134,26 @@ public class JObjectManager {
         }
 
         @Override
-        public <T extends JData> Optional<TransactionObject<T>> get(Class<T> type, JObjectKey key) {
-            var got = JObjectManager.this.get(type, key);
-            if (got == null) return Optional.empty();
-            return Optional.of(new TransactionObjectImpl<>(got.obj(), got.wrapper().lock));
+        public <T extends JData> TransactionObject<T> get(Class<T> type, JObjectKey key) {
+            return getObj(type, key);
+//            return getObj(type, key).map(got -> {
+//                if (got.data().getVersion() > _txId) {
+//                    throw new IllegalStateException("Serialization race for " + key + ": " + got.data().getVersion() + " vs " + _txId);
+//                }
+//                return got;
+//            });
         }
 
         @Override
-        public <T extends JData> Optional<TransactionObject<T>> getWriteLocked(Class<T> type, JObjectKey key) {
-            var got = JObjectManager.this.getLocked(type, key, true);
-            if (got == null) return Optional.empty();
-            if (got.obj.getVersion() >= _txId) {
-                got.wrapper().lock.writeLock().unlock();
-                throw new IllegalStateException("Serialization race");
-            }
-            return Optional.of(new TransactionObjectImpl<>(got.obj(), got.wrapper().lock));
+        public <T extends JData> TransactionObject<T> getWriteLocked(Class<T> type, JObjectKey key) {
+            return getObjLock(type, key);
+//            return getObjLock(type, key).map(got -> {
+//                if (got.data().getVersion() > _txId) {
+//                    got.lock.close();
+//                    throw new IllegalStateException("Serialization race for " + key + ": " + got.data().getVersion() + " vs " + _txId);
+//                }
+//                return got;
+//            });
         }
     }
 
@@ -200,168 +187,130 @@ public class JObjectManager {
     public void commit(TransactionPrivate tx) {
         Log.trace("Committing transaction " + tx.getId());
 
-        // This also holds the weak references
-        var toUnlock = new LinkedList<VoidFn>();
+        var current = new LinkedHashMap<JObjectKey, TxRecord.TxObjectRecord<?>>();
+        var dependenciesLocked = new LinkedHashMap<JObjectKey, TransactionObjectLocked<?>>();
+        var toUnlock = new ArrayList<AutoCloseableNoThrow>();
 
-        var toFlush = new LinkedList<TxRecord.TxObjectRecordWrite<?>>();
-        var toPut = new LinkedList<TxRecord.TxObjectRecordNew<?>>();
-        var toDelete = new LinkedList<JObjectKey>();
-        var dependencies = new LinkedList<TransactionObject<?>>();
+        Consumer<JObjectKey> addDependency =
+                key -> {
+                    dependenciesLocked.computeIfAbsent(key, k -> {
+                        Log.trace("Adding dependency " + k.toString());
+                        var got = getObjLock(JData.class, k);
+                        toUnlock.add(got.lock);
+                        return got;
+                    });
+                };
+
+        Function<JObjectKey, JData> getCurrent =
+                key -> switch (current.get(key)) {
+                    case TxRecord.TxObjectRecordWrite<?> write -> write.data();
+                    case TxRecord.TxObjectRecordDeleted deleted -> null;
+                    case null -> {
+                        var dep = dependenciesLocked.get(key);
+                        if (dep == null) {
+                            throw new IllegalStateException("No dependency for " + key);
+                        }
+                        yield dep.data.orElse(null);
+                    }
+                    default -> {
+                        throw new IllegalStateException("Unexpected value: " + current.get(key));
+                    }
+                };
 
         // For existing objects:
         // Check that their version is not higher than the version of transaction being committed
         // TODO: check deletions, inserts
-
         try {
             Collection<TxRecord.TxObjectRecord<?>> drained;
             while (!(drained = tx.drainNewWrites()).isEmpty()) {
-                Log.trace("Commit iteration with " + drained.size() + " records");
                 var toLock = new ArrayList<JObjectKey>();
 
-                for (var entry : drained) {
-                    Log.trace("Processing write " + entry.toString());
-                    switch (entry) {
-                        case TxRecord.TxObjectRecordCopyLock<?> copy -> {
-                            toUnlock.add(copy.original().lock().writeLock()::unlock);
-                            toFlush.add(copy);
-                        }
-                        case TxRecord.TxObjectRecordOptimistic<?> copy -> {
-                            toLock.add(copy.original().data().getKey());
-                            toFlush.add(copy);
-                        }
-                        case TxRecord.TxObjectRecordNew<?> created -> {
-                            toPut.add(created);
-                        }
-                        case TxRecord.TxObjectRecordDeleted<?> deleted -> {
-                            toLock.add(deleted.getKey());
-                            toDelete.add(deleted.getKey());
-                        }
-                        default -> throw new IllegalStateException("Unexpected value: " + entry);
-                    }
-                }
+                Log.trace("Commit iteration with " + drained.size() + " records");
 
-                for (var entry : tx.reads().entrySet()) {
-                    Log.trace("Processing read " + entry.toString());
-                    switch (entry.getValue()) {
-                        case ReadTrackingObjectSource.TxReadObjectNone<?> none -> {
-                            // TODO: Check this
-                        }
-                        case ReadTrackingObjectSource.TxReadObjectSome<?>(var obj) -> {
-                            toLock.add(obj.data().getKey());
-                            dependencies.add(obj);
-                        }
-                        default -> throw new IllegalStateException("Unexpected value: " + entry);
-                    }
-                }
-
-                toLock.sort(Comparator.comparingInt(System::identityHashCode));
-
-                for (var key : toLock) {
-                    Log.trace("Locking " + key.toString());
-
-                    var got = getLocked(JData.class, key, true);
-
-                    if (got == null) {
-                        throw new IllegalStateException("Object " + key + " not found");
-                    }
-
-                    toUnlock.add(got.wrapper().lock.writeLock()::unlock);
-                }
+                drained.stream()
+                        .map(TxRecord.TxObjectRecord::key)
+                        .sorted(Comparator.comparing(JObjectKey::toString))
+                        .forEach(addDependency);
 
                 for (var hook : _preCommitTxHooks) {
                     for (var entry : drained) {
                         Log.trace("Running pre-commit hook " + hook.getClass() + " for" + entry.toString());
                         switch (entry) {
-                            case TxRecord.TxObjectRecordCopyLock<?> copy -> {
-                                hook.onChange(copy.getKey(), copy.original().data(), copy.copy().wrapped());
+                            case TxRecord.TxObjectRecordWrite<?> write -> {
+                                var oldObj = getCurrent.apply(write.key());
+                                if (oldObj == null) {
+                                    hook.onCreate(write.key(), write.data());
+                                } else {
+                                    hook.onChange(write.key(), oldObj, write.data());
+                                }
                             }
-                            case TxRecord.TxObjectRecordOptimistic<?> copy -> {
-                                hook.onChange(copy.getKey(), copy.original().data(), copy.copy().wrapped());
-                            }
-                            case TxRecord.TxObjectRecordNew<?> created -> {
-                                hook.onCreate(created.getKey(), created.created());
-                            }
-                            case TxRecord.TxObjectRecordDeleted<?> deleted -> {
-                                hook.onDelete(deleted.getKey(), deleted.current());
+                            case TxRecord.TxObjectRecordDeleted deleted -> {
+                                hook.onDelete(deleted.key(), getCurrent.apply(deleted.key()));
                             }
                             default -> throw new IllegalStateException("Unexpected value: " + entry);
                         }
+                        current.put(entry.key(), entry);
                     }
                 }
             }
 
-            for (var dep : dependencies) {
-                Log.trace("Checking dependency " + dep.toString());
-                var current = _objects.get(dep.data().getKey()).get();
-
-                // Check that the object we have locked is really the one in the map
-                // Note that current can be null, not only if it doesn't exist, but
-                // also for example in the case when it was changed and then garbage collected
-                if (dep.data() != current) {
-                    throw new IllegalStateException("Serialization hazard: " + dep.data() + " vs " + current);
-                }
-
-                if (current.getVersion() >= tx.getId()) {
-                    throw new IllegalStateException("Serialization hazard: " + current.getVersion() + " vs " + tx.getId());
+            // FIXME: lock leak
+            for (var read : tx.reads().entrySet()) {
+                addDependency.accept(read.getKey());
+                if (read.getValue() instanceof TransactionObjectLocked<?> locked) {
+                    toUnlock.add(locked.lock);
                 }
             }
 
-            for (var put : toPut) {
-                Log.trace("Putting new object " + put.toString());
-                var wrapper = new JDataWrapper<>(put.created());
-                wrapper.lock.writeLock().lock();
-                var old = _objects.putIfAbsent(put.created().getKey(), wrapper);
-                if (old != null)
-                    throw new IllegalStateException("Object already exists: " + old.get());
-                toUnlock.add(wrapper.lock.writeLock()::unlock);
-            }
+            for (var dep : dependenciesLocked.entrySet()) {
+                Log.trace("Checking dependency " + dep.getKey());
 
-            for (var record : toFlush) {
-                if (!record.copy().isModified()) {
-                    Log.trace("Not changed " + record.toString());
-                    continue;
+                if (dep.getValue().data.isEmpty()) continue;
+
+                if (dep.getValue().data.get().getVersion() >= tx.getId()) {
+                    throw new IllegalStateException("Serialization hazard: " + dep.getValue().data.get().getVersion() + " vs " + tx.getId());
                 }
-
-                Log.trace("Flushing changed " + record.toString());
-                var current = _objects.get(record.original().data().getKey());
-
-                var newWrapper = new JDataWrapper<>(record.copy().wrapped());
-                newWrapper.lock.writeLock().lock();
-                if (!_objects.replace(record.copy().wrapped().getKey(), current, newWrapper)) {
-                    assert false; // Should not happen, as the object is locked
-                    throw new IllegalStateException("Object changed during transaction after locking: " + current.get() + " vs " + record.copy().wrapped());
-                }
-                toUnlock.add(newWrapper.lock.writeLock()::unlock);
             }
 
             Log.tracef("Flushing transaction %d to storage", tx.getId());
 
-            var written = Streams.concat(toFlush.stream().map(f -> f.copy().wrapped()),
-                    toPut.stream().map(TxRecord.TxObjectRecordNew::created)).toList();
+            var toDelete = new ArrayList<JObjectKey>();
+            var toWrite = new ArrayList<JObjectKey>();
 
-            // Really flushing to storage
-            written.forEach(obj -> {
-                Log.trace("Flushing object " + obj.getKey());
-                assert obj.getVersion() == tx.getId();
-                var key = obj.getKey();
-                var data = objectSerializer.serialize(obj);
-                objectStorage.writeObject(key, data);
-            });
+            for (var action : current.entrySet()) {
+                switch (action.getValue()) {
+                    case TxRecord.TxObjectRecordWrite<?> write -> {
+                        Log.trace("Flushing object " + action.getKey());
+                        toWrite.add(action.getKey());
+                        var data = objectSerializer.serialize(write.data());
+                        objectStorage.writeObject(action.getKey(), data);
+                        _objects.put(action.getKey(), new JDataWrapper<>(write.data()));
+                    }
+                    case TxRecord.TxObjectRecordDeleted deleted -> {
+                        Log.trace("Deleting object " + action.getKey());
+                        toDelete.add(action.getKey());
+                        _objects.remove(action.getKey());
+                    }
+                    default -> {
+                        throw new IllegalStateException("Unexpected value: " + action.getValue());
+                    }
+                }
+            }
 
             Log.tracef("Committing transaction %d to storage", tx.getId());
 
-            objectStorage.commitTx(new SimpleTxManifest(written.stream().map(JData::getKey).toList(), toDelete));
-
-            for (var del : toDelete) {
-                _objects.remove(del);
-            }
-        } catch (Throwable t) {
+            objectStorage.commitTx(new SimpleTxManifest(toWrite, toDelete));
+        } catch (
+                Throwable t) {
             Log.error("Error when committing transaction", t);
             throw t;
         } finally {
             for (var unlock : toUnlock) {
-                unlock.apply();
+                unlock.close();
             }
         }
+    }
+
+    public void rollback(TransactionPrivate tx) {
     }
 }

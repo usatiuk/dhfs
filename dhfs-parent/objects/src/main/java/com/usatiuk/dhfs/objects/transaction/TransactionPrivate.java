@@ -9,5 +9,5 @@ import java.util.Map;
 public interface TransactionPrivate extends Transaction {
     Collection<TxRecord.TxObjectRecord<?>> drainNewWrites();
 
-    Map<JObjectKey, ReadTrackingObjectSource.TxReadObject<?>> reads();
+    Map<JObjectKey, TransactionObject<?>> reads();
 }

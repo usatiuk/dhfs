@@ -2,7 +2,6 @@ package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.dhfs.objects.transaction.TransactionPrivate;
-import com.usatiuk.dhfs.objects.transaction.TxRecord;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -44,16 +43,18 @@ public class TransactionManagerImpl implements TransactionManager {
 
     @Override
     public void rollback() {
-        var tx = _currentTransaction.get();
-        // Works only before commit was called
-        for (var o : tx.drainNewWrites()) {
-            switch (o) {
-                case TxRecord.TxObjectRecordCopyLock<?> r -> r.original().lock().writeLock().unlock();
-                default -> {
-                }
-            }
+        if (_currentTransaction.get() == null) {
+            throw new IllegalStateException("No transaction started");
         }
-        _currentTransaction.remove();
+
+        try {
+            jObjectManager.rollback(_currentTransaction.get());
+        } catch (Throwable e) {
+            Log.error("Transaction rollback failed", e);
+            throw e;
+        } finally {
+            _currentTransaction.remove();
+        }
     }
 
     @Override

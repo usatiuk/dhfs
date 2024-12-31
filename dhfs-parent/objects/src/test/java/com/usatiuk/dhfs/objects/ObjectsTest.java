@@ -86,15 +86,17 @@ public class ObjectsTest {
             curTx.put(newParent);
             txm.commit();
         }
-        Assertions.assertThrows(Exception.class, () -> txm.run(() -> {
+        {
+            txm.begin();
             var newParent = alloc.create(Parent.class, new JObjectKey("Parent7"));
             newParent.setLastName("John2");
             curTx.put(newParent);
-        }));
+            txm.commit();
+        }
         {
             txm.begin();
             var parent = curTx.get(Parent.class, new JObjectKey("Parent7")).orElse(null);
-            Assertions.assertEquals("John", parent.getLastName());
+            Assertions.assertEquals("John2", parent.getLastName());
             txm.commit();
         }
     }
