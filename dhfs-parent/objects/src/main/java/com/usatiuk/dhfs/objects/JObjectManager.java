@@ -220,34 +220,41 @@ public class JObjectManager {
         // TODO: check deletions, inserts
         try {
             Collection<TxRecord.TxObjectRecord<?>> drained;
-            while (!(drained = tx.drainNewWrites()).isEmpty()) {
-                Log.trace("Commit iteration with " + drained.size() + " records");
+            {
+                boolean somethingChanged;
+                do {
+                    somethingChanged = false;
+                    for (var hook : _preCommitTxHooks) {
+                        drained = tx.drainNewWrites();
+                        Log.trace("Commit iteration with " + drained.size() + " records for hook " + hook.getClass());
 
-                drained.stream()
-                        .map(TxRecord.TxObjectRecord::key)
-                        .sorted(Comparator.comparing(JObjectKey::toString))
-                        .forEach(addDependency);
+                        drained.stream()
+                                .map(TxRecord.TxObjectRecord::key)
+                                .sorted(Comparator.comparing(JObjectKey::toString))
+                                .forEach(addDependency);
 
-                for (var hook : _preCommitTxHooks) {
-                    for (var entry : drained) {
-                        Log.trace("Running pre-commit hook " + hook.getClass() + " for" + entry.toString());
-                        var oldObj = getCurrent.apply(entry.key());
-                        var curObj = tx.get(JData.class, entry.key()).orElse(null);
-
-                        assert (curObj == null) == (entry instanceof TxRecord.TxObjectRecordDeleted);
-
-                        if (curObj == null) {
-                            hook.onDelete(entry.key(), oldObj);
-                        } else if (oldObj == null) {
-                            hook.onCreate(entry.key(), curObj);
-                        } else {
-                            hook.onChange(entry.key(), oldObj, curObj);
+                        for (var entry : drained) {
+                            somethingChanged = true;
+                            Log.trace("Running pre-commit hook " + hook.getClass() + " for" + entry.toString());
+                            var oldObj = getCurrent.apply(entry.key());
+                            switch (entry) {
+                                case TxRecord.TxObjectRecordWrite<?> write -> {
+                                    if (oldObj == null) {
+                                        hook.onCreate(write.key(), write.data());
+                                    } else {
+                                        hook.onChange(write.key(), oldObj, write.data());
+                                    }
+                                }
+                                case TxRecord.TxObjectRecordDeleted deleted -> {
+                                    hook.onDelete(deleted.key(), oldObj);
+                                }
+                                default -> throw new IllegalStateException("Unexpected value: " + entry);
+                            }
+                            current.put(entry.key(), entry);
                         }
-                        current.put(entry.key(), entry);
                     }
-                }
+                } while (somethingChanged);
             }
-
             reads = tx.reads();
             for (var read : reads.entrySet()) {
                 addDependency.accept(read.getKey());
