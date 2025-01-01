@@ -175,7 +175,7 @@
                 <configuration>
                     <systemPropertyVariables>
                         <junit.jupiter.execution.parallel.enabled>
-                            true
+                            false
                         </junit.jupiter.execution.parallel.enabled>
                         <junit.jupiter.execution.parallel.mode.default>
                             concurrent
