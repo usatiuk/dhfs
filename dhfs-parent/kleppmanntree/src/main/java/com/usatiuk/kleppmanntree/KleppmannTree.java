@@ -51,7 +51,6 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     private void undoEffect(LogEffect<TimestampT, PeerIdT, MetaT, NodeIdT> effect) {
         if (effect.oldInfo() != null) {
             var node = _storage.getById(effect.childId());
-            var oldParent = _storage.getById(effect.oldInfo().oldParent());
             var curParent = _storage.getById(effect.newParentId());
             {
                 var newCurParentChildren = new HashMap<>(curParent.children());
@@ -62,6 +61,9 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
 
             if (!node.meta().getClass().equals(effect.oldInfo().oldMeta().getClass()))
                 throw new IllegalArgumentException("Class mismatch for meta for node " + node.key());
+
+            // Needs to be read after changing curParent, as it might be the same node
+            var oldParent = _storage.getById(effect.oldInfo().oldParent());
             {
                 var newOldParentChildren = new HashMap<>(oldParent.children());
                 newOldParentChildren.put(node.meta().getName(), node.key());
@@ -296,7 +298,6 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> newParentNode;
             TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> node;
 
-            newParentNode = _storage.getById(effect.newParentId());
             if (effect.oldInfo() != null) {
                 oldParentNode = _storage.getById(effect.oldInfo().oldParent());
             }
@@ -311,6 +312,9 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 oldParentNode = oldParentNode.withChildren(newOldParentChildren);
                 _storage.putNode(oldParentNode);
             }
+
+            // Needs to be read after changing oldParentNode, as it might be the same node
+            newParentNode = _storage.getById(effect.newParentId());
 
             {
                 var newNewParentChildren = new HashMap<>(newParentNode.children());

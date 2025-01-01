@@ -75,7 +75,7 @@ public class JObjectManager {
                     } else if (type.isInstance(ref.data())) {
                         return (JDataVersionedWrapper<T>) ref;
                     } else {
-                        throw new IllegalArgumentException("Object type mismatch: " + ref.getClass() + " vs " + type);
+                        throw new IllegalArgumentException("Object type mismatch: " + ref.data().getClass() + " vs " + type);
                     }
                 }
             }
