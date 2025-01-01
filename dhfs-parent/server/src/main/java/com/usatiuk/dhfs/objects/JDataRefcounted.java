@@ -7,13 +7,13 @@ import java.util.Collection;
 import java.util.List;
 
 public interface JDataRefcounted extends JData {
-    Collection<JObjectKey> getRefsFrom();
+    Collection<JObjectKey> refsFrom();
 
-    void setRefsFrom(Collection<JObjectKey> refs);
+    JDataRefcounted withRefsFrom(Collection<JObjectKey> refs);
 
-    boolean getFrozen();
+    boolean frozen();
 
-    void setFrozen(boolean frozen);
+    JDataRefcounted withFrozen(boolean frozen);
 
     default Collection<JObjectKey> collectRefsTo() {
         return List.of();

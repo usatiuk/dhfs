@@ -3,17 +3,17 @@ package com.usatiuk.kleppmanntree;
 import java.util.HashMap;
 import java.util.Map;
 
-public class TestStorageInterface implements StorageInterface<Long, Long, TestNodeMeta, Long, TestNodeWrapper> {
+public class TestStorageInterface implements StorageInterface<Long, Long, TestNodeMeta, Long> {
     private final long _peerId;
-    private final Map<Long, TreeNode<Long, Long, TestNodeMeta, Long>> _nodes = new HashMap<>();
+    private final Map<Long, TestTreeNode> _nodes = new HashMap<>();
     private final TestLog _log = new TestLog();
     private final TestPeerLog _peerLog = new TestPeerLog();
     private long _curId = 1;
 
     public TestStorageInterface(long peerId) {
         _peerId = peerId;
-        _nodes.put(getRootId(), new TreeNode<>(getRootId(), null, null));
-        _nodes.put(getTrashId(), new TreeNode<>(getTrashId(), null, null));
+        _nodes.put(getRootId(), new TestTreeNode(getRootId(), null, null));
+        _nodes.put(getTrashId(), new TestTreeNode(getTrashId(), null, null));
     }
 
     @Override
@@ -32,18 +32,18 @@ public class TestStorageInterface implements StorageInterface<Long, Long, TestNo
     }
 
     @Override
-    public TestNodeWrapper getById(Long id) {
-        var node = _nodes.get(id);
-        return node == null ? null : new TestNodeWrapper(node);
+    public TestTreeNode getById(Long id) {
+        return _nodes.get(id);
     }
 
     @Override
-    public TestNodeWrapper createNewNode(TreeNode<Long, Long, TestNodeMeta, Long> node) {
-        if (!_nodes.containsKey(node.getId())) {
-            _nodes.put(node.getId(), node);
-            return new TestNodeWrapper(node);
-        }
-        throw new IllegalStateException("Node with id " + node.getId() + " already exists");
+    public TestTreeNode createNewNode(Long key, Long parent, TestNodeMeta meta) {
+        return new TestTreeNode(key, parent, meta);
+    }
+
+    @Override
+    public void putNode(TreeNode<Long, Long, TestNodeMeta, Long> node) {
+        _nodes.put(node.key(), (TestTreeNode) node);
     }
 
     @Override
@@ -52,7 +52,6 @@ public class TestStorageInterface implements StorageInterface<Long, Long, TestNo
             throw new IllegalStateException("Node with id " + id + " doesn't exist");
         _nodes.remove(id);
     }
-
 
     @Override
     public LogInterface<Long, Long, TestNodeMeta, Long> getLog() {
@@ -63,30 +62,5 @@ public class TestStorageInterface implements StorageInterface<Long, Long, TestNo
     @Override
     public PeerTimestampLogInterface<Long, Long> getPeerTimestampLog() {
         return _peerLog;
-    }
-
-    @Override
-    public void rLock() {
-
-    }
-
-    @Override
-    public void rUnlock() {
-
-    }
-
-    @Override
-    public void rwLock() {
-
-    }
-
-    @Override
-    public void rwUnlock() {
-
-    }
-
-    @Override
-    public void assertRwLock() {
-
     }
 }

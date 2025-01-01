@@ -18,11 +18,6 @@ public class AtomicClock implements Clock<Long>, Serializable {
         _max = timestamp;
     }
 
-    // FIXME:
-    public void ungetTimestamp() {
-        --_max;
-    }
-
     @Override
     public Long peekTimestamp() {
         return _max;

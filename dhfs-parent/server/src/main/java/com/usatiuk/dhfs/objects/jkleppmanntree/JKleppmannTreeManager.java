@@ -7,7 +7,6 @@ import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaDir
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreePersistentData;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.kleppmanntree.*;
-import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import com.usatiuk.objects.common.runtime.JObjectKey;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -29,21 +28,26 @@ public class JKleppmannTreeManager {
     @Inject
     TransactionManager txManager;
     @Inject
-    ObjectAllocator objectAllocator;
-    @Inject
     JKleppmannTreePeerInterface peerInterface;
 
     public JKleppmannTree getTree(JObjectKey name) {
         return txManager.executeTx(() -> {
             var data = curTx.get(JKleppmannTreePersistentData.class, name).orElse(null);
             if (data == null) {
-                data = objectAllocator.create(JKleppmannTreePersistentData.class, name);
-                data.setClock(new AtomicClock(1L));
-                data.setQueues(new HashMap<>());
-                data.setLog(new TreeMap<>());
-                data.setPeerTimestampLog(new HashMap<>());
-                data.setFrozen(true);
+                data = new JKleppmannTreePersistentData(
+                        name,
+                        List.of(),
+                        true,
+                        1L,
+                        new HashMap<>(),
+                        new HashMap<>(),
+                        new TreeMap<>()
+                );
                 curTx.put(data);
+                var rootNode = new JKleppmannTreeNode(JObjectKey.of(name.name() + "_jt_root"), null, new JKleppmannTreeNodeMetaDirectory(""));
+                curTx.put(rootNode);
+                var trashNode = new JKleppmannTreeNode(JObjectKey.of(name.name() + "_jt_trash"), null, new JKleppmannTreeNodeMetaDirectory(""));
+                curTx.put(trashNode);
             }
             return new JKleppmannTree(data);
 //            opObjectRegistry.registerObject(tree);
@@ -51,9 +55,9 @@ public class JKleppmannTreeManager {
     }
 
     public class JKleppmannTree {
-        private final KleppmannTree<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey, JKleppmannTreeNodeWrapper> _tree;
+        private final KleppmannTree<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> _tree;
 
-        private final JKleppmannTreePersistentData _data;
+        private JKleppmannTreePersistentData _data;
 
         private final JKleppmannTreeStorageInterface _storageInterface;
         private final JKleppmannTreeClock _clock;
@@ -61,7 +65,7 @@ public class JKleppmannTreeManager {
         private final JObjectKey _treeName;
 
         JKleppmannTree(JKleppmannTreePersistentData data) {
-            _treeName = data.getKey();
+            _treeName = data.key();
             _data = data;
 
             _storageInterface = new JKleppmannTreeStorageInterface();
@@ -149,7 +153,7 @@ public class JKleppmannTreeManager {
 //            _tree.recordBoostrapFor(host);
 //        }
 
-        public Pair<String, JObjectKey> findParent(Function<JKleppmannTreeNodeWrapper, Boolean> predicate) {
+        public Pair<String, JObjectKey> findParent(Function<TreeNode<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>, Boolean> predicate) {
             return _tree.findParent(predicate);
         }
 
@@ -273,35 +277,31 @@ public class JKleppmannTreeManager {
         private class JKleppmannTreeClock implements Clock<Long> {
             @Override
             public Long getTimestamp() {
-                return _data.getClock().getTimestamp();
+                var res = _data.clock() + 1;
+                _data = _data.toBuilder().clock(res).build();
+                curTx.put(_data);
+                return res;
             }
 
             @Override
             public Long peekTimestamp() {
-                return _data.getClock().peekTimestamp();
+                return _data.clock();
             }
 
             @Override
             public Long updateTimestamp(Long receivedTimestamp) {
-                return _data.getClock().updateTimestamp(receivedTimestamp);
+                var old = _data.clock();
+                _data = _data.toBuilder().clock(Math.max(old, receivedTimestamp) + 1).build();
+                curTx.put(_data);
+                return old;
             }
         }
 
-        public class JKleppmannTreeStorageInterface implements StorageInterface<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey, JKleppmannTreeNodeWrapper> {
+        public class JKleppmannTreeStorageInterface implements StorageInterface<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> {
             private final LogWrapper _logWrapper = new LogWrapper();
             private final PeerLogWrapper _peerLogWrapper = new PeerLogWrapper();
 
             public JKleppmannTreeStorageInterface() {
-                if (curTx.get(JKleppmannTreeNode.class, getRootId()).isEmpty()) {
-                    var rootNode = objectAllocator.create(JKleppmannTreeNode.class, getRootId());
-                    rootNode.setNode(new TreeNode<>(getRootId(), null, new JKleppmannTreeNodeMetaDirectory("")));
-                    rootNode.setRefsFrom(List.of());
-                    curTx.put(rootNode);
-                    var trashNode = objectAllocator.create(JKleppmannTreeNode.class, getTrashId());
-                    trashNode.setRefsFrom(List.of());
-                    trashNode.setNode(new TreeNode<>(getTrashId(), null, new JKleppmannTreeNodeMetaDirectory("")));
-                    curTx.put(trashNode);
-                }
             }
 
             @Override
@@ -320,19 +320,19 @@ public class JKleppmannTreeManager {
             }
 
             @Override
-            public JKleppmannTreeNodeWrapper getById(JObjectKey id) {
+            public JKleppmannTreeNode getById(JObjectKey id) {
                 var got = curTx.get(JKleppmannTreeNode.class, id);
-                if (got.isEmpty()) return null;
-                return new JKleppmannTreeNodeWrapper(got.get());
+                return got.orElse(null);
             }
 
             @Override
-            public JKleppmannTreeNodeWrapper createNewNode(TreeNode<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> node) {
-                var created = objectAllocator.create(JKleppmannTreeNode.class, node.getId());
-                created.setNode(node);
-                created.setRefsFrom(List.of());
-                curTx.put(created);
-                return new JKleppmannTreeNodeWrapper(created);
+            public JKleppmannTreeNode createNewNode(JObjectKey key, JObjectKey parent, JKleppmannTreeNodeMeta meta) {
+                return new JKleppmannTreeNode(key, parent, meta);
+            }
+
+            @Override
+            public void putNode(TreeNode<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> node) {
+                curTx.put(((JKleppmannTreeNode) node));
             }
 
             @Override
@@ -350,95 +350,87 @@ public class JKleppmannTreeManager {
                 return _peerLogWrapper;
             }
 
-            @Override
-            public void rLock() {
-            }
-
-            @Override
-            public void rUnlock() {
-            }
-
-            @Override
-            public void rwLock() {
-            }
-
-            @Override
-            public void rwUnlock() {
-            }
-
-            @Override
-            public void assertRwLock() {
-            }
-
             private class PeerLogWrapper implements PeerTimestampLogInterface<Long, UUID> {
                 @Override
                 public Long getForPeer(UUID peerId) {
-                    return _data.getPeerTimestampLog().get(peerId);
+                    return _data.peerTimestampLog().get(peerId);
                 }
 
                 @Override
                 public void putForPeer(UUID peerId, Long timestamp) {
-                    _data.getPeerTimestampLog().put(peerId, timestamp);
+                    var newPeerTimestampLog = new HashMap<>(_data.peerTimestampLog());
+                    newPeerTimestampLog.put(peerId, timestamp);
+                    _data = _data.toBuilder().peerTimestampLog(newPeerTimestampLog).build();
+                    curTx.put(_data);
                 }
             }
 
             private class LogWrapper implements LogInterface<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> {
                 @Override
                 public Pair<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>> peekOldest() {
-                    var ret = _data.getLog().firstEntry();
+                    var ret = _data.log().firstEntry();
                     if (ret == null) return null;
                     return Pair.of(ret);
                 }
 
                 @Override
                 public Pair<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>> takeOldest() {
-                    var ret = _data.getLog().pollFirstEntry();
+                    var newLog = new TreeMap<>(_data.log());
+                    var ret = newLog.pollFirstEntry();
+                    _data = _data.toBuilder().log(newLog).build();
+                    curTx.put(_data);
                     if (ret == null) return null;
                     return Pair.of(ret);
                 }
 
                 @Override
                 public Pair<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>> peekNewest() {
-                    var ret = _data.getLog().lastEntry();
+                    var ret = _data.log().lastEntry();
                     if (ret == null) return null;
                     return Pair.of(ret);
                 }
 
                 @Override
                 public List<Pair<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>>> newestSlice(CombinedTimestamp<Long, UUID> since, boolean inclusive) {
-                    return _data.getLog().tailMap(since, inclusive).entrySet().stream().map(e -> Pair.of(e.getKey(), e.getValue())).toList();
+                    return _data.log().tailMap(since, inclusive).entrySet().stream().map(e -> Pair.of(e.getKey(), e.getValue())).toList();
                 }
 
                 @Override
                 public List<Pair<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>>> getAll() {
-                    return _data.getLog().entrySet().stream().map(e -> Pair.of(e.getKey(), e.getValue())).toList();
+                    return _data.log().entrySet().stream().map(e -> Pair.of(e.getKey(), e.getValue())).toList();
                 }
 
                 @Override
                 public boolean isEmpty() {
-                    return _data.getLog().isEmpty();
+                    return _data.log().isEmpty();
                 }
 
                 @Override
                 public boolean containsKey(CombinedTimestamp<Long, UUID> timestamp) {
-                    return _data.getLog().containsKey(timestamp);
+                    return _data.log().containsKey(timestamp);
                 }
 
                 @Override
                 public long size() {
-                    return (long) _data.getLog().size();
+                    return (long) _data.log().size();
                 }
 
                 @Override
                 public void put(CombinedTimestamp<Long, UUID> timestamp, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> record) {
-                    if (_data.getLog().containsKey(timestamp))
+                    if (_data.log().containsKey(timestamp))
                         throw new IllegalStateException("Overwriting log entry?");
-                    _data.getLog().put(timestamp, record);
+                    var newLog = new TreeMap<>(_data.log());
+                    newLog.put(timestamp, record);
+                    _data = _data.toBuilder().log(newLog).build();
+                    curTx.put(_data);
                 }
 
                 @Override
                 public void replace(CombinedTimestamp<Long, UUID> timestamp, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> record) {
-                    _data.getLog().put(timestamp, record);
+                    var newLog = new TreeMap<>(_data.log());
+                    newLog.put(timestamp, record);
+                    _data = _data.toBuilder().log(newLog).build();
+                    curTx.put(_data);
                 }
             }
         }

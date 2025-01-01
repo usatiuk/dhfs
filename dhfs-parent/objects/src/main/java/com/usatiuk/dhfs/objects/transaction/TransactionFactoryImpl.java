@@ -4,7 +4,6 @@ import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.common.runtime.JData;
 import com.usatiuk.objects.common.runtime.JObjectKey;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 import lombok.AccessLevel;
 import lombok.Getter;
 
@@ -30,6 +29,21 @@ public class TransactionFactoryImpl implements TransactionFactory {
 
         @Override
         public <T extends JData> Optional<T> get(Class<T> type, JObjectKey key, LockingStrategy strategy) {
+            switch (_writes.get(key)) {
+                case TxRecord.TxObjectRecordWrite<?> write -> {
+                    if (type.isInstance(write.data())) {
+                        return Optional.of((T) write.data());
+                    } else {
+                        throw new IllegalStateException("Type mismatch for " + key + ": expected " + type + ", got " + write.data().getClass());
+                    }
+                }
+                case TxRecord.TxObjectRecordDeleted deleted -> {
+                    return Optional.empty();
+                }
+                case null, default -> {
+                }
+            }
+
             return switch (strategy) {
                 case OPTIMISTIC -> _source.get(type, key).data().map(JDataVersionedWrapper::data);
                 case WRITE -> _source.getWriteLocked(type, key).data().map(JDataVersionedWrapper::data);

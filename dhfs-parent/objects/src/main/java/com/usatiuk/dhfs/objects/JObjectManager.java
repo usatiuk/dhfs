@@ -232,19 +232,17 @@ public class JObjectManager {
                 for (var hook : _preCommitTxHooks) {
                     for (var entry : drained) {
                         Log.trace("Running pre-commit hook " + hook.getClass() + " for" + entry.toString());
-                        switch (entry) {
-                            case TxRecord.TxObjectRecordWrite<?> write -> {
-                                var oldObj = getCurrent.apply(write.key());
-                                if (oldObj == null) {
-                                    hook.onCreate(write.key(), write.data());
-                                } else {
-                                    hook.onChange(write.key(), oldObj, write.data());
-                                }
-                            }
-                            case TxRecord.TxObjectRecordDeleted deleted -> {
-                                hook.onDelete(deleted.key(), getCurrent.apply(deleted.key()));
-                            }
-                            default -> throw new IllegalStateException("Unexpected value: " + entry);
+                        var oldObj = getCurrent.apply(entry.key());
+                        var curObj = tx.get(JData.class, entry.key()).orElse(null);
+
+                        assert (curObj == null) == (entry instanceof TxRecord.TxObjectRecordDeleted);
+
+                        if (curObj == null) {
+                            hook.onDelete(entry.key(), oldObj);
+                        } else if (oldObj == null) {
+                            hook.onCreate(entry.key(), curObj);
+                        } else {
+                            hook.onChange(entry.key(), oldObj, curObj);
                         }
                         current.put(entry.key(), entry);
                     }

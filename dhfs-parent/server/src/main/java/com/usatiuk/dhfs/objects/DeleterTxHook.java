@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.transaction.Transaction;
-import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import com.usatiuk.objects.common.runtime.JData;
 import com.usatiuk.objects.common.runtime.JObjectKey;
 import io.quarkus.logging.Log;
@@ -13,11 +12,8 @@ public class DeleterTxHook implements PreCommitTxHook {
     @Inject
     Transaction curTx;
 
-    @Inject
-    ObjectAllocator alloc;
-
     private boolean canDelete(JDataRefcounted data) {
-        return !data.getFrozen() && data.getRefsFrom().isEmpty();
+        return !data.frozen() && data.refsFrom().isEmpty();
     }
 
     @Override

@@ -42,6 +42,25 @@ public class ObjectsTest {
     }
 
     @Test
+    void createGetObject() {
+        {
+            txm.begin();
+            var newParent = new Parent(JObjectKey.of("ParentCreateGet"), "John");
+            curTx.put(newParent);
+            var parent = curTx.get(Parent.class, JObjectKey.of("ParentCreateGet")).orElse(null);
+            Assertions.assertEquals("John", parent.name());
+            txm.commit();
+        }
+
+        {
+            txm.begin();
+            var parent = curTx.get(Parent.class, JObjectKey.of("ParentCreateGet")).orElse(null);
+            Assertions.assertEquals("John", parent.name());
+            txm.commit();
+        }
+    }
+
+    @Test
     void createDeleteObject() {
         {
             txm.begin();
@@ -207,6 +226,7 @@ public class ObjectsTest {
                 curTx.put(parent.toBuilder().name("John").build());
                 Log.warn("Thread 1 commit");
                 txm.commit();
+                Log.warn("Thread 1 commit done");
                 thread1Failed.set(false);
                 return null;
             } finally {
@@ -222,6 +242,7 @@ public class ObjectsTest {
                 curTx.put(parent.toBuilder().name("John2").build());
                 Log.warn("Thread 2 commit");
                 txm.commit();
+                Log.warn("Thread 2 commit done");
                 thread2Failed.set(false);
                 return null;
             } finally {

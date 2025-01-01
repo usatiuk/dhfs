@@ -12,7 +12,6 @@ import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaDir
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaFile;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.dhfs.utils.StatusRuntimeExceptionNoStacktrace;
-import com.usatiuk.objects.alloc.runtime.ObjectAllocator;
 import com.usatiuk.objects.common.runtime.JData;
 import com.usatiuk.objects.common.runtime.JObjectKey;
 import io.grpc.Status;
@@ -37,8 +36,6 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     Transaction curTx;
     @Inject
     TransactionManager jObjectTxManager;
-    @Inject
-    ObjectAllocator objectAllocator;
 
     @ConfigProperty(name = "dhfs.files.target_chunk_size")
     int targetChunkSize;
@@ -75,9 +72,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     }
 
     private ChunkData createChunk(ByteString bytes) {
-        var newChunk = objectAllocator.create(ChunkData.class, new JObjectKey(UUID.randomUUID().toString()));
-        newChunk.setData(bytes);
-        newChunk.setRefsFrom(List.of());
+        var newChunk = new ChunkData(JObjectKey.of(UUID.randomUUID().toString()), bytes);
         curTx.put(newChunk);
         return newChunk;
     }
@@ -108,11 +103,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (ref == null) return Optional.empty();
             GetattrRes ret;
             if (ref instanceof File f) {
-                ret = new GetattrRes(f.getMtime(), f.getCtime(), f.getMode(), f.getSymlink() ? GetattrType.SYMLINK : GetattrType.FILE);
+                ret = new GetattrRes(f.mTime(), f.cTime(), f.mode(), f.symlink() ? GetattrType.SYMLINK : GetattrType.FILE);
             } else if (ref instanceof JKleppmannTreeNode) {
                 ret = new GetattrRes(100, 100, 0700, GetattrType.DIRECTORY);
             } else {
-                throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + ref.getKey()));
+                throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + ref.key()));
             }
             return Optional.of(ret);
         });
@@ -123,9 +118,9 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         return jObjectTxManager.executeTx(() -> {
             try {
                 var ret = getDirEntry(name);
-                return switch (ret.getNode().getMeta()) {
+                return switch (ret.meta()) {
                     case JKleppmannTreeNodeMetaFile f -> Optional.of(f.getFileIno());
-                    case JKleppmannTreeNodeMetaDirectory f -> Optional.of(ret.getKey());
+                    case JKleppmannTreeNodeMetaDirectory f -> Optional.of(ret.key());
                     default -> Optional.empty();
                 };
             } catch (StatusRuntimeException e) {
@@ -138,8 +133,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     }
 
     private void ensureDir(JKleppmannTreeNode entry) {
-        if (!(entry.getNode().getMeta() instanceof JKleppmannTreeNodeMetaDirectory))
-            throw new StatusRuntimeExceptionNoStacktrace(Status.INVALID_ARGUMENT.withDescription("Not a directory: " + entry.getKey()));
+        if (!(entry.meta() instanceof JKleppmannTreeNodeMetaDirectory))
+            throw new StatusRuntimeExceptionNoStacktrace(Status.INVALID_ARGUMENT.withDescription("Not a directory: " + entry.key()));
     }
 
     @Override
@@ -154,24 +149,18 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             var fuuid = UUID.randomUUID();
             Log.debug("Creating file " + fuuid);
-            File f = objectAllocator.create(File.class, new JObjectKey(fuuid.toString()));
-            f.setMode(mode);
-            f.setMtime(System.currentTimeMillis());
-            f.setCtime(f.getMtime());
-            f.setSymlink(false);
-            f.setChunks(new TreeMap<>());
-            f.setRefsFrom(List.of());
+            File f = new File(JObjectKey.of(fuuid.toString()), new HashSet<>(), false, mode, System.currentTimeMillis(), System.currentTimeMillis(), new TreeMap<>(), false, 0);
             curTx.put(f);
 
             try {
-                getTree().move(parent.getKey(), new JKleppmannTreeNodeMetaFile(fname, f.getKey()), getTree().getNewNodeId());
+                getTree().move(parent.key(), new JKleppmannTreeNodeMetaFile(fname, f.key()), getTree().getNewNodeId());
             } catch (Exception e) {
 //                fobj.getMeta().removeRef(newNodeId);
                 throw e;
             } finally {
 //                fobj.rwUnlock();
             }
-            return Optional.of(f.getKey());
+            return Optional.of(f.key());
         });
     }
 
@@ -180,7 +169,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     public Pair<String, JObjectKey> inoToParent(JObjectKey ino) {
         return jObjectTxManager.executeTx(() -> {
             return getTree().findParent(w -> {
-                if (w.getNode().getMeta() instanceof JKleppmannTreeNodeMetaFile f)
+                if (w.meta() instanceof JKleppmannTreeNodeMetaFile f)
                     if (f.getFileIno().equals(ino))
                         return true;
                 return false;
@@ -199,7 +188,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             Log.debug("Creating directory " + name);
 
-            getTree().move(parent.getKey(), new JKleppmannTreeNodeMetaDirectory(dname), getTree().getNewNodeId());
+            getTree().move(parent.key(), new JKleppmannTreeNodeMetaDirectory(dname), getTree().getNewNodeId());
         });
     }
 
@@ -207,11 +196,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     public void unlink(String name) {
         jObjectTxManager.executeTx(() -> {
             var node = getDirEntryOpt(name).orElse(null);
-            if (node.getNode().getMeta() instanceof JKleppmannTreeNodeMetaDirectory f) {
-                if (!allowRecursiveDelete && !node.getNode().getChildren().isEmpty())
+            if (node.meta() instanceof JKleppmannTreeNodeMetaDirectory f) {
+                if (!allowRecursiveDelete && !node.children().isEmpty())
                     throw new DirectoryNotEmptyException();
             }
-            getTree().trash(node.getNode().getMeta(), node.getKey());
+            getTree().trash(node.meta(), node.key());
         });
     }
 
@@ -219,13 +208,13 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     public Boolean rename(String from, String to) {
         return jObjectTxManager.executeTx(() -> {
             var node = getDirEntry(from);
-            JKleppmannTreeNodeMeta meta = node.getNode().getMeta();
+            JKleppmannTreeNodeMeta meta = node.meta();
 
             var toPath = Path.of(to);
             var toDentry = getDirEntry(toPath.getParent().toString());
             ensureDir(toDentry);
 
-            getTree().move(toDentry.getKey(), meta.withName(toPath.getFileName().toString()), node.getKey());
+            getTree().move(toDentry.key(), meta.withName(toPath.getFileName().toString()), node.key());
             return true;
         });
     }
@@ -238,8 +227,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (dent instanceof JKleppmannTreeNode) {
                 return true;
             } else if (dent instanceof File f) {
-                f.setMode(mode);
-                f.setMtime(System.currentTimeMillis());
+                curTx.put(f.toBuilder().mode(mode).mTime(System.currentTimeMillis()).build());
                 return true;
             } else {
                 throw new IllegalArgumentException(uuid + " is not a file");
@@ -252,10 +240,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         return jObjectTxManager.executeTx(() -> {
             var found = getDirEntry(name);
 
-            if (!(found.getNode().getMeta() instanceof JKleppmannTreeNodeMetaDirectory md))
+            if (!(found.meta() instanceof JKleppmannTreeNodeMetaDirectory md))
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
 
-            return found.getNode().getChildren().keySet();
+            return found.children().keySet();
         });
     }
 
@@ -274,7 +262,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
 
             try {
-                var chunksAll = file.getChunks();
+                var chunksAll = file.chunks();
                 if (chunksAll.isEmpty()) {
                     return Optional.of(ByteString.empty());
                 }
@@ -334,7 +322,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             throw new StatusRuntimeException(Status.NOT_FOUND);
         }
 
-        return chunkRead.getData();
+        return chunkRead.data();
     }
 
     private int getChunkSize(JObjectKey uuid) {
@@ -373,7 +361,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
 
             if (writeLogging) {
-                Log.info("Writing to file: " + file.getKey() + " size=" + size(fileUuid) + " "
+                Log.info("Writing to file: " + file.key() + " size=" + size(fileUuid) + " "
                         + offset + " " + data.size());
             }
 
@@ -381,7 +369,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 truncate(fileUuid, offset);
 
             // FIXME: Some kind of immutable interface?
-            var chunksAll = Collections.unmodifiableNavigableMap(file.getChunks());
+            var chunksAll = Collections.unmodifiableNavigableMap(file.chunks());
             var first = chunksAll.floorEntry(offset);
             var last = chunksAll.lowerEntry(offset + data.size());
             NavigableMap<Long, JObjectKey> removedChunks = new TreeMap<>();
@@ -496,14 +484,15 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                     var thisChunk = pendingWrites.substring(cur, end);
 
                     ChunkData newChunkData = createChunk(thisChunk);
-                    newChunks.put(start, newChunkData.getKey());
+                    newChunks.put(start, newChunkData.key());
 
                     start += thisChunk.size();
                     cur = end;
                 }
             }
 
-            file.setChunks(newChunks);
+            file = file.toBuilder().chunks(newChunks).mTime(System.currentTimeMillis()).build();
+            curTx.put(file);
             cleanupChunks(file, removedChunks.values());
             updateFileSize(file);
 
@@ -524,10 +513,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
 
             if (length == 0) {
-                var oldChunks = Collections.unmodifiableNavigableMap(new TreeMap<>(file.getChunks()));
+                var oldChunks = Collections.unmodifiableNavigableMap(new TreeMap<>(file.chunks()));
 
-                file.setChunks(new TreeMap<>());
-                file.setMtime(System.currentTimeMillis());
+                file = file.toBuilder().chunks(new TreeMap<>()).mTime(System.currentTimeMillis()).build();
+                curTx.put(file);
                 cleanupChunks(file, oldChunks.values());
                 updateFileSize(file);
                 return true;
@@ -536,7 +525,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             var curSize = size(fileUuid);
             if (curSize == length) return true;
 
-            var chunksAll = Collections.unmodifiableNavigableMap(file.getChunks());
+            var chunksAll = Collections.unmodifiableNavigableMap(file.chunks());
             NavigableMap<Long, JObjectKey> removedChunks = new TreeMap<>();
             NavigableMap<Long, JObjectKey> newChunks = new TreeMap<>();
 
@@ -567,9 +556,9 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                             zeroCache.put(end - cur, UnsafeByteOperations.unsafeWrap(new byte[Math.toIntExact(end - cur)]));
 
                         ChunkData newChunkData = createChunk(zeroCache.get(end - cur));
-                        newChunks.put(start, newChunkData.getKey());
+                        newChunks.put(start, newChunkData.key());
 
-                        start += newChunkData.getData().size();
+                        start += newChunkData.data().size();
                         cur = end;
                     }
                 }
@@ -584,10 +573,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 var newChunk = tailBytes.substring(0, (int) (length - tail.getKey()));
 
                 ChunkData newChunkData = createChunk(newChunk);
-                newChunks.put(tail.getKey(), newChunkData.getKey());
+                newChunks.put(tail.getKey(), newChunkData.key());
             }
 
-            file.setChunks(newChunks);
+            file = file.toBuilder().chunks(newChunks).mTime(System.currentTimeMillis()).build();
+            curTx.put(file);
             cleanupChunks(file, removedChunks.values());
             updateFileSize(file);
             return true;
@@ -622,16 +612,14 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             var fuuid = UUID.randomUUID();
             Log.debug("Creating file " + fuuid);
 
-            File f = objectAllocator.create(File.class, new JObjectKey(fuuid.toString()));
-            f.setSymlink(true);
-            f.setRefsFrom(List.of());
+            File f = new File(JObjectKey.of(fuuid.toString()), new HashSet<>(), false, 0, System.currentTimeMillis(), System.currentTimeMillis(), new TreeMap<>(), true, 0);
             ChunkData newChunkData = createChunk(UnsafeByteOperations.unsafeWrap(oldpath.getBytes(StandardCharsets.UTF_8)));
 
-            f.getChunks().put(0L, newChunkData.getKey());
+            f.chunks().put(0L, newChunkData.key());
             updateFileSize(f);
 
-            getTree().move(parent.getKey(), new JKleppmannTreeNodeMetaFile(fname, f.getKey()), getTree().getNewNodeId());
-            return f.getKey();
+            getTree().move(parent.key(), new JKleppmannTreeNodeMetaFile(fname, f.key()), getTree().getNewNodeId());
+            return f.key();
         });
     }
 
@@ -643,7 +631,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                             "File not found for setTimes: " + fileUuid))
             );
 
-            file.setMtime(mtimeMs);
+            curTx.put(file.toBuilder().cTime(atimeMs).mTime(mtimeMs).build());
             return true;
         });
     }
@@ -653,14 +641,14 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         jObjectTxManager.executeTx(() -> {
             long realSize = 0;
 
-            var last = file.getChunks().lastEntry();
+            var last = file.chunks().lastEntry();
             if (last != null) {
                 var lastSize = getChunkSize(last.getValue());
                 realSize = last.getKey() + lastSize;
             }
 
-            if (realSize != file.getSize()) {
-                file.setSize(realSize);
+            if (realSize != file.size()) {
+                curTx.put(file.toBuilder().size(realSize).build());
             }
         });
     }
@@ -671,7 +659,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             var read = curTx.get(File.class, uuid)
                     .orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
-            return read.getSize();
+            return read.size();
         });
     }
 }

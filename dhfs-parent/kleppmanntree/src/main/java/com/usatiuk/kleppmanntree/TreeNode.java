@@ -1,32 +1,24 @@
 package com.usatiuk.kleppmanntree;
 
-import lombok.Getter;
-import lombok.Setter;
-
 import java.io.Serializable;
-import java.util.HashMap;
 import java.util.Map;
 
-@Getter
-@Setter
-public class TreeNode<TimestampT extends Comparable<TimestampT>, PeerIdT extends Comparable<PeerIdT>, MetaT extends NodeMeta, NodeIdT> implements Serializable {
-    private final NodeIdT _id;
-    private NodeIdT _parent = null;
-    private OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> _lastEffectiveOp = null;
-    private MetaT _meta = null;
-    private Map<String, NodeIdT> _children = new HashMap<>();
+public interface TreeNode<TimestampT extends Comparable<TimestampT>, PeerIdT extends Comparable<PeerIdT>, MetaT extends NodeMeta, NodeIdT> extends Serializable {
+    NodeIdT key();
 
-    public TreeNode(NodeIdT id, NodeIdT parent, MetaT meta) {
-        _id = id;
-        _meta = meta;
-        _parent = parent;
-    }
+    NodeIdT parent();
 
-    public TreeNode(NodeIdT id, NodeIdT parent, MetaT meta, Map<String, NodeIdT> children) {
-        _id = id;
-        _meta = meta;
-        _parent = parent;
-        _children = children;
-    }
+    OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> lastEffectiveOp();
 
+    MetaT meta();
+
+    Map<String, NodeIdT> children();
+
+    TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> withParent(NodeIdT parent);
+
+    TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> withLastEffectiveOp(OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> lastEffectiveOp);
+
+    TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> withMeta(MetaT meta);
+
+    TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> withChildren(Map<String, NodeIdT> children);
 }

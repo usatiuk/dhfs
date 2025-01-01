@@ -31,7 +31,7 @@ public class ReadTrackingObjectSource implements TransactionObjectSource {
         }
 
         got.data().ifPresent(data -> {
-            if (!type.isInstance(data))
+            if (!type.isInstance(data.data()))
                 throw new IllegalStateException("Type mismatch for " + got + ": expected " + type + ", got " + data.getClass());
         });
 
@@ -49,7 +49,7 @@ public class ReadTrackingObjectSource implements TransactionObjectSource {
         }
 
         got.data().ifPresent(data -> {
-            if (!type.isInstance(data))
+            if (!type.isInstance(data.data()))
                 throw new IllegalStateException("Type mismatch for " + got + ": expected " + type + ", got " + data.getClass());
         });
 
