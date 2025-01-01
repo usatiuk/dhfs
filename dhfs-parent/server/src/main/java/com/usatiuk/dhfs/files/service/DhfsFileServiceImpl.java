@@ -365,8 +365,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                         + offset + " " + data.size());
             }
 
-            if (size(fileUuid) < offset)
+            if (size(fileUuid) < offset) {
                 truncate(fileUuid, offset);
+                file = curTx.get(File.class, fileUuid).orElse(null);
+            }
 
             // FIXME: Some kind of immutable interface?
             var chunksAll = Collections.unmodifiableNavigableMap(file.chunks());
@@ -491,7 +493,16 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 }
             }
 
-            file = file.toBuilder().chunks(newChunks).mTime(System.currentTimeMillis()).build();
+            NavigableMap<Long, JObjectKey> realNewChunks = new TreeMap<>();
+            for (var chunk : chunksAll.entrySet()) {
+                if (!removedChunks.containsKey(chunk.getKey())) {
+                    realNewChunks.put(chunk.getKey(), chunk.getValue());
+                }
+            }
+
+            realNewChunks.putAll(newChunks);
+
+            file = file.toBuilder().chunks(Collections.unmodifiableNavigableMap(realNewChunks)).mTime(System.currentTimeMillis()).build();
             curTx.put(file);
             cleanupChunks(file, removedChunks.values());
             updateFileSize(file);
@@ -576,7 +587,16 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 newChunks.put(tail.getKey(), newChunkData.key());
             }
 
-            file = file.toBuilder().chunks(newChunks).mTime(System.currentTimeMillis()).build();
+            NavigableMap<Long, JObjectKey> realNewChunks = new TreeMap<>();
+            for (var chunk : chunksAll.entrySet()) {
+                if (!removedChunks.containsKey(chunk.getKey())) {
+                    realNewChunks.put(chunk.getKey(), chunk.getValue());
+                }
+            }
+
+            realNewChunks.putAll(newChunks);
+
+            file = file.toBuilder().chunks(Collections.unmodifiableNavigableMap(realNewChunks)).mTime(System.currentTimeMillis()).build();
             curTx.put(file);
             cleanupChunks(file, removedChunks.values());
             updateFileSize(file);
