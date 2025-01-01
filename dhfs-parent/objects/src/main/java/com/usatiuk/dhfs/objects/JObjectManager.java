@@ -324,5 +324,11 @@ public class JObjectManager {
     }
 
     public void rollback(TransactionPrivate tx) {
+        Log.trace("Rolling back transaction " + tx.getId());
+        tx.reads().forEach((key, value) -> {
+            if (value instanceof TransactionObjectLocked<?> locked) {
+                locked.lock.close();
+            }
+        });
     }
 }

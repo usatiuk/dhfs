@@ -10,6 +10,7 @@ import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaDirectory;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaFile;
+import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.dhfs.utils.StatusRuntimeExceptionNoStacktrace;
 import com.usatiuk.objects.common.runtime.JData;
@@ -354,7 +355,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Offset should be more than zero: " + offset));
 
             // FIXME:
-            var file = curTx.get(File.class, fileUuid).orElse(null);
+            var file = curTx.get(File.class, fileUuid, LockingStrategy.WRITE).orElse(null);
             if (file == null) {
                 Log.error("File not found when trying to write: " + fileUuid);
                 return -1L;

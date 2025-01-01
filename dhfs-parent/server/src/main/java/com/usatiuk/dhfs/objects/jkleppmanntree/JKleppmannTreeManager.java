@@ -5,6 +5,7 @@ import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaDirectory;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreePersistentData;
+import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.kleppmanntree.*;
 import com.usatiuk.objects.common.runtime.JObjectKey;
@@ -32,7 +33,7 @@ public class JKleppmannTreeManager {
 
     public JKleppmannTree getTree(JObjectKey name) {
         return txManager.executeTx(() -> {
-            var data = curTx.get(JKleppmannTreePersistentData.class, name).orElse(null);
+            var data = curTx.get(JKleppmannTreePersistentData.class, name, LockingStrategy.WRITE).orElse(null);
             if (data == null) {
                 data = new JKleppmannTreePersistentData(
                         name,

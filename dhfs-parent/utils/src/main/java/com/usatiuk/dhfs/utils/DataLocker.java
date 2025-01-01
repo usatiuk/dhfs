@@ -32,7 +32,9 @@ public class DataLocker {
         public void close() {
             synchronized (_tag) {
                 _tag.released = true;
-                _tag.notify();
+                // Notify all because when the object is locked again,
+                // it's a different lock tag
+                _tag.notifyAll();
                 _locks.remove(_key, _tag);
             }
         }
