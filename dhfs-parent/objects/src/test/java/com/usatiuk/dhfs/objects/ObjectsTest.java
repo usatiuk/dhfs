@@ -158,6 +158,7 @@ public class ObjectsTest {
                 Log.warn("Thread 1");
                 txm.begin();
                 barrier.await();
+                var got = curTx.get(Parent.class, new JObjectKey("Parent2")).orElse(null);
                 var newParent = new Parent(JObjectKey.of("Parent2"), "John");
                 curTx.put(newParent);
                 Log.warn("Thread 1 commit");
@@ -173,6 +174,7 @@ public class ObjectsTest {
                 Log.warn("Thread 2");
                 txm.begin();
                 barrier.await();
+                var got = curTx.get(Parent.class, new JObjectKey("Parent2")).orElse(null);
                 var newParent = new Parent(JObjectKey.of("Parent2"), "John2");
                 curTx.put(newParent);
                 Log.warn("Thread 2 commit");

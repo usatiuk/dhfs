@@ -186,6 +186,7 @@ public class JObjectManager {
 
         var current = new LinkedHashMap<JObjectKey, TxRecord.TxObjectRecord<?>>();
         var dependenciesLocked = new LinkedHashMap<JObjectKey, TransactionObjectLocked<?>>();
+        Map<JObjectKey, TransactionObject<?>> reads;
         var toUnlock = new ArrayList<AutoCloseableNoThrow>();
 
         Consumer<JObjectKey> addDependency =
@@ -220,8 +221,6 @@ public class JObjectManager {
         try {
             Collection<TxRecord.TxObjectRecord<?>> drained;
             while (!(drained = tx.drainNewWrites()).isEmpty()) {
-                var toLock = new ArrayList<JObjectKey>();
-
                 Log.trace("Commit iteration with " + drained.size() + " records");
 
                 drained.stream()
@@ -249,7 +248,8 @@ public class JObjectManager {
                 }
             }
 
-            for (var read : tx.reads().entrySet()) {
+            reads = tx.reads();
+            for (var read : reads.entrySet()) {
                 addDependency.accept(read.getKey());
                 if (read.getValue() instanceof TransactionObjectLocked<?> locked) {
                     toUnlock.add(locked.lock);
@@ -257,13 +257,23 @@ public class JObjectManager {
             }
 
             for (var dep : dependenciesLocked.entrySet()) {
-                Log.trace("Checking dependency " + dep.getKey());
-
-                if (dep.getValue().data().isEmpty()) continue;
+                if (dep.getValue().data().isEmpty()) {
+                    Log.trace("Checking dependency " + dep.getKey() + " - not found");
+                    continue;
+                }
 
                 if (dep.getValue().data().get().version() >= tx.getId()) {
+                    Log.trace("Checking dependency " + dep.getKey() + " - newer than");
                     throw new IllegalStateException("Serialization hazard: " + dep.getValue().data().get().version() + " vs " + tx.getId());
                 }
+
+                var read = reads.get(dep.getKey());
+                if (read != null && read.data().orElse(null) != dep.getValue().data().orElse(null)) {
+                    Log.trace("Checking dependency " + dep.getKey() + " - read mismatch");
+                    throw new IllegalStateException("Read mismatch for " + dep.getKey() + ": " + read + " vs " + dep.getValue());
+                }
+
+                Log.trace("Checking dependency " + dep.getKey() + " - ok");
             }
 
             Log.tracef("Flushing transaction %d to storage", tx.getId());
