@@ -102,8 +102,10 @@ public class CachingObjectPersistentStore {
     public void commitTx(TxManifest names) {
         // During commit, readObject shouldn't be called for these items,
         // it should be handled by the upstream store
-        for (var key : Stream.concat(names.written().stream(), names.deleted().stream()).toList()) {
-            _cache.remove(key);
+        synchronized (_cache) {
+            for (var key : Stream.concat(names.written().stream(), names.deleted().stream()).toList()) {
+                _cache.remove(key);
+            }
         }
         delegate.commitTx(names);
     }
