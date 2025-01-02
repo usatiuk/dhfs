@@ -9,4 +9,8 @@ import java.io.Serializable;
 // It is immutable, its version is filled in by the allocator from the AllocVersionProvider
 public interface JData extends Serializable {
     JObjectKey key();
+
+    default int estimateSize() {
+        return 100;
+    }
 }

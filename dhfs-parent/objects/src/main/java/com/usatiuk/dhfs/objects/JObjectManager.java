@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.persistence.ObjectPersistentStore;
-import com.usatiuk.dhfs.objects.persistence.TxManifest;
 import com.usatiuk.dhfs.objects.transaction.*;
 import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
 import com.usatiuk.dhfs.utils.DataLocker;
@@ -12,7 +11,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
-import java.io.Serializable;
 import java.lang.ref.Cleaner;
 import java.lang.ref.WeakReference;
 import java.util.*;
@@ -33,6 +31,8 @@ public class JObjectManager {
     ObjectSerializer<JDataVersionedWrapper> objectSerializer;
     @Inject
     TransactionFactory transactionFactory;
+    @Inject
+    TxWriteback txWriteback;
 
     private final List<PreCommitTxHook> _preCommitTxHooks;
 
@@ -160,27 +160,6 @@ public class JObjectManager {
         return transactionFactory.createTransaction(counter, new TransactionObjectSourceImpl(counter));
     }
 
-    // FIXME:
-    private static class SimpleTxManifest implements Serializable, TxManifest {
-        private final List<JObjectKey> _written;
-        private final List<JObjectKey> _deleted;
-
-        public SimpleTxManifest(List<JObjectKey> written, List<JObjectKey> deleted) {
-            _written = written;
-            _deleted = deleted;
-        }
-
-        @Override
-        public List<JObjectKey> getWritten() {
-            return _written;
-        }
-
-        @Override
-        public List<JObjectKey> getDeleted() {
-            return _deleted;
-        }
-    }
-
     public void commit(TransactionPrivate tx) {
         Log.trace("Committing transaction " + tx.getId());
 
@@ -285,22 +264,19 @@ public class JObjectManager {
 
             Log.tracef("Flushing transaction %d to storage", tx.getId());
 
-            var toDelete = new ArrayList<JObjectKey>();
-            var toWrite = new ArrayList<JObjectKey>();
+            var bundle = txWriteback.createBundle();
 
             for (var action : current.entrySet()) {
                 switch (action.getValue()) {
                     case TxRecord.TxObjectRecordWrite<?> write -> {
                         Log.trace("Flushing object " + action.getKey());
-                        toWrite.add(action.getKey());
                         var wrapped = new JDataVersionedWrapper<>(write.data(), tx.getId());
-                        var data = objectSerializer.serialize(wrapped);
-                        objectStorage.writeObject(action.getKey(), data);
+                        bundle.commit(wrapped);
                         _objects.put(action.getKey(), new JDataWrapper<>(wrapped));
                     }
                     case TxRecord.TxObjectRecordDeleted deleted -> {
                         Log.trace("Deleting object " + action.getKey());
-                        toDelete.add(action.getKey());
+                        bundle.delete(action.getKey());
                         _objects.remove(action.getKey());
                     }
                     default -> {
@@ -310,8 +286,7 @@ public class JObjectManager {
             }
 
             Log.tracef("Committing transaction %d to storage", tx.getId());
-
-            objectStorage.commitTx(new SimpleTxManifest(toWrite, toDelete));
+            txWriteback.commitBundle(bundle);
         } catch (
                 Throwable t) {
             Log.error("Error when committing transaction", t);

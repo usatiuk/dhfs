@@ -244,17 +244,17 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
 
     public void commitTxImpl(TxManifest manifest, boolean failIfNotFound) {
         try {
-            if (manifest.getDeleted().isEmpty() && manifest.getWritten().isEmpty()) {
+            if (manifest.deleted().isEmpty() && manifest.written().isEmpty()) {
                 Log.debug("Empty manifest, skipping");
                 return;
             }
 
             putTxManifest(manifest);
 
-            var latch = new CountDownLatch(manifest.getWritten().size() + manifest.getDeleted().size());
+            var latch = new CountDownLatch(manifest.written().size() + manifest.deleted().size());
             ConcurrentLinkedQueue<Throwable> errors = new ConcurrentLinkedQueue<>();
 
-            for (var n : manifest.getWritten()) {
+            for (var n : manifest.written()) {
                 _flushExecutor.execute(() -> {
                     try {
                         Files.move(getTmpObjPath(n), getObjPath(n), ATOMIC_MOVE, REPLACE_EXISTING);
@@ -267,7 +267,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
                     }
                 });
             }
-            for (var d : manifest.getDeleted()) {
+            for (var d : manifest.deleted()) {
                 _flushExecutor.execute(() -> {
                     try {
                         deleteImpl(getObjPath(d));

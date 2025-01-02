@@ -6,7 +6,6 @@ import com.usatiuk.objects.common.runtime.JObjectKey;
 import lombok.Builder;
 
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 
 @Builder(toBuilder = true)
@@ -24,5 +23,10 @@ public record ChunkData(JObjectKey key, Collection<JObjectKey> refsFrom, boolean
     @Override
     public ChunkData withFrozen(boolean frozen) {
         return this.toBuilder().frozen(frozen).build();
+    }
+
+    @Override
+    public int estimateSize() {
+        return data.size();
     }
 }

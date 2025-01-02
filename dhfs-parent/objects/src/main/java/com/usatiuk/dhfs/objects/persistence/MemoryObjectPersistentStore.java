@@ -43,10 +43,10 @@ public class MemoryObjectPersistentStore implements ObjectPersistentStore {
     @Override
     public void commitTx(TxManifest names) {
         synchronized (this) {
-            for (JObjectKey key : names.getWritten()) {
+            for (JObjectKey key : names.written()) {
                 _objects.put(key, _pending.get(key));
             }
-            for (JObjectKey key : names.getDeleted()) {
+            for (JObjectKey key : names.deleted()) {
                 _objects.remove(key);
             }
         }

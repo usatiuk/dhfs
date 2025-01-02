@@ -3,11 +3,8 @@ package com.usatiuk.dhfs.objects.persistence;
 import com.usatiuk.objects.common.runtime.JObjectKey;
 
 import java.io.Serializable;
-import java.util.List;
+import java.util.Collection;
 
 // FIXME: Serializable
-public interface TxManifest extends Serializable {
-    List<JObjectKey> getWritten();
-
-    List<JObjectKey> getDeleted();
+public record TxManifest(Collection<JObjectKey> written, Collection<JObjectKey> deleted) implements Serializable {
 }
