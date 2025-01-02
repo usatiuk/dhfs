@@ -14,15 +14,14 @@ import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 @ApplicationScoped
 public class TxWritebackImpl implements TxWriteback {
     private final LinkedList<TxBundleImpl> _pendingBundles = new LinkedList<>();
+
+    private final ConcurrentHashMap<JObjectKey, PendingWriteEntry> _pendingWrites = new ConcurrentHashMap<>();
     private final LinkedHashMap<Long, TxBundleImpl> _notFlushedBundles = new LinkedHashMap<>();
 
     private final Object _flushWaitSynchronizer = new Object();
@@ -148,6 +147,14 @@ public class TxWritebackImpl implements TxWriteback {
 
                 Log.trace("Bundle " + bundle.getId() + " committed");
 
+                synchronized (_pendingBundles) {
+                    bundle._entries.values().forEach(e -> {
+                        var cur = _pendingWrites.get(e.key());
+                        if (cur.bundleId() == bundle.getId())
+                            _pendingWrites.remove(e.key(), cur);
+                    });
+                }
+
                 List<List<VoidFn>> callbacks = new ArrayList<>();
                 synchronized (_notFlushedBundles) {
                     _lastWrittenTx.set(bundle.getId());
@@ -233,6 +240,15 @@ public class TxWritebackImpl implements TxWriteback {
         verifyReady();
         synchronized (_pendingBundles) {
             ((TxBundleImpl) bundle).setReady();
+            ((TxBundleImpl) bundle)._entries.values().forEach(e -> {
+                switch (e) {
+                    case TxBundleImpl.CommittedEntry c ->
+                            _pendingWrites.put(c.key(), new PendingWrite(c.data, bundle.getId()));
+                    case TxBundleImpl.DeletedEntry d ->
+                            _pendingWrites.put(d.key(), new PendingDelete(d.key, bundle.getId()));
+                    default -> throw new IllegalStateException("Unexpected value: " + e);
+                }
+            });
             if (_pendingBundles.peek() == bundle)
                 _pendingBundles.notify();
             synchronized (_flushWaitSynchronizer) {
@@ -261,6 +277,13 @@ public class TxWritebackImpl implements TxWriteback {
             latch.await();
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public Optional<PendingWriteEntry> getPendingWrite(JObjectKey key) {
+        synchronized (_pendingWrites) {
+            return Optional.ofNullable(_pendingWrites.get(key));
         }
     }
 

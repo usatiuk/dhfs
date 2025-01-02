@@ -82,7 +82,25 @@ public class JObjectManager {
             try (var readLock = _objLocker.lock(key)) {
                 if (_objects.containsKey(key)) continue;
 
-                var read = objectStorage.readObject(key)
+                var pending = txWriteback.getPendingWrite(key);
+
+                JDataVersionedWrapper<?> read;
+
+                switch (pending.orElse(null)) {
+                    case TxWriteback.PendingWrite write -> {
+                        read = write.data();
+                    }
+                    case TxWriteback.PendingDelete delete -> {
+                        return null;
+                    }
+                    case null -> {
+                    }
+                    default -> {
+                        throw new IllegalStateException("Unexpected value: " + pending);
+                    }
+                }
+
+                read = objectStorage.readObject(key)
                         .map(objectSerializer::deserialize)
                         .orElse(null);
 
@@ -92,7 +110,7 @@ public class JObjectManager {
                     var wrapper = new JDataWrapper<>((JDataVersionedWrapper<T>) read);
                     var old = _objects.put(key, wrapper);
                     assert old == null;
-                    return read;
+                    return (JDataVersionedWrapper<T>) read;
                 } else {
                     throw new IllegalArgumentException("Object type mismatch: " + read.getClass() + " vs " + type);
                 }
