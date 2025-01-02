@@ -28,49 +28,38 @@ public class PreCommitTxHookTest {
 
     @Test
     void createObject() {
-        {
-            txm.begin();
-            var newParent = new Parent(JObjectKey.of("ParentCreate"), "John");
+        txm.run(() -> {
+            var newParent = new Parent(JObjectKey.of("ParentCreate2"), "John");
             curTx.put(newParent);
-            curTx.put(newParent);
-            txm.commit();
-        }
+        });
 
-        {
-            txm.begin();
-            var parent = curTx.get(Parent.class, new JObjectKey("ParentCreate")).orElse(null);
+        txm.run(() -> {
+            var parent = curTx.get(Parent.class, new JObjectKey("ParentCreate2")).orElse(null);
             Assertions.assertEquals("John", parent.name());
-            txm.commit();
-        }
+        });
 
         ArgumentCaptor<JData> dataCaptor = ArgumentCaptor.forClass(JData.class);
         ArgumentCaptor<JObjectKey> keyCaptor = ArgumentCaptor.forClass(JObjectKey.class);
         Mockito.verify(spyHook, Mockito.times(1)).onCreate(keyCaptor.capture(), dataCaptor.capture());
         Assertions.assertEquals("John", ((Parent) dataCaptor.getValue()).name());
-        Assertions.assertEquals(new JObjectKey("ParentCreate"), keyCaptor.getValue());
+        Assertions.assertEquals(new JObjectKey("ParentCreate2"), keyCaptor.getValue());
     }
 
     @Test
     void deleteObject() {
-        {
-            txm.begin();
+        txm.run(() -> {
             var newParent = new Parent(JObjectKey.of("ParentDel"), "John");
             curTx.put(newParent);
-            txm.commit();
-        }
+        });
 
-        {
-            txm.begin();
+        txm.run(() -> {
             var parent = curTx.get(Parent.class, new JObjectKey("ParentDel")).orElse(null);
             Assertions.assertEquals("John", parent.name());
-            txm.commit();
-        }
+        });
 
-        {
-            txm.begin();
+        txm.run(() -> {
             curTx.delete(new JObjectKey("ParentDel"));
-            txm.commit();
-        }
+        });
 
         ArgumentCaptor<JData> dataCaptor = ArgumentCaptor.forClass(JData.class);
         ArgumentCaptor<JObjectKey> keyCaptor = ArgumentCaptor.forClass(JObjectKey.class);
@@ -81,19 +70,15 @@ public class PreCommitTxHookTest {
 
     @Test
     void editObject() {
-        {
-            txm.begin();
+        txm.run(() -> {
             var newParent = new Parent(JObjectKey.of("ParentEdit"), "John");
             curTx.put(newParent);
-            txm.commit();
-        }
+        });
 
-        {
-            txm.begin();
+        txm.run(() -> {
             var newParent = new Parent(JObjectKey.of("ParentEdit"), "John changed");
             curTx.put(newParent);
-            txm.commit();
-        }
+        });
 
         ArgumentCaptor<JData> dataCaptorOld = ArgumentCaptor.forClass(JData.class);
         ArgumentCaptor<JData> dataCaptorNew = ArgumentCaptor.forClass(JData.class);
@@ -106,20 +91,16 @@ public class PreCommitTxHookTest {
 
     @Test
     void editObjectWithGet() {
-        {
-            txm.begin();
+        txm.run(() -> {
             var newParent = new Parent(JObjectKey.of("ParentEdit2"), "John");
             curTx.put(newParent);
-            txm.commit();
-        }
+        });
 
-        {
-            txm.begin();
+        txm.run(() -> {
             var parent = curTx.get(Parent.class, new JObjectKey("ParentEdit2")).orElse(null);
             Assertions.assertEquals("John", parent.name());
-            curTx.put(parent.toBuilder().name("John changed").build());
-            txm.commit();
-        }
+            curTx.put(parent.withName("John changed"));
+        });
 
         ArgumentCaptor<JData> dataCaptorOld = ArgumentCaptor.forClass(JData.class);
         ArgumentCaptor<JData> dataCaptorNew = ArgumentCaptor.forClass(JData.class);

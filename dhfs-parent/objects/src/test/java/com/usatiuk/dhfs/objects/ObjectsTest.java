@@ -25,123 +25,91 @@ public class ObjectsTest {
 
     @Test
     void createObject() {
-        {
-            txm.begin();
-            var newParent = new Parent(JObjectKey.of("Parent"), "John");
+        txm.run(() -> {
+            var newParent = new Parent(JObjectKey.of("ParentCreate"), "John");
             curTx.put(newParent);
-            txm.commit();
-        }
+        });
 
-        {
-            txm.begin();
-            var parent = curTx.get(Parent.class, JObjectKey.of("Parent")).orElse(null);
+        txm.run(() -> {
+            var parent = curTx.get(Parent.class, new JObjectKey("ParentCreate")).orElse(null);
             Assertions.assertEquals("John", parent.name());
-            txm.commit();
-        }
+        });
     }
 
     @Test
     void createGetObject() {
-        {
-            txm.begin();
+        txm.run(() -> {
             var newParent = new Parent(JObjectKey.of("ParentCreateGet"), "John");
             curTx.put(newParent);
             var parent = curTx.get(Parent.class, JObjectKey.of("ParentCreateGet")).orElse(null);
             Assertions.assertEquals("John", parent.name());
-            txm.commit();
-        }
+        });
 
-        {
-            txm.begin();
-            var parent = curTx.get(Parent.class, JObjectKey.of("ParentCreateGet")).orElse(null);
+        txm.run(() -> {
+            var parent = curTx.get(Parent.class, new JObjectKey("ParentCreateGet")).orElse(null);
             Assertions.assertEquals("John", parent.name());
-            txm.commit();
-        }
+        });
     }
 
     @Test
     void createDeleteObject() {
-        {
-            txm.begin();
-            var newParent = new Parent(JObjectKey.of("Parent2"), "John");
+        txm.run(() -> {
+            var newParent = new Parent(JObjectKey.of("ParentCreateDeleteObject"), "John");
             curTx.put(newParent);
-            txm.commit();
-        }
+        });
 
-        {
-            txm.begin();
-            var parent = curTx.get(Parent.class, JObjectKey.of("Parent2")).orElse(null);
+        txm.run(() -> {
+            var parent = curTx.get(Parent.class, JObjectKey.of("ParentCreateDeleteObject")).orElse(null);
             Assertions.assertEquals("John", parent.name());
-            txm.commit();
-        }
+        });
 
-        {
-            txm.begin();
-            curTx.delete(new JObjectKey("Parent2"));
-            txm.commit();
-        }
+        txm.run(() -> {
+            curTx.delete(new JObjectKey("ParentCreateDeleteObject"));
+        });
 
-        {
-            txm.begin();
-            var parent = curTx.get(Parent.class, new JObjectKey("Parent2")).orElse(null);
+        txm.run(() -> {
+            var parent = curTx.get(Parent.class, new JObjectKey("ParentCreateDeleteObject")).orElse(null);
             Assertions.assertNull(parent);
-            txm.commit();
-        }
+        });
     }
 
     @Test
     void createCreateObject() {
-        {
-            txm.begin();
+        txm.run(() -> {
             var newParent = new Parent(JObjectKey.of("Parent7"), "John");
             curTx.put(newParent);
-            txm.commit();
-        }
-        {
-            txm.begin();
+        });
+        txm.run(() -> {
             var newParent = new Parent(JObjectKey.of("Parent7"), "John2");
             curTx.put(newParent);
-            txm.commit();
-        }
-        {
-            txm.begin();
+        });
+        txm.run(() -> {
             var parent = curTx.get(Parent.class, new JObjectKey("Parent7")).orElse(null);
             Assertions.assertEquals("John2", parent.name());
-            txm.commit();
-        }
+        });
     }
 
     @Test
     void editObject() {
-        {
-            txm.begin();
+        txm.run(() -> {
             var newParent = new Parent(JObjectKey.of("Parent3"), "John");
             curTx.put(newParent);
-            txm.commit();
-        }
+        });
 
-        {
-            txm.begin();
+        txm.run(() -> {
             var parent = curTx.get(Parent.class, new JObjectKey("Parent3"), LockingStrategy.OPTIMISTIC).orElse(null);
             Assertions.assertEquals("John", parent.name());
-            curTx.put(parent.toBuilder().name("John2").build());
-            txm.commit();
-        }
-
-        {
-            txm.begin();
+            curTx.put(parent.withName("John2"));
+        });
+        txm.run(() -> {
             var parent = curTx.get(Parent.class, new JObjectKey("Parent3"), LockingStrategy.WRITE).orElse(null);
             Assertions.assertEquals("John2", parent.name());
-            curTx.put(parent.toBuilder().name("John3").build());
-            txm.commit();
-        }
-
-        {
-            txm.begin();
+            curTx.put(parent.withName("John3"));
+        });
+        txm.run(() -> {
             var parent = curTx.get(Parent.class, new JObjectKey("Parent3")).orElse(null);
             Assertions.assertEquals("John3", parent.name());
-            txm.commit();
-        }
+        });
     }
 
     @Test
@@ -155,13 +123,17 @@ public class ObjectsTest {
         Just.run(() -> {
             try {
                 Log.warn("Thread 1");
-                txm.begin();
-                barrier.await();
-                var got = curTx.get(Parent.class, new JObjectKey("Parent2")).orElse(null);
-                var newParent = new Parent(JObjectKey.of("Parent2"), "John");
-                curTx.put(newParent);
-                Log.warn("Thread 1 commit");
-                txm.commit();
+                txm.runTries(() -> {
+                    try {
+                        barrier.await();
+                    } catch (Throwable e) {
+                        throw new RuntimeException(e);
+                    }
+                    var got = curTx.get(Parent.class, new JObjectKey("Parent2")).orElse(null);
+                    var newParent = new Parent(JObjectKey.of("Parent2"), "John");
+                    curTx.put(newParent);
+                    Log.warn("Thread 1 commit");
+                }, 0);
                 thread1Failed.set(false);
                 return null;
             } finally {
@@ -171,13 +143,17 @@ public class ObjectsTest {
         Just.run(() -> {
             try {
                 Log.warn("Thread 2");
-                txm.begin();
-                barrier.await();
-                var got = curTx.get(Parent.class, new JObjectKey("Parent2")).orElse(null);
-                var newParent = new Parent(JObjectKey.of("Parent2"), "John2");
-                curTx.put(newParent);
-                Log.warn("Thread 2 commit");
-                txm.commit();
+                txm.runTries(() -> {
+                    try {
+                        barrier.await();
+                    } catch (Throwable e) {
+                        throw new RuntimeException(e);
+                    }
+                    var got = curTx.get(Parent.class, new JObjectKey("Parent2")).orElse(null);
+                    var newParent = new Parent(JObjectKey.of("Parent2"), "John2");
+                    curTx.put(newParent);
+                    Log.warn("Thread 2 commit");
+                }, 0);
                 thread2Failed.set(false);
                 return null;
             } finally {
@@ -187,9 +163,9 @@ public class ObjectsTest {
 
         latch.await();
 
-        txm.begin();
-        var got = curTx.get(Parent.class, new JObjectKey("Parent2")).orElse(null);
-        txm.commit();
+        var got = txm.run(() -> {
+            return curTx.get(Parent.class, new JObjectKey("Parent2")).orElse(null);
+        });
 
         if (!thread1Failed.get()) {
             Assertions.assertTrue(thread2Failed.get());
@@ -205,12 +181,10 @@ public class ObjectsTest {
     @EnumSource(LockingStrategy.class)
     void editConflict(LockingStrategy strategy) throws InterruptedException {
         String key = "Parent4" + strategy.name();
-        {
-            txm.begin();
+        txm.run(() -> {
             var newParent = new Parent(JObjectKey.of(key), "John3");
             curTx.put(newParent);
-            txm.commit();
-        }
+        });
 
         AtomicBoolean thread1Failed = new AtomicBoolean(true);
         AtomicBoolean thread2Failed = new AtomicBoolean(true);
@@ -221,12 +195,16 @@ public class ObjectsTest {
         Just.run(() -> {
             try {
                 Log.warn("Thread 1");
-                txm.begin();
-                barrier.await();
-                var parent = curTx.get(Parent.class, new JObjectKey(key), strategy).orElse(null);
-                curTx.put(parent.toBuilder().name("John").build());
-                Log.warn("Thread 1 commit");
-                txm.commit();
+                txm.runTries(() -> {
+                    try {
+                        barrier.await();
+                    } catch (Throwable e) {
+                        throw new RuntimeException(e);
+                    }
+                    var parent = curTx.get(Parent.class, new JObjectKey(key), strategy).orElse(null);
+                    curTx.put(parent.withName("John"));
+                    Log.warn("Thread 1 commit");
+                }, 0);
                 Log.warn("Thread 1 commit done");
                 thread1Failed.set(false);
                 return null;
@@ -237,12 +215,16 @@ public class ObjectsTest {
         Just.run(() -> {
             try {
                 Log.warn("Thread 2");
-                txm.begin();
-                barrier.await();
-                var parent = curTx.get(Parent.class, new JObjectKey(key), strategy).orElse(null);
-                curTx.put(parent.toBuilder().name("John2").build());
-                Log.warn("Thread 2 commit");
-                txm.commit();
+                txm.runTries(() -> {
+                    try {
+                        barrier.await();
+                    } catch (Throwable e) {
+                        throw new RuntimeException(e);
+                    }
+                    var parent = curTx.get(Parent.class, new JObjectKey(key), strategy).orElse(null);
+                    curTx.put(parent.withName("John2"));
+                    Log.warn("Thread 2 commit");
+                }, 0);
                 Log.warn("Thread 2 commit done");
                 thread2Failed.set(false);
                 return null;
@@ -253,9 +235,9 @@ public class ObjectsTest {
 
         latchEnd.await();
 
-        txm.begin();
-        var got = curTx.get(Parent.class, new JObjectKey(key)).orElse(null);
-        txm.commit();
+        var got = txm.run(() -> {
+            return curTx.get(Parent.class, new JObjectKey(key)).orElse(null);
+        });
 
         if (!thread1Failed.get()) {
             Assertions.assertTrue(thread2Failed.get());

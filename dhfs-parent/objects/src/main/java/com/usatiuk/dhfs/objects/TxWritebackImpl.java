@@ -10,7 +10,6 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import lombok.Getter;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -286,7 +285,6 @@ public class TxWritebackImpl implements TxWriteback {
         private final LinkedHashMap<JObjectKey, BundleEntry> _entries = new LinkedHashMap<>();
         private final ArrayList<VoidFn> _callbacks = new ArrayList<>();
         private long _txId;
-        @Getter
         private volatile boolean _ready = false;
         private long _size = -1;
         private boolean _wasCommitted = false;

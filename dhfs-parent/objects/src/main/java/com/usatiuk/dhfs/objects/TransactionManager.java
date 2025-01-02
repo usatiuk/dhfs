@@ -12,7 +12,7 @@ public interface TransactionManager {
 
     void rollback();
 
-    default <T> T run(Supplier<T> supplier) {
+    default <T> T runTries(Supplier<T> supplier, int tries) {
         if (current() != null) {
             return supplier.get();
         }
@@ -23,14 +23,16 @@ public interface TransactionManager {
             commit();
             return ret;
         } catch (TxCommitException txCommitException) {
-            return run(supplier);
+            if (tries == 0)
+                throw txCommitException;
+            return runTries(supplier, tries - 1);
         } catch (Throwable e) {
             rollback();
             throw e;
         }
     }
 
-    default void run(VoidFn fn) {
+    default void runTries(VoidFn fn, int tries) {
         if (current() != null) {
             fn.apply();
             return;
@@ -41,12 +43,22 @@ public interface TransactionManager {
             fn.apply();
             commit();
         } catch (TxCommitException txCommitException) {
-            run(fn);
+            if (tries == 0)
+                throw txCommitException;
+            runTries(fn, tries - 1);
             return;
         } catch (Throwable e) {
             rollback();
             throw e;
         }
+    }
+
+    default void run(VoidFn fn) {
+        runTries(fn, 10);
+    }
+
+    default <T> T run(Supplier<T> supplier) {
+        return runTries(supplier, 10);
     }
 
     default void executeTx(VoidFn fn) {

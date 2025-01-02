@@ -1,11 +1,9 @@
 package com.usatiuk.dhfs.objects.transaction;
 
-import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
 import com.usatiuk.dhfs.objects.JData;
+import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import jakarta.enterprise.context.ApplicationScoped;
-import lombok.AccessLevel;
-import lombok.Getter;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -15,8 +13,12 @@ import java.util.Optional;
 @ApplicationScoped
 public class TransactionFactoryImpl implements TransactionFactory {
     private class TransactionImpl implements TransactionPrivate {
-        @Getter(AccessLevel.PUBLIC)
         private final long _id;
+
+        public long getId() {
+            return _id;
+        }
+
         private final ReadTrackingObjectSource _source;
 
         private final Map<JObjectKey, TxRecord.TxObjectRecord<?>> _writes = new HashMap<>();
