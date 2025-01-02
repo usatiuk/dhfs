@@ -32,6 +32,10 @@
         <quarkus.platform.version>3.15.2</quarkus.platform.version>
         <surefire-plugin.version>3.5.2</surefire-plugin.version>
         <dhfs.native-libs-dir>${project.parent.build.outputDirectory}/native</dhfs.native-libs-dir>
+        <jvm.args>
+            --add-exports java.base/sun.nio.ch=ALL-UNNAMED
+            --add-exports java.base/jdk.internal.access=ALL-UNNAMED
+        </jvm.args>
     </properties>
 
     <repositories>
@@ -78,11 +82,58 @@
                 <artifactId>commons-collections4</artifactId>
                 <version>4.5.0-M2</version>
             </dependency>
+            <dependency>
+                <groupId>io.quarkiverse.scala</groupId>
+                <artifactId>quarkus-scala3</artifactId>
+                <version>1.0.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.scala-lang</groupId>
+                <artifactId>scala3-library_3</artifactId>
+                <version>3.6.2</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>net.alchim31.maven</groupId>
+                <artifactId>scala-maven-plugin</artifactId>
+                <version>4.9.2</version>
+                <executions>
+                    <execution>
+                        <id>scala-compile-first</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                            <goal>compile</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>scala-test-compile</id>
+                        <phase>process-test-resources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                            <goal>testCompile</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <compileOrder>JavaThenScala</compileOrder>
+                    <!-- Some solid defaults, change if you like -->
+                    <args>
+                        <arg>-deprecated</arg>
+                        <arg>-explain</arg>
+                        <arg>-feature</arg>
+                        <arg>-Ysafe-init</arg>
+                    </args>
+                    <addJavacArgs>
+                        --add-exports
+                        java.base/jdk.internal.access=ALL-UNNAMED
+                    </addJavacArgs>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>quarkus-maven-plugin</artifactId>
