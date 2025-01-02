@@ -1,16 +1,18 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree;
 
-import lombok.Getter;
-
-import java.util.Collection;
-import java.util.List;
 import java.util.UUID;
 
 public class JKleppmannTreePeriodicPushOp  {
-    @Getter
     private final UUID _from;
-    @Getter
     private final long _timestamp;
+
+    public UUID getFrom() {
+        return _from;
+    }
+
+    public long getTimestamp() {
+        return _timestamp;
+    }
 
     public JKleppmannTreePeriodicPushOp(UUID from, long timestamp) {
         _from = from;

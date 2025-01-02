@@ -4,6 +4,8 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.files.objects.ChunkData;
 import com.usatiuk.dhfs.files.objects.File;
+import com.usatiuk.dhfs.objects.JData;
+import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.TransactionManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
@@ -13,8 +15,6 @@ import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaFil
 import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.dhfs.utils.StatusRuntimeExceptionNoStacktrace;
-import com.usatiuk.dhfs.objects.JData;
-import com.usatiuk.dhfs.objects.JObjectKey;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -228,7 +228,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (dent instanceof JKleppmannTreeNode) {
                 return true;
             } else if (dent instanceof File f) {
-                curTx.put(f.toBuilder().mode(mode).mTime(System.currentTimeMillis()).build());
+                curTx.put(f.withMode(mode).withMTime(System.currentTimeMillis()));
                 return true;
             } else {
                 throw new IllegalArgumentException(uuid + " is not a file");
@@ -503,7 +503,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             realNewChunks.putAll(newChunks);
 
-            file = file.toBuilder().chunks(Collections.unmodifiableNavigableMap(realNewChunks)).mTime(System.currentTimeMillis()).build();
+            file = file.withChunks(Collections.unmodifiableNavigableMap(realNewChunks)).withMTime(System.currentTimeMillis());
             curTx.put(file);
             cleanupChunks(file, removedChunks.values());
             updateFileSize(file);
@@ -527,7 +527,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (length == 0) {
                 var oldChunks = Collections.unmodifiableNavigableMap(new TreeMap<>(file.chunks()));
 
-                file = file.toBuilder().chunks(new TreeMap<>()).mTime(System.currentTimeMillis()).build();
+                file = file.withChunks(new TreeMap<>()).withMTime(System.currentTimeMillis());
                 curTx.put(file);
                 cleanupChunks(file, oldChunks.values());
                 updateFileSize(file);
@@ -597,7 +597,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             realNewChunks.putAll(newChunks);
 
-            file = file.toBuilder().chunks(Collections.unmodifiableNavigableMap(realNewChunks)).mTime(System.currentTimeMillis()).build();
+            file = file.withChunks(Collections.unmodifiableNavigableMap(realNewChunks)).withMTime(System.currentTimeMillis());
             curTx.put(file);
             cleanupChunks(file, removedChunks.values());
             updateFileSize(file);
@@ -652,7 +652,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                             "File not found for setTimes: " + fileUuid))
             );
 
-            curTx.put(file.toBuilder().cTime(atimeMs).mTime(mtimeMs).build());
+            curTx.put(file.withCTime(atimeMs).withMTime(mtimeMs));
             return true;
         });
     }
@@ -669,7 +669,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
 
             if (realSize != file.size()) {
-                curTx.put(file.toBuilder().size(realSize).build());
+                curTx.put(file.withSize(realSize));
             }
         });
     }

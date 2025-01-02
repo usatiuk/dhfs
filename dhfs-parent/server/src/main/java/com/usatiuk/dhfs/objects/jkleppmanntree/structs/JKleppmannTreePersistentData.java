@@ -5,11 +5,9 @@ import com.usatiuk.kleppmanntree.CombinedTimestamp;
 import com.usatiuk.kleppmanntree.LogRecord;
 import com.usatiuk.kleppmanntree.OpMove;
 import com.usatiuk.dhfs.objects.JObjectKey;
-import lombok.Builder;
 
 import java.util.*;
 
-@Builder(toBuilder = true)
 public record JKleppmannTreePersistentData(
         JObjectKey key, Collection<JObjectKey> refsFrom, boolean frozen,
         long clock,
@@ -40,12 +38,28 @@ public record JKleppmannTreePersistentData(
 
     @Override
     public JKleppmannTreePersistentData withRefsFrom(Collection<JObjectKey> refs) {
-        return this.toBuilder().refsFrom(refs).build();
+        return new JKleppmannTreePersistentData(key, refs, frozen, clock, queues, peerTimestampLog, log);
     }
 
     @Override
     public JKleppmannTreePersistentData withFrozen(boolean frozen) {
-        return this.toBuilder().frozen(frozen).build();
+        return new JKleppmannTreePersistentData(key, refsFrom, frozen, clock, queues, peerTimestampLog, log);
+    }
+
+    public JKleppmannTreePersistentData withClock(long clock) {
+        return new JKleppmannTreePersistentData(key, refsFrom, frozen, clock, queues, peerTimestampLog, log);
+    }
+
+    public JKleppmannTreePersistentData withQueues(HashMap<UUID, TreeMap<CombinedTimestamp<Long, UUID>, OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>>> queues) {
+        return new JKleppmannTreePersistentData(key, refsFrom, frozen, clock, queues, peerTimestampLog, log);
+    }
+
+    public JKleppmannTreePersistentData withPeerTimestampLog(HashMap<UUID, Long> peerTimestampLog) {
+        return new JKleppmannTreePersistentData(key, refsFrom, frozen, clock, queues, peerTimestampLog, log);
+    }
+
+    public JKleppmannTreePersistentData withLog(TreeMap<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>> log) {
+        return new JKleppmannTreePersistentData(key, refsFrom, frozen, clock, queues, peerTimestampLog, log);
     }
 
     @Override

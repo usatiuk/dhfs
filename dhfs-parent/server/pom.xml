@@ -86,11 +86,6 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
             <groupId>com.github.SerCeMan</groupId>
             <artifactId>jnr-fuse</artifactId>
             <version>44ed40f8ce</version>

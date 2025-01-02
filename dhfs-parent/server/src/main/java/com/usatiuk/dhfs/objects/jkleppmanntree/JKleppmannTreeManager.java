@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree;
 
+import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.TransactionManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
@@ -8,7 +9,6 @@ import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreePersistentD
 import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.kleppmanntree.*;
-import com.usatiuk.dhfs.objects.JObjectKey;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
@@ -279,7 +279,7 @@ public class JKleppmannTreeManager {
             @Override
             public Long getTimestamp() {
                 var res = _data.clock() + 1;
-                _data = _data.toBuilder().clock(res).build();
+                _data = _data.withClock(res);
                 curTx.put(_data);
                 return res;
             }
@@ -292,7 +292,7 @@ public class JKleppmannTreeManager {
             @Override
             public Long updateTimestamp(Long receivedTimestamp) {
                 var old = _data.clock();
-                _data = _data.toBuilder().clock(Math.max(old, receivedTimestamp) + 1).build();
+                _data = _data.withClock(Math.max(old, receivedTimestamp) + 1);
                 curTx.put(_data);
                 return old;
             }
@@ -361,7 +361,7 @@ public class JKleppmannTreeManager {
                 public void putForPeer(UUID peerId, Long timestamp) {
                     var newPeerTimestampLog = new HashMap<>(_data.peerTimestampLog());
                     newPeerTimestampLog.put(peerId, timestamp);
-                    _data = _data.toBuilder().peerTimestampLog(newPeerTimestampLog).build();
+                    _data = _data.withPeerTimestampLog(newPeerTimestampLog);
                     curTx.put(_data);
                 }
             }
@@ -378,7 +378,7 @@ public class JKleppmannTreeManager {
                 public Pair<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>> takeOldest() {
                     var newLog = new TreeMap<>(_data.log());
                     var ret = newLog.pollFirstEntry();
-                    _data = _data.toBuilder().log(newLog).build();
+                    _data = _data.withLog(newLog);
                     curTx.put(_data);
                     if (ret == null) return null;
                     return Pair.of(ret);
@@ -422,7 +422,7 @@ public class JKleppmannTreeManager {
                         throw new IllegalStateException("Overwriting log entry?");
                     var newLog = new TreeMap<>(_data.log());
                     newLog.put(timestamp, record);
-                    _data = _data.toBuilder().log(newLog).build();
+                    _data = _data.withLog(newLog);
                     curTx.put(_data);
                 }
 
@@ -430,7 +430,7 @@ public class JKleppmannTreeManager {
                 public void replace(CombinedTimestamp<Long, UUID> timestamp, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> record) {
                     var newLog = new TreeMap<>(_data.log());
                     newLog.put(timestamp, record);
-                    _data = _data.toBuilder().log(newLog).build();
+                    _data = _data.withLog(newLog);
                     curTx.put(_data);
                 }
             }

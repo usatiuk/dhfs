@@ -1,10 +1,9 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
 import com.usatiuk.dhfs.objects.JDataRefcounted;
+import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.kleppmanntree.OpMove;
 import com.usatiuk.kleppmanntree.TreeNode;
-import com.usatiuk.dhfs.objects.JObjectKey;
-import lombok.Builder;
 
 import java.io.Serializable;
 import java.util.Collection;
@@ -14,7 +13,6 @@ import java.util.UUID;
 import java.util.stream.Stream;
 
 // FIXME: Ideally this is two classes?
-@Builder(toBuilder = true)
 public record JKleppmannTreeNode(JObjectKey key, Collection<JObjectKey> refsFrom, boolean frozen, JObjectKey parent,
                                  OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> lastEffectiveOp,
                                  JKleppmannTreeNodeMeta meta,
@@ -26,32 +24,32 @@ public record JKleppmannTreeNode(JObjectKey key, Collection<JObjectKey> refsFrom
 
     @Override
     public JKleppmannTreeNode withParent(JObjectKey parent) {
-        return this.toBuilder().parent(parent).build();
+        return new JKleppmannTreeNode(key, refsFrom, frozen, parent, lastEffectiveOp, meta, children);
     }
 
     @Override
     public JKleppmannTreeNode withLastEffectiveOp(OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> lastEffectiveOp) {
-        return this.toBuilder().lastEffectiveOp(lastEffectiveOp).build();
+        return new JKleppmannTreeNode(key, refsFrom, frozen, parent, lastEffectiveOp, meta, children);
     }
 
     @Override
     public JKleppmannTreeNode withMeta(JKleppmannTreeNodeMeta meta) {
-        return this.toBuilder().meta(meta).build();
+        return new JKleppmannTreeNode(key, refsFrom, frozen, parent, lastEffectiveOp, meta, children);
     }
 
     @Override
     public JKleppmannTreeNode withChildren(Map<String, JObjectKey> children) {
-        return this.toBuilder().children(children).build();
+        return new JKleppmannTreeNode(key, refsFrom, frozen, parent, lastEffectiveOp, meta, children);
     }
 
     @Override
     public JKleppmannTreeNode withRefsFrom(Collection<JObjectKey> refs) {
-        return this.toBuilder().refsFrom(refs).build();
+        return new JKleppmannTreeNode(key, refs, frozen, parent, lastEffectiveOp, meta, children);
     }
 
     @Override
     public JKleppmannTreeNode withFrozen(boolean frozen) {
-        return this.toBuilder().frozen(frozen).build();
+        return new JKleppmannTreeNode(key, refsFrom, frozen, parent, lastEffectiveOp, meta, children);
     }
 
     @Override

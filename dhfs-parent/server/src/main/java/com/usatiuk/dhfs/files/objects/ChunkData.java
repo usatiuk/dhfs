@@ -3,12 +3,10 @@ package com.usatiuk.dhfs.files.objects;
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.JDataRefcounted;
 import com.usatiuk.dhfs.objects.JObjectKey;
-import lombok.Builder;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
 
-@Builder(toBuilder = true)
 public record ChunkData(JObjectKey key, Collection<JObjectKey> refsFrom, boolean frozen,
                         ByteString data) implements JDataRefcounted {
     public ChunkData(JObjectKey key, ByteString data) {
@@ -17,12 +15,12 @@ public record ChunkData(JObjectKey key, Collection<JObjectKey> refsFrom, boolean
 
     @Override
     public ChunkData withRefsFrom(Collection<JObjectKey> refs) {
-        return this.toBuilder().refsFrom(refs).build();
+        return new ChunkData(key, refs, frozen, data);
     }
 
     @Override
     public ChunkData withFrozen(boolean frozen) {
-        return this.toBuilder().frozen(frozen).build();
+        return new ChunkData(key, refsFrom, frozen, data);
     }
 
     @Override
