@@ -148,7 +148,7 @@ public class TxWritebackImpl implements TxWriteback {
                 synchronized (_pendingBundles) {
                     bundle._entries.values().forEach(e -> {
                         var cur = _pendingWrites.get(e.key());
-                        if (cur.bundleId() == bundle.getId())
+                        if (cur.bundleId() <= bundle.getId())
                             _pendingWrites.remove(e.key(), cur);
                     });
                 }
@@ -280,7 +280,7 @@ public class TxWritebackImpl implements TxWriteback {
 
     @Override
     public Optional<PendingWriteEntry> getPendingWrite(JObjectKey key) {
-        synchronized (_pendingWrites) {
+        synchronized (_pendingBundles) {
             return Optional.ofNullable(_pendingWrites.get(key));
         }
     }
