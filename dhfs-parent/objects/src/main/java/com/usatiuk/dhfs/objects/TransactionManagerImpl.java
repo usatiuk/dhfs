@@ -34,7 +34,7 @@ public class TransactionManagerImpl implements TransactionManager {
         try {
             jObjectManager.commit(_currentTransaction.get());
         } catch (Throwable e) {
-            Log.warn("Transaction commit failed", e);
+            Log.trace("Transaction commit failed", e);
             throw e;
         } finally {
             _currentTransaction.remove();

@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.dhfs.utils.VoidFn;
+import io.quarkus.logging.Log;
 
 import java.util.function.Supplier;
 
@@ -23,8 +24,10 @@ public interface TransactionManager {
             commit();
             return ret;
         } catch (TxCommitException txCommitException) {
-            if (tries == 0)
+            if (tries == 0) {
+                Log.error("Transaction commit failed", txCommitException);
                 throw txCommitException;
+            }
             return runTries(supplier, tries - 1);
         } catch (Throwable e) {
             rollback();
@@ -43,10 +46,11 @@ public interface TransactionManager {
             fn.apply();
             commit();
         } catch (TxCommitException txCommitException) {
-            if (tries == 0)
+            if (tries == 0) {
+                Log.error("Transaction commit failed", txCommitException);
                 throw txCommitException;
+            }
             runTries(fn, tries - 1);
-            return;
         } catch (Throwable e) {
             rollback();
             throw e;

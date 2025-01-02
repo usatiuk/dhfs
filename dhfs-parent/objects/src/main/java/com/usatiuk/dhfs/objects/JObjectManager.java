@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.objects;
 
-import com.usatiuk.dhfs.objects.persistence.ObjectPersistentStore;
 import com.usatiuk.dhfs.objects.transaction.*;
 import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
 import com.usatiuk.dhfs.utils.DataLocker;
@@ -24,13 +23,9 @@ import java.util.function.Function;
 @ApplicationScoped
 public class JObjectManager {
     @Inject
-    ObjectPersistentStore objectStorage;
-    @Inject
-    ObjectSerializer<JDataVersionedWrapper> objectSerializer;
+    WritebackObjectPersistentStore writebackObjectPersistentStore;
     @Inject
     TransactionFactory transactionFactory;
-    @Inject
-    TxWriteback txWriteback;
 
     private final List<PreCommitTxHook> _preCommitTxHooks;
 
@@ -82,27 +77,7 @@ public class JObjectManager {
             try (var readLock = _objLocker.lock(key)) {
                 if (_objects.containsKey(key)) continue;
 
-                var pending = txWriteback.getPendingWrite(key);
-
-                JDataVersionedWrapper<?> read;
-
-                switch (pending.orElse(null)) {
-                    case TxWriteback.PendingWrite write -> {
-                        read = write.data();
-                    }
-                    case TxWriteback.PendingDelete delete -> {
-                        return null;
-                    }
-                    case null -> {
-                    }
-                    default -> {
-                        throw new IllegalStateException("Unexpected value: " + pending);
-                    }
-                }
-
-                read = objectStorage.readObject(key)
-                        .map(objectSerializer::deserialize)
-                        .orElse(null);
+                var read = writebackObjectPersistentStore.readObject(key).orElse(null);
 
                 if (read == null) return null;
 
@@ -280,35 +255,27 @@ public class JObjectManager {
 
             Log.tracef("Flushing transaction %d to storage", tx.getId());
 
-            var bundle = txWriteback.createBundle();
-            try {
-                for (var action : current.entrySet()) {
-                    switch (action.getValue()) {
-                        case TxRecord.TxObjectRecordWrite<?> write -> {
-                            Log.trace("Flushing object " + action.getKey());
-                            var wrapped = new JDataVersionedWrapper<>(write.data(), tx.getId());
-                            bundle.commit(wrapped);
-                            _objects.put(action.getKey(), new JDataWrapper<>(wrapped));
-                        }
-                        case TxRecord.TxObjectRecordDeleted deleted -> {
-                            Log.trace("Deleting object " + action.getKey());
-                            bundle.delete(action.getKey());
-                            _objects.remove(action.getKey());
-                        }
-                        default -> {
-                            throw new TxCommitException("Unexpected value: " + action.getValue());
-                        }
+            for (var action : current.entrySet()) {
+                switch (action.getValue()) {
+                    case TxRecord.TxObjectRecordWrite<?> write -> {
+                        Log.trace("Flushing object " + action.getKey());
+                        var wrapped = new JDataVersionedWrapper<>(write.data(), tx.getId());
+                        _objects.put(action.getKey(), new JDataWrapper<>(wrapped));
+                    }
+                    case TxRecord.TxObjectRecordDeleted deleted -> {
+                        Log.trace("Deleting object " + action.getKey());
+                        _objects.remove(action.getKey());
+                    }
+                    default -> {
+                        throw new TxCommitException("Unexpected value: " + action.getValue());
                     }
                 }
-            } catch (Throwable t) {
-                txWriteback.dropBundle(bundle);
-                throw new TxCommitException(t.getMessage(), t);
             }
 
             Log.tracef("Committing transaction %d to storage", tx.getId());
-            txWriteback.commitBundle(bundle);
+            writebackObjectPersistentStore.commitTx(current.values(), tx.getId());
         } catch (Throwable t) {
-            Log.error("Error when committing transaction", t);
+            Log.trace("Error when committing transaction", t);
             throw new TxCommitException(t.getMessage(), t);
         } finally {
             for (var unlock : toUnlock) {

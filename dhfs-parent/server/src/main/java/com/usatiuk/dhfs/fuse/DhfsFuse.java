@@ -106,7 +106,7 @@ public class DhfsFuse extends FuseStubFS {
             stbuf.f_favail.set(Integer.MAX_VALUE - 2000); //FIXME:
             stbuf.f_namemax.set(2048);
             return super.statfs(path, stbuf);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.error("When statfs " + path, e);
             return -ErrorCodes.EIO();
         }
@@ -147,9 +147,6 @@ public class DhfsFuse extends FuseStubFS {
             stat.st_atim.tv_sec.set(found.get().mtime() / 1000);
             stat.st_atim.tv_nsec.set((found.get().mtime() % 1000) * 1000);
             stat.st_blksize.set(blksize);
-        } catch (Exception e) {
-            Log.error("When getattr " + path, e);
-            return -ErrorCodes.EIO();
         } catch (Throwable e) {
             Log.error("When getattr " + path, e);
             return -ErrorCodes.EIO();
@@ -168,7 +165,7 @@ public class DhfsFuse extends FuseStubFS {
                     timespec[1].tv_sec.get() * 1000);
             if (!res) return -ErrorCodes.EINVAL();
             else return 0;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.error("When utimens " + path, e);
             return -ErrorCodes.EIO();
         }
@@ -179,7 +176,7 @@ public class DhfsFuse extends FuseStubFS {
         try {
             if (fileService.open(path).isEmpty()) return -ErrorCodes.ENOENT();
             return 0;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.error("When open " + path, e);
             return -ErrorCodes.EIO();
         }
@@ -197,7 +194,7 @@ public class DhfsFuse extends FuseStubFS {
             if (read.isEmpty()) return 0;
             UnsafeByteOperations.unsafeWriteTo(read.get(), new JnrPtrByteOutput(jnrPtrByteOutputAccessors, buf, size));
             return read.get().size();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.error("When reading " + path, e);
             return -ErrorCodes.EIO();
         }
@@ -211,15 +208,19 @@ public class DhfsFuse extends FuseStubFS {
             if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
             var buffer = UninitializedByteBuffer.allocateUninitialized((int) size);
 
-            jnrPtrByteOutputAccessors.getUnsafe().copyMemory(
-                    buf.address(),
-                    jnrPtrByteOutputAccessors.getNioAccess().getBufferAddress(buffer),
-                    size
-            );
+            if (buffer.isDirect()) {
+                jnrPtrByteOutputAccessors.getUnsafe().copyMemory(
+                        buf.address(),
+                        jnrPtrByteOutputAccessors.getNioAccess().getBufferAddress(buffer),
+                        size
+                );
+            } else {
+                buf.get(0, buffer.array(), 0, (int) size);
+            }
 
             var written = fileService.write(fileOpt.get(), offset, UnsafeByteOperations.unsafeWrap(buffer));
             return written.intValue();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.error("When writing " + path, e);
             return -ErrorCodes.EIO();
         }
@@ -231,7 +232,7 @@ public class DhfsFuse extends FuseStubFS {
             var ret = fileService.create(path, mode);
             if (ret.isEmpty()) return -ErrorCodes.ENOSPC();
             else return 0;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.error("When creating " + path, e);
             return -ErrorCodes.EIO();
         }
@@ -244,7 +245,7 @@ public class DhfsFuse extends FuseStubFS {
             return 0;
         } catch (AlreadyExistsException aex) {
             return -ErrorCodes.EEXIST();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.error("When creating dir " + path, e);
             return -ErrorCodes.EIO();
         }
@@ -257,7 +258,7 @@ public class DhfsFuse extends FuseStubFS {
             return 0;
         } catch (DirectoryNotEmptyException ex) {
             return -ErrorCodes.ENOTEMPTY();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.error("When removing dir " + path, e);
             return -ErrorCodes.EIO();
         }
@@ -269,7 +270,7 @@ public class DhfsFuse extends FuseStubFS {
             var ret = fileService.rename(path, newName);
             if (!ret) return -ErrorCodes.ENOENT();
             else return 0;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.error("When renaming " + path, e);
             return -ErrorCodes.EIO();
         }
@@ -281,7 +282,7 @@ public class DhfsFuse extends FuseStubFS {
         try {
             fileService.unlink(path);
             return 0;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.error("When unlinking " + path, e);
             return -ErrorCodes.EIO();
         }
@@ -299,7 +300,7 @@ public class DhfsFuse extends FuseStubFS {
                 return 0;
             else
                 return -ErrorCodes.ENOSPC();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.error("When truncating " + path, e);
             return -ErrorCodes.EIO();
         }
@@ -313,7 +314,7 @@ public class DhfsFuse extends FuseStubFS {
             var ret = fileService.chmod(fileOpt.get(), mode);
             if (ret) return 0;
             else return -ErrorCodes.EINVAL();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.error("When chmod " + path, e);
             return -ErrorCodes.EIO();
         }
@@ -339,7 +340,7 @@ public class DhfsFuse extends FuseStubFS {
             }
 
             return 0;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.error("When readdir " + path, e);
             return -ErrorCodes.EIO();
         }
@@ -357,7 +358,7 @@ public class DhfsFuse extends FuseStubFS {
             UnsafeByteOperations.unsafeWriteTo(read, new JnrPtrByteOutput(jnrPtrByteOutputAccessors, buf, size));
             buf.putByte(Math.min(size - 1, read.size()), (byte) 0);
             return 0;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.error("When reading " + path, e);
             return -ErrorCodes.EIO();
         }
@@ -369,7 +370,7 @@ public class DhfsFuse extends FuseStubFS {
             var fileOpt = fileService.open(path);
             if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
             return 0;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.error("When chown " + path, e);
             return -ErrorCodes.EIO();
         }
@@ -381,7 +382,7 @@ public class DhfsFuse extends FuseStubFS {
             var ret = fileService.symlink(oldpath, newpath);
             if (ret == null) return -ErrorCodes.EEXIST();
             else return 0;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.error("When creating " + newpath, e);
             return -ErrorCodes.EIO();
         }

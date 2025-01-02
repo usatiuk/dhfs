@@ -51,7 +51,7 @@ public class JnrPtrByteOutput extends ByteOutput {
             var out = _backing.address() + _pos;
             _accessors.getUnsafe().copyMemory(addr, out, rem);
         } else {
-            throw new UnsupportedOperationException();
+            _backing.put(_pos, value.array(), value.arrayOffset() + value.position(), rem);
         }
 
         _pos += rem;

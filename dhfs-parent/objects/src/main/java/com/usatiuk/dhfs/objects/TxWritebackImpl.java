@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.objects;
 
-import com.usatiuk.dhfs.objects.persistence.ObjectPersistentStore;
+import com.usatiuk.dhfs.objects.persistence.CachingObjectPersistentStore;
 import com.usatiuk.dhfs.objects.persistence.TxManifest;
 import com.usatiuk.dhfs.utils.VoidFn;
 import io.quarkus.logging.Log;
@@ -29,9 +29,7 @@ public class TxWritebackImpl implements TxWriteback {
     private final AtomicLong _counter = new AtomicLong();
     private final AtomicLong _waitedTotal = new AtomicLong(0);
     @Inject
-    ObjectPersistentStore objectPersistentStore;
-    @Inject
-    ObjectSerializer<JDataVersionedWrapper> objectSerializer;
+    CachingObjectPersistentStore objectPersistentStore;
     @ConfigProperty(name = "dhfs.objects.writeback.limit")
     long sizeLimit;
     private long currentSize = 0;
@@ -118,7 +116,7 @@ public class TxWritebackImpl implements TxWriteback {
                         case TxBundleImpl.CommittedEntry c -> _commitExecutor.execute(() -> {
                             try {
                                 Log.trace("Writing new " + c.key());
-                                objectPersistentStore.writeObject(c.key(), objectSerializer.serialize(c.data()));
+                                objectPersistentStore.writeObject(c.key(), c.data());
                             } catch (Throwable t) {
                                 Log.error("Error writing " + c.key(), t);
                                 errors.add(t);
