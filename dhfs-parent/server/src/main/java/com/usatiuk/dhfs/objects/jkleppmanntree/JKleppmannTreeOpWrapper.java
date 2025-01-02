@@ -2,7 +2,7 @@ package com.usatiuk.dhfs.objects.jkleppmanntree;
 
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.kleppmanntree.OpMove;
-import com.usatiuk.objects.common.runtime.JObjectKey;
+import com.usatiuk.dhfs.objects.JObjectKey;
 import lombok.Getter;
 
 import java.util.UUID;

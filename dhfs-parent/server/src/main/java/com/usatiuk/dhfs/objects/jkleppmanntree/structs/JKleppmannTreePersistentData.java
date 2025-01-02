@@ -1,11 +1,10 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
 import com.usatiuk.dhfs.objects.JDataRefcounted;
-import com.usatiuk.kleppmanntree.AtomicClock;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
 import com.usatiuk.kleppmanntree.LogRecord;
 import com.usatiuk.kleppmanntree.OpMove;
-import com.usatiuk.objects.common.runtime.JObjectKey;
+import com.usatiuk.dhfs.objects.JObjectKey;
 import lombok.Builder;
 
 import java.util.*;

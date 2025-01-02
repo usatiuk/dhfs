@@ -2,7 +2,7 @@ package com.usatiuk.dhfs.files.objects;
 
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.JDataRefcounted;
-import com.usatiuk.objects.common.runtime.JObjectKey;
+import com.usatiuk.dhfs.objects.JObjectKey;
 import lombok.Builder;
 
 import java.util.Collection;

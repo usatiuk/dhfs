@@ -8,7 +8,7 @@ import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreePersistentD
 import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.kleppmanntree.*;
-import com.usatiuk.objects.common.runtime.JObjectKey;
+import com.usatiuk.dhfs.objects.JObjectKey;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;

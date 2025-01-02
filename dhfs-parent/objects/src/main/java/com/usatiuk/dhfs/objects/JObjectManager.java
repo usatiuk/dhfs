@@ -4,8 +4,6 @@ import com.usatiuk.dhfs.objects.persistence.ObjectPersistentStore;
 import com.usatiuk.dhfs.objects.transaction.*;
 import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
 import com.usatiuk.dhfs.utils.DataLocker;
-import com.usatiuk.objects.common.runtime.JData;
-import com.usatiuk.objects.common.runtime.JObjectKey;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
@@ -19,7 +17,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-// Manages all access to com.usatiuk.objects.common.runtime.JData objects.
+// Manages all access to com.usatiuk.dhfs.objects.JData objects.
 // In particular, it serves as a source of truth for what is committed to the backing storage.
 // All data goes through it, it is responsible for transaction atomicity
 // TODO: persistent tx id

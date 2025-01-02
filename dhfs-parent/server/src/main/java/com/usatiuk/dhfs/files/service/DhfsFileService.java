@@ -3,7 +3,7 @@ package com.usatiuk.dhfs.files.service;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.files.objects.File;
-import com.usatiuk.objects.common.runtime.JObjectKey;
+import com.usatiuk.dhfs.objects.JObjectKey;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.Optional;

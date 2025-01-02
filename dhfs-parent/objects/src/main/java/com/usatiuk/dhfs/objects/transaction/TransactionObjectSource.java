@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects.transaction;
 
-import com.usatiuk.objects.common.runtime.JData;
-import com.usatiuk.objects.common.runtime.JObjectKey;
+import com.usatiuk.dhfs.objects.JData;
+import com.usatiuk.dhfs.objects.JObjectKey;
 
 public interface TransactionObjectSource {
     <T extends JData> TransactionObject<T> get(Class<T> type, JObjectKey key);

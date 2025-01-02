@@ -1,8 +1,8 @@
 package com.usatiuk.dhfs.objects.transaction;
 
 import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
-import com.usatiuk.objects.common.runtime.JData;
-import com.usatiuk.objects.common.runtime.JObjectKey;
+import com.usatiuk.dhfs.objects.JData;
+import com.usatiuk.dhfs.objects.JObjectKey;
 import jakarta.enterprise.context.ApplicationScoped;
 import lombok.AccessLevel;
 import lombok.Getter;

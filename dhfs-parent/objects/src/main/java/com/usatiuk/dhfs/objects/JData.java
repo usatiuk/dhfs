@@ -1,4 +1,4 @@
-package com.usatiuk.objects.common.runtime;
+package com.usatiuk.dhfs.objects;
 
 import java.io.Serializable;
 

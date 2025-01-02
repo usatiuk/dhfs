@@ -13,8 +13,8 @@ import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaFil
 import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.dhfs.utils.StatusRuntimeExceptionNoStacktrace;
-import com.usatiuk.objects.common.runtime.JData;
-import com.usatiuk.objects.common.runtime.JObjectKey;
+import com.usatiuk.dhfs.objects.JData;
+import com.usatiuk.dhfs.objects.JObjectKey;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;

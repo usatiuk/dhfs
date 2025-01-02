@@ -1,8 +1,6 @@
 package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.transaction.Transaction;
-import com.usatiuk.objects.common.runtime.JData;
-import com.usatiuk.objects.common.runtime.JObjectKey;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

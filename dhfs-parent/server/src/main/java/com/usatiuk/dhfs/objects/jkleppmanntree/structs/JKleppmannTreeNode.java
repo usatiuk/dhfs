@@ -3,7 +3,7 @@ package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 import com.usatiuk.dhfs.objects.JDataRefcounted;
 import com.usatiuk.kleppmanntree.OpMove;
 import com.usatiuk.kleppmanntree.TreeNode;
-import com.usatiuk.objects.common.runtime.JObjectKey;
+import com.usatiuk.dhfs.objects.JObjectKey;
 import lombok.Builder;
 
 import java.io.Serializable;

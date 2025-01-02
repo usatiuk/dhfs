@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.objects;
 
-import com.usatiuk.objects.common.runtime.JData;
 import jakarta.annotation.Nonnull;
 import lombok.Builder;
 

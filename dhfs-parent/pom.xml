@@ -17,7 +17,6 @@
         <module>autoprotomap</module>
         <module>objects</module>
         <module>utils</module>
-        <module>objects-common</module>
     </modules>
 
     <properties>

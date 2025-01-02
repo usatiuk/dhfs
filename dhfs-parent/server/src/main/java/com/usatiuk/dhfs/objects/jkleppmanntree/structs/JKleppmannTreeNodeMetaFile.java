@@ -2,7 +2,7 @@ package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
 import com.usatiuk.autoprotomap.runtime.ProtoMirror;
 import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeNodeMetaFileP;
-import com.usatiuk.objects.common.runtime.JObjectKey;
+import com.usatiuk.dhfs.objects.JObjectKey;
 import lombok.Getter;
 
 import java.util.Objects;
