@@ -22,6 +22,8 @@ public interface TransactionManager {
             var ret = supplier.get();
             commit();
             return ret;
+        } catch (TxCommitException txCommitException) {
+            return run(supplier);
         } catch (Throwable e) {
             rollback();
             throw e;
@@ -38,6 +40,9 @@ public interface TransactionManager {
         try {
             fn.apply();
             commit();
+        } catch (TxCommitException txCommitException) {
+            run(fn);
+            return;
         } catch (Throwable e) {
             rollback();
             throw e;
