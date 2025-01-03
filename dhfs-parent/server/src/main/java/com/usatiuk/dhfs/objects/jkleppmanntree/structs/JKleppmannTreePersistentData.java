@@ -1,15 +1,16 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
 import com.usatiuk.dhfs.objects.JDataRefcounted;
+import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
 import com.usatiuk.kleppmanntree.LogRecord;
 import com.usatiuk.kleppmanntree.OpMove;
-import com.usatiuk.dhfs.objects.JObjectKey;
+import org.pcollections.PCollection;
 
 import java.util.*;
 
 public record JKleppmannTreePersistentData(
-        JObjectKey key, Collection<JObjectKey> refsFrom, boolean frozen,
+        JObjectKey key, PCollection<JObjectKey> refsFrom, boolean frozen,
         long clock,
         HashMap<UUID, TreeMap<CombinedTimestamp<Long, UUID>, OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>>> queues,
         HashMap<UUID, Long> peerTimestampLog,
@@ -37,7 +38,7 @@ public record JKleppmannTreePersistentData(
     }
 
     @Override
-    public JKleppmannTreePersistentData withRefsFrom(Collection<JObjectKey> refs) {
+    public JKleppmannTreePersistentData withRefsFrom(PCollection<JObjectKey> refs) {
         return new JKleppmannTreePersistentData(key, refs, frozen, clock, queues, peerTimestampLog, log);
     }
 

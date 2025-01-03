@@ -1,12 +1,14 @@
 package com.usatiuk.dhfs.objects;
 
+import org.pcollections.PCollection;
+
 import java.util.Collection;
 import java.util.List;
 
 public interface JDataRefcounted extends JData {
-    Collection<JObjectKey> refsFrom();
+    PCollection<JObjectKey> refsFrom();
 
-    JDataRefcounted withRefsFrom(Collection<JObjectKey> refs);
+    JDataRefcounted withRefsFrom(PCollection<JObjectKey> refs);
 
     boolean frozen();
 

@@ -12,6 +12,7 @@ import com.usatiuk.kleppmanntree.*;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
+import org.pcollections.TreePSet;
 
 import java.util.HashMap;
 import java.util.List;
@@ -37,7 +38,7 @@ public class JKleppmannTreeManager {
             if (data == null) {
                 data = new JKleppmannTreePersistentData(
                         name,
-                        List.of(),
+                        TreePSet.empty(),
                         true,
                         1L,
                         new HashMap<>(),

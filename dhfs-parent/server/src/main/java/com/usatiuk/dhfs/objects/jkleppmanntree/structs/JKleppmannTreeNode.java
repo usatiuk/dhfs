@@ -4,6 +4,8 @@ import com.usatiuk.dhfs.objects.JDataRefcounted;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.kleppmanntree.OpMove;
 import com.usatiuk.kleppmanntree.TreeNode;
+import org.pcollections.PCollection;
+import org.pcollections.TreePSet;
 
 import java.io.Serializable;
 import java.util.Collection;
@@ -13,13 +15,13 @@ import java.util.UUID;
 import java.util.stream.Stream;
 
 // FIXME: Ideally this is two classes?
-public record JKleppmannTreeNode(JObjectKey key, Collection<JObjectKey> refsFrom, boolean frozen, JObjectKey parent,
+public record JKleppmannTreeNode(JObjectKey key, PCollection<JObjectKey> refsFrom, boolean frozen, JObjectKey parent,
                                  OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> lastEffectiveOp,
                                  JKleppmannTreeNodeMeta meta,
                                  Map<String, JObjectKey> children) implements TreeNode<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>, JDataRefcounted, Serializable {
 
     public JKleppmannTreeNode(JObjectKey id, JObjectKey parent, JKleppmannTreeNodeMeta meta) {
-        this(id, Collections.emptyList(), false, parent, null, meta, Collections.emptyMap());
+        this(id, TreePSet.empty(), false, parent, null, meta, Collections.emptyMap());
     }
 
     @Override
@@ -43,7 +45,7 @@ public record JKleppmannTreeNode(JObjectKey key, Collection<JObjectKey> refsFrom
     }
 
     @Override
-    public JKleppmannTreeNode withRefsFrom(Collection<JObjectKey> refs) {
+    public JKleppmannTreeNode withRefsFrom(PCollection<JObjectKey> refs) {
         return new JKleppmannTreeNode(key, refs, frozen, parent, lastEffectiveOp, meta, children);
     }
 

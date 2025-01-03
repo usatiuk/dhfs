@@ -25,6 +25,8 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.pcollections.TreePMap;
+import org.pcollections.TreePSet;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -150,7 +152,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             var fuuid = UUID.randomUUID();
             Log.debug("Creating file " + fuuid);
-            File f = new File(JObjectKey.of(fuuid.toString()), new HashSet<>(), false, mode, System.currentTimeMillis(), System.currentTimeMillis(), new TreeMap<>(), false, 0);
+            File f = new File(JObjectKey.of(fuuid.toString()), TreePSet.empty(), false, mode, System.currentTimeMillis(), System.currentTimeMillis(), TreePMap.empty(), false, 0);
             curTx.put(f);
 
             try {
@@ -371,8 +373,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 file = curTx.get(File.class, fileUuid).orElse(null);
             }
 
-            // FIXME: Some kind of immutable interface?
-            var chunksAll = Collections.unmodifiableNavigableMap(file.chunks());
+            var chunksAll = file.chunks();
             var first = chunksAll.floorEntry(offset);
             var last = chunksAll.lowerEntry(offset + data.size());
             NavigableMap<Long, JObjectKey> removedChunks = new TreeMap<>();
@@ -494,16 +495,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 }
             }
 
-            NavigableMap<Long, JObjectKey> realNewChunks = new TreeMap<>();
-            for (var chunk : chunksAll.entrySet()) {
-                if (!removedChunks.containsKey(chunk.getKey())) {
-                    realNewChunks.put(chunk.getKey(), chunk.getValue());
-                }
-            }
-
-            realNewChunks.putAll(newChunks);
-
-            file = file.withChunks(Collections.unmodifiableNavigableMap(realNewChunks)).withMTime(System.currentTimeMillis());
+            file = file.withChunks(file.chunks().minusAll(removedChunks.keySet()).plusAll(newChunks)).withMTime(System.currentTimeMillis());
             curTx.put(file);
             cleanupChunks(file, removedChunks.values());
             updateFileSize(file);
@@ -525,9 +517,9 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
 
             if (length == 0) {
-                var oldChunks = Collections.unmodifiableNavigableMap(new TreeMap<>(file.chunks()));
+                var oldChunks = file.chunks();
 
-                file = file.withChunks(new TreeMap<>()).withMTime(System.currentTimeMillis());
+                file = file.withChunks(TreePMap.empty()).withMTime(System.currentTimeMillis());
                 curTx.put(file);
                 cleanupChunks(file, oldChunks.values());
                 updateFileSize(file);
@@ -537,7 +529,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             var curSize = size(fileUuid);
             if (curSize == length) return true;
 
-            var chunksAll = Collections.unmodifiableNavigableMap(file.chunks());
+            var chunksAll = file.chunks();
             NavigableMap<Long, JObjectKey> removedChunks = new TreeMap<>();
             NavigableMap<Long, JObjectKey> newChunks = new TreeMap<>();
 
@@ -588,16 +580,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 newChunks.put(tail.getKey(), newChunkData.key());
             }
 
-            NavigableMap<Long, JObjectKey> realNewChunks = new TreeMap<>();
-            for (var chunk : chunksAll.entrySet()) {
-                if (!removedChunks.containsKey(chunk.getKey())) {
-                    realNewChunks.put(chunk.getKey(), chunk.getValue());
-                }
-            }
-
-            realNewChunks.putAll(newChunks);
-
-            file = file.withChunks(Collections.unmodifiableNavigableMap(realNewChunks)).withMTime(System.currentTimeMillis());
+            file = file.withChunks(file.chunks().minusAll(removedChunks.keySet()).plusAll(newChunks)).withMTime(System.currentTimeMillis());
             curTx.put(file);
             cleanupChunks(file, removedChunks.values());
             updateFileSize(file);
@@ -633,10 +616,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             var fuuid = UUID.randomUUID();
             Log.debug("Creating file " + fuuid);
 
-            File f = new File(JObjectKey.of(fuuid.toString()), new HashSet<>(), false, 0, System.currentTimeMillis(), System.currentTimeMillis(), new TreeMap<>(), true, 0);
             ChunkData newChunkData = createChunk(UnsafeByteOperations.unsafeWrap(oldpath.getBytes(StandardCharsets.UTF_8)));
+            File f = new File(JObjectKey.of(fuuid.toString()), TreePSet.empty(),
+                    false, 0, System.currentTimeMillis(), System.currentTimeMillis(), TreePMap.<Long, JObjectKey>empty().plus(0L, newChunkData.key()), true, 0);
 
-            f.chunks().put(0L, newChunkData.key());
             updateFileSize(f);
 
             getTree().move(parent.key(), new JKleppmannTreeNodeMetaFile(fname, f.key()), getTree().getNewNodeId());
@@ -662,8 +645,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         jObjectTxManager.executeTx(() -> {
             long realSize = 0;
 
-            var last = file.chunks().lastEntry();
-            if (last != null) {
+            if (!file.chunks().isEmpty()) {
+                var last = file.chunks().lastEntry();
                 var lastSize = getChunkSize(last.getValue());
                 realSize = last.getKey() + lastSize;
             }

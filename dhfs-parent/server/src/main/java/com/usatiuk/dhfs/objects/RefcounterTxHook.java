@@ -3,9 +3,6 @@ package com.usatiuk.dhfs.objects;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.apache.commons.collections4.CollectionUtils;
-
-import java.util.Set;
 
 @ApplicationScoped
 public class RefcounterTxHook implements PreCommitTxHook {
@@ -19,14 +16,21 @@ public class RefcounterTxHook implements PreCommitTxHook {
         }
         var refOld = (JDataRefcounted) old;
 
-        for (var newRef : CollectionUtils.subtract(refCur.collectRefsTo(), refOld.collectRefsTo())) {
-            var referenced = curTx.get(JDataRefcounted.class, newRef).orElse(null);
-            curTx.put(referenced.withRefsFrom(CollectionUtils.union(referenced.refsFrom(), Set.of(key))));
+        var curRefs = refCur.collectRefsTo();
+        var oldRefs = refOld.collectRefsTo();
+
+        for (var curRef : curRefs) {
+            if (!oldRefs.contains(curRef)) {
+                var referenced = curTx.get(JDataRefcounted.class, curRef).orElse(null);
+                curTx.put(referenced.withRefsFrom(referenced.refsFrom().plus(key)));
+            }
         }
 
-        for (var removedRef : CollectionUtils.subtract(refOld.collectRefsTo(), refCur.collectRefsTo())) {
-            var referenced = curTx.get(JDataRefcounted.class, removedRef).orElse(null);
-            curTx.put(referenced.withRefsFrom(CollectionUtils.subtract(referenced.refsFrom(), Set.of(key))));
+        for (var oldRef : oldRefs) {
+            if (!curRefs.contains(oldRef)) {
+                var referenced = curTx.get(JDataRefcounted.class, oldRef).orElse(null);
+                curTx.put(referenced.withRefsFrom(referenced.refsFrom().minus(key)));
+            }
         }
     }
 
@@ -38,7 +42,7 @@ public class RefcounterTxHook implements PreCommitTxHook {
 
         for (var newRef : refCur.collectRefsTo()) {
             var referenced = curTx.get(JDataRefcounted.class, newRef).orElse(null);
-            curTx.put(referenced.withRefsFrom(CollectionUtils.union(referenced.refsFrom(), Set.of(key))));
+            curTx.put(referenced.withRefsFrom(referenced.refsFrom().plus(key)));
         }
     }
 
@@ -48,10 +52,9 @@ public class RefcounterTxHook implements PreCommitTxHook {
             return;
         }
 
-
         for (var removedRef : refCur.collectRefsTo()) {
             var referenced = curTx.get(JDataRefcounted.class, removedRef).orElse(null);
-            curTx.put(referenced.withRefsFrom(CollectionUtils.subtract(referenced.refsFrom(), Set.of(key))));
+            curTx.put(referenced.withRefsFrom(referenced.refsFrom().minus(key)));
         }
     }
 

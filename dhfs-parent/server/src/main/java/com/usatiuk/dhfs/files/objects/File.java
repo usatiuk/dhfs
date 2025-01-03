@@ -1,15 +1,17 @@
 package com.usatiuk.dhfs.files.objects;
 
 import com.usatiuk.dhfs.objects.JObjectKey;
+import org.pcollections.PCollection;
+import org.pcollections.TreePMap;
 
 import java.util.Collection;
-import java.util.NavigableMap;
 
-public record File(JObjectKey key, Collection<JObjectKey> refsFrom, boolean frozen, long mode, long cTime, long mTime,
-                   NavigableMap<Long, JObjectKey> chunks, boolean symlink, long size
+public record File(JObjectKey key, PCollection<JObjectKey> refsFrom, boolean frozen,
+                   long mode, long cTime, long mTime,
+                   TreePMap<Long, JObjectKey> chunks, boolean symlink, long size
 ) implements FsNode {
     @Override
-    public File withRefsFrom(Collection<JObjectKey> refs) {
+    public File withRefsFrom(PCollection<JObjectKey> refs) {
         return new File(key, refs, frozen, mode, cTime, mTime, chunks, symlink, size);
     }
 
@@ -18,7 +20,7 @@ public record File(JObjectKey key, Collection<JObjectKey> refsFrom, boolean froz
         return new File(key, refsFrom, frozen, mode, cTime, mTime, chunks, symlink, size);
     }
 
-    public File withChunks(NavigableMap<Long, JObjectKey> chunks) {
+    public File withChunks(TreePMap<Long, JObjectKey> chunks) {
         return new File(key, refsFrom, frozen, mode, cTime, mTime, chunks, symlink, size);
     }
 
