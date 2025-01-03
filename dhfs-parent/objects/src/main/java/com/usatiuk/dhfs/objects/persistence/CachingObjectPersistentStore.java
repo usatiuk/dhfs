@@ -25,7 +25,7 @@ public class CachingObjectPersistentStore {
     private record CacheEntry(Optional<JDataVersionedWrapper<?>> object, long size) {
     }
 
-    private final LinkedHashMap<JObjectKey, CacheEntry> _cache = new LinkedHashMap<>();
+    private final LinkedHashMap<JObjectKey, CacheEntry> _cache = new LinkedHashMap<>(8, 0.75f, true);
 
     @ConfigProperty(name = "dhfs.objects.lru.limit")
     long sizeLimit;
@@ -104,6 +104,7 @@ public class CachingObjectPersistentStore {
         // it should be handled by the upstream store
         synchronized (_cache) {
             for (var key : Stream.concat(names.written().stream(), names.deleted().stream()).toList()) {
+                _curSize -= Optional.ofNullable(_cache.get(key)).map(CacheEntry::size).orElse(0L);
                 _cache.remove(key);
             }
         }
