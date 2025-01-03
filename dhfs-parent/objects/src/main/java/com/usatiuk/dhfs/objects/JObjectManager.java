@@ -162,8 +162,8 @@ public class JObjectManager {
         Consumer<JObjectKey> addDependency =
                 key -> {
                     dependenciesLocked.computeIfAbsent(key, k -> {
-                        Log.trace("Adding dependency " + k.toString());
                         var got = getObjLock(JData.class, k);
+                        Log.trace("Adding dependency " + k.toString() + " -> " + got);
                         toUnlock.add(got.lock);
                         return got;
                     });
@@ -250,7 +250,7 @@ public class JObjectManager {
                     throw new TxCommitException("Read mismatch for " + dep.getKey() + ": " + read + " vs " + dep.getValue());
                 }
 
-                Log.trace("Checking dependency " + dep.getKey() + " - ok");
+                Log.trace("Checking dependency " + dep.getKey() + " - ok with read " + read);
             }
 
             Log.tracef("Flushing transaction %d to storage", tx.getId());
