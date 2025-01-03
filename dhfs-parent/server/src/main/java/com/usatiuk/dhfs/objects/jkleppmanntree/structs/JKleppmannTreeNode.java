@@ -12,6 +12,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 // FIXME: Ideally this is two classes?
@@ -62,6 +63,6 @@ public record JKleppmannTreeNode(JObjectKey key, PCollection<JObjectKey> refsFro
                     case JKleppmannTreeNodeMetaFile file -> Stream.of(file.getFileIno());
                     default -> throw new IllegalStateException("Unexpected value: " + meta());
                 }
-        ).toList();
+        ).collect(Collectors.toUnmodifiableSet());
     }
 }

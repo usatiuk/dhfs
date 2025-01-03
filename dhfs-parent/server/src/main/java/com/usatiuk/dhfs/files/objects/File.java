@@ -5,6 +5,7 @@ import org.pcollections.PCollection;
 import org.pcollections.TreePMap;
 
 import java.util.Collection;
+import java.util.Set;
 
 public record File(JObjectKey key, PCollection<JObjectKey> refsFrom, boolean frozen,
                    long mode, long cTime, long mTime,
@@ -46,6 +47,6 @@ public record File(JObjectKey key, PCollection<JObjectKey> refsFrom, boolean fro
 
     @Override
     public Collection<JObjectKey> collectRefsTo() {
-        return chunks().values().stream().toList();
+        return Set.copyOf(chunks().values());
     }
 }
