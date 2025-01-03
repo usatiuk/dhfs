@@ -163,7 +163,7 @@ public class TxWritebackImpl implements TxWriteback {
                 callbacks.forEach(l -> l.forEach(VoidFn::apply));
 
                 synchronized (_flushWaitSynchronizer) {
-                    currentSize -= ((TxBundleImpl) bundle).calculateTotalSize();
+                    currentSize -= bundle.calculateTotalSize();
                     // FIXME:
                     if (currentSize <= sizeLimit || !_ready)
                         _flushWaitSynchronizer.notifyAll();

@@ -12,21 +12,23 @@ import java.util.Optional;
 
 @ApplicationScoped
 public class TransactionFactoryImpl implements TransactionFactory {
+    @Override
+    public TransactionPrivate createTransaction(long id, TransactionObjectSource source) {
+        return new TransactionImpl(id, source);
+    }
+
     private class TransactionImpl implements TransactionPrivate {
         private final long _id;
-
-        public long getId() {
-            return _id;
-        }
-
         private final ReadTrackingObjectSource _source;
-
         private final Map<JObjectKey, TxRecord.TxObjectRecord<?>> _writes = new HashMap<>();
         private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _newWrites = new HashMap<>();
-
         private TransactionImpl(long id, TransactionObjectSource source) {
             _id = id;
             _source = new ReadTrackingObjectSource(source);
+        }
+
+        public long getId() {
+            return _id;
         }
 
         @Override
@@ -95,11 +97,6 @@ public class TransactionFactoryImpl implements TransactionFactory {
         public Map<JObjectKey, TransactionObject<?>> reads() {
             return _source.getRead();
         }
-    }
-
-    @Override
-    public TransactionPrivate createTransaction(long id, TransactionObjectSource source) {
-        return new TransactionImpl(id, source);
     }
 
 }

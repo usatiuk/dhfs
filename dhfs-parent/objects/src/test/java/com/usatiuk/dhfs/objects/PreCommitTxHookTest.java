@@ -18,11 +18,6 @@ public class PreCommitTxHookTest {
 
     @Inject
     Transaction curTx;
-
-    @ApplicationScoped
-    public static class DummyPreCommitTxHook implements PreCommitTxHook {
-    }
-
     @InjectSpy
     private DummyPreCommitTxHook spyHook;
 
@@ -109,6 +104,10 @@ public class PreCommitTxHookTest {
         Assertions.assertEquals("John", ((Parent) dataCaptorOld.getValue()).name());
         Assertions.assertEquals("John changed", ((Parent) dataCaptorNew.getValue()).name());
         Assertions.assertEquals(new JObjectKey("ParentEdit2"), keyCaptor.getValue());
+    }
+
+    @ApplicationScoped
+    public static class DummyPreCommitTxHook implements PreCommitTxHook {
     }
 
 }

@@ -11,15 +11,21 @@ public class HashSetDelayedBlockingQueue<T> {
     private final LinkedHashMap<T, SetElement<T>> _set = new LinkedHashMap<>();
     private final Object _sleepSynchronizer = new Object();
     private long _delay;
+    private boolean _closed = false;
+
+    public HashSetDelayedBlockingQueue(long delay) {
+        _delay = delay;
+    }
 
     public long getDelay() {
         return _delay;
     }
 
-    private boolean _closed = false;
-
-    public HashSetDelayedBlockingQueue(long delay) {
-        _delay = delay;
+    public void setDelay(long delay) {
+        synchronized (_sleepSynchronizer) {
+            _delay = delay;
+            _sleepSynchronizer.notifyAll();
+        }
     }
 
     // If there's object with key in the queue, don't do anything
@@ -250,13 +256,6 @@ public class HashSetDelayedBlockingQueue<T> {
         }
 
         return out;
-    }
-
-    public void setDelay(long delay) {
-        synchronized (_sleepSynchronizer) {
-            _delay = delay;
-            _sleepSynchronizer.notifyAll();
-        }
     }
 
     private record SetElement<T>(T el, long time) {

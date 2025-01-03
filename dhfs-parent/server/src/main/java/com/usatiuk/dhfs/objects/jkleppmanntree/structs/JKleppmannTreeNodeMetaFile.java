@@ -10,13 +10,13 @@ import java.util.Objects;
 public class JKleppmannTreeNodeMetaFile extends JKleppmannTreeNodeMeta {
     private final JObjectKey _fileIno;
 
-    public JObjectKey getFileIno() {
-        return _fileIno;
-    }
-
     public JKleppmannTreeNodeMetaFile(String name, JObjectKey fileIno) {
         super(name);
         _fileIno = fileIno;
+    }
+
+    public JObjectKey getFileIno() {
+        return _fileIno;
     }
 
     @Override

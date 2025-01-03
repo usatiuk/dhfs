@@ -22,38 +22,16 @@ import java.util.function.Function;
 // TODO: persistent tx id
 @ApplicationScoped
 public class JObjectManager {
+    private final List<PreCommitTxHook> _preCommitTxHooks;
+    private final DataLocker _objLocker = new DataLocker();
+    private final ConcurrentHashMap<JObjectKey, JDataWrapper<?>> _objects = new ConcurrentHashMap<>();
+    private final AtomicLong _txCounter = new AtomicLong();
     @Inject
     WritebackObjectPersistentStore writebackObjectPersistentStore;
     @Inject
     TransactionFactory transactionFactory;
-
-    private final List<PreCommitTxHook> _preCommitTxHooks;
-
     JObjectManager(Instance<PreCommitTxHook> preCommitTxHooks) {
         _preCommitTxHooks = preCommitTxHooks.stream().sorted(Comparator.comparingInt(PreCommitTxHook::getPriority)).toList();
-    }
-
-    private final DataLocker _objLocker = new DataLocker();
-    private final ConcurrentHashMap<JObjectKey, JDataWrapper<?>> _objects = new ConcurrentHashMap<>();
-    private final AtomicLong _txCounter = new AtomicLong();
-
-    private class JDataWrapper<T extends JData> extends WeakReference<JDataVersionedWrapper<T>> {
-        private static final Cleaner CLEANER = Cleaner.create();
-
-        public JDataWrapper(JDataVersionedWrapper<T> referent) {
-            super(referent);
-            var key = referent.data().key();
-            CLEANER.register(referent, () -> {
-                _objects.remove(key, this);
-            });
-        }
-
-        @Override
-        public String toString() {
-            return "JDataWrapper{" +
-                    "ref=" + get() +
-                    '}';
-        }
     }
 
     private <T extends JData> JDataVersionedWrapper<T> get(Class<T> type, JObjectKey key) {
@@ -93,16 +71,6 @@ public class JObjectManager {
         }
     }
 
-    private record TransactionObjectNoLock<T extends JData>
-            (Optional<JDataVersionedWrapper<T>> data)
-            implements TransactionObject<T> {
-    }
-
-    private record TransactionObjectLocked<T extends JData>
-            (Optional<JDataVersionedWrapper<T>> data, AutoCloseableNoThrow lock)
-            implements TransactionObject<T> {
-    }
-
     private <T extends JData> TransactionObjectNoLock<T> getObj(Class<T> type, JObjectKey key) {
         var got = get(type, key);
         return new TransactionObjectNoLock<>(Optional.ofNullable(got));
@@ -112,37 +80,6 @@ public class JObjectManager {
         var lock = _objLocker.lock(key);
         var got = get(type, key);
         return new TransactionObjectLocked<>(Optional.ofNullable(got), lock);
-    }
-
-    private class TransactionObjectSourceImpl implements TransactionObjectSource {
-        private final long _txId;
-
-        private TransactionObjectSourceImpl(long txId) {
-            _txId = txId;
-        }
-
-        @Override
-        public <T extends JData> TransactionObject<T> get(Class<T> type, JObjectKey key) {
-            return getObj(type, key);
-//            return getObj(type, key).map(got -> {
-//                if (got.data().getVersion() > _txId) {
-//                    throw new IllegalStateException("Serialization race for " + key + ": " + got.data().getVersion() + " vs " + _txId);
-//                }
-//                return got;
-//            });
-        }
-
-        @Override
-        public <T extends JData> TransactionObject<T> getWriteLocked(Class<T> type, JObjectKey key) {
-            return getObjLock(type, key);
-//            return getObjLock(type, key).map(got -> {
-//                if (got.data().getVersion() > _txId) {
-//                    got.lock.close();
-//                    throw new IllegalStateException("Serialization race for " + key + ": " + got.data().getVersion() + " vs " + _txId);
-//                }
-//                return got;
-//            });
-        }
     }
 
     public TransactionPrivate createTransaction() {
@@ -291,5 +228,65 @@ public class JObjectManager {
                 locked.lock.close();
             }
         });
+    }
+
+    private record TransactionObjectNoLock<T extends JData>
+            (Optional<JDataVersionedWrapper<T>> data)
+            implements TransactionObject<T> {
+    }
+
+    private record TransactionObjectLocked<T extends JData>
+            (Optional<JDataVersionedWrapper<T>> data, AutoCloseableNoThrow lock)
+            implements TransactionObject<T> {
+    }
+
+    private class JDataWrapper<T extends JData> extends WeakReference<JDataVersionedWrapper<T>> {
+        private static final Cleaner CLEANER = Cleaner.create();
+
+        public JDataWrapper(JDataVersionedWrapper<T> referent) {
+            super(referent);
+            var key = referent.data().key();
+            CLEANER.register(referent, () -> {
+                _objects.remove(key, this);
+            });
+        }
+
+        @Override
+        public String toString() {
+            return "JDataWrapper{" +
+                    "ref=" + get() +
+                    '}';
+        }
+    }
+
+    private class TransactionObjectSourceImpl implements TransactionObjectSource {
+        private final long _txId;
+
+        private TransactionObjectSourceImpl(long txId) {
+            _txId = txId;
+        }
+
+        @Override
+        public <T extends JData> TransactionObject<T> get(Class<T> type, JObjectKey key) {
+            return getObj(type, key);
+//            return getObj(type, key).map(got -> {
+//                if (got.data().getVersion() > _txId) {
+//                    throw new IllegalStateException("Serialization race for " + key + ": " + got.data().getVersion() + " vs " + _txId);
+//                }
+//                return got;
+//            });
+        }
+
+        @Override
+        public <T extends JData> TransactionObject<T> getWriteLocked(Class<T> type, JObjectKey key) {
+            return getObjLock(type, key);
+//            return getObjLock(type, key).map(got -> {
+//                if (got.data().getVersion() > _txId) {
+//                    got.lock.close();
+//                    throw new IllegalStateException("Serialization race for " + key + ": " + got.data().getVersion() + " vs " + _txId);
+//                }
+//                return got;
+//            });
+        }
     }
 }

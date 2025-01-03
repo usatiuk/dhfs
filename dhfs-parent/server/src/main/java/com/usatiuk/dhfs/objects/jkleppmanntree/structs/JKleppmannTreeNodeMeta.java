@@ -10,12 +10,12 @@ import java.util.Objects;
 public abstract class JKleppmannTreeNodeMeta implements NodeMeta {
     private final String _name;
 
-    public String getName() {
-        return _name;
-    }
-
     public JKleppmannTreeNodeMeta(String name) {
         _name = name;
+    }
+
+    public String getName() {
+        return _name;
     }
 
     public abstract JKleppmannTreeNodeMeta withName(String name);

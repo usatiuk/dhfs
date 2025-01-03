@@ -12,10 +12,11 @@ import java.util.concurrent.TimeoutException;
 
 public class DhfsImage implements Future<String> {
 
+    private static final DhfsImage INSTANCE = new DhfsImage();
     private static String _builtImage = null;
-    private static DhfsImage INSTANCE = new DhfsImage();
 
-    private DhfsImage() {}
+    private DhfsImage() {
+    }
 
     public static DhfsImage getInstance() {
         return INSTANCE;

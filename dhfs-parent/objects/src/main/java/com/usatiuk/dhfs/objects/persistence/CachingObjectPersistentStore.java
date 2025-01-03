@@ -19,14 +19,10 @@ import java.util.stream.Stream;
 
 @ApplicationScoped
 public class CachingObjectPersistentStore {
+    private final LinkedHashMap<JObjectKey, CacheEntry> _cache = new LinkedHashMap<>(8, 0.75f, true);
+    private final DataLocker _locker = new DataLocker();
     @Inject
     SerializingObjectPersistentStore delegate;
-
-    private record CacheEntry(Optional<JDataVersionedWrapper<?>> object, long size) {
-    }
-
-    private final LinkedHashMap<JObjectKey, CacheEntry> _cache = new LinkedHashMap<>(8, 0.75f, true);
-
     @ConfigProperty(name = "dhfs.objects.lru.limit")
     long sizeLimit;
     @ConfigProperty(name = "dhfs.objects.lru.print-stats")
@@ -36,8 +32,6 @@ public class CachingObjectPersistentStore {
     private long _evict = 0;
 
     private ExecutorService _statusExecutor = null;
-
-    private final DataLocker _locker = new DataLocker();
 
     @Startup
     void init() {
@@ -109,5 +103,8 @@ public class CachingObjectPersistentStore {
             }
         }
         delegate.commitTx(names);
+    }
+
+    private record CacheEntry(Optional<JDataVersionedWrapper<?>> object, long size) {
     }
 }

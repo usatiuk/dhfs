@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects.transaction;
 
-import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
 import com.usatiuk.dhfs.objects.JData;
+import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
 
 import java.util.Optional;
 

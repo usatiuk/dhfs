@@ -8,10 +8,9 @@ import jakarta.inject.Inject;
 
 @ApplicationScoped
 public class TransactionManagerImpl implements TransactionManager {
+    private static final ThreadLocal<TransactionPrivate> _currentTransaction = new ThreadLocal<>();
     @Inject
     JObjectManager jObjectManager;
-
-    private static final ThreadLocal<TransactionPrivate> _currentTransaction = new ThreadLocal<>();
 
     @Override
     public void begin() {

@@ -13,6 +13,12 @@ public interface TxWriteback {
 
     void fence(long bundleId);
 
+    Optional<PendingWriteEntry> getPendingWrite(JObjectKey key);
+
+    // Executes callback after bundle with bundleId id has been persisted
+    // if it was already, runs callback on the caller thread
+    void asyncFence(long bundleId, VoidFn callback);
+
     interface PendingWriteEntry {
         long bundleId();
     }
@@ -22,10 +28,4 @@ public interface TxWriteback {
 
     record PendingDelete(JObjectKey key, long bundleId) implements PendingWriteEntry {
     }
-
-    Optional<PendingWriteEntry> getPendingWrite(JObjectKey key);
-
-    // Executes callback after bundle with bundleId id has been persisted
-    // if it was already, runs callback on the caller thread
-    void asyncFence(long bundleId, VoidFn callback);
 }

@@ -250,7 +250,7 @@ public class ObjectsTest {
                 Assertions.assertEquals("John", got.name());
             }
         } else {
-            Assertions.assertTrue(!thread2Failed.get());
+            Assertions.assertFalse(thread2Failed.get());
             Assertions.assertEquals("John2", got.name());
         }
     }

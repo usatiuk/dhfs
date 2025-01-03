@@ -58,13 +58,10 @@ public class JKleppmannTreeManager {
 
     public class JKleppmannTree {
         private final KleppmannTree<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> _tree;
-
-        private JKleppmannTreePersistentData _data;
-
         private final JKleppmannTreeStorageInterface _storageInterface;
         private final JKleppmannTreeClock _clock;
-
         private final JObjectKey _treeName;
+        private JKleppmannTreePersistentData _data;
 
         JKleppmannTree(JKleppmannTreePersistentData data) {
             _treeName = data.key();
@@ -414,7 +411,7 @@ public class JKleppmannTreeManager {
 
                 @Override
                 public long size() {
-                    return (long) _data.log().size();
+                    return _data.log().size();
                 }
 
                 @Override

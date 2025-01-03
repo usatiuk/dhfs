@@ -160,8 +160,6 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             } catch (Exception e) {
 //                fobj.getMeta().removeRef(newNodeId);
                 throw e;
-            } finally {
-//                fobj.rwUnlock();
             }
             return Optional.of(f.key());
         });
@@ -173,8 +171,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         return jObjectTxManager.executeTx(() -> {
             return getTree().findParent(w -> {
                 if (w.meta() instanceof JKleppmannTreeNodeMetaFile f)
-                    if (f.getFileIno().equals(ino))
-                        return true;
+                    return f.getFileIno().equals(ino);
                 return false;
             });
         });

@@ -9,7 +9,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 abstract public class TempDataProfile implements QuarkusTestProfile {
-    protected void getConfigOverrides(Map<String, String> toPut) {}
+    protected void getConfigOverrides(Map<String, String> toPut) {
+    }
 
     @Override
     final public Map<String, String> getConfigOverrides() {

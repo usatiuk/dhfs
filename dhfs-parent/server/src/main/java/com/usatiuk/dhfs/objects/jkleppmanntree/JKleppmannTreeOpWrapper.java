@@ -10,13 +10,13 @@ import java.util.UUID;
 public class JKleppmannTreeOpWrapper {
     private final OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> _op;
 
-    public OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> getOp() {
-        return _op;
-    }
-
     public JKleppmannTreeOpWrapper(OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> op) {
         if (op == null) throw new IllegalArgumentException("op shouldn't be null");
         _op = op;
+    }
+
+    public OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> getOp() {
+        return _op;
     }
 
 //    @Override

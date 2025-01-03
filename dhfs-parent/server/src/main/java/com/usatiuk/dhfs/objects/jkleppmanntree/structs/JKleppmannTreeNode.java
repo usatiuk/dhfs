@@ -59,7 +59,7 @@ public record JKleppmannTreeNode(JObjectKey key, PCollection<JObjectKey> refsFro
         return Stream.concat(children().values().stream(),
                 switch (meta()) {
                     case JKleppmannTreeNodeMetaDirectory dir -> Stream.<JObjectKey>of();
-                    case JKleppmannTreeNodeMetaFile file -> Stream.<JObjectKey>of(file.getFileIno());
+                    case JKleppmannTreeNodeMetaFile file -> Stream.of(file.getFileIno());
                     default -> throw new IllegalStateException("Unexpected value: " + meta());
                 }
         ).toList();
