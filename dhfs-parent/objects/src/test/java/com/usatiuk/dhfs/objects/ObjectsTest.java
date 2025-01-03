@@ -215,12 +215,8 @@ public class ObjectsTest {
         Just.run(() -> {
             try {
                 Log.warn("Thread 2");
+                barrier.await(); // Ensure thread 2 tx id is larger than thread 1
                 txm.runTries(() -> {
-                    try {
-                        barrier.await();
-                    } catch (Throwable e) {
-                        throw new RuntimeException(e);
-                    }
                     var parent = curTx.get(Parent.class, new JObjectKey(key), strategy).orElse(null);
                     curTx.put(parent.withName("John2"));
                     Log.warn("Thread 2 commit");
@@ -239,16 +235,24 @@ public class ObjectsTest {
             return curTx.get(Parent.class, new JObjectKey(key)).orElse(null);
         });
 
-        if (!thread1Failed.get()) {
-            Assertions.assertTrue(thread2Failed.get());
-            Assertions.assertEquals("John", got.name());
-        } else if (!thread2Failed.get()) {
-            Assertions.assertEquals("John2", got.name());
-        } else {
-            Assertions.fail("No thread succeeded");
+        // It is possible that thread 2 did get the object after thread 1 committed it, so there is no conflict
+        Assertions.assertTrue(!thread1Failed.get() || !thread2Failed.get());
+
+        if (strategy.equals(LockingStrategy.WRITE)) {
+            if (!thread1Failed.get())
+                Assertions.assertFalse(thread2Failed.get());
         }
 
-        Assertions.assertTrue(thread1Failed.get() || thread2Failed.get());
+        if (!thread1Failed.get()) {
+            if (!thread2Failed.get()) {
+                Assertions.assertEquals("John2", got.name());
+            } else {
+                Assertions.assertEquals("John", got.name());
+            }
+        } else {
+            Assertions.assertTrue(!thread2Failed.get());
+            Assertions.assertEquals("John2", got.name());
+        }
     }
 
 //    }
