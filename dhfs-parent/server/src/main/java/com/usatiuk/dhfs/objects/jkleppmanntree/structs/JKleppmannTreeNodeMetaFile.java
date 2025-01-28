@@ -6,7 +6,7 @@ import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeNodeMetaFileP;
 
 import java.util.Objects;
 
-@ProtoMirror(JKleppmannTreeNodeMetaFileP.class)
+//@ProtoMirror(JKleppmannTreeNodeMetaFileP.class)
 public class JKleppmannTreeNodeMetaFile extends JKleppmannTreeNodeMeta {
     private final JObjectKey _fileIno;
 

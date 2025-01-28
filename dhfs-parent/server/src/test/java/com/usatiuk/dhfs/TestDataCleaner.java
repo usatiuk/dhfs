@@ -17,13 +17,10 @@ import java.util.Objects;
 public class TestDataCleaner {
     @ConfigProperty(name = "dhfs.objects.persistence.files.root")
     String tempDirectory;
-    @ConfigProperty(name = "dhfs.objects.root")
-    String tempDirectoryIdx;
 
     void init(@Observes @Priority(1) StartupEvent event) throws IOException {
         try {
             purgeDirectory(Path.of(tempDirectory).toFile());
-            purgeDirectory(Path.of(tempDirectoryIdx).toFile());
         } catch (Exception ignored) {
             Log.warn("Couldn't cleanup test data on init");
         }
@@ -31,7 +28,6 @@ public class TestDataCleaner {
 
     void shutdown(@Observes @Priority(1000000000) ShutdownEvent event) throws IOException {
         purgeDirectory(Path.of(tempDirectory).toFile());
-        purgeDirectory(Path.of(tempDirectoryIdx).toFile());
     }
 
     void purgeDirectory(File dir) {

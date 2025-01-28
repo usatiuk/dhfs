@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
 import com.usatiuk.dhfs.objects.JDataRefcounted;
 import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.repository.peersync.structs.JKleppmannTreeNodeMetaPeer;
 import com.usatiuk.kleppmanntree.OpMove;
 import com.usatiuk.kleppmanntree.TreeNode;
 import org.pcollections.PCollection;
@@ -61,6 +62,7 @@ public record JKleppmannTreeNode(JObjectKey key, PCollection<JObjectKey> refsFro
                 switch (meta()) {
                     case JKleppmannTreeNodeMetaDirectory dir -> Stream.<JObjectKey>of();
                     case JKleppmannTreeNodeMetaFile file -> Stream.of(file.getFileIno());
+                    case JKleppmannTreeNodeMetaPeer peer -> Stream.of(peer.getPeerId());
                     default -> throw new IllegalStateException("Unexpected value: " + meta());
                 }
         ).collect(Collectors.toUnmodifiableSet());

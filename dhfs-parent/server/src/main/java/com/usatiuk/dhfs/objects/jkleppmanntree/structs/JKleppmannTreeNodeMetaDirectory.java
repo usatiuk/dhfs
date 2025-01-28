@@ -3,7 +3,7 @@ package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 import com.usatiuk.autoprotomap.runtime.ProtoMirror;
 import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeNodeMetaDirectoryP;
 
-@ProtoMirror(JKleppmannTreeNodeMetaDirectoryP.class)
+//@ProtoMirror(JKleppmannTreeNodeMetaDirectoryP.class)
 public class JKleppmannTreeNodeMetaDirectory extends JKleppmannTreeNodeMeta {
     public JKleppmannTreeNodeMetaDirectory(String name) {
         super(name);

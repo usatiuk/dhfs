@@ -6,7 +6,7 @@ import com.usatiuk.kleppmanntree.NodeMeta;
 
 import java.util.Objects;
 
-@ProtoMirror(JKleppmannTreeNodeMetaP.class)
+//@ProtoMirror(JKleppmannTreeNodeMetaP.class)
 public abstract class JKleppmannTreeNodeMeta implements NodeMeta {
     private final String _name;
 

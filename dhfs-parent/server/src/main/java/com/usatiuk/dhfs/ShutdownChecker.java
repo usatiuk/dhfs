@@ -14,7 +14,7 @@ import java.nio.file.Paths;
 @ApplicationScoped
 public class ShutdownChecker {
     private static final String dataFileName = "running";
-    @ConfigProperty(name = "dhfs.objects.root")
+    @ConfigProperty(name = "dhfs.objects.persistence.files.root")
     String dataRoot;
     boolean _cleanShutdown = true;
     boolean _initialized = false;
