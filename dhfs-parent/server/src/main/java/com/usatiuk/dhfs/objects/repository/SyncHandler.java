@@ -8,7 +8,6 @@ import com.usatiuk.dhfs.objects.transaction.Transaction;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.apache.commons.lang3.NotImplementedException;
 import org.pcollections.PMap;
 
 import java.util.stream.Collectors;
@@ -172,11 +171,11 @@ public class SyncHandler {
 //                                resolve(from, theirsHeader, theirsData, found);
 //                    });
 //            Log.  info("Resolved conflict for " + from + " " + header.getName());
-            throw new NotImplementedException();
+//            throw new NotImplementedException();
         } else if (hasLower) {
             Log.info("Received older index update than known: " + from + " " + current.key());
 //            throw new OutdatedUpdateException();
-            throw new NotImplementedException();
+//            throw new NotImplementedException();
         } else if (hasHigher) {
             var newChangelog = rcvChangelog.containsKey(persistentPeerDataService.getSelfUuid()) ?
                     rcvChangelog : rcvChangelog.plus(persistentPeerDataService.getSelfUuid(), 0L);
@@ -205,7 +204,7 @@ public class SyncHandler {
             if (current == null) {
                 var obj = new RemoteObject<>(key, rcv);
                 curTx.put(obj);
-                return (RemoteObject<T>) obj;
+                current = (RemoteObject<T>) obj; // Will update known remote version too
             }
 
             var newObj = handleOneUpdate(from, current, rcv);

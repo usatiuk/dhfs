@@ -5,6 +5,7 @@ import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.objects.repository.SyncHandler;
 import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
+import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.mutable.MutableObject;
@@ -26,39 +27,45 @@ public class RemoteTransaction {
         return curTx.getId();
     }
 
-    private <T extends JDataRemote> RemoteObject<T> tryDownloadRemote(RemoteObject<T> obj) {
+    private <T extends JDataRemote> Optional<RemoteObject<T>> tryDownloadRemote(RemoteObject<T> obj) {
         MutableObject<RemoteObject<T>> success = new MutableObject<>(null);
 
-        remoteObjectServiceClient.getObject(obj.key(), rcv -> {
-            if (!obj.meta().knownType().isInstance(rcv.getRight().data()))
-                throw new IllegalStateException("Object type mismatch: " + obj.meta().knownType() + " vs " + rcv.getRight().data().getClass());
+        try {
+            remoteObjectServiceClient.getObject(obj.key(), rcv -> {
+                if (!obj.meta().knownType().isInstance(rcv.getRight().data()))
+                    throw new IllegalStateException("Object type mismatch: " + obj.meta().knownType() + " vs " + rcv.getRight().data().getClass());
 
-            if (!rcv.getRight().changelog().equals(obj.meta().changelog())) {
-                var updated = syncHandler.handleRemoteUpdate(rcv.getLeft(), obj.key(), obj, rcv.getRight().changelog());
-                if (!rcv.getRight().changelog().equals(updated.meta().changelog()))
-                    throw new IllegalStateException("Changelog mismatch, update failed?: " + rcv.getRight().changelog() + " vs " + updated.meta().changelog());
-                success.setValue(updated.withData((T) rcv.getRight().data()));
-            } else {
-                success.setValue(obj.withData((T) rcv.getRight().data()));
-            }
-            return true;
-        });
+                if (!rcv.getRight().changelog().equals(obj.meta().changelog())) {
+                    var updated = syncHandler.handleRemoteUpdate(rcv.getLeft(), obj.key(), obj, rcv.getRight().changelog());
+                    if (!rcv.getRight().changelog().equals(updated.meta().changelog()))
+                        throw new IllegalStateException("Changelog mismatch, update failed?: " + rcv.getRight().changelog() + " vs " + updated.meta().changelog());
+                    success.setValue(updated.withData((T) rcv.getRight().data()));
+                } else {
+                    success.setValue(obj.withData((T) rcv.getRight().data()));
+                }
+                return true;
+            });
+        } catch (Exception e) {
+            Log.error("Failed to download object " + obj.key(), e);
+            return Optional.empty();
+        }
 
         curTx.put(success.getValue());
-        return success.getValue();
+        return Optional.of(success.getValue());
     }
 
     @SuppressWarnings("unchecked")
     public <T extends JDataRemote> Optional<RemoteObject<T>> get(Class<T> type, JObjectKey key, LockingStrategy strategy) {
         return curTx.get(RemoteObject.class, key, strategy)
-                .map(obj -> {
+                .flatMap(obj -> {
                     if (obj.data() != null && !type.isInstance(obj.data()))
                         throw new IllegalStateException("Object (real) type mismatch: " + obj.data().getClass() + " vs " + type);
-                    if (!type.isAssignableFrom(obj.meta().knownType()))
-                        throw new IllegalStateException("Object (meta) type mismatch: " + obj.meta().knownType() + " vs " + type);
+// FIXME:
+//                    if (!type.isAssignableFrom(obj.meta().knownType()))
+//                        throw new IllegalStateException("Object (meta) type mismatch: " + obj.meta().knownType() + " vs " + type);
 
                     if (obj.data() != null)
-                        return obj;
+                        return Optional.of(obj);
                     else
                         return tryDownloadRemote(obj);
                 });
@@ -71,7 +78,6 @@ public class RemoteTransaction {
     public <T extends JDataRemote> Optional<T> getData(Class<T> type, JObjectKey key, LockingStrategy strategy) {
         return get(type, key, strategy).map(RemoteObject::data);
     }
-
 
     public <T extends JDataRemote> void put(RemoteObject<T> obj) {
         curTx.put(obj);

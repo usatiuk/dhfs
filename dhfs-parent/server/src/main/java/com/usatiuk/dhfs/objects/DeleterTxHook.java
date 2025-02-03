@@ -16,6 +16,9 @@ public class DeleterTxHook implements PreCommitTxHook {
 
     @Override
     public void onChange(JObjectKey key, JData old, JData cur) {
+        if (cur instanceof RemoteObject<?>) {
+            return; // FIXME:
+        }
         if (!(cur instanceof JDataRefcounted refCur)) {
             return;
         }
@@ -28,6 +31,9 @@ public class DeleterTxHook implements PreCommitTxHook {
 
     @Override
     public void onCreate(JObjectKey key, JData cur) {
+        if (cur instanceof RemoteObject<?>) {
+            return;
+        }
         if (!(cur instanceof JDataRefcounted refCur)) {
             return;
         }
@@ -40,6 +46,9 @@ public class DeleterTxHook implements PreCommitTxHook {
 
     @Override
     public void onDelete(JObjectKey key, JData cur) {
+        if (cur instanceof RemoteObject<?>) {
+            return;
+        }
         if (!(cur instanceof JDataRefcounted refCur)) {
             return;
         }
