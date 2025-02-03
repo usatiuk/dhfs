@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.IntConsumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -61,7 +62,7 @@ public class ProtoSerializerGenerator {
             visitor.accept(cur);
 
             var next = cur.superClassType().name();
-            if (next.equals(DotName.OBJECT_NAME)) break;
+            if (next.equals(DotName.OBJECT_NAME) || next.equals(DotName.RECORD_NAME)) break;
             cur = index.getClassByName(next);
         }
     }
@@ -82,6 +83,10 @@ public class ProtoSerializerGenerator {
 
         var objectClass = index.getClassByName(objectType.name().toString());
 
+        Function<String, String> getterGetter = objectClass.isRecord()
+                ? Function.identity()
+                : s -> "get" + capitalize(stripPrefix(s, FIELD_PREFIX));
+
         for (var f : findAllFields(index, objectClass)) {
             var consideredFieldName = stripPrefix(f.name(), FIELD_PREFIX);
 
@@ -89,7 +94,7 @@ public class ProtoSerializerGenerator {
                 if ((f.flags() & Opcodes.ACC_PUBLIC) != 0)
                     return bytecodeCreator.readInstanceField(f, object);
                 else {
-                    var fieldGetter = "get" + capitalize(stripPrefix(f.name(), FIELD_PREFIX));
+                    var fieldGetter = getterGetter.apply(f.name());
                     return bytecodeCreator.invokeVirtualMethod(
                             MethodDescriptor.ofMethod(objectType.toString(), fieldGetter, f.type().name().toString()), object);
                 }
