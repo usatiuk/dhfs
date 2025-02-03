@@ -30,6 +30,7 @@ public class JObjectManager {
     WritebackObjectPersistentStore writebackObjectPersistentStore;
     @Inject
     TransactionFactory transactionFactory;
+
     JObjectManager(Instance<PreCommitTxHook> preCommitTxHooks) {
         _preCommitTxHooks = preCommitTxHooks.stream().sorted(Comparator.comparingInt(PreCommitTxHook::getPriority)).toList();
     }
@@ -131,20 +132,21 @@ public class JObjectManager {
                 boolean somethingChanged;
                 do {
                     somethingChanged = false;
+                    Map<JObjectKey, TxRecord.TxObjectRecord<?>> currentIteration = new HashMap();
                     for (var hook : _preCommitTxHooks) {
-                        drained = tx.drainNewWrites();
-                        Log.trace("Commit iteration with " + drained.size() + " records for hook " + hook.getClass());
+                        for (var n : tx.drainNewWrites())
+                            currentIteration.put(n.key(), n);
+                        Log.trace("Commit iteration with " + currentIteration.size() + " records for hook " + hook.getClass());
 
-                        drained.stream()
-                                .map(TxRecord.TxObjectRecord::key)
+                        currentIteration.keySet().stream()
                                 .sorted(Comparator.comparing(JObjectKey::toString))
                                 .forEach(addDependency);
 
-                        for (var entry : drained) {
+                        for (var entry : currentIteration.entrySet()) {
                             somethingChanged = true;
                             Log.trace("Running pre-commit hook " + hook.getClass() + " for" + entry.toString());
-                            var oldObj = getCurrent.apply(entry.key());
-                            switch (entry) {
+                            var oldObj = getCurrent.apply(entry.getKey());
+                            switch (entry.getValue()) {
                                 case TxRecord.TxObjectRecordWrite<?> write -> {
                                     if (oldObj == null) {
                                         hook.onCreate(write.key(), write.data());
@@ -157,9 +159,9 @@ public class JObjectManager {
                                 }
                                 default -> throw new TxCommitException("Unexpected value: " + entry);
                             }
-                            current.put(entry.key(), entry);
                         }
                     }
+                    current.putAll(currentIteration);
                 } while (somethingChanged);
             }
             reads = tx.reads();
