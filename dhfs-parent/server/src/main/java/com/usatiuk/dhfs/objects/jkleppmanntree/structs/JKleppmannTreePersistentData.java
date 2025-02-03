@@ -2,41 +2,24 @@ package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
 import com.usatiuk.dhfs.objects.JDataRefcounted;
 import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.PeerId;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
 import com.usatiuk.kleppmanntree.LogRecord;
 import com.usatiuk.kleppmanntree.OpMove;
 import org.pcollections.PCollection;
+import org.pcollections.PMap;
+import org.pcollections.PSortedMap;
+import org.pcollections.TreePMap;
 
 import java.util.*;
 
 public record JKleppmannTreePersistentData(
         JObjectKey key, PCollection<JObjectKey> refsFrom, boolean frozen,
         long clock,
-        HashMap<UUID, TreeMap<CombinedTimestamp<Long, UUID>, OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>>> queues,
-        HashMap<UUID, Long> peerTimestampLog,
-        TreeMap<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>> log
+        PMap<PeerId, PSortedMap<CombinedTimestamp<Long, PeerId>, OpMove<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>>> queues,
+        HashMap<PeerId, Long> peerTimestampLog,
+        TreeMap<CombinedTimestamp<Long, PeerId>, LogRecord<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>> log
 ) implements JDataRefcounted {
-    void recordOp(UUID host, OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> opMove) {
-        queues().computeIfAbsent(host, h -> new TreeMap<>());
-        queues().get(host).put(opMove.timestamp(), opMove);
-    }
-
-    void removeOp(UUID host, OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> opMove) {
-        queues().get(host).remove(opMove.timestamp(), opMove);
-    }
-
-    void recordOp(Collection<UUID> hosts, OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> opMove) {
-        for (var u : hosts) {
-            recordOp(u, opMove);
-        }
-    }
-
-    void removeOp(Collection<UUID> hosts, OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> opMove) {
-        for (var u : hosts) {
-            removeOp(u, opMove);
-        }
-    }
-
     @Override
     public JKleppmannTreePersistentData withRefsFrom(PCollection<JObjectKey> refs) {
         return new JKleppmannTreePersistentData(key, refs, frozen, clock, queues, peerTimestampLog, log);
@@ -51,15 +34,15 @@ public record JKleppmannTreePersistentData(
         return new JKleppmannTreePersistentData(key, refsFrom, frozen, clock, queues, peerTimestampLog, log);
     }
 
-    public JKleppmannTreePersistentData withQueues(HashMap<UUID, TreeMap<CombinedTimestamp<Long, UUID>, OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>>> queues) {
+    public JKleppmannTreePersistentData withQueues(PMap<PeerId, PSortedMap<CombinedTimestamp<Long, PeerId>, OpMove<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>>> queues) {
         return new JKleppmannTreePersistentData(key, refsFrom, frozen, clock, queues, peerTimestampLog, log);
     }
 
-    public JKleppmannTreePersistentData withPeerTimestampLog(HashMap<UUID, Long> peerTimestampLog) {
+    public JKleppmannTreePersistentData withPeerTimestampLog(HashMap<PeerId, Long> peerTimestampLog) {
         return new JKleppmannTreePersistentData(key, refsFrom, frozen, clock, queues, peerTimestampLog, log);
     }
 
-    public JKleppmannTreePersistentData withLog(TreeMap<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>> log) {
+    public JKleppmannTreePersistentData withLog(TreeMap<CombinedTimestamp<Long, PeerId>, LogRecord<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>> log) {
         return new JKleppmannTreePersistentData(key, refsFrom, frozen, clock, queues, peerTimestampLog, log);
     }
 

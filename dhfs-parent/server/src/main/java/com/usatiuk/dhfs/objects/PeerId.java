@@ -3,7 +3,7 @@ package com.usatiuk.dhfs.objects;
 import java.io.Serializable;
 import java.util.UUID;
 
-public record PeerId(UUID id) implements Serializable {
+public record PeerId(UUID id) implements Serializable, Comparable<PeerId> {
     public static PeerId of(UUID id) {
         return new PeerId(id);
     }
@@ -19,5 +19,10 @@ public record PeerId(UUID id) implements Serializable {
 
     public JObjectKey toJObjectKey() {
         return JObjectKey.of(id.toString());
+    }
+
+    @Override
+    public int compareTo(PeerId o) {
+        return id.compareTo(o.id);
     }
 }

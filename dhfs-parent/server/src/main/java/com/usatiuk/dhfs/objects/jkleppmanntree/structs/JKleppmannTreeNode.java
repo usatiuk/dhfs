@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
 import com.usatiuk.dhfs.objects.JDataRefcounted;
 import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.PeerId;
 import com.usatiuk.dhfs.objects.repository.peersync.structs.JKleppmannTreeNodeMetaPeer;
 import com.usatiuk.kleppmanntree.OpMove;
 import com.usatiuk.kleppmanntree.TreeNode;
@@ -12,15 +13,14 @@ import java.io.Serializable;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 // FIXME: Ideally this is two classes?
 public record JKleppmannTreeNode(JObjectKey key, PCollection<JObjectKey> refsFrom, boolean frozen, JObjectKey parent,
-                                 OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> lastEffectiveOp,
+                                 OpMove<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> lastEffectiveOp,
                                  JKleppmannTreeNodeMeta meta,
-                                 Map<String, JObjectKey> children) implements TreeNode<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey>, JDataRefcounted, Serializable {
+                                 Map<String, JObjectKey> children) implements TreeNode<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>, JDataRefcounted, Serializable {
 
     public JKleppmannTreeNode(JObjectKey id, JObjectKey parent, JKleppmannTreeNodeMeta meta) {
         this(id, TreePSet.empty(), false, parent, null, meta, Collections.emptyMap());
@@ -32,7 +32,7 @@ public record JKleppmannTreeNode(JObjectKey key, PCollection<JObjectKey> refsFro
     }
 
     @Override
-    public JKleppmannTreeNode withLastEffectiveOp(OpMove<Long, UUID, JKleppmannTreeNodeMeta, JObjectKey> lastEffectiveOp) {
+    public JKleppmannTreeNode withLastEffectiveOp(OpMove<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> lastEffectiveOp) {
         return new JKleppmannTreeNode(key, refsFrom, frozen, parent, lastEffectiveOp, meta, children);
     }
 

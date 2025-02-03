@@ -1,82 +1,84 @@
-//package com.usatiuk.dhfs.objects.repository;
-//
-//import com.google.common.collect.Maps;
-//import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
-//import com.usatiuk.dhfs.objects.jrepository.*;
-//import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
-//import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
-//import com.usatiuk.dhfs.objects.repository.opsupport.Op;
-//import io.grpc.Status;
-//import io.grpc.StatusRuntimeException;
-//import io.quarkus.logging.Log;
-//import jakarta.enterprise.context.ApplicationScoped;
-//import jakarta.inject.Inject;
-//import org.apache.commons.lang3.tuple.Pair;
-//
-//import javax.annotation.Nullable;
-//import java.util.*;
-//import java.util.concurrent.Callable;
-//import java.util.concurrent.ConcurrentLinkedDeque;
-//import java.util.concurrent.Executors;
-//import java.util.stream.Collectors;
-//
-//@ApplicationScoped
-//public class RemoteObjectServiceClient {
-//    @Inject
-//    PersistentPeerDataService persistentPeerDataService;
-//
-//    @Inject
-//    RpcClientFactory rpcClientFactory;
-//
-//    @Inject
-//    JObjectManager jObjectManager;
-//
-//    @Inject
-//    SyncHandler syncHandler;
-//    @Inject
-//    InvalidationQueueService invalidationQueueService;
-//    @Inject
+package com.usatiuk.dhfs.objects.repository;
+
+import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
+import com.usatiuk.dhfs.objects.*;
+import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
+import com.usatiuk.dhfs.objects.repository.invalidation.Op;
+import com.usatiuk.dhfs.objects.transaction.Transaction;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import io.quarkus.logging.Log;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.apache.commons.lang3.tuple.Pair;
+
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+
+@ApplicationScoped
+public class RemoteObjectServiceClient {
+    @Inject
+    PersistentPeerDataService persistentPeerDataService;
+
+    @Inject
+    RpcClientFactory rpcClientFactory;
+
+    @Inject
+    TransactionManager txm;
+    @Inject
+    Transaction curTx;
+    @Inject
+    RemoteTransaction remoteTx;
+
+    @Inject
+    SyncHandler syncHandler;
+    @Inject
+    InvalidationQueueService invalidationQueueService;
+    //    @Inject
 //    ProtoSerializer<JObjectDataP, JObjectData> dataProtoSerializer;
-//    @Inject
-//    ProtoSerializer<OpPushPayload, Op> opProtoSerializer;
-//    @Inject
-//    JObjectTxManager jObjectTxManager;
-//
+    @Inject
+    ProtoSerializer<OpPushPayload, Op> opProtoSerializer;
+
+    @Inject
+    ProtoSerializer<GetObjectReply, ReceivedObject> receivedObjectProtoSerializer;
+
 //    public Pair<ObjectHeader, JObjectDataP> getSpecificObject(UUID host, String name) {
 //        return rpcClientFactory.withObjSyncClient(host, client -> {
 //            var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString()).setName(name).build());
 //            return Pair.of(reply.getObject().getHeader(), reply.getObject().getContent());
 //        });
 //    }
-//
-//    public JObjectDataP getObject(JObject<?> jObject) {
-//        jObject.assertRwLock();
-//
-//        var targets = jObject.runReadLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (md, d) -> {
-//            var ourVersion = md.getOurVersion();
-//            if (ourVersion >= 1)
-//                return md.getRemoteCopies().entrySet().stream()
-//                        .filter(entry -> entry.getValue().equals(ourVersion))
-//                        .map(Map.Entry::getKey).toList();
-//            else
-//                return persistentPeerDataService.getHostUuids();
-//        });
-//
-//        if (targets.isEmpty())
-//            throw new IllegalStateException("No targets for object " + jObject.getMeta().getName());
-//
-//        Log.info("Downloading object " + jObject.getMeta().getName() + " from " + targets.stream().map(UUID::toString).collect(Collectors.joining(", ")));
-//
-//        return rpcClientFactory.withObjSyncClient(targets, client -> {
-//            var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString()).setName(jObject.getMeta().getName()).build());
-//
-//            var receivedMap = new HashMap<UUID, Long>();
-//            for (var e : reply.getObject().getHeader().getChangelog().getEntriesList()) {
-//                receivedMap.put(UUID.fromString(e.getHost()), e.getVersion());
-//            }
-//
+
+    public void getObject(JObjectKey key, Function<Pair<PeerId, ReceivedObject>, Boolean> onReceive) {
+        var objMeta = remoteTx.getMeta(key).orElse(null);
+
+        if (objMeta == null) {
+            throw new IllegalArgumentException("Object " + key + " not found");
+        }
+
+        var targetVersion = objMeta.versionSum();
+        var targets = objMeta.knownRemoteVersions().entrySet().stream()
+                .filter(entry -> entry.getValue().equals(targetVersion))
+                .map(Map.Entry::getKey).toList();
+
+        if (targets.isEmpty())
+            throw new IllegalStateException("No targets for object " + key);
+
+        Log.info("Downloading object " + key + " from " + targets);
+
+        rpcClientFactory.withObjSyncClient(targets, (peer, client) -> {
+            var reply = client.getObject(GetObjectRequest.newBuilder().setName(key.toString()).build());
+
+            var deserialized = receivedObjectProtoSerializer.deserialize(reply);
+
+            if (!onReceive.apply(Pair.of(peer, deserialized))) {
+                throw new StatusRuntimeException(Status.ABORTED.withDescription("Failed to process object " + key + " from " + peer));
+            }
+
+            return null;
 //            return jObjectTxManager.executeTx(() -> {
-//                return jObject.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (md, d, b, v) -> {
+//                return key.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (md, d, b, v) -> {
 //                    var unexpected = !Objects.equals(
 //                            Maps.filterValues(md.getChangelog(), val -> val != 0),
 //                            Maps.filterValues(receivedMap, val -> val != 0));
@@ -98,10 +100,10 @@
 //                    return reply.getObject().getContent();
 //                });
 //            });
-//        });
-//    }
-//
-//    @Nullable
+        });
+    }
+
+    //    @Nullable
 //    public IndexUpdateReply notifyUpdate(JObject<?> obj, UUID host) {
 //        var builder = IndexUpdatePush.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString());
 //
@@ -128,7 +130,7 @@
 //        return rpcClientFactory.withObjSyncClient(host, client -> client.indexUpdate(send));
 //    }
 //
-//    public OpPushReply pushOps(List<Op> ops, String queueName, UUID host) {
+    public OpPushReply pushOps(PeerId target, List<Op> ops) {
 //        for (Op op : ops) {
 //            for (var ref : op.getEscapedRefs()) {
 //                jObjectTxManager.executeTx(() -> {
@@ -141,9 +143,14 @@
 //                .setQueueId(queueName);
 //        for (var op : ops)
 //            builder.addMsg(opProtoSerializer.serialize(op));
-//        return rpcClientFactory.withObjSyncClient(host, client -> client.opPush(builder.build()));
-//    }
-//
+        for (Op op : ops) {
+            var serialized = opProtoSerializer.serialize(op);
+            var built = OpPushRequest.newBuilder().addMsg(serialized).build();
+            rpcClientFactory.withObjSyncClient(target, (tgt, client) -> client.opPush(built));
+        }
+        return OpPushReply.getDefaultInstance();
+    }
+
 //    public Collection<CanDeleteReply> canDelete(Collection<UUID> targets, String object, Collection<String> ourReferrers) {
 //        ConcurrentLinkedDeque<CanDeleteReply> results = new ConcurrentLinkedDeque<>();
 //        Log.trace("Asking canDelete for " + object + " from " + targets.stream().map(UUID::toString).collect(Collectors.joining(", ")));
@@ -171,4 +178,4 @@
 //        }
 //        return results;
 //    }
-//}
+}

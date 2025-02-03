@@ -4,6 +4,7 @@ import com.usatiuk.dhfs.TempDataProfile;
 import com.usatiuk.dhfs.files.objects.ChunkData;
 import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
+import com.usatiuk.dhfs.objects.RemoteTransaction;
 import com.usatiuk.dhfs.objects.TransactionManager;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.kleppmanntree.AlreadyExistsException;
@@ -45,6 +46,8 @@ public class DhfsFileServiceSimpleTestImpl {
     Transaction curTx;
     @Inject
     TransactionManager jObjectTxManager;
+    @Inject
+    RemoteTransaction remoteTx;
 
 //    @Test
 //    void readTest() {
@@ -207,9 +210,9 @@ public class DhfsFileServiceSimpleTestImpl {
 
 
         jObjectTxManager.run(() -> {
-            var oldfile = curTx.get(File.class, ret2.get()).orElseThrow(IllegalStateException::new);
+            var oldfile = remoteTx.getData(File.class, ret2.get()).orElseThrow(IllegalStateException::new);
             var chunk = oldfile.chunks().get(0L);
-            var chunkObj = curTx.get(ChunkData.class, chunk).orElseThrow(IllegalStateException::new);
+            var chunkObj = remoteTx.getData(ChunkData.class, chunk).orElseThrow(IllegalStateException::new);
         });
 
         Assertions.assertTrue(fileService.rename("/moveOverTest1", "/moveOverTest2"));

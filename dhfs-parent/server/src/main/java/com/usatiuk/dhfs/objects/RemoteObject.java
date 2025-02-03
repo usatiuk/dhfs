@@ -1,67 +1,71 @@
 package com.usatiuk.dhfs.objects;
 
+import org.pcollections.HashTreePSet;
 import org.pcollections.PCollection;
 import org.pcollections.PMap;
-import org.pcollections.PSet;
+import org.pcollections.TreePMap;
 
+import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.List;
 
-public record RemoteObject<T>(
-        JObjectKey key, PCollection<JObjectKey> refsFrom, boolean frozen,
-        PMap<PeerId, Long> knownRemoteVersions,
-        Class<? extends JData> knownType,
-        PSet<PeerId> confirmedDeletes,
-        boolean seen,
-        PMap<PeerId, Long> changelog,
-        boolean haveLocal
-) implements JDataRefcounted {
+public record RemoteObject<T extends JDataRemote>(PCollection<JObjectKey> refsFrom, boolean frozen,
+                                                  RemoteObjectMeta meta, @Nullable T data) implements JDataRefcounted {
+    public RemoteObject(T data, PeerId initialPeer) {
+        this(HashTreePSet.empty(), false, new RemoteObjectMeta(data.key(), data.getClass(), initialPeer), data);
+    }
+
+    public RemoteObject(JObjectKey key, PMap<PeerId, Long> remoteChangelog) {
+        this(HashTreePSet.empty(), false, new RemoteObjectMeta(key, remoteChangelog), null);
+    }
+
+    public RemoteObject(JObjectKey key) {
+        this(HashTreePSet.empty(), false, new RemoteObjectMeta(key, TreePMap.empty()), null);
+    }
+
+    @Override
+    public JObjectKey key() {
+        if (data != null && !data.key().equals(meta.key()))
+            throw new IllegalStateException("Corrupted object, key mismatch: " + meta.key() + " vs " + data.key());
+        return meta.key();
+    }
+
     @Override
     public RemoteObject<T> withRefsFrom(PCollection<JObjectKey> refs) {
-        return new RemoteObject<>(key, refs, frozen, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, haveLocal);
+        return new RemoteObject<>(refs, frozen, meta, data);
     }
 
     @Override
     public RemoteObject<T> withFrozen(boolean frozen) {
-        return new RemoteObject<>(key, refsFrom, frozen, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, haveLocal);
+        return new RemoteObject<>(refsFrom, frozen, meta, data);
     }
 
-    public RemoteObject<T> withKnownRemoteVersions(PMap<PeerId, Long> knownRemoteVersions) {
-        return new RemoteObject<>(key, refsFrom, frozen, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, haveLocal);
+    public RemoteObject<T> withMeta(RemoteObjectMeta meta) {
+        return new RemoteObject<>(refsFrom, frozen, meta, data);
     }
 
-    public RemoteObject<T> withKnownType(Class<? extends JData> knownType) {
-        return new RemoteObject<>(key, refsFrom, frozen, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, haveLocal);
+    public RemoteObject<T> withData(T data) {
+        return new RemoteObject<>(refsFrom, frozen, meta, data);
     }
 
-    public RemoteObject<T> withConfirmedDeletes(PSet<PeerId> confirmedDeletes) {
-        return new RemoteObject<>(key, refsFrom, frozen, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, haveLocal);
+    public RemoteObject<T> withRefsFrom(PCollection<JObjectKey> refs, boolean frozen) {
+        return new RemoteObject<>(refs, frozen, meta, data);
     }
 
-    public RemoteObject<T> withSeen(boolean seen) {
-        return new RemoteObject<>(key, refsFrom, frozen, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, haveLocal);
-    }
-
-    public RemoteObject<T> withChangelog(PMap<PeerId, Long> changelog) {
-        return new RemoteObject<>(key, refsFrom, frozen, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, haveLocal);
-    }
-
-    public RemoteObject<T> withHaveLocal(boolean haveLocal) {
-        return new RemoteObject<>(key, refsFrom, frozen, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, haveLocal);
-    }
-
-    public static JObjectKey keyFrom(JObjectKey key) {
-        return new JObjectKey(key + "_remote");
-    }
-
-    public JObjectKey localKey() {
-        if (!haveLocal) throw new IllegalStateException("No local key");
-        return JObjectKey.of(key.name().substring(0, key.name().length() - "_remote".length()));
+    public ReceivedObject toReceivedObject() {
+        if (data == null)
+            throw new IllegalStateException("Cannot convert to ReceivedObject without data: " + meta.key());
+        return new ReceivedObject(meta.key(), meta.changelog(), data);
     }
 
     @Override
     public Collection<JObjectKey> collectRefsTo() {
-        if (haveLocal) return List.of(localKey());
+        if (data != null) return data.collectRefsTo();
         return List.of();
+    }
+
+    @Override
+    public int estimateSize() {
+        return data == null ? 1000 : data.estimateSize();
     }
 }

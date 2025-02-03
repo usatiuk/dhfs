@@ -33,10 +33,13 @@ message FilePChunksEntry {
 }
 
 message FileP {
-  FsNodeP fsNode = 1;
-  repeated FilePChunksEntry chunks = 2;
-  bool symlink = 3;
-  int64 size = 4;
+  string uuid = 1;
+  int64 mode = 2;
+  int64 ctime = 3;
+  int64 mtime = 4;
+  repeated FilePChunksEntry chunks = 5;
+  bool symlink = 6;
+  int64 size = 7;
 }
 
 message DirectoryP {
@@ -53,7 +56,7 @@ message PeerDirectoryP {
   repeated string peers = 1;
 }
 
-message PersistentPeerInfoP {
+message PeerInfoP {
   string uuid = 1;
   bytes cert = 2;
 }
@@ -141,15 +144,26 @@ message PeerDirectoryLocalP {
   repeated string initialObjSyncDonePeers = 2;
 }
 
+message RemoteObjectP {
+  oneof obj {
+    FileP file = 2;
+    ChunkDataP chunkData = 5;
+    //    PeerDirectoryP peerDirectory = 6;
+    PeerInfoP peerInfo = 7;
+    //    JKleppmannTreeNodeP jKleppmannTreeNode = 8;
+    //    JKleppmannTreePersistentDataP jKleppmannTreePersistentData = 9;
+    //    PeerDirectoryLocalP peerDirectoryLocal = 10;
+  }
+}
+
 message JObjectDataP {
   oneof obj {
     FileP file = 2;
-    DirectoryP directory = 3;
     ChunkDataP chunkData = 5;
-    PeerDirectoryP peerDirectory = 6;
-    PersistentPeerInfoP persistentPeerInfo = 7;
-    JKleppmannTreeNodeP jKleppmannTreeNode = 8;
-    JKleppmannTreePersistentDataP jKleppmannTreePersistentData = 9;
-    PeerDirectoryLocalP peerDirectoryLocal = 10;
+//    PeerDirectoryP peerDirectory = 6;
+    PeerInfoP peerInfo = 7;
+//    JKleppmannTreeNodeP jKleppmannTreeNode = 8;
+//    JKleppmannTreePersistentDataP jKleppmannTreePersistentData = 9;
+//    PeerDirectoryLocalP peerDirectoryLocal = 10;
   }
 }

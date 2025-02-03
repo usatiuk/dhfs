@@ -4,9 +4,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.files.objects.ChunkData;
 import com.usatiuk.dhfs.files.objects.File;
-import com.usatiuk.dhfs.objects.JData;
-import com.usatiuk.dhfs.objects.JObjectKey;
-import com.usatiuk.dhfs.objects.TransactionManager;
+import com.usatiuk.dhfs.objects.*;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
@@ -26,7 +24,6 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.pcollections.TreePMap;
-import org.pcollections.TreePSet;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -37,6 +34,8 @@ import java.util.stream.StreamSupport;
 public class DhfsFileServiceImpl implements DhfsFileService {
     @Inject
     Transaction curTx;
+    @Inject
+    RemoteTransaction remoteTx;
     @Inject
     TransactionManager jObjectTxManager;
 
@@ -76,7 +75,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     private ChunkData createChunk(ByteString bytes) {
         var newChunk = new ChunkData(JObjectKey.of(UUID.randomUUID().toString()), bytes);
-        curTx.put(newChunk);
+        remoteTx.put(newChunk);
         return newChunk;
     }
 
@@ -105,8 +104,13 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             var ref = curTx.get(JData.class, uuid).orElse(null);
             if (ref == null) return Optional.empty();
             GetattrRes ret;
-            if (ref instanceof File f) {
-                ret = new GetattrRes(f.mTime(), f.cTime(), f.mode(), f.symlink() ? GetattrType.SYMLINK : GetattrType.FILE);
+            if (ref instanceof RemoteObject r) {
+                var remote = remoteTx.getData(JDataRemote.class, uuid).orElse(null);
+                if (remote instanceof File f) {
+                    ret = new GetattrRes(f.mTime(), f.cTime(), f.mode(), f.symlink() ? GetattrType.SYMLINK : GetattrType.FILE);
+                } else {
+                    throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + ref.key()));
+                }
             } else if (ref instanceof JKleppmannTreeNode) {
                 ret = new GetattrRes(100, 100, 0700, GetattrType.DIRECTORY);
             } else {
@@ -152,8 +156,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             var fuuid = UUID.randomUUID();
             Log.debug("Creating file " + fuuid);
-            File f = new File(JObjectKey.of(fuuid.toString()), TreePSet.empty(), false, mode, System.currentTimeMillis(), System.currentTimeMillis(), TreePMap.empty(), false, 0);
-            curTx.put(f);
+            File f = new File(JObjectKey.of(fuuid.toString()), mode, System.currentTimeMillis(), System.currentTimeMillis(), TreePMap.empty(), false, 0);
+            remoteTx.put(f);
 
             try {
                 getTree().move(parent.key(), new JKleppmannTreeNodeMetaFile(fname, f.key()), getTree().getNewNodeId());
@@ -226,9 +230,14 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             if (dent instanceof JKleppmannTreeNode) {
                 return true;
-            } else if (dent instanceof File f) {
-                curTx.put(f.withMode(mode).withMTime(System.currentTimeMillis()));
-                return true;
+            } else if (dent instanceof RemoteObject) {
+                var remote = remoteTx.getData(JDataRemote.class, uuid).orElse(null);
+                if (remote instanceof File f) {
+                    remoteTx.put(f.withMode(mode).withMTime(System.currentTimeMillis()));
+                    return true;
+                } else {
+                    throw new IllegalArgumentException(uuid + " is not a file");
+                }
             } else {
                 throw new IllegalArgumentException(uuid + " is not a file");
             }
@@ -255,7 +264,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (offset < 0)
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Offset should be more than zero: " + offset));
 
-            var file = curTx.get(File.class, fileUuid).orElse(null);
+            var file = remoteTx.getData(File.class, fileUuid).orElse(null);
             if (file == null) {
                 Log.error("File not found when trying to read: " + fileUuid);
                 return Optional.empty();
@@ -315,7 +324,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     }
 
     private ByteString readChunk(JObjectKey uuid) {
-        var chunkRead = curTx.get(ChunkData.class, uuid).orElse(null);
+        var chunkRead = remoteTx.getData(ChunkData.class, uuid).orElse(null);
 
         if (chunkRead == null) {
             Log.error("Chunk requested not found: " + uuid);
@@ -354,7 +363,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Offset should be more than zero: " + offset));
 
             // FIXME:
-            var file = curTx.get(File.class, fileUuid, LockingStrategy.WRITE).orElse(null);
+            var file = remoteTx.getData(File.class, fileUuid, LockingStrategy.WRITE).orElse(null);
             if (file == null) {
                 Log.error("File not found when trying to write: " + fileUuid);
                 return -1L;
@@ -367,7 +376,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             if (size(fileUuid) < offset) {
                 truncate(fileUuid, offset);
-                file = curTx.get(File.class, fileUuid).orElse(null);
+                file = remoteTx.getData(File.class, fileUuid).orElse(null);
             }
 
             var chunksAll = file.chunks();
@@ -493,7 +502,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
 
             file = file.withChunks(file.chunks().minusAll(removedChunks.keySet()).plusAll(newChunks)).withMTime(System.currentTimeMillis());
-            curTx.put(file);
+            remoteTx.put(file);
             cleanupChunks(file, removedChunks.values());
             updateFileSize(file);
 
@@ -507,7 +516,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (length < 0)
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Length should be more than zero: " + length));
 
-            var file = curTx.get(File.class, fileUuid).orElse(null);
+            var file = remoteTx.getData(File.class, fileUuid).orElse(null);
             if (file == null) {
                 Log.error("File not found when trying to write: " + fileUuid);
                 return false;
@@ -517,7 +526,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 var oldChunks = file.chunks();
 
                 file = file.withChunks(TreePMap.empty()).withMTime(System.currentTimeMillis());
-                curTx.put(file);
+                remoteTx.put(file);
                 cleanupChunks(file, oldChunks.values());
                 updateFileSize(file);
                 return true;
@@ -578,7 +587,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
 
             file = file.withChunks(file.chunks().minusAll(removedChunks.keySet()).plusAll(newChunks)).withMTime(System.currentTimeMillis());
-            curTx.put(file);
+            remoteTx.put(file);
             cleanupChunks(file, removedChunks.values());
             updateFileSize(file);
             return true;
@@ -595,7 +604,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Override
     public ByteString readlinkBS(JObjectKey uuid) {
         return jObjectTxManager.executeTx(() -> {
-            var fileOpt = curTx.get(File.class, uuid).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("File not found when trying to readlink: " + uuid)));
+            var fileOpt = remoteTx.getData(File.class, uuid).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("File not found when trying to readlink: " + uuid)));
             return read(uuid, 0, Math.toIntExact(size(uuid))).get();
         });
     }
@@ -614,8 +623,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             Log.debug("Creating file " + fuuid);
 
             ChunkData newChunkData = createChunk(UnsafeByteOperations.unsafeWrap(oldpath.getBytes(StandardCharsets.UTF_8)));
-            File f = new File(JObjectKey.of(fuuid.toString()), TreePSet.empty(),
-                    false, 0, System.currentTimeMillis(), System.currentTimeMillis(), TreePMap.<Long, JObjectKey>empty().plus(0L, newChunkData.key()), true, 0);
+            File f = new File(JObjectKey.of(fuuid.toString()), 0, System.currentTimeMillis(), System.currentTimeMillis(), TreePMap.<Long, JObjectKey>empty().plus(0L, newChunkData.key()), true, 0);
 
             updateFileSize(f);
 
@@ -627,12 +635,12 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Override
     public Boolean setTimes(JObjectKey fileUuid, long atimeMs, long mtimeMs) {
         return jObjectTxManager.executeTx(() -> {
-            var file = curTx.get(File.class, fileUuid).orElseThrow(
+            var file = remoteTx.getData(File.class, fileUuid).orElseThrow(
                     () -> new StatusRuntimeException(Status.NOT_FOUND.withDescription(
                             "File not found for setTimes: " + fileUuid))
             );
 
-            curTx.put(file.withCTime(atimeMs).withMTime(mtimeMs));
+            remoteTx.put(file.withCTime(atimeMs).withMTime(mtimeMs));
             return true;
         });
     }
@@ -649,7 +657,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
 
             if (realSize != file.size()) {
-                curTx.put(file.withSize(realSize));
+                remoteTx.put(file.withSize(realSize));
             }
         });
     }
@@ -657,7 +665,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Override
     public Long size(JObjectKey uuid) {
         return jObjectTxManager.executeTx(() -> {
-            var read = curTx.get(File.class, uuid)
+            var read = remoteTx.getData(File.class, uuid)
                     .orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
             return read.size();

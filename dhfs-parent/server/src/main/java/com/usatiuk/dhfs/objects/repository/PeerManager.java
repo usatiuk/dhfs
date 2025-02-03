@@ -23,6 +23,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class PeerManager {
@@ -135,7 +136,7 @@ public class PeerManager {
     // FIXME:
     private boolean pingCheck(PeerInfo host, PeerAddress address) {
         try {
-            return rpcClientFactory.withObjSyncClient(host.id(), address, pingTimeout, c -> {
+            return rpcClientFactory.withObjSyncClient(host.id(), address, pingTimeout, (peer, c) -> {
                 var ret = c.ping(PingRequest.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString()).build());
                 if (!UUID.fromString(ret.getSelfUuid()).equals(host.id().id())) {
                     throw new IllegalStateException("Ping selfUuid returned " + ret.getSelfUuid() + " but expected " + host.id());
@@ -148,8 +149,12 @@ public class PeerManager {
         }
     }
 
+    public boolean isReachable(PeerId host) {
+        return _states.containsKey(host);
+    }
+
     public boolean isReachable(PeerInfo host) {
-        return _states.containsKey(host.id());
+        return isReachable(host.id());
     }
 
     public PeerAddress getAddress(PeerId host) {
@@ -166,21 +171,13 @@ public class PeerManager {
 //                .map(Map.Entry::getKey).toList());
 //    }
 
-//    public HostStateSnapshot getHostStateSnapshot() {
-//        ArrayList<UUID> available = new ArrayList<>();
-//        ArrayList<UUID> unavailable = new ArrayList<>();
-//        _transientPeersState.runReadLocked(d -> {
-//                    for (var v : d.getStates().entrySet()) {
-//                        if (v.getValue().isReachable())
-//                            available.add(v.getKey());
-//                        else
-//                            unavailable.add(v.getKey());
-//                    }
-//                    return null;
-//                }
-//        );
-//        return new HostStateSnapshot(available, unavailable);
-//    }
+    public HostStateSnapshot getHostStateSnapshot() {
+        return transactionManager.run(() -> {
+            var partition = peerInfoService.getPeersNoSelf().stream().map(PeerInfo::id)
+                    .collect(Collectors.partitioningBy(this::isReachable));
+            return new HostStateSnapshot(partition.get(true), partition.get(false));
+        });
+    }
 
 //    public void removeRemoteHost(UUID host) {
 //        persistentPeerDataService.removeHost(host);
@@ -227,7 +224,7 @@ public class PeerManager {
         void apply(UUID host);
     }
 
-    public record HostStateSnapshot(List<UUID> available, List<UUID> unavailable) {
+    public record HostStateSnapshot(Collection<PeerId> available, Collection<PeerId> unavailable) {
     }
 
 }

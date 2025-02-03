@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects.repository.peersync;
 
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.PeerId;
+import com.usatiuk.dhfs.objects.RemoteTransaction;
 import com.usatiuk.dhfs.objects.TransactionManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
@@ -24,6 +25,8 @@ public class PeerInfoService {
     JKleppmannTreeManager jKleppmannTreeManager;
     @Inject
     PersistentPeerDataService persistentPeerDataService;
+    @Inject
+    RemoteTransaction remoteTx;
 
     private JKleppmannTreeManager.JKleppmannTree getTree() {
         return jKleppmannTreeManager.getTree(JObjectKey.of("peers"));
@@ -37,7 +40,7 @@ public class PeerInfoService {
             }
             return curTx.get(JKleppmannTreeNode.class, gotKey).flatMap(node -> {
                 var meta = (JKleppmannTreeNodeMetaPeer) node.meta();
-                return curTx.get(PeerInfo.class, meta.getPeerId());
+                return remoteTx.getData(PeerInfo.class, meta.getPeerId());
             });
         });
     }
@@ -69,7 +72,7 @@ public class PeerInfoService {
         jObjectTxManager.run(() -> {
             var parent = getTree().traverse(List.of());
             var newPeerInfo = new PeerInfo(id, cert);
-            curTx.put(newPeerInfo);
+            remoteTx.put(newPeerInfo);
             getTree().move(parent, new JKleppmannTreeNodeMetaPeer(newPeerInfo.id()), getTree().getNewNodeId());
         });
     }

@@ -76,7 +76,7 @@ public class RpcClientFactory {
                     .withMaxOutboundMessageSize(Integer.MAX_VALUE)
                     .withMaxInboundMessageSize(Integer.MAX_VALUE);
         });
-        return fn.apply(stub.withDeadlineAfter(timeout, TimeUnit.SECONDS));
+        return fn.apply(host, stub.withDeadlineAfter(timeout, TimeUnit.SECONDS));
     }
 
     public void dropCache() {
@@ -85,7 +85,7 @@ public class RpcClientFactory {
 
     @FunctionalInterface
     public interface ObjectSyncClientFunction<R> {
-        R apply(DhfsObjectSyncGrpcGrpc.DhfsObjectSyncGrpcBlockingStub client);
+        R apply(PeerId peer, DhfsObjectSyncGrpcGrpc.DhfsObjectSyncGrpcBlockingStub client);
     }
 
     private record ObjSyncStubKey(PeerId id, InetAddress addr, int port) {
