@@ -128,7 +128,7 @@ public class JObjectManager {
         // TODO: check deletions, inserts
         try {
             Collection<TxRecord.TxObjectRecord<?>> drained;
-            {
+            try {
                 boolean somethingChanged;
                 do {
                     somethingChanged = false;
@@ -163,12 +163,13 @@ public class JObjectManager {
                     }
                     current.putAll(currentIteration);
                 } while (somethingChanged);
-            }
-            reads = tx.reads();
-            for (var read : reads.entrySet()) {
-                addDependency.accept(read.getKey());
-                if (read.getValue() instanceof TransactionObjectLocked<?> locked) {
-                    toUnlock.add(locked.lock);
+            } finally {
+                reads = tx.reads();
+                for (var read : reads.entrySet()) {
+                    addDependency.accept(read.getKey());
+                    if (read.getValue() instanceof TransactionObjectLocked<?> locked) {
+                        toUnlock.add(locked.lock);
+                    }
                 }
             }
 
