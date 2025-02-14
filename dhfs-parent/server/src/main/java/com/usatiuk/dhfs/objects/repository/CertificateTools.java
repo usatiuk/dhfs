@@ -24,40 +24,52 @@ import java.util.Date;
 
 public class CertificateTools {
 
-    public static X509Certificate certFromBytes(byte[] bytes) throws CertificateException {
-        CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
-        InputStream in = new ByteArrayInputStream(bytes);
-        return (X509Certificate) certFactory.generateCertificate(in);
+    public static X509Certificate certFromBytes(byte[] bytes) {
+        try {
+            CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
+            InputStream in = new ByteArrayInputStream(bytes);
+            return (X509Certificate) certFactory.generateCertificate(in);
+        } catch (CertificateException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    public static KeyPair generateKeyPair() throws NoSuchAlgorithmException {
-        KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
-        keyGen.initialize(2048); //FIXME:
-        return keyGen.generateKeyPair();
+    public static KeyPair generateKeyPair() {
+        try {
+            KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
+            keyGen.initialize(2048); //FIXME:
+            return keyGen.generateKeyPair();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    public static X509Certificate generateCertificate(KeyPair keyPair, String subject) throws CertificateException, CertIOException, NoSuchAlgorithmException, OperatorCreationException {
-        Provider bcProvider = new BouncyCastleProvider();
-        Security.addProvider(bcProvider);
+    public static X509Certificate generateCertificate(KeyPair keyPair, String subject) {
+        try {
+            Provider bcProvider = new BouncyCastleProvider();
+            Security.addProvider(bcProvider);
 
-        Date startDate = new Date();
+            Date startDate = new Date();
 
-        X500Name cnName = new X500Name("CN=" + subject);
-        BigInteger certSerialNumber = new BigInteger(DigestUtils.sha256(subject));
+            X500Name cnName = new X500Name("CN=" + subject);
+            BigInteger certSerialNumber = new BigInteger(DigestUtils.sha256(subject));
 
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTime(startDate);
-        calendar.add(Calendar.YEAR, 999);
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTime(startDate);
+            calendar.add(Calendar.YEAR, 999);
 
-        Date endDate = calendar.getTime();
+            Date endDate = calendar.getTime();
 
-        ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSA").build(keyPair.getPrivate());
+            ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSA").build(keyPair.getPrivate());
 
-        JcaX509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(cnName, certSerialNumber, startDate, endDate, cnName, keyPair.getPublic());
+            JcaX509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(cnName, certSerialNumber, startDate, endDate, cnName, keyPair.getPublic());
 
-        BasicConstraints basicConstraints = new BasicConstraints(false);
-        certBuilder.addExtension(new ASN1ObjectIdentifier("2.5.29.19"), true, basicConstraints);
+            BasicConstraints basicConstraints = new BasicConstraints(false);
+            certBuilder.addExtension(new ASN1ObjectIdentifier("2.5.29.19"), true, basicConstraints);
 
-        return new JcaX509CertificateConverter().setProvider(bcProvider).getCertificate(certBuilder.build(contentSigner));
+            return new JcaX509CertificateConverter().setProvider(bcProvider).getCertificate(certBuilder.build(contentSigner));
+        } catch (OperatorCreationException | CertificateException | CertIOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

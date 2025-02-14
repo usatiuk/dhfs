@@ -7,6 +7,7 @@ import io.quarkus.logging.Log;
 import io.quarkus.runtime.Startup;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.annotation.Nonnull;
@@ -89,15 +90,12 @@ public class CachingObjectPersistentStore {
         }
     }
 
-    public void writeObject(JObjectKey name, JDataVersionedWrapper<?> object) {
-        delegate.writeObject(name, object);
-    }
-
-    public void commitTx(TxManifest names) {
+    public void commitTx(TxManifestObj<? extends JDataVersionedWrapper<?>> names) {
         // During commit, readObject shouldn't be called for these items,
         // it should be handled by the upstream store
         synchronized (_cache) {
-            for (var key : Stream.concat(names.written().stream(), names.deleted().stream()).toList()) {
+            for (var key : Stream.concat(names.written().stream().map(Pair::getLeft),
+                    names.deleted().stream()).toList()) {
                 _curSize -= Optional.ofNullable(_cache.get(key)).map(CacheEntry::size).orElse(0L);
                 _cache.remove(key);
             }

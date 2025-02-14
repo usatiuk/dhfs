@@ -16,9 +16,7 @@ public interface ObjectPersistentStore {
     @Nonnull
     Optional<ByteString> readObject(JObjectKey name);
 
-    void writeObject(JObjectKey name, ByteString object);
-
-    void commitTx(TxManifest names);
+    void commitTx(TxManifestRaw names);
 
     long getTotalSpace();
 

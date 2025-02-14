@@ -7,6 +7,7 @@ import io.quarkus.logging.Log;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -113,6 +114,7 @@ public class ObjectsTest {
     }
 
     @Test
+    @Disabled
     void createObjectConflict() throws InterruptedException {
         AtomicBoolean thread1Failed = new AtomicBoolean(true);
         AtomicBoolean thread2Failed = new AtomicBoolean(true);

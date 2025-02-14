@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.persistence.CachingObjectPersistentStore;
-import com.usatiuk.dhfs.objects.persistence.TxManifest;
+import com.usatiuk.dhfs.objects.persistence.TxManifestObj;
 import com.usatiuk.dhfs.utils.VoidFn;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
@@ -11,10 +11,14 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
+import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 @ApplicationScoped
@@ -108,39 +112,27 @@ public class TxWritebackImpl implements TxWriteback {
                     }
                 }
 
-                var latch = new CountDownLatch((int) bundle._entries.values().stream().filter(e -> e instanceof TxBundleImpl.CommittedEntry).count());
-                ConcurrentLinkedQueue<Throwable> errors = new ConcurrentLinkedQueue<>();
+                var toWrite = new ArrayList<Pair<JObjectKey, JDataVersionedWrapper<?>>>();
+                var toDelete = new ArrayList<JObjectKey>();
 
                 for (var e : bundle._entries.values()) {
                     switch (e) {
-                        case TxBundleImpl.CommittedEntry c -> _commitExecutor.execute(() -> {
-                            try {
-                                Log.trace("Writing new " + c.key());
-                                objectPersistentStore.writeObject(c.key(), c.data());
-                            } catch (Throwable t) {
-                                Log.error("Error writing " + c.key(), t);
-                                errors.add(t);
-                            } finally {
-                                latch.countDown();
-                            }
-                        });
-                        case TxBundleImpl.DeletedEntry d -> {
-                            if (Log.isDebugEnabled())
-                                Log.debug("Deleting from persistent storage " + d.key()); // FIXME: For tests
+                        case TxBundleImpl.CommittedEntry(JObjectKey key, JDataVersionedWrapper<?> data, int size) -> {
+                            Log.trace("Writing new " + key);
+                            toWrite.add(Pair.of(key, data));
+                        }
+                        case TxBundleImpl.DeletedEntry(JObjectKey key) -> {
+                            Log.trace("Deleting from persistent storage " + key);
+                            toDelete.add(key);
                         }
                         default -> throw new IllegalStateException("Unexpected value: " + e);
                     }
                 }
 
-                latch.await();
-                if (!errors.isEmpty()) {
-                    throw new RuntimeException("Errors in writeback!");
-                }
-
                 objectPersistentStore.commitTx(
-                        new TxManifest(
-                                bundle._entries.values().stream().filter(e -> e instanceof TxBundleImpl.CommittedEntry).map(TxBundleImpl.BundleEntry::key).toList(),
-                                bundle._entries.values().stream().filter(e -> e instanceof TxBundleImpl.DeletedEntry).map(TxBundleImpl.BundleEntry::key).toList()
+                        new TxManifestObj<>(
+                                Collections.unmodifiableList(toWrite),
+                                Collections.unmodifiableList(toDelete)
                         ));
 
                 Log.trace("Bundle " + bundle.getId() + " committed");

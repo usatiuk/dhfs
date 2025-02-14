@@ -19,11 +19,11 @@ public interface TransactionManager {
         }
 
         begin();
+        T ret;
         try {
-            var ret = supplier.get();
-            commit();
-            return ret;
+            ret = supplier.get();
         } catch (TxCommitException txCommitException) {
+            rollback();
             if (tries == 0) {
                 Log.error("Transaction commit failed", txCommitException);
                 throw txCommitException;
@@ -32,6 +32,16 @@ public interface TransactionManager {
         } catch (Throwable e) {
             rollback();
             throw e;
+        }
+        try {
+            commit();
+            return ret;
+        } catch (TxCommitException txCommitException) {
+            if (tries == 0) {
+                Log.error("Transaction commit failed", txCommitException);
+                throw txCommitException;
+            }
+            return runTries(supplier, tries - 1);
         }
     }
 
@@ -44,6 +54,19 @@ public interface TransactionManager {
         begin();
         try {
             fn.apply();
+        } catch (TxCommitException txCommitException) {
+            rollback();
+            if (tries == 0) {
+                Log.error("Transaction commit failed", txCommitException);
+                throw txCommitException;
+            }
+            runTries(fn, tries - 1);
+            return;
+        } catch (Throwable e) {
+            rollback();
+            throw e;
+        }
+        try {
             commit();
         } catch (TxCommitException txCommitException) {
             if (tries == 0) {
@@ -51,9 +74,6 @@ public interface TransactionManager {
                 throw txCommitException;
             }
             runTries(fn, tries - 1);
-        } catch (Throwable e) {
-            rollback();
-            throw e;
         }
     }
 

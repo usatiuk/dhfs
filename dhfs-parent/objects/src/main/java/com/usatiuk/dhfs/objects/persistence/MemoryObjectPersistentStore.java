@@ -15,7 +15,6 @@ import java.util.Optional;
 @IfBuildProperty(name = "dhfs.objects.persistence", stringValue = "memory")
 public class MemoryObjectPersistentStore implements ObjectPersistentStore {
     private final Map<JObjectKey, ByteString> _objects = new HashMap<>();
-    private final Map<JObjectKey, ByteString> _pending = new HashMap<>();
 
     @Nonnull
     @Override
@@ -34,17 +33,10 @@ public class MemoryObjectPersistentStore implements ObjectPersistentStore {
     }
 
     @Override
-    public void writeObject(JObjectKey name, ByteString object) {
+    public void commitTx(TxManifestRaw names) {
         synchronized (this) {
-            _pending.put(name, object);
-        }
-    }
-
-    @Override
-    public void commitTx(TxManifest names) {
-        synchronized (this) {
-            for (JObjectKey key : names.written()) {
-                _objects.put(key, _pending.get(key));
+            for (var written : names.written()) {
+                _objects.put(written.getKey(), written.getValue());
             }
             for (JObjectKey key : names.deleted()) {
                 _objects.remove(key);

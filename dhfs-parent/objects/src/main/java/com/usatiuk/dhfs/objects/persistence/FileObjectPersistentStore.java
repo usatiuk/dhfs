@@ -16,7 +16,6 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import net.openhft.hashing.LongHashFunction;
-import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.annotation.Nonnull;
@@ -27,10 +26,11 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Stream;
 
 import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
@@ -50,7 +50,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     private final Path _txManifest;
     private ExecutorService _flushExecutor;
     private RandomAccessFile _txFile;
-    private volatile boolean _ready = false;
+    private boolean _ready = false;
 
     public FileObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.persistence.files.root") String root) {
         this._root = Path.of(root).resolve("objects");
@@ -69,13 +69,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
             Files.createFile(_txManifest);
         }
         _txFile = new RandomAccessFile(_txManifest.toFile(), "rw");
-        {
-            BasicThreadFactory factory = new BasicThreadFactory.Builder()
-                    .namingPattern("persistent-commit-%d")
-                    .build();
-
-            _flushExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), factory);
-        }
+        _flushExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
         tryReplay();
         Log.info("Transaction replay done");
@@ -181,18 +175,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         }
     }
 
-    @Override
-    public void writeObject(JObjectKey name, ByteString obj) {
-        verifyReady();
-        try {
-            var tmpPath = getTmpObjPath(name);
-            writeObjectImpl(tmpPath, obj, true);
-        } catch (IOException e) {
-            Log.error("Error writing new file " + name, e);
-        }
-    }
-
-    private TxManifest readTxManifest() {
+    private TxManifestRaw readTxManifest() {
         try {
             var channel = _txFile.getChannel();
 
@@ -219,7 +202,7 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
         }
     }
 
-    private void putTxManifest(TxManifest manifest) {
+    private void putTxManifest(TxManifestRaw manifest) {
         try {
             var channel = _txFile.getChannel();
             var data = SerializationHelper.serializeArray(manifest);
@@ -237,62 +220,58 @@ public class FileObjectPersistentStore implements ObjectPersistentStore {
     }
 
     @Override
-    public void commitTx(TxManifest manifest) {
+    public void commitTx(TxManifestRaw manifest) {
         verifyReady();
+        try {
+            _flushExecutor.invokeAll(
+                    manifest.written().stream().map(p -> (Callable<Void>) () -> {
+                        var tmpPath = getTmpObjPath(p.getKey());
+                        writeObjectImpl(tmpPath, p.getValue(), true);
+                        return null;
+                    }).toList()
+            ).forEach(p -> {
+                try {
+                    p.get();
+                } catch (InterruptedException | ExecutionException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         commitTxImpl(manifest, true);
     }
 
-    public void commitTxImpl(TxManifest manifest, boolean failIfNotFound) {
+    public void commitTxImpl(TxManifestRaw manifest, boolean failIfNotFound) {
+        if (manifest.deleted().isEmpty() && manifest.written().isEmpty()) {
+            Log.debug("Empty manifest, skipping");
+            return;
+        }
+
+        putTxManifest(manifest);
+
         try {
-            if (manifest.deleted().isEmpty() && manifest.written().isEmpty()) {
-                Log.debug("Empty manifest, skipping");
-                return;
-            }
-
-            putTxManifest(manifest);
-
-            var latch = new CountDownLatch(manifest.written().size() + manifest.deleted().size());
-            ConcurrentLinkedQueue<Throwable> errors = new ConcurrentLinkedQueue<>();
-
-            for (var n : manifest.written()) {
-                _flushExecutor.execute(() -> {
-                    try {
-                        Files.move(getTmpObjPath(n), getObjPath(n), ATOMIC_MOVE, REPLACE_EXISTING);
-                    } catch (Throwable t) {
-                        if (!failIfNotFound && (t instanceof NoSuchFileException)) return;
-                        Log.error("Error writing " + n, t);
-                        errors.add(t);
-                    } finally {
-                        latch.countDown();
-                    }
-                });
-            }
-            for (var d : manifest.deleted()) {
-                _flushExecutor.execute(() -> {
-                    try {
-                        deleteImpl(getObjPath(d));
-                    } catch (Throwable t) {
-                        Log.error("Error deleting " + d, t);
-                        errors.add(t);
-                    } finally {
-                        latch.countDown();
-                    }
-                });
-            }
-
-            latch.await();
-
-            if (!errors.isEmpty()) {
-                throw new RuntimeException("Errors when commiting tx!");
-            }
-
-            // No real need to truncate here
-//            try (var channel = _txFile.getChannel()) {
-//                channel.truncate(0);
-//            }
-//        } catch (IOException e) {
-//            Log.error("Failed committing transaction to disk: ", e);
-//            throw new RuntimeException(e);
+            _flushExecutor.invokeAll(
+                    Stream.concat(manifest.written().stream().map(p -> (Callable<Void>) () -> {
+                                try {
+                                    Files.move(getTmpObjPath(p.getKey()), getObjPath(p.getKey()), ATOMIC_MOVE, REPLACE_EXISTING);
+                                } catch (NoSuchFileException n) {
+                                    if (failIfNotFound)
+                                        throw n;
+                                }
+                                return null;
+                            }),
+                            manifest.deleted().stream().map(p -> (Callable<Void>) () -> {
+                                deleteImpl(getObjPath(p));
+                                return null;
+                            })).toList()
+            ).forEach(p -> {
+                try {
+                    p.get();
+                } catch (InterruptedException | ExecutionException e) {
+                    throw new RuntimeException(e);
+                }
+            });
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }

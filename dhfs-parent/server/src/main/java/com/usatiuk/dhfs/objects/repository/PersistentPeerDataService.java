@@ -16,6 +16,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
 import java.security.KeyPair;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.util.Optional;
 import java.util.UUID;
@@ -54,15 +55,15 @@ public class PersistentPeerDataService {
                 _selfKeyPair = selfData.selfKeyPair();
                 return;
             } else {
-                _selfUuid = presetUuid.map(s -> PeerId.of(UUID.fromString(s))).orElseGet(() -> PeerId.of(UUID.randomUUID()));
                 try {
+                    _selfUuid = presetUuid.map(s -> PeerId.of(UUID.fromString(s))).orElseGet(() -> PeerId.of(UUID.randomUUID()));
                     Log.info("Generating a key pair, please wait");
                     _selfKeyPair = CertificateTools.generateKeyPair();
                     _selfCertificate = CertificateTools.generateCertificate(_selfKeyPair, _selfUuid.toString());
 
                     curTx.put(new PersistentRemoteHostsData(_selfUuid, 0, _selfCertificate, _selfKeyPair));
                     peerInfoService.putPeer(_selfUuid, _selfCertificate.getEncoded());
-                } catch (Exception e) {
+                } catch (CertificateEncodingException e) {
                     throw new RuntimeException(e);
                 }
             }
