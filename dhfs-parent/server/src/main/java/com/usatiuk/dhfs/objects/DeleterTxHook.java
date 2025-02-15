@@ -9,6 +9,8 @@ import jakarta.inject.Inject;
 public class DeleterTxHook implements PreCommitTxHook {
     @Inject
     Transaction curTx;
+    @Inject
+    RemoteObjectDeleter remoteObjectDeleter;
 
     private boolean canDelete(JDataRefcounted data) {
         return !data.frozen() && data.refsFrom().isEmpty();
@@ -16,14 +18,14 @@ public class DeleterTxHook implements PreCommitTxHook {
 
     @Override
     public void onChange(JObjectKey key, JData old, JData cur) {
-        if (cur instanceof RemoteObject<?>) {
-            return; // FIXME:
-        }
         if (!(cur instanceof JDataRefcounted refCur)) {
             return;
         }
-
         if (canDelete(refCur)) {
+            if (refCur instanceof RemoteObject<?> ro) {
+                remoteObjectDeleter.putDeletionCandidate(ro);
+                return;
+            }
             Log.trace("Deleting object on change: " + key);
             curTx.delete(key);
         }
@@ -31,14 +33,15 @@ public class DeleterTxHook implements PreCommitTxHook {
 
     @Override
     public void onCreate(JObjectKey key, JData cur) {
-        if (cur instanceof RemoteObject<?>) {
-            return;
-        }
         if (!(cur instanceof JDataRefcounted refCur)) {
             return;
         }
 
         if (canDelete(refCur)) {
+            if (refCur instanceof RemoteObject<?> ro) {
+                remoteObjectDeleter.putDeletionCandidate(ro);
+                return;
+            }
             Log.warn("Deleting object on creation: " + key);
             curTx.delete(key);
         }
@@ -46,9 +49,6 @@ public class DeleterTxHook implements PreCommitTxHook {
 
     @Override
     public void onDelete(JObjectKey key, JData cur) {
-        if (cur instanceof RemoteObject<?>) {
-            return;
-        }
         if (!(cur instanceof JDataRefcounted refCur)) {
             return;
         }

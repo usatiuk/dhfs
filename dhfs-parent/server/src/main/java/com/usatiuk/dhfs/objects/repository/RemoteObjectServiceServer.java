@@ -15,7 +15,6 @@ import io.smallrye.common.annotation.Blocking;
 import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
-import org.apache.commons.lang3.NotImplementedException;
 
 // Note: RunOnVirtualThread hangs somehow
 @GrpcService
@@ -101,58 +100,37 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     }
 
     @Override
+    @Blocking
     public Uni<CanDeleteReply> canDelete(CanDeleteRequest request) {
-        throw new NotImplementedException();
+        var peerId = identity.getPrincipal().getName().substring(3);
+
+        Log.info("<-- canDelete: " + request.getName() + " from " + peerId);
+
+        var builder = CanDeleteReply.newBuilder();
+        builder.setObjName(request.getName());
+
+        txm.run(() -> {
+            var obj = curTx.get(RemoteObject.class, JObjectKey.of(request.getName())).orElse(null);
+
+            if (obj == null) {
+                builder.setDeletionCandidate(true);
+                return;
+            }
+
+            builder.setDeletionCandidate(!obj.frozen() && obj.refsFrom().isEmpty());
+
+            if (!builder.getDeletionCandidate())
+                for (var r : obj.refsFrom())
+                    builder.addReferrers(r.toString());
+
+//            if (!ret.getDeletionCandidate())
+//                for (var rr : request.getOurReferrersList())
+//                    autoSyncProcessor.add(rr);
+        });
+        return Uni.createFrom().item(builder.build());
     }
 
-//    @Override
-//    @Blocking
-//    public Uni<CanDeleteReply> canDelete(CanDeleteRequest request) {
-//        if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-//        if (!persistentPeerDataService.existsHost(UUID.fromString(request.getSelfUuid())))
-//            throw new StatusRuntimeException(Status.UNAUTHENTICATED);
-//
-//        Log.info("<-- canDelete: " + request.getName() + " from " + request.getSelfUuid());
-//
-//        var builder = CanDeleteReply.newBuilder();
-//
-//        var obj = jObjectManager.get(request.getName());
-//
-//        builder.setSelfUuid(persistentPeerDataService.getSelfUuid().toString());
-//        builder.setObjName(request.getName());
-//
-//        if (obj.isPresent()) try {
-//            boolean tryUpdate = obj.get().runReadLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
-//                if (m.isDeleted() && !m.isDeletionCandidate())
-//                    throw new IllegalStateException("Object " + m.getName() + " is deleted but not a deletion candidate");
-//                builder.setDeletionCandidate(m.isDeletionCandidate());
-//                builder.addAllReferrers(m.getReferrers());
-//                return m.isDeletionCandidate() && !m.isDeleted();
-//            });
-//            // FIXME
-
-    /// /            if (tryUpdate) {
-    /// /                obj.get().runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
-    /// /                    return null;
-    /// /                });
-    /// /            }
-//        } catch (DeletedObjectAccessException dox) {
-//            builder.setDeletionCandidate(true);
-//        }
-//        else {
-//            builder.setDeletionCandidate(true);
-//        }
-//
-//        var ret = builder.build();
-//
-//        if (!ret.getDeletionCandidate())
-//            for (var rr : request.getOurReferrersList())
-//                autoSyncProcessor.add(rr);
-//
-//        return Uni.createFrom().item(ret);
-//    }
-
-//    @Override
+    //    @Override
 //    @Blocking
 //    public Uni<IndexUpdateReply> indexUpdate(IndexUpdatePush request) {
 //        if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);

@@ -31,6 +31,10 @@ public class OpPusher {
                     return new IndexUpdateOp(key, remote.meta().changelog());
                 }
                 case JKleppmannTreePersistentData pd -> {
+                    var maybeQueue = pd.queues().get(op);
+                    if(maybeQueue == null || maybeQueue.isEmpty()) {
+                        return null;
+                    }
                     var ret = new JKleppmannTreeOpWrapper(key, pd.queues().get(op).firstEntry().getValue());
                     var newPd = pd.withQueues(pd.queues().plus(op, pd.queues().get(op).minus(ret.op().timestamp())));
                     curTx.put(newPd);

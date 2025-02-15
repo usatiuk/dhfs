@@ -12,9 +12,15 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class RemoteObjectServiceClient {
@@ -42,6 +48,8 @@ public class RemoteObjectServiceClient {
 
     @Inject
     ProtoSerializer<GetObjectReply, ReceivedObject> receivedObjectProtoSerializer;
+
+    private final ExecutorService _batchExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
 //    public Pair<ObjectHeader, JObjectDataP> getSpecificObject(UUID host, String name) {
 //        return rpcClientFactory.withObjSyncClient(host, client -> {
@@ -151,31 +159,24 @@ public class RemoteObjectServiceClient {
         return OpPushReply.getDefaultInstance();
     }
 
-//    public Collection<CanDeleteReply> canDelete(Collection<UUID> targets, String object, Collection<String> ourReferrers) {
-//        ConcurrentLinkedDeque<CanDeleteReply> results = new ConcurrentLinkedDeque<>();
-//        Log.trace("Asking canDelete for " + object + " from " + targets.stream().map(UUID::toString).collect(Collectors.joining(", ")));
-//        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-//            try {
-//                executor.invokeAll(targets.stream().<Callable<Void>>map(h -> () -> {
-//                    try {
-//                        var req = CanDeleteRequest.newBuilder()
-//                                .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
-//                                .setName(object);
-//                        req.addAllOurReferrers(ourReferrers);
-//                        var res = rpcClientFactory.withObjSyncClient(h, client -> client.canDelete(req.build()));
-//                        if (res != null)
-//                            results.add(res);
-//                    } catch (Exception e) {
-//                        Log.debug("Error when asking canDelete for object " + object, e);
-//                    }
-//                    return null;
-//                }).toList());
-//            } catch (InterruptedException e) {
-//                Log.warn("Interrupted waiting for canDelete for object " + object);
-//            }
-//            if (!executor.shutdownNow().isEmpty())
-//                Log.warn("Didn't ask all targets when asking canDelete for " + object);
-//        }
-//        return results;
-//    }
+    public Collection<CanDeleteReply> canDelete(Collection<PeerId> targets, JObjectKey object, Collection<JObjectKey> ourReferrers) {
+        Log.trace("Asking canDelete for " + object + " from " + targets.stream().map(PeerId::toString).collect(Collectors.joining(", ")));
+        try {
+            return _batchExecutor.invokeAll(targets.stream().<Callable<CanDeleteReply>>map(h -> () -> {
+                var req = CanDeleteRequest.newBuilder().setName(object.toString());
+                for (var ref : ourReferrers) {
+                    req.addOurReferrers(ref.toString());
+                }
+                return rpcClientFactory.withObjSyncClient(h, (p, client) -> client.canDelete(req.build()));
+            }).toList()).stream().map(f -> {
+                try {
+                    return f.get();
+                } catch (InterruptedException | ExecutionException e) {
+                    throw new RuntimeException(e);
+                }
+            }).toList();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

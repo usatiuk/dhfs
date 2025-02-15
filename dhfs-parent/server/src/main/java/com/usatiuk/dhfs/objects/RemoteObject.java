@@ -11,8 +11,9 @@ import java.util.List;
 
 public record RemoteObject<T extends JDataRemote>(PCollection<JObjectKey> refsFrom, boolean frozen,
                                                   RemoteObjectMeta meta, @Nullable T data) implements JDataRefcounted {
+    // Self put
     public RemoteObject(T data, PeerId initialPeer) {
-        this(HashTreePSet.empty(), false, new RemoteObjectMeta(data.key(), data.getClass(), initialPeer), data);
+        this(HashTreePSet.empty(), false, new RemoteObjectMeta(data.key(), data.getClass(), false, initialPeer), data);
     }
 
     public RemoteObject(JObjectKey key, PMap<PeerId, Long> remoteChangelog) {

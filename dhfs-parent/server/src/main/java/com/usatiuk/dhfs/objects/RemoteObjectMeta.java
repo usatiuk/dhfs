@@ -14,8 +14,8 @@ public record RemoteObjectMeta(
         PSet<PeerId> confirmedDeletes,
         boolean seen,
         PMap<PeerId, Long> changelog) implements Serializable {
-    public RemoteObjectMeta(JObjectKey key, Class<? extends JDataRemote> type, PeerId initialPeer) {
-        this(key, HashTreePMap.empty(), type, HashTreePSet.empty(), true,
+    public RemoteObjectMeta(JObjectKey key, Class<? extends JDataRemote> type, boolean seen, PeerId initialPeer) {
+        this(key, HashTreePMap.empty(), type, HashTreePSet.empty(), seen,
                 HashTreePMap.<PeerId, Long>empty().plus(initialPeer, 1L));
     }
 
