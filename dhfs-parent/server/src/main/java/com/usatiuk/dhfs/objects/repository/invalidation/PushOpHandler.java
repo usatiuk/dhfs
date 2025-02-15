@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.objects.repository.invalidation;
 
-import com.usatiuk.dhfs.objects.JDataRemote;
 import com.usatiuk.dhfs.objects.PeerId;
 import com.usatiuk.dhfs.objects.RemoteTransaction;
 import com.usatiuk.dhfs.objects.repository.SyncHandler;
@@ -18,8 +17,6 @@ public class PushOpHandler {
     RemoteTransaction remoteTransaction;
 
     public void handlePush(PeerId peer, IndexUpdateOp obj) {
-        syncHandler.handleRemoteUpdate(peer, obj.key(),
-                remoteTransaction.get(JDataRemote.class, obj.key()).orElse(null),
-                obj.changelog());
+        syncHandler.handleRemoteUpdate(peer, obj.key(), obj.changelog(), null);
     }
 }

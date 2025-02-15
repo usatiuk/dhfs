@@ -72,7 +72,7 @@ public class PeerInfoService {
         jObjectTxManager.run(() -> {
             var parent = getTree().traverse(List.of());
             var newPeerInfo = new PeerInfo(id, cert);
-            remoteTx.put(newPeerInfo);
+            remoteTx.putData(newPeerInfo);
             getTree().move(parent, new JKleppmannTreeNodeMetaPeer(newPeerInfo.id()), getTree().getNewNodeId());
         });
     }

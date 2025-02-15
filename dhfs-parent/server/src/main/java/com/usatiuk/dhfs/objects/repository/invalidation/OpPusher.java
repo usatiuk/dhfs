@@ -27,8 +27,8 @@ public class OpPusher {
         Op info = txm.run(() -> {
             var obj = curTx.get(JData.class, key).orElse(null);
             switch (obj) {
-                case RemoteObject<?> remote -> {
-                    return new IndexUpdateOp(key, remote.meta().changelog());
+                case RemoteObjectMeta remote -> {
+                    return new IndexUpdateOp(key, remote.changelog());
                 }
                 case JKleppmannTreePersistentData pd -> {
                     var maybeQueue = pd.queues().get(op);

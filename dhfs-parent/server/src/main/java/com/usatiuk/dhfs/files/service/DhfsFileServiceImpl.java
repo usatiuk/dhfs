@@ -75,7 +75,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     private ChunkData createChunk(ByteString bytes) {
         var newChunk = new ChunkData(JObjectKey.of(UUID.randomUUID().toString()), bytes);
-        remoteTx.put(newChunk);
+        remoteTx.putData(newChunk);
         return newChunk;
     }
 
@@ -104,7 +104,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             var ref = curTx.get(JData.class, uuid).orElse(null);
             if (ref == null) return Optional.empty();
             GetattrRes ret;
-            if (ref instanceof RemoteObject r) {
+            if (ref instanceof RemoteObjectMeta r) {
                 var remote = remoteTx.getData(JDataRemote.class, uuid).orElse(null);
                 if (remote instanceof File f) {
                     ret = new GetattrRes(f.mTime(), f.cTime(), f.mode(), f.symlink() ? GetattrType.SYMLINK : GetattrType.FILE);
@@ -157,7 +157,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             var fuuid = UUID.randomUUID();
             Log.debug("Creating file " + fuuid);
             File f = new File(JObjectKey.of(fuuid.toString()), mode, System.currentTimeMillis(), System.currentTimeMillis(), TreePMap.empty(), false, 0);
-            remoteTx.put(f);
+            remoteTx.putData(f);
 
             try {
                 getTree().move(parent.key(), new JKleppmannTreeNodeMetaFile(fname, f.key()), getTree().getNewNodeId());
@@ -230,10 +230,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             if (dent instanceof JKleppmannTreeNode) {
                 return true;
-            } else if (dent instanceof RemoteObject) {
+            } else if (dent instanceof RemoteObjectMeta) {
                 var remote = remoteTx.getData(JDataRemote.class, uuid).orElse(null);
                 if (remote instanceof File f) {
-                    remoteTx.put(f.withMode(mode).withMTime(System.currentTimeMillis()));
+                    remoteTx.putData(f.withMode(mode).withMTime(System.currentTimeMillis()));
                     return true;
                 } else {
                     throw new IllegalArgumentException(uuid + " is not a file");
@@ -502,7 +502,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
 
             file = file.withChunks(file.chunks().minusAll(removedChunks.keySet()).plusAll(newChunks)).withMTime(System.currentTimeMillis());
-            remoteTx.put(file);
+            remoteTx.putData(file);
             cleanupChunks(file, removedChunks.values());
             updateFileSize(file);
 
@@ -526,7 +526,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 var oldChunks = file.chunks();
 
                 file = file.withChunks(TreePMap.empty()).withMTime(System.currentTimeMillis());
-                remoteTx.put(file);
+                remoteTx.putData(file);
                 cleanupChunks(file, oldChunks.values());
                 updateFileSize(file);
                 return true;
@@ -587,7 +587,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
 
             file = file.withChunks(file.chunks().minusAll(removedChunks.keySet()).plusAll(newChunks)).withMTime(System.currentTimeMillis());
-            remoteTx.put(file);
+            remoteTx.putData(file);
             cleanupChunks(file, removedChunks.values());
             updateFileSize(file);
             return true;
@@ -640,7 +640,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                             "File not found for setTimes: " + fileUuid))
             );
 
-            remoteTx.put(file.withCTime(atimeMs).withMTime(mtimeMs));
+            remoteTx.putData(file.withCTime(atimeMs).withMTime(mtimeMs));
             return true;
         });
     }
@@ -657,7 +657,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
 
             if (realSize != file.size()) {
-                remoteTx.put(file.withSize(realSize));
+                remoteTx.putData(file.withSize(realSize));
             }
         });
     }

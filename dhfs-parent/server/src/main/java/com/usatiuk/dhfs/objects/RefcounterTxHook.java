@@ -1,8 +1,6 @@
 package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaFile;
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreePersistentData;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -19,8 +17,8 @@ public class RefcounterTxHook implements PreCommitTxHook {
             return found;
         }
 
-        if (cur instanceof RemoteObject<?> || cur instanceof JKleppmannTreeNode) {
-            return new RemoteObject<>(key);
+        if (cur instanceof RemoteObjectMeta || cur instanceof JKleppmannTreeNode) {
+            return new RemoteObjectMeta(key);
         } else {
             return found;
         }

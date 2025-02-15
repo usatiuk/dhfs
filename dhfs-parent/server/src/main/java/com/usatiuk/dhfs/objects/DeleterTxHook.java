@@ -22,7 +22,7 @@ public class DeleterTxHook implements PreCommitTxHook {
             return;
         }
         if (canDelete(refCur)) {
-            if (refCur instanceof RemoteObject<?> ro) {
+            if (refCur instanceof RemoteObjectMeta ro) {
                 remoteObjectDeleter.putDeletionCandidate(ro);
                 return;
             }
@@ -38,7 +38,7 @@ public class DeleterTxHook implements PreCommitTxHook {
         }
 
         if (canDelete(refCur)) {
-            if (refCur instanceof RemoteObject<?> ro) {
+            if (refCur instanceof RemoteObjectMeta ro) {
                 remoteObjectDeleter.putDeletionCandidate(ro);
                 return;
             }

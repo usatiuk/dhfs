@@ -15,6 +15,7 @@ import io.smallrye.common.annotation.Blocking;
 import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.tuple.Pair;
 
 // Note: RunOnVirtualThread hangs somehow
 @GrpcService
@@ -52,16 +53,32 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     public Uni<GetObjectReply> getObject(GetObjectRequest request) {
         Log.info("<-- getObject: " + request.getName() + " from " + identity.getPrincipal().getName().substring(3));
 
-        var obj = txm.run(() -> {
-            var got = remoteTx.get(JDataRemote.class, JObjectKey.of(request.getName())).orElse(null);
-            if (got == null) {
-                Log.info("<-- getObject NOT FOUND: " + request.getName() + " from " + identity.getPrincipal().getName().substring(3));
-                throw new StatusRuntimeException(Status.NOT_FOUND);
-            }
-            return got;
+
+        Pair<RemoteObjectMeta, JDataRemote> got = txm.run(() -> {
+            var meta = remoteTx.getMeta(JObjectKey.of(request.getName())).orElse(null);
+            var obj = remoteTx.getDataLocal(JDataRemote.class, JObjectKey.of(request.getName())).orElse(null);
+            if (meta != null && !meta.seen())
+                curTx.put(meta.withSeen(true));
+            if (obj != null)
+                for (var ref : obj.collectRefsTo()) {
+                    var refMeta = remoteTx.getMeta(ref).orElse(null);
+                    if (refMeta != null && !refMeta.seen())
+                        curTx.put(refMeta.withSeen(true));
+                }
+            return Pair.of(meta, obj);
         });
 
-        var serialized = receivedObjectProtoSerializer.serialize(obj.toReceivedObject());
+        if ((got.getValue() != null) && (got.getKey() == null)) {
+            Log.error("Inconsistent state for object meta: " + request.getName());
+            throw new StatusRuntimeException(Status.INTERNAL);
+        }
+
+        if (got.getValue() == null) {
+            Log.info("<-- getObject NOT FOUND: " + request.getName() + " from " + identity.getPrincipal().getName().substring(3));
+            throw new StatusRuntimeException(Status.NOT_FOUND);
+        }
+
+        var serialized = receivedObjectProtoSerializer.serialize(new ReceivedObject(got.getKey().key(), got.getKey().changelog(), got.getValue()));
         return Uni.createFrom().item(serialized);
 //        // Does @Blocking break this?
 //        return Uni.createFrom().emitter(emitter -> {
@@ -110,7 +127,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         builder.setObjName(request.getName());
 
         txm.run(() -> {
-            var obj = curTx.get(RemoteObject.class, JObjectKey.of(request.getName())).orElse(null);
+            var obj = curTx.get(RemoteObjectMeta.class, JObjectKey.of(request.getName())).orElse(null);
 
             if (obj == null) {
                 builder.setDeletionCandidate(true);

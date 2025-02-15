@@ -93,17 +93,14 @@ public class RemoteObjectDeleter {
 //        _quickCandidates.add(obj);
 //    }
 
-    public void putDeletionCandidate(RemoteObject<?> obj) {
-        synchronized (_movablesInProcessing) {
-            if (_movablesInProcessing.contains(obj.key())) return;
-            if (!obj.meta().seen()) {
-                if (_quickCandidates.add(obj.key()))
-                    Log.debug("Quick deletion candidate: " + obj.key());
-                return;
-            }
-            if (_candidates.add(obj.key()))
-                Log.debug("Deletion candidate: " + obj.key());
+    public void putDeletionCandidate(RemoteObjectMeta obj) {
+        if (!obj.seen()) {
+            if (_quickCandidates.add(obj.key()))
+                Log.debug("Quick deletion candidate: " + obj.key());
+            return;
         }
+        if (_candidates.add(obj.key()))
+            Log.debug("Deletion candidate: " + obj.key());
     }
 
     private void asyncProcessMovable(JObjectKey objName) {
@@ -118,18 +115,20 @@ public class RemoteObjectDeleter {
             try {
                 delay = txm.run(() -> {
                     Log.debugv("Starting async processing of remote obj del: {0}", objName);
-                    RemoteObject<?> target = curTx.get(RemoteObject.class, objName).orElse(null);
+                    RemoteObjectMeta target = curTx.get(RemoteObjectMeta.class, objName).orElse(null);
                     if (target == null) return true;
+                    if (!canDelete(target)) return true;
 
-                    if (canDelete(target)) {
+                    if (canDeleteImmediately(target)) {
                         Log.debugv("Async processing of remote obj del: immediate {0}", objName);
                         curTx.delete(objName);
                         return true;
                     }
+
                     var knownHosts = peerInfoService.getPeersNoSelf();
                     List<PeerId> missing = knownHosts.stream()
                             .map(PeerInfo::id)
-                            .filter(id -> !target.meta().confirmedDeletes().contains(id)).toList();
+                            .filter(id -> !target.confirmedDeletes().contains(id)).toList();
 
                     var ret = remoteObjectServiceClient.canDelete(missing, objName, target.refsFrom());
 
@@ -148,7 +147,7 @@ public class RemoteObjectDeleter {
                         Log.debugv("Delaying deletion check of {0}", objName);
                         return true;
                     } else {
-                        assert canDelete(target);
+                        assert canDeleteImmediately(target);
                         Log.debugv("Async processing of remote obj del: after query {0}", objName);
                         curTx.delete(objName);
                         return false;
@@ -166,15 +165,20 @@ public class RemoteObjectDeleter {
         });
     }
 
+    // FIXME:
+    private boolean canDelete(JDataRefcounted obj) {
+        return obj.refsFrom().isEmpty() && !obj.frozen();
+    }
+
     // Returns true if the object can be deleted
-    private boolean canDelete(RemoteObject<?> obj) {
-        if (!obj.meta().seen())
+    private boolean canDeleteImmediately(RemoteObjectMeta obj) {
+        if (!obj.seen())
             return true;
 
         var knownHosts = peerInfoService.getPeers();
         boolean missing = false;
         for (var x : knownHosts) {
-            if (!obj.meta().confirmedDeletes().contains(x.id())) {
+            if (!obj.confirmedDeletes().contains(x.id())) {
                 missing = true;
                 break;
             }
@@ -204,10 +208,12 @@ public class RemoteObjectDeleter {
                     Stream.of(next, nextQuick).filter(Objects::nonNull).forEach(realNext -> {
                         Log.debugv("Processing remote object deletion candidate: {0}", realNext);
                         var deleted = txm.run(() -> {
-                            RemoteObject<?> target = curTx.get(RemoteObject.class, realNext).orElse(null);
+                            RemoteObjectMeta target = curTx.get(RemoteObjectMeta.class, realNext).orElse(null);
                             if (target == null) return true;
 
-                            if (canDelete(target)) {
+                            if (!canDelete(target)) return true;
+
+                            if (canDeleteImmediately(target)) {
                                 Log.debugv("Immediate deletion of: {0}", realNext);
                                 curTx.delete(realNext);
                                 return true;
