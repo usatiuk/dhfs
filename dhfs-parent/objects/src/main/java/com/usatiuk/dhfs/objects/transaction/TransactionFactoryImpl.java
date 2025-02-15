@@ -97,6 +97,11 @@ public class TransactionFactoryImpl implements TransactionFactory {
         public Map<JObjectKey, TransactionObject<?>> reads() {
             return _source.getRead();
         }
+
+        @Override
+        public ReadTrackingObjectSource readSource() {
+            return _source;
+        }
     }
 
 }

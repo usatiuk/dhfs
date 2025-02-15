@@ -10,4 +10,6 @@ public interface TransactionPrivate extends Transaction {
     Collection<TxRecord.TxObjectRecord<?>> drainNewWrites();
 
     Map<JObjectKey, TransactionObject<?>> reads();
+
+    ReadTrackingObjectSource readSource();
 }
