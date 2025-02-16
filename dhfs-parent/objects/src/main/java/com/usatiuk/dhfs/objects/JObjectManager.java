@@ -110,7 +110,7 @@ public class JObjectManager {
         return transactionFactory.createTransaction(counter, new TransactionObjectSourceImpl(counter));
     }
 
-    public void commit(TransactionPrivate tx) {
+    public TransactionHandle commit(TransactionPrivate tx) {
         verifyReady();
         Log.trace("Committing transaction " + tx.getId());
         // FIXME: Better way?
@@ -243,7 +243,27 @@ public class JObjectManager {
             }
 
             Log.tracef("Committing transaction %d to storage", tx.getId());
-            writebackObjectPersistentStore.commitTx(current.values(), tx.getId());
+            var addFlushCallback = writebackObjectPersistentStore.commitTx(current.values(), tx.getId());
+
+            for (var callback : tx.getOnCommit()) {
+                callback.run();
+            }
+
+            for (var callback : tx.getOnFlush()) {
+                addFlushCallback.accept(callback);
+            }
+
+            return new TransactionHandle() {
+                @Override
+                public long getId() {
+                    return tx.getId();
+                }
+
+                @Override
+                public void onFlush(Runnable runnable) {
+                    addFlushCallback.accept(runnable);
+                }
+            };
         } catch (Throwable t) {
             Log.trace("Error when committing transaction", t);
             throw new TxCommitException(t.getMessage(), t);

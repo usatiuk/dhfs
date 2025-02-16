@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.transaction.Transaction;
+import com.usatiuk.dhfs.objects.transaction.TransactionHandle;
 import com.usatiuk.dhfs.objects.transaction.TransactionPrivate;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -24,14 +25,14 @@ public class TransactionManagerImpl implements TransactionManager {
     }
 
     @Override
-    public void commit() {
+    public TransactionHandle commit() {
         if (_currentTransaction.get() == null) {
             throw new IllegalStateException("No transaction started");
         }
 
         Log.trace("Committing transaction");
         try {
-            jObjectManager.commit(_currentTransaction.get());
+            return jObjectManager.commit(_currentTransaction.get());
         } catch (Throwable e) {
             Log.trace("Transaction commit failed", e);
             throw e;

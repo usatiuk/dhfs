@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.transaction.Transaction;
+import com.usatiuk.dhfs.objects.transaction.TransactionHandle;
 import com.usatiuk.dhfs.utils.VoidFn;
 import io.quarkus.logging.Log;
 
@@ -9,7 +10,7 @@ import java.util.function.Supplier;
 public interface TransactionManager {
     void begin();
 
-    void commit();
+    TransactionHandle commit();
 
     void rollback();
 

@@ -145,14 +145,14 @@ public class TxWritebackImpl implements TxWriteback {
                     });
                 }
 
-                List<List<VoidFn>> callbacks = new ArrayList<>();
+                List<List<Runnable>> callbacks = new ArrayList<>();
                 synchronized (_notFlushedBundles) {
                     _lastWrittenTx.set(bundle.getId());
                     while (!_notFlushedBundles.isEmpty() && _notFlushedBundles.firstEntry().getKey() <= bundle.getId()) {
                         callbacks.add(_notFlushedBundles.pollFirstEntry().getValue().setCommitted());
                     }
                 }
-                callbacks.forEach(l -> l.forEach(VoidFn::apply));
+                callbacks.forEach(l -> l.forEach(Runnable::run));
 
                 synchronized (_flushWaitSynchronizer) {
                     currentSize -= bundle.calculateTotalSize();
@@ -278,16 +278,16 @@ public class TxWritebackImpl implements TxWriteback {
     }
 
     @Override
-    public void asyncFence(long bundleId, VoidFn fn) {
+    public void asyncFence(long bundleId, Runnable fn) {
         verifyReady();
         if (bundleId < 0) throw new IllegalArgumentException("txId should be >0!");
         if (_lastWrittenTx.get() >= bundleId) {
-            fn.apply();
+            fn.run();
             return;
         }
         synchronized (_notFlushedBundles) {
             if (_lastWrittenTx.get() >= bundleId) {
-                fn.apply();
+                fn.run();
                 return;
             }
             _notFlushedBundles.get(bundleId).addCallback(fn);
@@ -296,7 +296,7 @@ public class TxWritebackImpl implements TxWriteback {
 
     private class TxBundleImpl implements TxBundle {
         private final LinkedHashMap<JObjectKey, BundleEntry> _entries = new LinkedHashMap<>();
-        private final ArrayList<VoidFn> _callbacks = new ArrayList<>();
+        private final ArrayList<Runnable> _callbacks = new ArrayList<>();
         private long _txId;
         private volatile boolean _ready = false;
         private long _size = -1;
@@ -315,14 +315,14 @@ public class TxWritebackImpl implements TxWriteback {
             _ready = true;
         }
 
-        public void addCallback(VoidFn callback) {
+        public void addCallback(Runnable callback) {
             synchronized (_callbacks) {
                 if (_wasCommitted) throw new IllegalStateException();
                 _callbacks.add(callback);
             }
         }
 
-        public List<VoidFn> setCommitted() {
+        public List<Runnable> setCommitted() {
             synchronized (_callbacks) {
                 _wasCommitted = true;
                 return Collections.unmodifiableList(_callbacks);

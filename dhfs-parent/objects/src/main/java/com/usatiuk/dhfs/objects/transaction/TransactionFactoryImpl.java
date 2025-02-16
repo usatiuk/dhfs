@@ -5,10 +5,7 @@ import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import jakarta.enterprise.context.ApplicationScoped;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 @ApplicationScoped
 public class TransactionFactoryImpl implements TransactionFactory {
@@ -22,6 +19,9 @@ public class TransactionFactoryImpl implements TransactionFactory {
         private final ReadTrackingObjectSource _source;
         private final Map<JObjectKey, TxRecord.TxObjectRecord<?>> _writes = new HashMap<>();
         private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _newWrites = new HashMap<>();
+        private final List<Runnable> _onCommit = new ArrayList<>();
+        private final List<Runnable> _onFlush = new ArrayList<>();
+
         private TransactionImpl(long id, TransactionObjectSource source) {
             _id = id;
             _source = new ReadTrackingObjectSource(source);
@@ -29,6 +29,26 @@ public class TransactionFactoryImpl implements TransactionFactory {
 
         public long getId() {
             return _id;
+        }
+
+        @Override
+        public void onCommit(Runnable runnable) {
+            _onCommit.add(runnable);
+        }
+
+        @Override
+        public void onFlush(Runnable runnable) {
+            _onFlush.add(runnable);
+        }
+
+        @Override
+        public Collection<Runnable> getOnCommit() {
+            return Collections.unmodifiableCollection(_onCommit);
+        }
+
+        @Override
+        public Collection<Runnable> getOnFlush() {
+            return Collections.unmodifiableCollection(_onFlush);
         }
 
         @Override

@@ -6,8 +6,10 @@ import com.usatiuk.dhfs.objects.JObjectKey;
 import java.util.Optional;
 
 // The transaction interface actually used by user code to retrieve objects
-public interface Transaction {
+public interface Transaction extends TransactionHandle {
     long getId();
+
+    void onCommit(Runnable runnable);
 
     <T extends JData> Optional<T> get(Class<T> type, JObjectKey key, LockingStrategy strategy);
 

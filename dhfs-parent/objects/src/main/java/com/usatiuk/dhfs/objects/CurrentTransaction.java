@@ -18,6 +18,16 @@ public class CurrentTransaction implements Transaction {
     }
 
     @Override
+    public void onCommit(Runnable runnable) {
+        transactionManager.current().onCommit(runnable);
+    }
+
+    @Override
+    public void onFlush(Runnable runnable) {
+        transactionManager.current().onFlush(runnable);
+    }
+
+    @Override
     public <T extends JData> Optional<T> get(Class<T> type, JObjectKey key, LockingStrategy strategy) {
         return transactionManager.current().get(type, key, strategy);
     }

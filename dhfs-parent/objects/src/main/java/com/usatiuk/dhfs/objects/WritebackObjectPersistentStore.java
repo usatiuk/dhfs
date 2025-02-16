@@ -9,6 +9,7 @@ import jakarta.inject.Inject;
 import javax.annotation.Nonnull;
 import java.util.Collection;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 @ApplicationScoped
 public class WritebackObjectPersistentStore {
@@ -33,7 +34,7 @@ public class WritebackObjectPersistentStore {
         };
     }
 
-    void commitTx(Collection<TxRecord.TxObjectRecord<?>> writes, long id) {
+    Consumer<Runnable> commitTx(Collection<TxRecord.TxObjectRecord<?>> writes, long id) {
         var bundle = txWriteback.createBundle();
         try {
             for (var action : writes) {
@@ -58,5 +59,9 @@ public class WritebackObjectPersistentStore {
 
         Log.tracef("Committing transaction %d to storage", id);
         txWriteback.commitBundle(bundle);
+
+        long bundleId = bundle.getId();
+
+        return r -> txWriteback.asyncFence(bundleId, r);
     }
 }
