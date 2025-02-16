@@ -3,12 +3,8 @@ package com.usatiuk.dhfs.objects.repository.invalidation;
 import com.usatiuk.dhfs.objects.JData;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.PeerId;
-import com.usatiuk.dhfs.objects.TransactionManager;
 import com.usatiuk.dhfs.objects.repository.PeerManager;
-import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
-import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerInfoService;
-import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.dhfs.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
@@ -33,14 +29,6 @@ public class InvalidationQueueService {
     private final AtomicReference<ConcurrentHashSet<JObjectKey>> _toAllQueue = new AtomicReference<>(new ConcurrentHashSet<>());
     @Inject
     PeerManager remoteHostManager;
-    @Inject
-    RemoteObjectServiceClient remoteObjectServiceClient;
-    @Inject
-    TransactionManager txm;
-    @Inject
-    Transaction curTx;
-    @Inject
-    PersistentPeerDataService persistentPeerDataService;
     @Inject
     DeferredInvalidationQueueService deferredInvalidationQueueService;
     @Inject
@@ -148,7 +136,6 @@ public class InvalidationQueueService {
     }
 
     public void pushInvalidationToAll(JObjectKey key) {
-//        if (obj.getMeta().isOnlyLocal()) return;
         while (true) {
             var queue = _toAllQueue.get();
             if (queue == null) {
@@ -164,7 +151,6 @@ public class InvalidationQueueService {
     }
 
     public void pushInvalidationToOne(PeerId host, JObjectKey obj) {
-//        if (obj.getMeta().isOnlyLocal()) return;
         if (remoteHostManager.isReachable(host))
             _queue.add(Pair.of(host, obj));
         else
@@ -172,17 +158,8 @@ public class InvalidationQueueService {
     }
 
     public void pushInvalidationToOne(PeerId host, JData obj) {
-//        if (obj.getMeta().isOnlyLocal()) return;
         pushInvalidationToOne(host, obj.key());
     }
-
-//    public void pushInvalidationToAll(String name) {
-//        pushInvalidationToAll(jObjectManager.get(name).orElseThrow(() -> new IllegalArgumentException("Object " + name + " not found")));
-//    }
-//
-//    public void pushInvalidationToOne(PeerId host, JObjectKey name) {
-//        pushInvalidationToOne(host, jObjectManager.get(name).orElseThrow(() -> new IllegalArgumentException("Object " + name + " not found")));
-//    }
 
     protected void pushDeferredInvalidations(PeerId host, JObjectKey name) {
         _queue.add(Pair.of(host, name));

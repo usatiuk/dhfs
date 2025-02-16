@@ -139,19 +139,12 @@ public class RemoteObjectServiceClient {
 //    }
 //
     public OpPushReply pushOps(PeerId target, List<Op> ops) {
-//        for (Op op : ops) {
-//            for (var ref : op.getEscapedRefs()) {
-//                jObjectTxManager.executeTx(() -> {
-//                    jObjectManager.get(ref).ifPresent(JObject::markSeen);
-//                });
-//            }
-//        }
-//        var builder = OpPushMsg.newBuilder()
-//                .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
-//                .setQueueId(queueName);
-//        for (var op : ops)
-//            builder.addMsg(opProtoSerializer.serialize(op));
         for (Op op : ops) {
+            txm.run(() -> {
+                for (var ref : op.getEscapedRefs()) {
+                    curTx.get(RemoteObjectMeta.class, ref).map(m -> m.withSeen(true)).ifPresent(curTx::put);
+                }
+            });
             var serialized = opProtoSerializer.serialize(op);
             var built = OpPushRequest.newBuilder().addMsg(serialized).build();
             rpcClientFactory.withObjSyncClient(target, (tgt, client) -> client.opPush(built));
