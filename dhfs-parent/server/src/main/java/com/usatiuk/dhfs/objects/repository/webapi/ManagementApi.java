@@ -34,7 +34,7 @@ public class ManagementApi {
     @Path("known-peers")
     @DELETE
     public void deletePeer(KnownPeerDelete knownPeerDelete) {
-//        peerManager.removeRemoteHost(PeerId.of(knownPeerPut.uuid()));
+        peerManager.removeRemoteHost(PeerId.of(knownPeerDelete.uuid()));
     }
 
     @Path("available-peers")

@@ -49,6 +49,8 @@ public class PeerManager {
     long pingTimeout;
     @Inject
     PeerDiscoveryDirectory peerDiscoveryDirectory;
+    @Inject
+    SyncHandler syncHandler;
     private ExecutorService _heartbeatExecutor;
 
     // Note: keep priority updated with below
@@ -101,13 +103,10 @@ public class PeerManager {
     private void handleConnectionSuccess(PeerInfo host, PeerAddress address) {
         boolean wasReachable = isReachable(host);
 
-//        boolean shouldSyncObj = persistentPeerDataService.markInitialObjSyncDone(host);
-//        boolean shouldSyncOp = persistentPeerDataService.markInitialOpSyncDone(host);
-//
-//        if (shouldSyncObj)
-//            syncHandler.pushInitialResyncObj(host);
-//        if (shouldSyncOp)
-//            syncHandler.pushInitialResyncOp(host);
+        boolean shouldSync = persistentPeerDataService.markInitialSyncDone(host.id());
+
+        if (shouldSync)
+            syncHandler.doInitialSync(host.id());
 
         _states.put(host.id(), address);
 
@@ -179,14 +178,12 @@ public class PeerManager {
         });
     }
 
-//    public void removeRemoteHost(UUID host) {
-//        persistentPeerDataService.removeHost(host);
-//        // Race?
-//        _transientPeersState.runWriteLocked(d -> {
-//            d.getStates().remove(host);
-//            return null;
-//        });
-//    }
+    public void removeRemoteHost(PeerId peerId) {
+        transactionManager.run(() -> {
+            peerInfoService.removePeer(peerId);
+            persistentPeerDataService.resetInitialSyncDone(peerId);
+        });
+    }
 
     private PeerAddress selectBestAddress(PeerId host) {
         return peerDiscoveryDirectory.getForPeer(host).stream().findFirst().orElseThrow();
@@ -207,9 +204,7 @@ public class PeerManager {
             peerInfoService.putPeer(host, cert);
         });
 
-        peerTrustManager.reloadTrustManagerHosts(
-                transactionManager.run(() -> peerInfoService.getPeers().stream().toList())
-        ); //FIXME:
+        peerTrustManager.reloadTrustManagerHosts(transactionManager.run(() -> peerInfoService.getPeers().stream().toList())); //FIXME:
     }
 
     public Collection<AvailablePeerInfo> getSeenButNotAddedHosts() {

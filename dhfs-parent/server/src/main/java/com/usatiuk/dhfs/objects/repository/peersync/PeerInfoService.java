@@ -9,6 +9,7 @@ import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.objects.repository.peersync.structs.JKleppmannTreeNodeMetaPeer;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
+import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -74,6 +75,21 @@ public class PeerInfoService {
             var newPeerInfo = new PeerInfo(id, cert);
             remoteTx.putData(newPeerInfo);
             getTree().move(parent, new JKleppmannTreeNodeMetaPeer(newPeerInfo.id()), getTree().getNewNodeId());
+        });
+    }
+
+    public void removePeer(PeerId id) {
+        jObjectTxManager.run(() -> {
+            var gotKey = getTree().traverse(List.of(id.toString()));
+            if (gotKey == null) {
+                return;
+            }
+            var meta = curTx.get(JKleppmannTreeNode.class, gotKey).map(node -> (JKleppmannTreeNodeMetaPeer) node.meta()).orElse(null);
+            if (meta == null) {
+                Log.warn("Peer " + id + " not found in the tree");
+                return;
+            }
+            getTree().trash(meta, id.toJObjectKey());
         });
     }
 }

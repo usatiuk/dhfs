@@ -248,4 +248,8 @@ public class SyncHandler {
             curTx.put(current);
         }
     }
+
+    public void doInitialSync(PeerId peer) {
+        //TODO:
+    }
 }
