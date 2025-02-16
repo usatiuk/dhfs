@@ -159,15 +159,15 @@ public class RemoteObjectServiceClient {
         return OpPushReply.getDefaultInstance();
     }
 
-    public Collection<CanDeleteReply> canDelete(Collection<PeerId> targets, JObjectKey object, Collection<JObjectKey> ourReferrers) {
+    public Collection<Pair<PeerId, CanDeleteReply>> canDelete(Collection<PeerId> targets, JObjectKey object, Collection<JObjectKey> ourReferrers) {
         Log.trace("Asking canDelete for " + object + " from " + targets.stream().map(PeerId::toString).collect(Collectors.joining(", ")));
         try {
-            return _batchExecutor.invokeAll(targets.stream().<Callable<CanDeleteReply>>map(h -> () -> {
+            return _batchExecutor.invokeAll(targets.stream().<Callable<Pair<PeerId, CanDeleteReply>>>map(h -> () -> {
                 var req = CanDeleteRequest.newBuilder().setName(object.toString());
                 for (var ref : ourReferrers) {
                     req.addOurReferrers(ref.toString());
                 }
-                return rpcClientFactory.withObjSyncClient(h, (p, client) -> client.canDelete(req.build()));
+                return Pair.of(h, rpcClientFactory.withObjSyncClient(h, (p, client) -> client.canDelete(req.build())));
             }).toList()).stream().map(f -> {
                 try {
                     return f.get();

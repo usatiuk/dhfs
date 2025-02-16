@@ -126,22 +126,26 @@ public class RemoteObjectDeleter {
                     }
 
                     var knownHosts = peerInfoService.getPeersNoSelf();
+                    RemoteObjectMeta finalTarget = target;
                     List<PeerId> missing = knownHosts.stream()
                             .map(PeerInfo::id)
-                            .filter(id -> !target.confirmedDeletes().contains(id)).toList();
+                            .filter(id -> !finalTarget.confirmedDeletes().contains(id)).toList();
 
                     var ret = remoteObjectServiceClient.canDelete(missing, objName, target.refsFrom());
 
                     long ok = 0;
 
                     for (var r : ret) {
-                        if (!r.getDeletionCandidate()) {
+                        if (!r.getValue().getDeletionCandidate()) {
 //                            for (var rr : r.getReferrersList())
 //                                autoSyncProcessor.add(rr);
                         } else {
+                            target = target.withConfirmedDeletes(target.confirmedDeletes().plus(r.getKey()));
                             ok++;
                         }
                     }
+
+                    curTx.put(target);
 
                     if (ok != missing.size()) {
                         Log.debugv("Delaying deletion check of {0}", objName);
@@ -175,7 +179,7 @@ public class RemoteObjectDeleter {
         if (!obj.seen())
             return true;
 
-        var knownHosts = peerInfoService.getPeers();
+        var knownHosts = peerInfoService.getPeersNoSelf();
         boolean missing = false;
         for (var x : knownHosts) {
             if (!obj.confirmedDeletes().contains(x.id())) {

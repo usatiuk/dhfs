@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
+import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -17,7 +18,8 @@ public class RefcounterTxHook implements PreCommitTxHook {
             return found;
         }
 
-        if (cur instanceof RemoteObjectMeta || cur instanceof JKleppmannTreeNode) {
+        if (cur instanceof RemoteObjectDataWrapper<?> || cur instanceof JKleppmannTreeNode) {
+            // FIXME:
             return new RemoteObjectMeta(key);
         } else {
             return found;
@@ -39,6 +41,7 @@ public class RefcounterTxHook implements PreCommitTxHook {
             if (!oldRefs.contains(curRef)) {
                 var referenced = getRef(refCur, curRef);
                 curTx.put(referenced.withRefsFrom(referenced.refsFrom().plus(key)));
+                Log.tracev("Added ref from {0} to {1}", key, curRef);
             }
         }
 
@@ -46,6 +49,7 @@ public class RefcounterTxHook implements PreCommitTxHook {
             if (!curRefs.contains(oldRef)) {
                 var referenced = getRef(refCur, oldRef);
                 curTx.put(referenced.withRefsFrom(referenced.refsFrom().minus(key)));
+                Log.tracev("Removed ref from {0} to {1}", key, oldRef);
             }
         }
     }
@@ -59,6 +63,7 @@ public class RefcounterTxHook implements PreCommitTxHook {
         for (var newRef : refCur.collectRefsTo()) {
             var referenced = getRef(refCur, newRef);
             curTx.put(referenced.withRefsFrom(referenced.refsFrom().plus(key)));
+            Log.tracev("Added ref from {0} to {1}", key, newRef);
         }
     }
 
@@ -71,6 +76,7 @@ public class RefcounterTxHook implements PreCommitTxHook {
         for (var removedRef : refCur.collectRefsTo()) {
             var referenced = getRef(refCur, removedRef);
             curTx.put(referenced.withRefsFrom(referenced.refsFrom().minus(key)));
+            Log.tracev("Removed ref from {0} to {1}", key, removedRef);
         }
     }
 
