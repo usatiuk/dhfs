@@ -1,5 +1,7 @@
 package com.usatiuk.kleppmanntree;
 
+import org.pcollections.PMap;
+
 import java.io.Serializable;
 import java.util.Map;
 
@@ -12,7 +14,7 @@ public interface TreeNode<TimestampT extends Comparable<TimestampT>, PeerIdT ext
 
     MetaT meta();
 
-    Map<String, NodeIdT> children();
+    PMap<String, NodeIdT> children();
 
     TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> withParent(NodeIdT parent);
 
@@ -20,5 +22,5 @@ public interface TreeNode<TimestampT extends Comparable<TimestampT>, PeerIdT ext
 
     TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> withMeta(MetaT meta);
 
-    TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> withChildren(Map<String, NodeIdT> children);
+    TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> withChildren(PMap<String, NodeIdT> children);
 }

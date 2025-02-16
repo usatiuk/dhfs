@@ -73,7 +73,7 @@ public class KleppmanTreeSimpleTest {
 
         // Second node wins as it has smaller timestamp
         Assertions.assertIterableEquals(List.of("Test2"), testNode1._storageInterface.getById(testNode2._storageInterface.getRootId()).children().keySet());
-        Assertions.assertIterableEquals(List.of("Test1", "TestFile"), testNode1._storageInterface.getById(d2id).children().keySet());
+        Assertions.assertIterableEquals(List.of("Test1", "TestFile"), testNode1._storageInterface.getById(d2id).children().keySet().stream().sorted().toList());
         Assertions.assertEquals(d2id, testNode1._tree.traverse(List.of("Test2")));
         Assertions.assertEquals(d1id, testNode1._tree.traverse(List.of("Test2", "Test1")));
         Assertions.assertEquals(f1id, testNode1._tree.traverse(List.of("Test2", "TestFile")));

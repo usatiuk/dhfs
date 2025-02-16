@@ -1,14 +1,14 @@
 package com.usatiuk.kleppmanntree;
 
-import java.util.Collections;
-import java.util.Map;
+import org.pcollections.HashTreePMap;
+import org.pcollections.PMap;
 
 public record TestTreeNode(Long key, Long parent, OpMove<Long, Long, TestNodeMeta, Long> lastEffectiveOp,
                            TestNodeMeta meta,
-                           Map<String, Long> children) implements TreeNode<Long, Long, TestNodeMeta, Long> {
+                           PMap<String, Long> children) implements TreeNode<Long, Long, TestNodeMeta, Long> {
 
     public TestTreeNode(Long id, Long parent, TestNodeMeta meta) {
-        this(id, parent, null, meta, Collections.emptyMap());
+        this(id, parent, null, meta, HashTreePMap.empty());
     }
 
     @Override
@@ -27,7 +27,7 @@ public record TestTreeNode(Long key, Long parent, OpMove<Long, Long, TestNodeMet
     }
 
     @Override
-    public TreeNode<Long, Long, TestNodeMeta, Long> withChildren(Map<String, Long> children) {
+    public TreeNode<Long, Long, TestNodeMeta, Long> withChildren(PMap<String, Long> children) {
         return new TestTreeNode(key, parent, lastEffectiveOp, meta, children);
     }
 }

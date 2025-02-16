@@ -1,15 +1,10 @@
 package com.usatiuk.dhfs.objects;
 
 import java.io.Serializable;
-import java.util.UUID;
 
-public record PeerId(UUID id) implements Serializable, Comparable<PeerId> {
-    public static PeerId of(UUID id) {
-        return new PeerId(id);
-    }
-
+public record PeerId(JObjectKey id) implements Serializable, Comparable<PeerId> {
     public static PeerId of(String id) {
-        return new PeerId(UUID.fromString(id));
+        return new PeerId(JObjectKey.of(id));
     }
 
     @Override

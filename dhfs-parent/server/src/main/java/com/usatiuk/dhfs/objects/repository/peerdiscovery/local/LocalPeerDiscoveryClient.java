@@ -72,7 +72,7 @@ public class LocalPeerDiscoveryClient {
                     var got = PeerDiscoveryInfo.parseFrom(ByteBuffer.wrap(buf, 0, packet.getLength()));
                     peerDiscoveryDirectory.notifyAddr(
                             new IpPeerAddress(
-                                    PeerId.of(UUID.fromString(got.getUuid())),
+                                    PeerId.of(got.getUuid()),
                                     PeerAddressType.LAN,
                                     packet.getAddress(),
                                     got.getPort(),

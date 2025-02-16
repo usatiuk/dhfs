@@ -59,7 +59,7 @@ public class PersistentPeerDataService {
                 return;
             } else {
                 try {
-                    _selfUuid = presetUuid.map(s -> PeerId.of(UUID.fromString(s))).orElseGet(() -> PeerId.of(UUID.randomUUID()));
+                    _selfUuid = presetUuid.map(PeerId::of).orElseGet(() -> PeerId.of(UUID.randomUUID().toString()));
                     Log.info("Generating a key pair, please wait");
                     _selfKeyPair = CertificateTools.generateKeyPair();
                     _selfCertificate = CertificateTools.generateCertificate(_selfKeyPair, _selfUuid.toString());

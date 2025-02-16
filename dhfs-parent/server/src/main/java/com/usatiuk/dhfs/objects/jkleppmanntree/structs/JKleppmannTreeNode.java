@@ -6,7 +6,9 @@ import com.usatiuk.dhfs.objects.PeerId;
 import com.usatiuk.dhfs.objects.repository.peersync.structs.JKleppmannTreeNodeMetaPeer;
 import com.usatiuk.kleppmanntree.OpMove;
 import com.usatiuk.kleppmanntree.TreeNode;
+import org.pcollections.HashTreePMap;
 import org.pcollections.PCollection;
+import org.pcollections.PMap;
 import org.pcollections.TreePSet;
 
 import java.io.Serializable;
@@ -20,10 +22,10 @@ import java.util.stream.Stream;
 public record JKleppmannTreeNode(JObjectKey key, PCollection<JObjectKey> refsFrom, boolean frozen, JObjectKey parent,
                                  OpMove<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> lastEffectiveOp,
                                  JKleppmannTreeNodeMeta meta,
-                                 Map<String, JObjectKey> children) implements TreeNode<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>, JDataRefcounted, Serializable {
+                                 PMap<String, JObjectKey> children) implements TreeNode<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>, JDataRefcounted, Serializable {
 
     public JKleppmannTreeNode(JObjectKey id, JObjectKey parent, JKleppmannTreeNodeMeta meta) {
-        this(id, TreePSet.empty(), false, parent, null, meta, Collections.emptyMap());
+        this(id, TreePSet.empty(), false, parent, null, meta, HashTreePMap.empty());
     }
 
     @Override
@@ -42,7 +44,7 @@ public record JKleppmannTreeNode(JObjectKey key, PCollection<JObjectKey> refsFro
     }
 
     @Override
-    public JKleppmannTreeNode withChildren(Map<String, JObjectKey> children) {
+    public JKleppmannTreeNode withChildren(PMap<String, JObjectKey> children) {
         return new JKleppmannTreeNode(key, refsFrom, frozen, parent, lastEffectiveOp, meta, children);
     }
 

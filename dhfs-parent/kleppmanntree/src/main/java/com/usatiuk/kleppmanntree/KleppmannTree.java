@@ -53,8 +53,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             var node = _storage.getById(effect.childId());
             var curParent = _storage.getById(effect.newParentId());
             {
-                var newCurParentChildren = new HashMap<>(curParent.children());
-                newCurParentChildren.remove(node.meta().getName());
+                var newCurParentChildren = curParent.children().minus(node.meta().getName());
                 curParent = curParent.withChildren(newCurParentChildren);
                 _storage.putNode(curParent);
             }
@@ -65,8 +64,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             // Needs to be read after changing curParent, as it might be the same node
             var oldParent = _storage.getById(effect.oldInfo().oldParent());
             {
-                var newOldParentChildren = new HashMap<>(oldParent.children());
-                newOldParentChildren.put(node.meta().getName(), node.key());
+                var newOldParentChildren = oldParent.children().plus(node.meta().getName(), node.key());
                 oldParent = oldParent.withChildren(newOldParentChildren);
                 _storage.putNode(oldParent);
             }
@@ -79,8 +77,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             var node = _storage.getById(effect.childId());
             var curParent = _storage.getById(effect.newParentId());
             {
-                var newCurParentChildren = new HashMap<>(curParent.children());
-                newCurParentChildren.remove(node.meta().getName());
+                var newCurParentChildren = curParent.children().minus(node.meta().getName());
                 curParent = curParent.withChildren(newCurParentChildren);
                 _storage.putNode(curParent);
             }
@@ -149,10 +146,9 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 for (var n : inTrash) {
                     var node = _storage.getById(n);
                     {
-                        var newTrashChildren = new HashMap<>(trash.children());
-                        if (newTrashChildren.remove(n.toString()) == null)
+                        if (!trash.children().containsKey(n.toString()))
                             LOGGER.severe("Node " + node.key() + " not found in trash but should be there");
-                        trash = trash.withChildren(newTrashChildren);
+                        trash = trash.withChildren(trash.children().minus(n.toString()));
                         _storage.putNode(trash);
                     }
                     _storage.removeNode(n);
@@ -307,8 +303,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 node = _storage.getById(effect.childId());
             }
             if (oldParentNode != null) {
-                var newOldParentChildren = new HashMap<>(oldParentNode.children());
-                newOldParentChildren.remove(effect.oldInfo().oldMeta().getName());
+                var newOldParentChildren = oldParentNode.children().minus(effect.oldInfo().oldMeta().getName());
                 oldParentNode = oldParentNode.withChildren(newOldParentChildren);
                 _storage.putNode(oldParentNode);
             }
@@ -317,8 +312,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             newParentNode = _storage.getById(effect.newParentId());
 
             {
-                var newNewParentChildren = new HashMap<>(newParentNode.children());
-                newNewParentChildren.put(effect.newMeta().getName(), effect.childId());
+                var newNewParentChildren = newParentNode.children().plus(effect.newMeta().getName(), effect.childId());
                 newParentNode = newParentNode.withChildren(newNewParentChildren);
                 _storage.putNode(newParentNode);
             }
