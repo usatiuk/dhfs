@@ -17,8 +17,8 @@ public record JKleppmannTreePersistentData(
         JObjectKey key, PCollection<JObjectKey> refsFrom, boolean frozen,
         long clock,
         PMap<PeerId, PSortedMap<CombinedTimestamp<Long, PeerId>, OpMove<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>>> queues,
-        HashMap<PeerId, Long> peerTimestampLog,
-        TreeMap<CombinedTimestamp<Long, PeerId>, LogRecord<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>> log
+        PMap<PeerId, Long> peerTimestampLog,
+        PSortedMap<CombinedTimestamp<Long, PeerId>, LogRecord<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>> log
 ) implements JDataRefcounted {
     @Override
     public JKleppmannTreePersistentData withRefsFrom(PCollection<JObjectKey> refs) {
@@ -38,11 +38,11 @@ public record JKleppmannTreePersistentData(
         return new JKleppmannTreePersistentData(key, refsFrom, frozen, clock, queues, peerTimestampLog, log);
     }
 
-    public JKleppmannTreePersistentData withPeerTimestampLog(HashMap<PeerId, Long> peerTimestampLog) {
+    public JKleppmannTreePersistentData withPeerTimestampLog(PMap<PeerId, Long> peerTimestampLog) {
         return new JKleppmannTreePersistentData(key, refsFrom, frozen, clock, queues, peerTimestampLog, log);
     }
 
-    public JKleppmannTreePersistentData withLog(TreeMap<CombinedTimestamp<Long, PeerId>, LogRecord<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>> log) {
+    public JKleppmannTreePersistentData withLog(PSortedMap<CombinedTimestamp<Long, PeerId>, LogRecord<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>> log) {
         return new JKleppmannTreePersistentData(key, refsFrom, frozen, clock, queues, peerTimestampLog, log);
     }
 
