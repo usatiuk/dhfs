@@ -3,12 +3,18 @@ package com.usatiuk.dhfs.objects.transaction;
 import com.usatiuk.dhfs.objects.JData;
 import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
 import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.WritebackObjectPersistentStore;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
+import javax.annotation.Nonnull;
 import java.util.*;
 
 @ApplicationScoped
 public class TransactionFactoryImpl implements TransactionFactory {
+    @Inject
+    WritebackObjectPersistentStore store; // FIXME:
+
     @Override
     public TransactionPrivate createTransaction(long id, TransactionObjectSource source) {
         return new TransactionImpl(id, source);
@@ -96,6 +102,12 @@ public class TransactionFactoryImpl implements TransactionFactory {
 //            }
             _writes.put(key, new TxRecord.TxObjectRecordDeleted(key)); // FIXME:
             _newWrites.put(key, new TxRecord.TxObjectRecordDeleted(key));
+        }
+
+        @Nonnull
+        @Override
+        public Collection<JObjectKey> findAllObjects() {
+            return store.findAllObjects();
         }
 
         @Override

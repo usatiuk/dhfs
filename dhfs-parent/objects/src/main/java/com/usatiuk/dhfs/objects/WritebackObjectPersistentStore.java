@@ -8,6 +8,7 @@ import jakarta.inject.Inject;
 
 import javax.annotation.Nonnull;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -19,8 +20,17 @@ public class WritebackObjectPersistentStore {
     TxWriteback txWriteback;
 
     @Nonnull
-    Collection<JObjectKey> findAllObjects() {
-        return delegate.findAllObjects();
+    public Collection<JObjectKey> findAllObjects() {
+        var pending = txWriteback.getPendingWrites();
+        var found = new HashSet<>(delegate.findAllObjects());
+        for (var p : pending) {
+            switch (p) {
+                case TxWriteback.PendingWrite write -> found.add(write.data().data().key());
+                case TxWriteback.PendingDelete deleted -> found.remove(deleted.key());
+                default -> throw new IllegalStateException("Unexpected value: " + p);
+            }
+        }
+        return found;
     }
 
     @Nonnull

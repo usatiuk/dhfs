@@ -115,12 +115,12 @@ public class JKleppmannTreeManager {
                 throw new IllegalArgumentException("Committed op push was not the oldest");
 
             _data = _data.withQueues(_data.queues().plus(host, _data.queues().get(host).minus(_data.queues().get(host).firstKey())));
+            curTx.put(_data);
         }
 
-//        @Override
-//        public void pushBootstrap(PeerId host) {
-//            _tree.recordBoostrapFor(host);
-//        }
+        public void recordBootstrap(PeerId host) {
+            _tree.recordBoostrapFor(host);
+        }
 
         public Pair<String, JObjectKey> findParent(Function<TreeNode<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>, Boolean> predicate) {
             return _tree.findParent(predicate);
@@ -207,42 +207,12 @@ public class JKleppmannTreeManager {
                 for (var p : peerInfoService.getPeersNoSelf()) {
                     recordOpForPeer(p.id(), op);
                 }
-//                _persistentData.get().assertRwLock();
-//                _persistentData.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
-//                var hostUuds = persistentPeerDataService.getHostUuids().stream().toList();
-//                _persistentData.get().mutate(new JMutator<JKleppmannTreePersistentData>() {
-//                    @Override
-//                    public boolean mutate(JKleppmannTreePersistentData object) {
-//                        object.recordOp(hostUuds, op);
-//                        return true;
-//                    }
-//
-//                    @Override
-//                    public void revert(JKleppmannTreePersistentData object) {
-//                        object.removeOp(hostUuds, op);
-//                    }
-//                });
-//                opSender.push(JKleppmannTree.this);
             }
 
             @Override
             public void recordOpForPeer(PeerId peer, OpMove<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> op) {
                 _data = _data.withQueues(_data.queues().plus(peer, _data.queues().getOrDefault(peer, TreePMap.empty()).plus(op.timestamp(), op)));
-//                _persistentData.get().assertRwLock();
-//                _persistentData.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
-//                _persistentData.get().mutate(new JMutator<JKleppmannTreePersistentData>() {
-//                    @Override
-//                    public boolean mutate(JKleppmannTreePersistentData object) {
-//                        object.recordOp(peer, op);
-//                        return true;
-//                    }
-//
-//                    @Override
-//                    public void revert(JKleppmannTreePersistentData object) {
-//                        object.removeOp(peer, op);
-//                    }
-//                });
-//                opSender.push(JKleppmannTree.this);
+                curTx.put(_data);
             }
         }
 

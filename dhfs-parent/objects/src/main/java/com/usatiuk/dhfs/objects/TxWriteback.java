@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.objects;
 
-import com.usatiuk.dhfs.utils.VoidFn;
-
+import java.util.Collection;
 import java.util.Optional;
 
 public interface TxWriteback {
@@ -14,6 +13,7 @@ public interface TxWriteback {
     void fence(long bundleId);
 
     Optional<PendingWriteEntry> getPendingWrite(JObjectKey key);
+    Collection<PendingWriteEntry> getPendingWrites();
 
     // Executes callback after bundle with bundleId id has been persisted
     // if it was already, runs callback on the caller thread

@@ -2,7 +2,6 @@ package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.persistence.CachingObjectPersistentStore;
 import com.usatiuk.dhfs.objects.persistence.TxManifestObj;
-import com.usatiuk.dhfs.utils.VoidFn;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -274,6 +273,13 @@ public class TxWritebackImpl implements TxWriteback {
     public Optional<PendingWriteEntry> getPendingWrite(JObjectKey key) {
         synchronized (_pendingBundles) {
             return Optional.ofNullable(_pendingWrites.get(key));
+        }
+    }
+
+    @Override
+    public Collection<PendingWriteEntry> getPendingWrites() {
+        synchronized (_pendingBundles) {
+            return Collections.unmodifiableCollection(_pendingWrites.values());
         }
     }
 

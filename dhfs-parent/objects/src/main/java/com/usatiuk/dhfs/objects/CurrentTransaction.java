@@ -5,6 +5,9 @@ import com.usatiuk.dhfs.objects.transaction.Transaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import javax.annotation.Nonnull;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 @ApplicationScoped
@@ -35,6 +38,12 @@ public class CurrentTransaction implements Transaction {
     @Override
     public void delete(JObjectKey key) {
         transactionManager.current().delete(key);
+    }
+
+    @Nonnull
+    @Override
+    public Collection<JObjectKey> findAllObjects() {
+        return transactionManager.current().findAllObjects();
     }
 
     @Override

@@ -13,6 +13,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.pcollections.HashTreePSet;
 
 import java.io.IOException;
 import java.security.KeyPair;
@@ -63,7 +64,7 @@ public class PersistentPeerDataService {
                     _selfKeyPair = CertificateTools.generateKeyPair();
                     _selfCertificate = CertificateTools.generateCertificate(_selfKeyPair, _selfUuid.toString());
 
-                    curTx.put(new PersistentRemoteHostsData(_selfUuid, _selfCertificate, _selfKeyPair));
+                    curTx.put(new PersistentRemoteHostsData(_selfUuid, _selfCertificate, _selfKeyPair, HashTreePSet.empty()));
                     peerInfoService.putPeer(_selfUuid, _selfCertificate.getEncoded());
                 } catch (CertificateEncodingException e) {
                     throw new RuntimeException(e);
@@ -116,5 +117,28 @@ public class PersistentPeerDataService {
         return _selfCertificate;
     }
 
+    // Returns true if host's initial sync wasn't done before, and marks it as done
+    public boolean markInitialSyncDone(PeerId peerId) {
+        return txm.run(() -> {
+            var data = curTx.get(PersistentRemoteHostsData.class, PersistentRemoteHostsData.KEY).orElse(null);
+            if (data == null) throw new IllegalStateException("Self data not found");
+            boolean exists = data.initialSyncDone().contains(peerId);
+            if (exists) return false;
+            curTx.put(data.withInitialSyncDone(data.initialSyncDone().plus(peerId)));
+            return true;
+        });
+    }
+
+    // Returns true if it was marked as done before, and resets it
+    public boolean resetInitialSyncDone(PeerId peerId) {
+        return txm.run(() -> {
+            var data = curTx.get(PersistentRemoteHostsData.class, PersistentRemoteHostsData.KEY).orElse(null);
+            if (data == null) throw new IllegalStateException("Self data not found");
+            boolean exists = data.initialSyncDone().contains(peerId);
+            if (!exists) return false;
+            curTx.put(data.withInitialSyncDone(data.initialSyncDone().minus(peerId)));
+            return true;
+        });
+    }
 
 }

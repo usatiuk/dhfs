@@ -90,8 +90,9 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     private void undoOp(LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> op) {
-        for (var e : op.effects().reversed())
-            undoEffect(e);
+        if (op.effects() != null)
+            for (var e : op.effects().reversed())
+                undoEffect(e);
     }
 
     private void redoOp(Map.Entry<CombinedTimestamp<TimestampT, PeerIdT>, LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT>> entry) {
@@ -343,11 +344,16 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             var conflictNodeId = newParent.children().get(op.newMeta().getName());
 
             if (conflictNodeId != null) {
+                var conflictNode = _storage.getById(conflictNodeId);
+                MetaT conflictNodeMeta = conflictNode.meta();
+
+                if (Objects.equals(conflictNodeMeta, op.newMeta())) {
+                    return new LogRecord<>(op, null);
+                }
+
                 if (failCreatingIfExists)
                     throw new AlreadyExistsException("Already exists: " + op.newMeta().getName() + ": " + conflictNodeId);
 
-                var conflictNode = _storage.getById(conflictNodeId);
-                MetaT conflictNodeMeta = conflictNode.meta();
                 String newConflictNodeName = conflictNodeMeta.getName() + ".conflict." + conflictNode.key();
                 String newOursName = op.newMeta().getName() + ".conflict." + op.childId();
                 return new LogRecord<>(op, List.of(
@@ -374,6 +380,11 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         if (replaceNodeId != null) {
             var replaceNode = _storage.getById(replaceNodeId);
             var replaceNodeMeta = replaceNode.meta();
+
+            if (Objects.equals(replaceNodeMeta, op.newMeta())) {
+                return new LogRecord<>(op, null);
+            }
+
             return new LogRecord<>(op, List.of(
                     new LogEffect<>(new LogEffectOld<>(replaceNode.lastEffectiveOp(), newParentId, replaceNodeMeta), replaceNode.lastEffectiveOp(), _storage.getTrashId(), (MetaT) replaceNodeMeta.withName(replaceNodeId.toString()), replaceNodeId),
                     new LogEffect<>(new LogEffectOld<>(node.lastEffectiveOp(), oldParentId, oldMeta), op, op.newParentId(), op.newMeta(), op.childId())

@@ -4,7 +4,7 @@ import com.usatiuk.dhfs.objects.JData;
 import com.usatiuk.dhfs.objects.RemoteObjectMeta;
 import com.usatiuk.dhfs.objects.RemoteTransaction;
 import com.usatiuk.dhfs.objects.TransactionManager;
-import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeOpWrapper;
+import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreePersistentData;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
@@ -25,25 +25,30 @@ public class OpPusher {
     RemoteObjectServiceClient remoteObjectServiceClient;
     @Inject
     InvalidationQueueService invalidationQueueService;
+    @Inject
+    JKleppmannTreeManager jKleppmannTreeManager;
 
     public void doPush(InvalidationQueueEntry entry) {
-        Op info = txm.run(() -> {
+        List<Op> info = txm.run(() -> {
             var obj = curTx.get(JData.class, entry.key()).orElse(null);
             switch (obj) {
                 case RemoteObjectMeta remote -> {
-                    return new IndexUpdateOp(entry.key(), remote.changelog());
+                    return List.of(new IndexUpdateOp(entry.key(), remote.changelog()));
                 }
                 case JKleppmannTreePersistentData pd -> {
-                    var maybeQueue = pd.queues().get(entry.peer());
-                    if (maybeQueue == null || maybeQueue.isEmpty()) {
+                    var tree = jKleppmannTreeManager.getTree(pd.key());
+                    if (entry.forced())
+                        tree.recordBootstrap(entry.peer());
+
+                    if (!tree.hasPendingOpsForHost(entry.peer()))
                         return null;
-                    }
-                    var ret = new JKleppmannTreeOpWrapper(entry.key(), pd.queues().get(entry.peer()).firstEntry().getValue());
-                    var newPd = pd.withQueues(pd.queues().plus(entry.peer(), pd.queues().get(entry.peer()).minus(ret.op().timestamp())));
-                    curTx.put(newPd);
-                    if (!newPd.queues().get(entry.peer()).isEmpty())
+
+                    var ops = tree.getPendingOpsForHost(entry.peer(), 1);
+
+                    if (tree.hasPendingOpsForHost(entry.peer()))
                         invalidationQueueService.pushInvalidationToOne(entry.peer(), pd.key());
-                    return ret;
+
+                    return ops;
                 }
                 case null,
                      default -> {
@@ -54,6 +59,21 @@ public class OpPusher {
         if (info == null) {
             return;
         }
-        remoteObjectServiceClient.pushOps(entry.peer(), List.of(info));
+        remoteObjectServiceClient.pushOps(entry.peer(), info);
+        txm.run(() -> {
+            var obj = curTx.get(JData.class, entry.key()).orElse(null);
+            switch (obj) {
+                case JKleppmannTreePersistentData pd: {
+                    var tree = jKleppmannTreeManager.getTree(pd.key());
+                    for (var op : info) {
+                        tree.commitOpForHost(entry.peer(), op);
+                    }
+                    break;
+                }
+                case null:
+                default:
+            }
+        });
+
     }
 }
