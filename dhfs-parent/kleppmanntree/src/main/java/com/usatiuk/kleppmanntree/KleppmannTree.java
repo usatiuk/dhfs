@@ -344,15 +344,15 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             var conflictNodeId = newParent.children().get(op.newMeta().getName());
 
             if (conflictNodeId != null) {
+                if (failCreatingIfExists)
+                    throw new AlreadyExistsException("Already exists: " + op.newMeta().getName() + ": " + conflictNodeId);
+
                 var conflictNode = _storage.getById(conflictNodeId);
                 MetaT conflictNodeMeta = conflictNode.meta();
 
                 if (Objects.equals(conflictNodeMeta, op.newMeta())) {
                     return new LogRecord<>(op, null);
                 }
-
-                if (failCreatingIfExists)
-                    throw new AlreadyExistsException("Already exists: " + op.newMeta().getName() + ": " + conflictNodeId);
 
                 String newConflictNodeName = conflictNodeMeta.getName() + ".conflict." + conflictNode.key();
                 String newOursName = op.newMeta().getName() + ".conflict." + op.childId();
