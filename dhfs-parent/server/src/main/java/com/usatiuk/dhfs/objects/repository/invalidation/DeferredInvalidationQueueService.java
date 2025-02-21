@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.objects.repository.invalidation;
 
-import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.PeerId;
 import com.usatiuk.dhfs.objects.repository.PeerManager;
 import com.usatiuk.dhfs.utils.SerializationHelper;
@@ -19,7 +18,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.UUID;
 
 @ApplicationScoped
 public class DeferredInvalidationQueueService {
@@ -69,17 +67,17 @@ public class DeferredInvalidationQueueService {
         synchronized (this) {
             var col = _persistentData.deferredInvalidations.get(host);
             for (var s : col) {
-                Log.trace("Un-deferred invalidation to " + host + " of " + s);
-                invalidationQueueService.pushDeferredInvalidations(host, s);
+                Log.tracev("Returning deferred invalidation: {0}", s);
+                invalidationQueueService.pushDeferredInvalidations(s);
             }
             col.clear();
         }
     }
 
-    void defer(PeerId host, JObjectKey object) {
+    void defer(InvalidationQueueEntry entry) {
         synchronized (this) {
-            Log.trace("Deferred invalidation to " + host + " of " + object);
-            _persistentData.deferredInvalidations.put(host, object);
+            Log.tracev("Deferred invalidation: {0}", entry);
+            _persistentData.deferredInvalidations.put(entry.peer(), entry);
         }
     }
 }

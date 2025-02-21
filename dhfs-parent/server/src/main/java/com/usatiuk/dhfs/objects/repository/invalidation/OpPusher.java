@@ -1,6 +1,9 @@
 package com.usatiuk.dhfs.objects.repository.invalidation;
 
-import com.usatiuk.dhfs.objects.*;
+import com.usatiuk.dhfs.objects.JData;
+import com.usatiuk.dhfs.objects.RemoteObjectMeta;
+import com.usatiuk.dhfs.objects.RemoteTransaction;
+import com.usatiuk.dhfs.objects.TransactionManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeOpWrapper;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreePersistentData;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
@@ -23,23 +26,23 @@ public class OpPusher {
     @Inject
     InvalidationQueueService invalidationQueueService;
 
-    public void doPush(PeerId op, JObjectKey key) {
+    public void doPush(InvalidationQueueEntry entry) {
         Op info = txm.run(() -> {
-            var obj = curTx.get(JData.class, key).orElse(null);
+            var obj = curTx.get(JData.class, entry.key()).orElse(null);
             switch (obj) {
                 case RemoteObjectMeta remote -> {
-                    return new IndexUpdateOp(key, remote.changelog());
+                    return new IndexUpdateOp(entry.key(), remote.changelog());
                 }
                 case JKleppmannTreePersistentData pd -> {
-                    var maybeQueue = pd.queues().get(op);
-                    if(maybeQueue == null || maybeQueue.isEmpty()) {
+                    var maybeQueue = pd.queues().get(entry.peer());
+                    if (maybeQueue == null || maybeQueue.isEmpty()) {
                         return null;
                     }
-                    var ret = new JKleppmannTreeOpWrapper(key, pd.queues().get(op).firstEntry().getValue());
-                    var newPd = pd.withQueues(pd.queues().plus(op, pd.queues().get(op).minus(ret.op().timestamp())));
+                    var ret = new JKleppmannTreeOpWrapper(entry.key(), pd.queues().get(entry.peer()).firstEntry().getValue());
+                    var newPd = pd.withQueues(pd.queues().plus(entry.peer(), pd.queues().get(entry.peer()).minus(ret.op().timestamp())));
                     curTx.put(newPd);
-                    if (!newPd.queues().get(op).isEmpty())
-                        invalidationQueueService.pushInvalidationToOne(op, pd.key());
+                    if (!newPd.queues().get(entry.peer()).isEmpty())
+                        invalidationQueueService.pushInvalidationToOne(entry.peer(), pd.key());
                     return ret;
                 }
                 case null,
@@ -51,6 +54,6 @@ public class OpPusher {
         if (info == null) {
             return;
         }
-        remoteObjectServiceClient.pushOps(op, List.of(info));
+        remoteObjectServiceClient.pushOps(entry.peer(), List.of(info));
     }
 }

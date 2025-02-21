@@ -103,11 +103,6 @@ public class PeerManager {
     private void handleConnectionSuccess(PeerInfo host, PeerAddress address) {
         boolean wasReachable = isReachable(host);
 
-        boolean shouldSync = persistentPeerDataService.markInitialSyncDone(host.id());
-
-        if (shouldSync)
-            syncHandler.doInitialSync(host.id());
-
         _states.put(host.id(), address);
 
         if (wasReachable) return;
@@ -178,7 +173,6 @@ public class PeerManager {
     public void removeRemoteHost(PeerId peerId) {
         transactionManager.run(() -> {
             peerInfoService.removePeer(peerId);
-            persistentPeerDataService.resetInitialSyncDone(peerId);
         });
     }
 

@@ -13,5 +13,5 @@ public class DeferredInvalidationQueueData implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    public final MultiValuedMap<PeerId, JObjectKey> deferredInvalidations = new HashSetValuedHashMap<>();
+    public final MultiValuedMap<PeerId, InvalidationQueueEntry> deferredInvalidations = new HashSetValuedHashMap<>();
 }

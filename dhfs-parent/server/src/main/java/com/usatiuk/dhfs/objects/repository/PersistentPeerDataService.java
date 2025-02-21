@@ -13,7 +13,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.pcollections.HashTreePSet;
 
 import java.io.IOException;
 import java.security.KeyPair;
@@ -64,7 +63,7 @@ public class PersistentPeerDataService {
                     _selfKeyPair = CertificateTools.generateKeyPair();
                     _selfCertificate = CertificateTools.generateCertificate(_selfKeyPair, _selfUuid.toString());
 
-                    curTx.put(new PersistentRemoteHostsData(_selfUuid, 0, _selfCertificate, _selfKeyPair, HashTreePSet.empty()));
+                    curTx.put(new PersistentRemoteHostsData(_selfUuid, _selfCertificate, _selfKeyPair));
                     peerInfoService.putPeer(_selfUuid, _selfCertificate.getEncoded());
                 } catch (CertificateEncodingException e) {
                     throw new RuntimeException(e);
@@ -94,14 +93,6 @@ public class PersistentPeerDataService {
         return _selfUuid;
     }
 
-    public long getUniqueId() {
-        return jObjectTxManager.run(() -> {
-            var curData = curTx.get(PersistentRemoteHostsData.class, PersistentRemoteHostsData.KEY).orElse(null);
-            curTx.put(curData.withSelfCounter(curData.selfCounter() + 1));
-            return curData.selfCounter();
-        });
-    }
-
 //    private void updateCerts() {
 //        try {
 //            peerDirectory.get().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
@@ -125,28 +116,5 @@ public class PersistentPeerDataService {
         return _selfCertificate;
     }
 
-    // Returns true if host's initial sync wasn't done before, and marks it as done
-    public boolean markInitialSyncDone(PeerId peerId) {
-        return txm.run(() -> {
-            var data = curTx.get(PersistentRemoteHostsData.class, PersistentRemoteHostsData.KEY).orElse(null);
-            if (data == null) throw new IllegalStateException("Self data not found");
-            boolean exists = data.initialSyncDone().contains(peerId);
-            if (exists) return false;
-            curTx.put(data.withInitialSyncDone(data.initialSyncDone().plus(peerId)));
-            return true;
-        });
-    }
-
-    // Returns true if it was marked as done before, and resets it
-    public boolean resetInitialSyncDone(PeerId peerId) {
-        return txm.run(() -> {
-            var data = curTx.get(PersistentRemoteHostsData.class, PersistentRemoteHostsData.KEY).orElse(null);
-            if (data == null) throw new IllegalStateException("Self data not found");
-            boolean exists = data.initialSyncDone().contains(peerId);
-            if (!exists) return false;
-            curTx.put(data.withInitialSyncDone(data.initialSyncDone().minus(peerId)));
-            return true;
-        });
-    }
 
 }

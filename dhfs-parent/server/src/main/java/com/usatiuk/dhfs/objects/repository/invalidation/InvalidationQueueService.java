@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.objects.repository.invalidation;
 
-import com.usatiuk.dhfs.objects.JData;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.PeerId;
 import com.usatiuk.dhfs.objects.repository.PeerManager;
@@ -15,7 +14,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
-import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.concurrent.ExecutorService;
@@ -25,7 +23,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @ApplicationScoped
 public class InvalidationQueueService {
-    private final HashSetDelayedBlockingQueue<Pair<PeerId, JObjectKey>> _queue;
+    private final HashSetDelayedBlockingQueue<InvalidationQueueEntry> _queue;
     private final AtomicReference<ConcurrentHashSet<JObjectKey>> _toAllQueue = new AtomicReference<>(new ConcurrentHashSet<>());
     @Inject
     PeerManager remoteHostManager;
@@ -65,7 +63,7 @@ public class InvalidationQueueService {
         var data = _queue.close();
         Log.info("Will defer " + data.size() + " invalidations on shutdown");
         for (var e : data)
-            deferredInvalidationQueueService.defer(e.getLeft(), e.getRight());
+            deferredInvalidationQueueService.defer(e);
     }
 
     private void sender() {
@@ -89,9 +87,9 @@ public class InvalidationQueueService {
                             var hostInfo = remoteHostManager.getHostStateSnapshot();
                             for (var o : toAllQueue) {
                                 for (var h : hostInfo.available())
-                                    _queue.add(Pair.of(h, o));
+                                    _queue.add(new InvalidationQueueEntry(h, o, false));
                                 for (var u : hostInfo.unavailable())
-                                    deferredInvalidationQueueService.defer(u, o);
+                                    deferredInvalidationQueueService.defer(new InvalidationQueueEntry(u, o, false));
                             }
                         }
                     }
@@ -102,19 +100,19 @@ public class InvalidationQueueService {
                     long success = 0;
 
                     for (var e : data) {
-                        if (peerInfoService.getPeerInfo(e.getLeft()).isEmpty()) continue;
+                        if (peerInfoService.getPeerInfo(e.peer()).isEmpty()) continue;
 
-                        if (!remoteHostManager.isReachable(e.getLeft())) {
-                            deferredInvalidationQueueService.defer(e.getLeft(), e.getRight());
+                        if (!remoteHostManager.isReachable(e.peer())) {
+                            deferredInvalidationQueueService.defer(e);
                             continue;
                         }
 
                         try {
-                            opPusher.doPush(e.getLeft(), e.getRight());
+                            opPusher.doPush(e);
                             success++;
                         } catch (Exception ex) {
-                            Log.info("Failed to send invalidation to " + e.getLeft() + ", will retry", ex);
-                            pushInvalidationToOne(e.getLeft(), e.getRight());
+                            Log.warnv("Failed to send invalidation to {0}, will retry: {1}", e, ex);
+                            pushInvalidationToOne(e);
                         }
                         if (_shutdown) {
                             Log.info("Invalidation sender exiting");
@@ -150,18 +148,23 @@ public class InvalidationQueueService {
         }
     }
 
-    public void pushInvalidationToOne(PeerId host, JObjectKey obj) {
-        if (remoteHostManager.isReachable(host))
-            _queue.add(Pair.of(host, obj));
+    void pushInvalidationToOne(InvalidationQueueEntry entry) {
+        if (remoteHostManager.isReachable(entry.peer()))
+            _queue.add(entry);
         else
-            deferredInvalidationQueueService.defer(host, obj);
+            deferredInvalidationQueueService.defer(entry);
     }
 
-    public void pushInvalidationToOne(PeerId host, JData obj) {
-        pushInvalidationToOne(host, obj.key());
+    public void pushInvalidationToOne(PeerId host, JObjectKey obj, boolean forced) {
+        var entry = new InvalidationQueueEntry(host, obj, forced);
+        pushInvalidationToOne(entry);
     }
 
-    protected void pushDeferredInvalidations(PeerId host, JObjectKey name) {
-        _queue.add(Pair.of(host, name));
+    public void pushInvalidationToOne(PeerId host, JObjectKey obj) {
+        pushInvalidationToOne(host, obj, false);
+    }
+
+    void pushDeferredInvalidations(InvalidationQueueEntry entry) {
+        _queue.add(entry);
     }
 }
