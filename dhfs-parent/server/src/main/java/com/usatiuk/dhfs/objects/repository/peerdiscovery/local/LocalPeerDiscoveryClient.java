@@ -18,7 +18,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.net.*;
 import java.nio.ByteBuffer;
-import java.util.UUID;
 
 @ApplicationScoped
 @IfBuildProperty(name = "dhfs.local-discovery", stringValue = "true")
@@ -70,6 +69,7 @@ public class LocalPeerDiscoveryClient {
 
                 try {
                     var got = PeerDiscoveryInfo.parseFrom(ByteBuffer.wrap(buf, 0, packet.getLength()));
+                    Log.tracev("Got peer discovery packet from {0}", packet.getAddress());
                     peerDiscoveryDirectory.notifyAddr(
                             new IpPeerAddress(
                                     PeerId.of(got.getUuid()),

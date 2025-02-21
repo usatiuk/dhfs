@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects.repository.peerdiscovery;
 
 import com.usatiuk.dhfs.objects.PeerId;
+import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.commons.collections4.multimap.HashSetValuedHashMap;
@@ -37,6 +38,7 @@ public class PeerDiscoveryDirectory {
     private final MultiValuedMap<PeerId, PeerEntry> _entries = new HashSetValuedHashMap<>();
 
     public void notifyAddr(PeerAddress addr) {
+        Log.tracev("New address {0}", addr);
         synchronized (_entries) {
             var peer = addr.peer();
             _entries.removeMapping(peer, new PeerEntry(addr, 0));

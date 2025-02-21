@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.objects.repository.peerdiscovery.local;
 import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.objects.repository.peerdiscovery.PeerDiscoveryInfo;
 import io.quarkus.arc.properties.IfBuildProperty;
+import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.Startup;
 import io.quarkus.scheduler.Scheduled;
@@ -90,6 +91,7 @@ public class LocalPeerDiscoveryBroadcaster {
                 try {
                     sendPacket = new DatagramPacket(sendBytes, sendBytes.length, broadcast, broadcastPort);
                     _socket.send(sendPacket);
+                    Log.tracev("Broadcast sent to: {0}, at: {1}", broadcast.getHostAddress(), networkInterface.getDisplayName());
                 } catch (Exception ignored) {
                     continue;
                 }

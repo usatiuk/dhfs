@@ -15,7 +15,11 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.pcollections.HashTreePSet;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.security.KeyPair;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
@@ -44,6 +48,8 @@ public class PersistentPeerDataService {
 
     @ConfigProperty(name = "dhfs.peerdiscovery.preset-uuid")
     Optional<String> presetUuid;
+    @ConfigProperty(name = "dhfs.objects.persistence.stuff.root")
+    String stuffRoot;
 
     private PeerId _selfUuid;
     private X509Certificate _selfCertificate;
@@ -73,6 +79,8 @@ public class PersistentPeerDataService {
         });
         peerTrustManager.reloadTrustManagerHosts(peerInfoService.getPeers());
         Log.info("Self uuid is: " + _selfUuid.toString());
+        new File(stuffRoot).mkdirs();
+        Files.write(Path.of(stuffRoot, "self_uuid"), _selfUuid.id().toString().getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
     }
 
 //    private void pushPeerUpdates() {
