@@ -6,164 +6,28 @@ option java_outer_classname = "DhfsObjectPersistence";
 
 package dhfs.objects.persistence;
 
-message ObjectMetadataP {
-  string name = 1;
-  map<string, int64> remoteCopies = 2;
-  string knownClass = 3;
-  bool seen = 4;
-  bool deleted = 5;
-  repeated string confirmedDeletes = 6;
-  repeated string referrers = 7;
-  map<string, int64> changelog = 8;
-  repeated string savedRefs = 9;
-  bool frozen = 10;
-  bool haveLocalCopy = 11;
-}
-
-message FsNodeP {
-  string uuid = 1;
-  int64 mode = 2;
-  int64 ctime = 3;
-  int64 mtime = 4;
-}
-
-message FilePChunksEntry {
-  int64 start = 1;
-  string id = 2;
-}
-
-message FileP {
-  string uuid = 1;
-  int64 mode = 2;
-  int64 ctime = 3;
-  int64 mtime = 4;
-  repeated FilePChunksEntry chunks = 5;
-  bool symlink = 6;
-  int64 size = 7;
-}
-
-message DirectoryP {
-  FsNodeP fsNode = 1;
-  map<string, string> children = 2;
-}
-
-message ChunkDataP {
-  string name = 1;
-  bytes data = 2;
-}
-
-message PeerDirectoryP {
-  repeated string peers = 1;
-}
-
-message PeerInfoP {
-  string uuid = 1;
-  bytes cert = 2;
-}
-
-message JKleppmannTreeNodeMetaFileP {
-  string name = 1;
-  string fileIno = 2;
-}
-
-message JKleppmannTreeNodeMetaDirectoryP {
+message JObjectKeyP {
   string name = 1;
 }
 
-message JKleppmannTreeNodeMetaP {
-  oneof meta {
-    JKleppmannTreeNodeMetaFileP jKleppmannTreeNodeMetaFile = 1;
-    JKleppmannTreeNodeMetaDirectoryP jKleppmannTreeNodeMetaDirectory = 2;
+message PeerIdP {
+  JObjectKeyP id = 1;
+}
+
+message ObjectChangelog {
+  message entries_Entry {
+    PeerIdP key = 1;
+    int64 value = 2;
   }
+  repeated entries_Entry entries = 1;
 }
 
-message JKleppmannTreeOpP {
-  int64 timestamp = 1;
-  string peer = 2;
-  string newParentId = 3;
-  JKleppmannTreeNodeMetaP meta = 4;
-  string child = 5;
+// TODO: Serialization
+
+message JDataRemoteP {
+  bytes serializedData = 1;
 }
 
-message JKleppmannTreeNodePChildrenEntry {
-  string key = 1;
-  string value = 2;
-}
-
-message JKleppmannTreeNodeP {
-  optional string parent = 1;
-  string id = 2;
-  repeated JKleppmannTreeNodePChildrenEntry children = 3;
-  optional JKleppmannTreeNodeMetaP meta = 4;
-  optional JKleppmannTreeOpP lastEffectiveOp = 5;
-}
-
-message JKleppmannTreePersistentDataPQueueEntry {
-  int64 clock = 1;
-  string uuid = 2;
-  JKleppmannTreeOpP op = 3;
-}
-
-message JKleppmannTreePersistentDataPQueue {
-  string node = 1;
-  repeated JKleppmannTreePersistentDataPQueueEntry entries = 2;
-}
-
-message JKleppmannTreePersistentDataPTimestampEntry {
-  string host = 1;
-  int64 timestamp = 2;
-}
-
-message JKleppmannTreeOpLogEffectP {
-  optional JKleppmannTreeOpP oldEffectiveMove = 1;
-  optional string oldParent = 2;
-  optional JKleppmannTreeNodeMetaP oldMeta = 3;
-  JKleppmannTreeOpP effectiveOp = 4;
-  string newParentId = 5;
-  JKleppmannTreeNodeMetaP newMeta = 6;
-  string selfId = 7;
-}
-
-message JKleppmannTreeOpLogPEntry {
-  int64 clock = 1;
-  string uuid = 2;
-  JKleppmannTreeOpP op = 3;
-  repeated JKleppmannTreeOpLogEffectP effects = 4;
-}
-
-message JKleppmannTreePersistentDataP {
-  string treeName = 1;
-  int64 clock = 2;
-  repeated JKleppmannTreePersistentDataPQueue queues = 3;
-  repeated JKleppmannTreePersistentDataPTimestampEntry peerLog = 4;
-  repeated JKleppmannTreeOpLogPEntry opLog = 5;
-}
-
-message PeerDirectoryLocalP {
-  repeated string initialOpSyncDonePeers = 1;
-  repeated string initialObjSyncDonePeers = 2;
-}
-
-message RemoteObjectP {
-  oneof obj {
-    FileP file = 2;
-    ChunkDataP chunkData = 5;
-    //    PeerDirectoryP peerDirectory = 6;
-    PeerInfoP peerInfo = 7;
-    //    JKleppmannTreeNodeP jKleppmannTreeNode = 8;
-    //    JKleppmannTreePersistentDataP jKleppmannTreePersistentData = 9;
-    //    PeerDirectoryLocalP peerDirectoryLocal = 10;
-  }
-}
-
-message JObjectDataP {
-  oneof obj {
-    FileP file = 2;
-    ChunkDataP chunkData = 5;
-//    PeerDirectoryP peerDirectory = 6;
-    PeerInfoP peerInfo = 7;
-//    JKleppmannTreeNodeP jKleppmannTreeNode = 8;
-//    JKleppmannTreePersistentDataP jKleppmannTreePersistentData = 9;
-//    PeerDirectoryLocalP peerDirectoryLocal = 10;
-  }
+message JDataP {
+  bytes serializedData = 1;
 }

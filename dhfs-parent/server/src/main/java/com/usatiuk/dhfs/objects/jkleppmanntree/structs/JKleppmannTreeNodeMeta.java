@@ -1,7 +1,5 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
-import com.usatiuk.autoprotomap.runtime.ProtoMirror;
-import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeNodeMetaP;
 import com.usatiuk.kleppmanntree.NodeMeta;
 
 import java.util.Objects;

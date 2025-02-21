@@ -2,11 +2,9 @@ package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
 import com.usatiuk.autoprotomap.runtime.ProtoMirror;
 import com.usatiuk.dhfs.objects.JObjectKey;
-import com.usatiuk.dhfs.objects.persistence.JKleppmannTreeNodeMetaFileP;
 
 import java.util.Objects;
 
-//@ProtoMirror(JKleppmannTreeNodeMetaFileP.class)
 public class JKleppmannTreeNodeMetaFile extends JKleppmannTreeNodeMeta {
     private final JObjectKey _fileIno;
 

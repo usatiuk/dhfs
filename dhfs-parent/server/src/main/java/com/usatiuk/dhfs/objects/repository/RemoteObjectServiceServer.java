@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects.repository;
 
 import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.*;
+import com.usatiuk.dhfs.objects.persistence.JObjectKeyP;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.invalidation.Op;
 import com.usatiuk.dhfs.objects.repository.invalidation.OpHandler;
@@ -37,10 +38,8 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     InvalidationQueueService invalidationQueueService;
     @Inject
     SecurityIdentity identity;
-    //    @Inject
-//    ProtoSerializer<JObjectDataP, JObjectData> dataProtoSerializer;
     @Inject
-    ProtoSerializer<OpPushPayload, Op> opProtoSerializer;
+    ProtoSerializer<OpP, Op> opProtoSerializer;
     @Inject
     ProtoSerializer<GetObjectReply, ReceivedObject> receivedObjectProtoSerializer;
     @Inject
@@ -53,10 +52,9 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     public Uni<GetObjectReply> getObject(GetObjectRequest request) {
         Log.info("<-- getObject: " + request.getName() + " from " + identity.getPrincipal().getName().substring(3));
 
-
         Pair<RemoteObjectMeta, JDataRemote> got = txm.run(() -> {
-            var meta = remoteTx.getMeta(JObjectKey.of(request.getName())).orElse(null);
-            var obj = remoteTx.getDataLocal(JDataRemote.class, JObjectKey.of(request.getName())).orElse(null);
+            var meta = remoteTx.getMeta(JObjectKey.of(request.getName().getName())).orElse(null);
+            var obj = remoteTx.getDataLocal(JDataRemote.class, JObjectKey.of(request.getName().getName())).orElse(null);
             if (meta != null && !meta.seen())
                 curTx.put(meta.withSeen(true));
             if (obj != null)
@@ -78,7 +76,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
             throw new StatusRuntimeException(Status.NOT_FOUND);
         }
 
-        var serialized = receivedObjectProtoSerializer.serialize(new ReceivedObject(got.getKey().key(), got.getKey().changelog(), got.getValue()));
+        var serialized = receivedObjectProtoSerializer.serialize(new ReceivedObject(got.getKey().changelog(), got.getValue()));
         return Uni.createFrom().item(serialized);
 //        // Does @Blocking break this?
 //        return Uni.createFrom().emitter(emitter -> {
@@ -124,10 +122,9 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         Log.info("<-- canDelete: " + request.getName() + " from " + peerId);
 
         var builder = CanDeleteReply.newBuilder();
-        builder.setObjName(request.getName());
 
         txm.run(() -> {
-            var obj = curTx.get(RemoteObjectMeta.class, JObjectKey.of(request.getName())).orElse(null);
+            var obj = curTx.get(RemoteObjectMeta.class, JObjectKey.of(request.getName().getName())).orElse(null);
 
             if (obj == null) {
                 builder.setDeletionCandidate(true);
@@ -138,7 +135,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
             if (!builder.getDeletionCandidate())
                 for (var r : obj.refsFrom())
-                    builder.addReferrers(r.toString());
+                    builder.addReferrers(JObjectKeyP.newBuilder().setName(r.toString()).build());
 
 //            if (!ret.getDeletionCandidate())
 //                for (var rr : request.getOurReferrersList())
@@ -181,8 +178,6 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     @Override
     @Blocking
     public Uni<PingReply> ping(PingRequest request) {
-        if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-
-        return Uni.createFrom().item(PingReply.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString()).build());
+        return Uni.createFrom().item(PingReply.getDefaultInstance());
     }
 }

@@ -136,10 +136,7 @@ public class PeerManager {
     private boolean pingCheck(PeerInfo host, PeerAddress address) {
         try {
             return rpcClientFactory.withObjSyncClient(host.id(), address, pingTimeout, (peer, c) -> {
-                var ret = c.ping(PingRequest.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString()).build());
-                if (!UUID.fromString(ret.getSelfUuid()).equals(host.id().id())) {
-                    throw new IllegalStateException("Ping selfUuid returned " + ret.getSelfUuid() + " but expected " + host.id());
-                }
+                c.ping(PingRequest.getDefaultInstance());
                 return true;
             });
         } catch (Exception ignored) {

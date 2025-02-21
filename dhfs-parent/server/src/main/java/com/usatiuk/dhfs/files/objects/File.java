@@ -2,7 +2,6 @@ package com.usatiuk.dhfs.files.objects;
 
 import com.usatiuk.autoprotomap.runtime.ProtoMirror;
 import com.usatiuk.dhfs.objects.JObjectKey;
-import com.usatiuk.dhfs.objects.persistence.ChunkDataP;
 import org.pcollections.TreePMap;
 
 import java.util.Collection;

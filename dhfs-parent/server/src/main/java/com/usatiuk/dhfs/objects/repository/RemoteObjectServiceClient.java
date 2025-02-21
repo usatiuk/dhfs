@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects.repository;
 
 import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.*;
+import com.usatiuk.dhfs.objects.persistence.JObjectKeyP;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.invalidation.Op;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
@@ -41,11 +42,8 @@ public class RemoteObjectServiceClient {
     SyncHandler syncHandler;
     @Inject
     InvalidationQueueService invalidationQueueService;
-    //    @Inject
-//    ProtoSerializer<JObjectDataP, JObjectData> dataProtoSerializer;
     @Inject
-    ProtoSerializer<OpPushPayload, Op> opProtoSerializer;
-
+    ProtoSerializer<OpP, Op> opProtoSerializer;
     @Inject
     ProtoSerializer<GetObjectReply, ReceivedObject> receivedObjectProtoSerializer;
 
@@ -76,7 +74,7 @@ public class RemoteObjectServiceClient {
         Log.info("Downloading object " + key + " from " + targets);
 
         rpcClientFactory.withObjSyncClient(targets, (peer, client) -> {
-            var reply = client.getObject(GetObjectRequest.newBuilder().setName(key.toString()).build());
+            var reply = client.getObject(GetObjectRequest.newBuilder().setName(JObjectKeyP.newBuilder().setName(key.toString()).build()).build());
 
             var deserialized = receivedObjectProtoSerializer.deserialize(reply);
 
@@ -152,13 +150,13 @@ public class RemoteObjectServiceClient {
         return OpPushReply.getDefaultInstance();
     }
 
-    public Collection<Pair<PeerId, CanDeleteReply>> canDelete(Collection<PeerId> targets, JObjectKey object, Collection<JObjectKey> ourReferrers) {
-        Log.trace("Asking canDelete for " + object + " from " + targets.stream().map(PeerId::toString).collect(Collectors.joining(", ")));
+    public Collection<Pair<PeerId, CanDeleteReply>> canDelete(Collection<PeerId> targets, JObjectKey objKey, Collection<JObjectKey> ourReferrers) {
+        Log.trace("Asking canDelete for " + objKey + " from " + targets.stream().map(PeerId::toString).collect(Collectors.joining(", ")));
         try {
             return _batchExecutor.invokeAll(targets.stream().<Callable<Pair<PeerId, CanDeleteReply>>>map(h -> () -> {
-                var req = CanDeleteRequest.newBuilder().setName(object.toString());
+                var req = CanDeleteRequest.newBuilder().setName(JObjectKeyP.newBuilder().setName(objKey.toString()).build());
                 for (var ref : ourReferrers) {
-                    req.addOurReferrers(ref.toString());
+                    req.addOurReferrers(JObjectKeyP.newBuilder().setName(ref.toString()).build());
                 }
                 return Pair.of(h, rpcClientFactory.withObjSyncClient(h, (p, client) -> client.canDelete(req.build())));
             }).toList()).stream().map(f -> {
