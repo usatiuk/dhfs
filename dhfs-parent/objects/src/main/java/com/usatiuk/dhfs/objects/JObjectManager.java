@@ -50,7 +50,12 @@ public class JObjectManager {
 
     public TransactionPrivate createTransaction() {
         verifyReady();
-        return transactionFactory.createTransaction(_txCounter.get());
+        while (true) {
+            try {
+                return transactionFactory.createTransaction(_txCounter.get());
+            } catch (SnapshotManager.IllegalSnapshotIdException ignored) {
+            }
+        }
     }
 
     public TransactionHandle commit(TransactionPrivate tx) {

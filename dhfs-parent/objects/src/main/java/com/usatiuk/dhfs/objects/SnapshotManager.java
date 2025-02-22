@@ -143,6 +143,17 @@ public class SnapshotManager {
         }
     }
 
+    public static class IllegalSnapshotIdException extends IllegalArgumentException {
+        public IllegalSnapshotIdException(String message) {
+            super(message);
+        }
+
+        @Override
+        public synchronized Throwable fillInStackTrace() {
+            return this;
+        }
+    }
+
     public class Snapshot implements AutoCloseableNoThrow {
         private final long _id;
         private static final Cleaner CLEANER = Cleaner.create();
@@ -157,7 +168,7 @@ public class SnapshotManager {
             synchronized (SnapshotManager.this) {
                 verify();
                 if (_lastSnapshotId > id)
-                    throw new IllegalArgumentException("Snapshot id less than last? " + id + " vs " + _lastSnapshotId);
+                    throw new IllegalSnapshotIdException("Snapshot id " + id + " is less than last snapshot id " + _lastSnapshotId);
                 _lastSnapshotId = id;
                 if (_lastAliveSnapshotId == -1)
                     _lastAliveSnapshotId = id;
