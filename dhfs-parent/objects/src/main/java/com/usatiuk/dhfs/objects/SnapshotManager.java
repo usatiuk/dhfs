@@ -326,8 +326,18 @@ public class SnapshotManager {
                     _backing.close();
                     _backing = new TombstoneMergingKvIterator<>(new SnapshotKvIterator(IteratorStart.GE, _next.getKey()), delegateStore.getIterator(IteratorStart.GE, _next.getKey()));
                     var next = _backing.hasNext() ? _backing.next() : null;
-                    assert next != null;
-                    assert next.equals(_next);
+                    boolean fail = false;
+                    if (next == null) {
+                        Log.errorv("Failed to refresh snapshot iterator, null {0}, last refreshed {1}," +
+                                " current version {2}, current value {3}", _id, _lastRefreshed, curVersion, next);
+                        fail = true;
+                    } else if (!next.equals(_next)) {
+                        Log.errorv("Failed to refresh snapshot iterator, mismatch {0}, last refreshed {1}," +
+                                " current version {2}, current value {3}, read value {4}", _id, _lastRefreshed, curVersion, _next, next);
+                        fail = true;
+                    }
+
+                    assert !fail;
                     _next = next;
                     _lastRefreshed = curVersion;
                 }
