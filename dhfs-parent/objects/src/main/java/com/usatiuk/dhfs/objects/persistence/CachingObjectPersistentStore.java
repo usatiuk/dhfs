@@ -59,6 +59,7 @@ public class CachingObjectPersistentStore {
     }
 
     private void put(JObjectKey key, Optional<JDataVersionedWrapper> obj) {
+//        Log.tracev("Adding {0} to cache: {1}", key, obj);
         synchronized (_cache) {
             int size = obj.map(o -> o.data().estimateSize()).orElse(0);
 
@@ -103,9 +104,41 @@ public class CachingObjectPersistentStore {
                 _curSize -= Optional.ofNullable(_cache.get(key)).map(CacheEntry::size).orElse(0L);
                 _cache.remove(key);
                 _sortedCache.remove(key);
+//                Log.tracev("Removing {0} from cache", key);
             }
         }
         delegate.commitTx(names);
+    }
+
+
+    private class CachingKvIterator implements CloseableKvIterator<JObjectKey, JDataVersionedWrapper> {
+        private final CloseableKvIterator<JObjectKey, JDataVersionedWrapper> _delegate;
+
+        private CachingKvIterator(CloseableKvIterator<JObjectKey, JDataVersionedWrapper> delegate) {
+            _delegate = delegate;
+        }
+
+        @Override
+        public JObjectKey peekNextKey() {
+            return _delegate.peekNextKey();
+        }
+
+        @Override
+        public void close() {
+            _delegate.close();
+        }
+
+        @Override
+        public boolean hasNext() {
+            return _delegate.hasNext();
+        }
+
+        @Override
+        public Pair<JObjectKey, JDataVersionedWrapper> next() {
+            var next = _delegate.next();
+            put(next.getKey(), Optional.of(next.getValue()));
+            return next;
+        }
     }
 
     // Returns an iterator with a view of all commited objects
@@ -115,8 +148,7 @@ public class CachingObjectPersistentStore {
                 new PredicateKvIterator<>(
                         new NavigableMapKvIterator<>(_sortedCache, start, key),
                         e -> e.object().orElse(null)
-                ),
-                delegate.getIterator(start, key)); // TODO: Doesn't work
+                ), new CachingKvIterator(delegate.getIterator(start, key)));
     }
 
     public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(JObjectKey key) {

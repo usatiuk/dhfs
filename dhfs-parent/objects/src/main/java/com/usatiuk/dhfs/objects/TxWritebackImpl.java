@@ -380,7 +380,7 @@ public class TxWritebackImpl implements TxWriteback {
     // Does not have to guarantee consistent view, snapshots are handled by upper layers
     @Override
     public CloseableKvIterator<JObjectKey, TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>> getIterator(IteratorStart start, JObjectKey key) {
-        return new PredicateKvIterator<>(
+        return new MappingKvIterator<>(
                 new NavigableMapKvIterator<>(_pendingWrites, start, key),
                 e -> switch (e) {
                     case PendingWrite p -> new TombstoneMergingKvIterator.Data<>(p.data());

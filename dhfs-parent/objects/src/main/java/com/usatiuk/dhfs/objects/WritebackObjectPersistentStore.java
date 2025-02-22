@@ -98,7 +98,7 @@ public class WritebackObjectPersistentStore {
     // Does not have to guarantee consistent view, snapshots are handled by upper layers
     public CloseableKvIterator<JObjectKey, TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>> getIterator(IteratorStart start, JObjectKey key) {
         return new MergingKvIterator<>(txWriteback.getIterator(start, key),
-                new PredicateKvIterator<>(delegate.getIterator(start, key), TombstoneMergingKvIterator.Data::new));
+                new MappingKvIterator<>(delegate.getIterator(start, key), TombstoneMergingKvIterator.Data::new));
     }
 
     public CloseableKvIterator<JObjectKey, TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>> getIterator(JObjectKey key) {
