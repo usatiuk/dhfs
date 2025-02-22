@@ -143,6 +143,8 @@ public class CachingObjectPersistentStore {
 
     // Returns an iterator with a view of all commited objects
     // Does not have to guarantee consistent view, snapshots are handled by upper layers
+    // Warning: it has a nasty side effect of global caching, so in this case don't even call next on it,
+    // if some objects are still in writeback
     public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
         return new MergingKvIterator<>(
                 new PredicateKvIterator<>(

@@ -254,7 +254,8 @@ public class SnapshotManager {
                         next = _backing.next();
                         nextNextKey = _backing.hasNext() ? _backing.peekNextKey() : null;
                     }
-                    if (next.getKey().version() <= _id && next.getValue().whenToRemove() > _id) {
+                    // next.getValue().whenToRemove() >=_id, read tx might have same snapshot id as some write tx
+                    if (next.getKey().version() <= _id && next.getValue().whenToRemove() >= _id) {
                         _next = switch (next.getValue()) {
                             case SnapshotEntryObject(JDataVersionedWrapper data, long whenToRemove) ->
                                     Pair.of(next.getKey().key(), new TombstoneMergingKvIterator.Data<>(data));
@@ -310,6 +311,8 @@ public class SnapshotManager {
                     long curVersion = _snapshotVersions.get(_id);
                     _backing = new TombstoneMergingKvIterator<>(new SnapshotKvIterator(start, key), delegateStore.getIterator(start, key));
                     _next = _backing.hasNext() ? _backing.next() : null;
+                    if (_next != null)
+                        assert _next.getValue().version() <= _id;
                     _lastRefreshed = curVersion;
                 }
             }
@@ -347,6 +350,7 @@ public class SnapshotManager {
                 doRefresh();
                 if (_backing.hasNext()) {
                     _next = _backing.next();
+                    assert _next.getValue().version() <= _id;
                 } else {
                     _next = null;
                 }
@@ -354,6 +358,9 @@ public class SnapshotManager {
 
             @Override
             public JObjectKey peekNextKey() {
+                if (_next == null) {
+                    throw new NoSuchElementException();
+                }
                 return _next.getKey();
             }
 
@@ -373,6 +380,7 @@ public class SnapshotManager {
                     throw new NoSuchElementException("No more elements");
                 }
                 var ret = _next;
+                assert ret.getValue().version() <= _id;
                 prepareNext();
                 Log.tracev("Read: {0}, next: {1}", ret, _next);
                 return ret;
