@@ -4,5 +4,5 @@ public enum IteratorStart {
     LT,
     LE,
     GT,
-    GE
+    GE,
 }

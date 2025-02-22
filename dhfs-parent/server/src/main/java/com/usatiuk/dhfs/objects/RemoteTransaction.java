@@ -23,10 +23,6 @@ public class RemoteTransaction {
     @Inject
     PersistentPeerDataService persistentPeerDataService;
 
-    public long getId() {
-        return curTx.getId();
-    }
-
     private <T extends JDataRemote> Optional<RemoteObjectDataWrapper<T>> tryDownloadRemote(RemoteObjectMeta obj) {
         MutableObject<RemoteObjectDataWrapper<T>> success = new MutableObject<>(null);
 

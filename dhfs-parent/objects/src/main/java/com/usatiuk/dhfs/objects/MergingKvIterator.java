@@ -2,27 +2,22 @@ package com.usatiuk.dhfs.objects;
 
 import org.apache.commons.lang3.tuple.Pair;
 
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.SortedMap;
-import java.util.TreeMap;
-import java.util.stream.Stream;
+import java.util.*;
 
 public class MergingKvIterator<K extends Comparable<K>, V> implements CloseableKvIterator<K, V> {
-    private final List<CloseableKvIterator<K, V>> _iterators;
+    private final Map<CloseableKvIterator<K, V>, Integer> _iterators;
     private final SortedMap<K, CloseableKvIterator<K, V>> _sortedIterators = new TreeMap<>();
 
     public MergingKvIterator(List<CloseableKvIterator<K, V>> iterators) {
-        _iterators = iterators;
+        int counter = 0;
+        var iteratorsTmp = new HashMap<CloseableKvIterator<K, V>, Integer>();
+        for (CloseableKvIterator<K, V> iterator : iterators) {
+            iteratorsTmp.put(iterator, counter++);
+        }
+        _iterators = Collections.unmodifiableMap(iteratorsTmp);
 
         for (CloseableKvIterator<K, V> iterator : iterators) {
-            if (!iterator.hasNext()) {
-                continue;
-            }
-            K key = iterator.peekNextKey();
-            if (key != null) {
-                _sortedIterators.put(key, iterator);
-            }
+            advanceIterator(iterator);
         }
     }
 
@@ -31,23 +26,36 @@ public class MergingKvIterator<K extends Comparable<K>, V> implements CloseableK
         this(List.of(iterators));
     }
 
-    @SafeVarargs
-    public MergingKvIterator(MergingKvIterator<K, V> parent, CloseableKvIterator<K, V>... iterators) {
-        this(Stream.concat(parent._iterators.stream(), Stream.of(iterators)).toList());
+    private void advanceIterator(CloseableKvIterator<K, V> iterator) {
+        if (!iterator.hasNext()) {
+            return;
+        }
+
+        K key = iterator.peekNextKey();
+        if (!_sortedIterators.containsKey(key)) {
+            _sortedIterators.put(key, iterator);
+            return;
+        }
+
+        var oursPrio = _iterators.get(iterator);
+        var them = _sortedIterators.get(key);
+        var theirsPrio = _iterators.get(them);
+        if (oursPrio < theirsPrio) {
+            _sortedIterators.put(key, iterator);
+            advanceIterator(them);
+        }
     }
 
     @Override
     public K peekNextKey() {
-        var cur = _sortedIterators.pollFirstEntry();
-        if (cur == null) {
+        if (_sortedIterators.isEmpty())
             throw new NoSuchElementException();
-        }
-        return cur.getKey();
+        return _sortedIterators.firstKey();
     }
 
     @Override
     public void close() {
-        for (CloseableKvIterator<K, V> iterator : _iterators) {
+        for (CloseableKvIterator<K, V> iterator : _iterators.keySet()) {
             iterator.close();
         }
     }
@@ -64,10 +72,7 @@ public class MergingKvIterator<K extends Comparable<K>, V> implements CloseableK
             throw new NoSuchElementException();
         }
         var curVal = cur.getValue().next();
-        if (cur.getValue().hasNext()) {
-            var nextKey = cur.getValue().peekNextKey();
-            _sortedIterators.put(nextKey, cur.getValue());
-        }
+        advanceIterator(cur.getValue());
         return curVal;
     }
 }

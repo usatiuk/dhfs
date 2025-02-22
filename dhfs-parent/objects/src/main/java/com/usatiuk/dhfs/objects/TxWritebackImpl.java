@@ -379,14 +379,13 @@ public class TxWritebackImpl implements TxWriteback {
     // Returns an iterator with a view of all commited objects
     // Does not have to guarantee consistent view, snapshots are handled by upper layers
     @Override
-    public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
+    public CloseableKvIterator<JObjectKey, TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>> getIterator(IteratorStart start, JObjectKey key) {
         return new PredicateKvIterator<>(
                 new NavigableMapKvIterator<>(_pendingWrites, start, key),
-                e -> {
-                    if (e instanceof PendingWrite pw) {
-                        return pw.data();
-                    }
-                    return null;
+                e -> switch (e) {
+                    case PendingWrite p -> new TombstoneMergingKvIterator.Data<>(p.data());
+                    case PendingDelete d -> new TombstoneMergingKvIterator.Tombstone<>();
+                    default -> throw new IllegalStateException("Unexpected value: " + e);
                 });
     }
 }

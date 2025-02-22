@@ -1,24 +1,21 @@
 package com.usatiuk.dhfs.objects;
 
+import com.usatiuk.dhfs.objects.persistence.IteratorStart;
 import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nonnull;
 import java.util.Collection;
-import java.util.List;
+import java.util.Iterator;
 import java.util.Optional;
 
 @ApplicationScoped
 public class CurrentTransaction implements Transaction {
     @Inject
     TransactionManager transactionManager;
-
-    @Override
-    public long getId() {
-        return transactionManager.current().getId();
-    }
 
     @Override
     public void onCommit(Runnable runnable) {
@@ -44,6 +41,11 @@ public class CurrentTransaction implements Transaction {
     @Override
     public Collection<JObjectKey> findAllObjects() {
         return transactionManager.current().findAllObjects();
+    }
+
+    @Override
+    public Iterator<Pair<JObjectKey, JData>> getIterator(IteratorStart start, JObjectKey key) {
+        return transactionManager.current().getIterator(start, key);
     }
 
     @Override

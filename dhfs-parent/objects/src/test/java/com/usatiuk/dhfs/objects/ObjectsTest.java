@@ -8,6 +8,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -52,7 +53,7 @@ public class ObjectsTest {
         });
     }
 
-    @Test
+    @RepeatedTest(100)
     void createDeleteObject() {
         txm.run(() -> {
             var newParent = new Parent(JObjectKey.of("ParentCreateDeleteObject"), "John");
@@ -237,13 +238,7 @@ public class ObjectsTest {
             return curTx.get(Parent.class, new JObjectKey(key)).orElse(null);
         });
 
-        // It is possible that thread 2 did get the object after thread 1 committed it, so there is no conflict
-        Assertions.assertTrue(!thread1Failed.get() || !thread2Failed.get());
-
-        if (strategy.equals(LockingStrategy.WRITE)) {
-            if (!thread1Failed.get())
-                Assertions.assertFalse(thread2Failed.get());
-        }
+        Assertions.assertFalse(!thread1Failed.get() && !thread2Failed.get());
 
         if (!thread1Failed.get()) {
             if (!thread2Failed.get()) {

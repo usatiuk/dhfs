@@ -45,6 +45,24 @@ public class WritebackObjectPersistentStore {
         };
     }
 
+    public interface VerboseReadResult {
+    }
+
+    public record VerboseReadResultPersisted(Optional<JDataVersionedWrapper> data) implements VerboseReadResult {
+    }
+
+    public record VerboseReadResultPending(TxWriteback.PendingWriteEntry pending) implements VerboseReadResult {
+    }
+
+    @Nonnull
+    VerboseReadResult readObjectVerbose(JObjectKey key) {
+        var pending = txWriteback.getPendingWrite(key).orElse(null);
+        if (pending != null) {
+            return new VerboseReadResultPending(pending);
+        }
+        return new VerboseReadResultPersisted(delegate.readObject(key));
+    }
+
     Consumer<Runnable> commitTx(Collection<TxRecord.TxObjectRecord<?>> writes, long id) {
         var bundle = txWriteback.createBundle();
         try {
@@ -78,11 +96,12 @@ public class WritebackObjectPersistentStore {
 
     // Returns an iterator with a view of all commited objects
     // Does not have to guarantee consistent view, snapshots are handled by upper layers
-    public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-        return new MergingKvIterator<>(delegate.getIterator(start, key), txWriteback.getIterator(start, key));
+    public CloseableKvIterator<JObjectKey, TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>> getIterator(IteratorStart start, JObjectKey key) {
+        return new MergingKvIterator<>(txWriteback.getIterator(start, key),
+                new PredicateKvIterator<>(delegate.getIterator(start, key), TombstoneMergingKvIterator.Data::new));
     }
 
-    public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(JObjectKey key) {
+    public CloseableKvIterator<JObjectKey, TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>> getIterator(JObjectKey key) {
         return getIterator(IteratorStart.GE, key);
     }
 }

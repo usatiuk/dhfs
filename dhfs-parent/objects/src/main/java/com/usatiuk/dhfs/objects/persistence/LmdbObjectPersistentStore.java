@@ -10,12 +10,14 @@ import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.lmdbjava.*;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.lang.ref.Cleaner;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Collection;
@@ -94,7 +96,17 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
         private final Cursor<byte[]> _cursor = _db.openCursor(_txn);
         private boolean _hasNext = false;
 
+        private static final Cleaner CLEANER = Cleaner.create();
+        private final MutableObject<Boolean> _closed = new MutableObject<>(false);
+
         LmdbKvIterator(IteratorStart start, JObjectKey key) {
+            var closedRef = _closed;
+            CLEANER.register(this, () -> {
+                if (!closedRef.getValue()) {
+                    Log.error("Iterator was not closed before GC");
+                }
+            });
+
             verifyReady();
             if (!_cursor.get(key.toString().getBytes(StandardCharsets.UTF_8), GetOp.MDB_SET_RANGE)) {
                 return;
@@ -131,6 +143,10 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
 
         @Override
         public void close() {
+            if (_closed.getValue()) {
+                return;
+            }
+            _closed.setValue(true);
             _cursor.close();
             _txn.close();
         }

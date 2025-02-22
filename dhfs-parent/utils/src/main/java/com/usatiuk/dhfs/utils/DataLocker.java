@@ -60,6 +60,8 @@ public class DataLocker {
         @Override
         public void close() {
             synchronized (_tag) {
+                if (_tag.released)
+                    return;
                 _tag.released = true;
                 // Notify all because when the object is locked again,
                 // it's a different lock tag

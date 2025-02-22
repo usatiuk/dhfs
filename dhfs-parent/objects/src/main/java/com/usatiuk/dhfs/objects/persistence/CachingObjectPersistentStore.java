@@ -116,7 +116,7 @@ public class CachingObjectPersistentStore {
                         new NavigableMapKvIterator<>(_sortedCache, start, key),
                         e -> e.object().orElse(null)
                 ),
-                delegate.getIterator(start, key));
+                delegate.getIterator(start, key)); // TODO: Doesn't work
     }
 
     public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(JObjectKey key) {

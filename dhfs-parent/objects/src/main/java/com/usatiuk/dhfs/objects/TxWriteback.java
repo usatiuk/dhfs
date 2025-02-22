@@ -32,9 +32,9 @@ public interface TxWriteback {
     record PendingDelete(JObjectKey key, long bundleId) implements PendingWriteEntry {
     }
 
-    CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key);
+    CloseableKvIterator<JObjectKey, TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>> getIterator(IteratorStart start, JObjectKey key);
 
-    default CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(JObjectKey key) {
+    default CloseableKvIterator<JObjectKey, TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>> getIterator(JObjectKey key) {
         return getIterator(IteratorStart.GE, key);
     }
 }

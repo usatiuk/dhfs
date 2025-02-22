@@ -37,6 +37,7 @@ public class TransactionManagerImpl implements TransactionManager {
             Log.trace("Transaction commit failed", e);
             throw e;
         } finally {
+            _currentTransaction.get().close();
             _currentTransaction.remove();
         }
     }
@@ -53,6 +54,7 @@ public class TransactionManagerImpl implements TransactionManager {
             Log.error("Transaction rollback failed", e);
             throw e;
         } finally {
+            _currentTransaction.get().close();
             _currentTransaction.remove();
         }
     }

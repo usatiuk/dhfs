@@ -1,11 +1,12 @@
 package com.usatiuk.dhfs.objects.transaction;
 
 import com.usatiuk.dhfs.objects.JData;
-import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
 import com.usatiuk.dhfs.objects.JObjectKey;
-import com.usatiuk.dhfs.objects.WritebackObjectPersistentStore;
+import com.usatiuk.dhfs.objects.SnapshotManager;
+import com.usatiuk.dhfs.objects.persistence.IteratorStart;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nonnull;
 import java.util.*;
@@ -13,28 +14,26 @@ import java.util.*;
 @ApplicationScoped
 public class TransactionFactoryImpl implements TransactionFactory {
     @Inject
-    WritebackObjectPersistentStore store; // FIXME:
+    SnapshotManager snapshotManager;
+    @Inject
+    ReadTrackingObjectSourceFactory readTrackingObjectSourceFactory;
 
     @Override
-    public TransactionPrivate createTransaction(long id, TransactionObjectSource source) {
-        return new TransactionImpl(id, source);
+    public TransactionPrivate createTransaction(long snapshotId) {
+        return new TransactionImpl(snapshotId);
     }
 
     private class TransactionImpl implements TransactionPrivate {
-        private final long _id;
-        private final ReadTrackingObjectSource _source;
+        private final ReadTrackingTransactionObjectSource _source;
         private final Map<JObjectKey, TxRecord.TxObjectRecord<?>> _writes = new HashMap<>();
         private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _newWrites = new HashMap<>();
         private final List<Runnable> _onCommit = new ArrayList<>();
         private final List<Runnable> _onFlush = new ArrayList<>();
+        private final SnapshotManager.Snapshot _snapshot;
 
-        private TransactionImpl(long id, TransactionObjectSource source) {
-            _id = id;
-            _source = new ReadTrackingObjectSource(source);
-        }
-
-        public long getId() {
-            return _id;
+        private TransactionImpl(long snapshotId) {
+            _snapshot = snapshotManager.createSnapshot(snapshotId);
+            _source = readTrackingObjectSourceFactory.create(_snapshot);
         }
 
         @Override
@@ -53,6 +52,11 @@ public class TransactionFactoryImpl implements TransactionFactory {
         }
 
         @Override
+        public SnapshotManager.Snapshot snapshot() {
+            return _snapshot;
+        }
+
+        @Override
         public Collection<Runnable> getOnFlush() {
             return Collections.unmodifiableCollection(_onFlush);
         }
@@ -61,11 +65,7 @@ public class TransactionFactoryImpl implements TransactionFactory {
         public <T extends JData> Optional<T> get(Class<T> type, JObjectKey key, LockingStrategy strategy) {
             switch (_writes.get(key)) {
                 case TxRecord.TxObjectRecordWrite<?> write -> {
-                    if (type.isInstance(write.data())) {
-                        return Optional.of((T) write.data());
-                    } else {
-                        throw new IllegalStateException("Type mismatch for " + key + ": expected " + type + ", got " + write.data().getClass());
-                    }
+                    return Optional.of(type.cast(write.data()));
                 }
                 case TxRecord.TxObjectRecordDeleted deleted -> {
                     return Optional.empty();
@@ -75,45 +75,38 @@ public class TransactionFactoryImpl implements TransactionFactory {
             }
 
             return switch (strategy) {
-                case OPTIMISTIC -> (Optional<T>) _source.get(type, key).data().map(JDataVersionedWrapper::data);
-                case WRITE -> (Optional<T>) _source.getWriteLocked(type, key).data().map(JDataVersionedWrapper::data);
+                case OPTIMISTIC -> _source.get(type, key);
+                case WRITE -> _source.getWriteLocked(type, key);
             };
         }
 
         @Override
         public void delete(JObjectKey key) {
-//            get(JData.class, key, LockingStrategy.OPTIMISTIC);
-
-            // FIXME
             var got = _writes.get(key);
             if (got != null) {
-                switch (got) {
-                    case TxRecord.TxObjectRecordDeleted deleted -> {
-                        return;
-                    }
-                    default -> {
-                    }
+                if (got instanceof TxRecord.TxObjectRecordDeleted) {
+                    return;
                 }
             }
-//
-//            var read = _source.get(JData.class, key).orElse(null);
-//            if (read == null) {
-//                return;
-//            }
-            _writes.put(key, new TxRecord.TxObjectRecordDeleted(key)); // FIXME:
+
+            _writes.put(key, new TxRecord.TxObjectRecordDeleted(key));
             _newWrites.put(key, new TxRecord.TxObjectRecordDeleted(key));
         }
 
         @Nonnull
         @Override
         public Collection<JObjectKey> findAllObjects() {
-            return store.findAllObjects();
+//            return store.findAllObjects();
+            return List.of();
+        }
+
+        @Override
+        public Iterator<Pair<JObjectKey, JData>> getIterator(IteratorStart start, JObjectKey key) {
+            return _source.getIterator(start, key);
         }
 
         @Override
         public void put(JData obj) {
-//            get(JData.class, obj.getKey(), LockingStrategy.OPTIMISTIC);
-
             _writes.put(obj.key(), new TxRecord.TxObjectRecordWrite<>(obj));
             _newWrites.put(obj.key(), new TxRecord.TxObjectRecordWrite<>(obj));
         }
@@ -131,9 +124,14 @@ public class TransactionFactoryImpl implements TransactionFactory {
         }
 
         @Override
-        public ReadTrackingObjectSource readSource() {
+        public ReadTrackingTransactionObjectSource readSource() {
             return _source;
         }
-    }
 
+        @Override
+        public void close() {
+            _source.close();
+            _snapshot.close();
+        }
+    }
 }
