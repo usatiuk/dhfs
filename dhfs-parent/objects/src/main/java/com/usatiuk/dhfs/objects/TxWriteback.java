@@ -1,5 +1,7 @@
 package com.usatiuk.dhfs.objects;
 
+import com.usatiuk.dhfs.objects.persistence.IteratorStart;
+
 import java.util.Collection;
 import java.util.Optional;
 
@@ -13,6 +15,7 @@ public interface TxWriteback {
     void fence(long bundleId);
 
     Optional<PendingWriteEntry> getPendingWrite(JObjectKey key);
+
     Collection<PendingWriteEntry> getPendingWrites();
 
     // Executes callback after bundle with bundleId id has been persisted
@@ -23,9 +26,15 @@ public interface TxWriteback {
         long bundleId();
     }
 
-    record PendingWrite(JDataVersionedWrapper<?> data, long bundleId) implements PendingWriteEntry {
+    record PendingWrite(JDataVersionedWrapper data, long bundleId) implements PendingWriteEntry {
     }
 
     record PendingDelete(JObjectKey key, long bundleId) implements PendingWriteEntry {
+    }
+
+    CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key);
+
+    default CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(JObjectKey key) {
+        return getIterator(IteratorStart.GE, key);
     }
 }

@@ -75,8 +75,8 @@ public class TransactionFactoryImpl implements TransactionFactory {
             }
 
             return switch (strategy) {
-                case OPTIMISTIC -> _source.get(type, key).data().map(JDataVersionedWrapper::data);
-                case WRITE -> _source.getWriteLocked(type, key).data().map(JDataVersionedWrapper::data);
+                case OPTIMISTIC -> (Optional<T>) _source.get(type, key).data().map(JDataVersionedWrapper::data);
+                case WRITE -> (Optional<T>) _source.getWriteLocked(type, key).data().map(JDataVersionedWrapper::data);
             };
         }
 

@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.persistence.CachingObjectPersistentStore;
+import com.usatiuk.dhfs.objects.persistence.IteratorStart;
 import com.usatiuk.dhfs.objects.persistence.TxManifestObj;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
@@ -14,7 +15,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -24,7 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class TxWritebackImpl implements TxWriteback {
     private final LinkedList<TxBundleImpl> _pendingBundles = new LinkedList<>();
 
-    private final ConcurrentHashMap<JObjectKey, PendingWriteEntry> _pendingWrites = new ConcurrentHashMap<>();
+    private final ConcurrentSkipListMap<JObjectKey, PendingWriteEntry> _pendingWrites = new ConcurrentSkipListMap<>();
     private final LinkedHashMap<Long, TxBundleImpl> _notFlushedBundles = new LinkedHashMap<>();
 
     private final Object _flushWaitSynchronizer = new Object();
@@ -37,7 +38,6 @@ public class TxWritebackImpl implements TxWriteback {
     long sizeLimit;
     private long currentSize = 0;
     private ExecutorService _writebackExecutor;
-    private ExecutorService _commitExecutor;
     private ExecutorService _statusExecutor;
     private volatile boolean _ready = false;
 
@@ -51,21 +51,13 @@ public class TxWritebackImpl implements TxWriteback {
             _writebackExecutor.submit(this::writeback);
         }
 
-        {
-            BasicThreadFactory factory = new BasicThreadFactory.Builder()
-                    .namingPattern("writeback-commit-%d")
-                    .build();
-
-            _commitExecutor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), factory);
-        }
         _statusExecutor = Executors.newSingleThreadExecutor();
         _statusExecutor.submit(() -> {
             try {
                 while (true) {
                     Thread.sleep(1000);
                     if (currentSize > 0)
-                        Log.info("Tx commit status: size="
-                                + currentSize / 1024 / 1024 + "MB");
+                        Log.info("Tx commit status: size=" + currentSize / 1024 / 1024 + "MB");
                 }
             } catch (InterruptedException ignored) {
             }
@@ -111,12 +103,12 @@ public class TxWritebackImpl implements TxWriteback {
                     }
                 }
 
-                var toWrite = new ArrayList<Pair<JObjectKey, JDataVersionedWrapper<?>>>();
+                var toWrite = new ArrayList<Pair<JObjectKey, JDataVersionedWrapper>>();
                 var toDelete = new ArrayList<JObjectKey>();
 
                 for (var e : bundle._entries.values()) {
                     switch (e) {
-                        case TxBundleImpl.CommittedEntry(JObjectKey key, JDataVersionedWrapper<?> data, int size) -> {
+                        case TxBundleImpl.CommittedEntry(JObjectKey key, JDataVersionedWrapper data, int size) -> {
                             Log.trace("Writing new " + key);
                             toWrite.add(Pair.of(key, data));
                         }
@@ -336,7 +328,7 @@ public class TxWritebackImpl implements TxWriteback {
         }
 
         @Override
-        public void commit(JDataVersionedWrapper<?> obj) {
+        public void commit(JDataVersionedWrapper obj) {
             synchronized (_entries) {
                 _entries.put(obj.data().key(), new CommittedEntry(obj.data().key(), obj, obj.data().estimateSize()));
             }
@@ -371,7 +363,7 @@ public class TxWritebackImpl implements TxWriteback {
             int size();
         }
 
-        private record CommittedEntry(JObjectKey key, JDataVersionedWrapper<?> data, int size)
+        private record CommittedEntry(JObjectKey key, JDataVersionedWrapper data, int size)
                 implements BundleEntry {
         }
 
@@ -382,5 +374,19 @@ public class TxWritebackImpl implements TxWriteback {
                 return 64;
             }
         }
+    }
+
+    // Returns an iterator with a view of all commited objects
+    // Does not have to guarantee consistent view, snapshots are handled by upper layers
+    @Override
+    public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
+        return new PredicateKvIterator<>(
+                new NavigableMapKvIterator<>(_pendingWrites, start, key),
+                e -> {
+                    if (e instanceof PendingWrite pw) {
+                        return pw.data();
+                    }
+                    return null;
+                });
     }
 }

@@ -1,5 +1,7 @@
 package com.usatiuk.dhfs.objects.persistence;
 
+import com.google.protobuf.ByteString;
+import com.usatiuk.dhfs.objects.CloseableKvIterator;
 import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.ObjectSerializer;
@@ -17,20 +19,59 @@ public class SerializingObjectPersistentStore {
     ObjectSerializer<JDataVersionedWrapper> serializer;
 
     @Inject
-    ObjectPersistentStore delegate;
+    ObjectPersistentStore delegateStore;
 
     @Nonnull
     Collection<JObjectKey> findAllObjects() {
-        return delegate.findAllObjects();
+        return delegateStore.findAllObjects();
     }
 
     @Nonnull
-    Optional<JDataVersionedWrapper<?>> readObject(JObjectKey name) {
-        return delegate.readObject(name).map(serializer::deserialize);
+    Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
+        return delegateStore.readObject(name).map(serializer::deserialize);
     }
 
-    void commitTx(TxManifestObj<? extends JDataVersionedWrapper<?>> names) {
-        delegate.commitTx(new TxManifestRaw(
+    private class SerializingKvIterator implements CloseableKvIterator<JObjectKey, JDataVersionedWrapper> {
+        private final CloseableKvIterator<JObjectKey, ByteString> _delegate;
+
+        private SerializingKvIterator(IteratorStart start, JObjectKey key) {
+            _delegate = delegateStore.getIterator(start, key);
+        }
+
+        @Override
+        public JObjectKey peekNextKey() {
+            return _delegate.peekNextKey();
+        }
+
+        @Override
+        public void close() {
+            _delegate.close();
+        }
+
+        @Override
+        public boolean hasNext() {
+            return _delegate.hasNext();
+        }
+
+        @Override
+        public Pair<JObjectKey, JDataVersionedWrapper> next() {
+            var next = _delegate.next();
+            return Pair.of(next.getKey(), serializer.deserialize(next.getValue()));
+        }
+    }
+
+    // Returns an iterator with a view of all commited objects
+    // Does not have to guarantee consistent view, snapshots are handled by upper layers
+    public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
+        return new SerializingKvIterator(start, key);
+    }
+
+    public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(JObjectKey key) {
+        return getIterator(IteratorStart.GE, key);
+    }
+
+    void commitTx(TxManifestObj<? extends JDataVersionedWrapper> names) {
+        delegateStore.commitTx(new TxManifestRaw(
                 names.written().stream()
                         .map(e -> Pair.of(e.getKey(), serializer.serialize(e.getValue())))
                         .toList()

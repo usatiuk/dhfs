@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.persistence.CachingObjectPersistentStore;
+import com.usatiuk.dhfs.objects.persistence.IteratorStart;
 import com.usatiuk.dhfs.objects.transaction.TxRecord;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -34,7 +35,7 @@ public class WritebackObjectPersistentStore {
     }
 
     @Nonnull
-    Optional<JDataVersionedWrapper<?>> readObject(JObjectKey name) {
+    Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
         var pending = txWriteback.getPendingWrite(name).orElse(null);
         return switch (pending) {
             case TxWriteback.PendingWrite write -> Optional.of(write.data());
@@ -51,7 +52,7 @@ public class WritebackObjectPersistentStore {
                 switch (action) {
                     case TxRecord.TxObjectRecordWrite<?> write -> {
                         Log.trace("Flushing object " + write.key());
-                        bundle.commit(new JDataVersionedWrapper<>(write.data(), id));
+                        bundle.commit(new JDataVersionedWrapper(write.data(), id));
                     }
                     case TxRecord.TxObjectRecordDeleted deleted -> {
                         Log.trace("Deleting object " + deleted.key());
@@ -73,5 +74,15 @@ public class WritebackObjectPersistentStore {
         long bundleId = bundle.getId();
 
         return r -> txWriteback.asyncFence(bundleId, r);
+    }
+
+    // Returns an iterator with a view of all commited objects
+    // Does not have to guarantee consistent view, snapshots are handled by upper layers
+    public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
+        return new MergingKvIterator<>(delegate.getIterator(start, key), txWriteback.getIterator(start, key));
+    }
+
+    public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(JObjectKey key) {
+        return getIterator(IteratorStart.GE, key);
     }
 }

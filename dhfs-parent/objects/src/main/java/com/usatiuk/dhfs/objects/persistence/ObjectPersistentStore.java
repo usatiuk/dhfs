@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects.persistence;
 
 import com.google.protobuf.ByteString;
+import com.usatiuk.dhfs.objects.CloseableKvIterator;
 import com.usatiuk.dhfs.objects.JObjectKey;
 
 import javax.annotation.Nonnull;
@@ -15,6 +16,14 @@ public interface ObjectPersistentStore {
 
     @Nonnull
     Optional<ByteString> readObject(JObjectKey name);
+
+    // Returns an iterator with a view of all commited objects
+    // Does not have to guarantee consistent view, snapshots are handled by upper layers
+    CloseableKvIterator<JObjectKey, ByteString> getIterator(IteratorStart start, JObjectKey key);
+
+    default CloseableKvIterator<JObjectKey, ByteString> getIterator(JObjectKey key) {
+        return getIterator(IteratorStart.GE, key);
+    }
 
     void commitTx(TxManifestRaw names);
 

@@ -1,20 +1,21 @@
 package com.usatiuk.dhfs.objects.persistence;
 
 import com.google.protobuf.ByteString;
+import com.usatiuk.dhfs.objects.CloseableKvIterator;
 import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.NavigableMapKvIterator;
 import io.quarkus.arc.properties.IfBuildProperty;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import javax.annotation.Nonnull;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 @ApplicationScoped
 @IfBuildProperty(name = "dhfs.objects.persistence", stringValue = "memory")
 public class MemoryObjectPersistentStore implements ObjectPersistentStore {
-    private final Map<JObjectKey, ByteString> _objects = new HashMap<>();
+    private final ConcurrentSkipListMap<JObjectKey, ByteString> _objects = new ConcurrentSkipListMap<>();
 
     @Nonnull
     @Override
@@ -30,6 +31,11 @@ public class MemoryObjectPersistentStore implements ObjectPersistentStore {
         synchronized (this) {
             return Optional.ofNullable(_objects.get(name));
         }
+    }
+
+    @Override
+    public CloseableKvIterator<JObjectKey, ByteString> getIterator(IteratorStart start, JObjectKey key) {
+        return new NavigableMapKvIterator<>(_objects, start, key);
     }
 
     @Override

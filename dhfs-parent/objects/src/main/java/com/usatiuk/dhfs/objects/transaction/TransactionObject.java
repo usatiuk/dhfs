@@ -6,5 +6,5 @@ import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
 import java.util.Optional;
 
 public interface TransactionObject<T extends JData> {
-    Optional<JDataVersionedWrapper<T>> data();
+    Optional<JDataVersionedWrapper> data();
 }

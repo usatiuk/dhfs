@@ -52,7 +52,7 @@ public class JObjectManager {
         _preCommitTxHooks = preCommitTxHooks.stream().sorted(Comparator.comparingInt(PreCommitTxHook::getPriority)).toList();
     }
 
-    private <T extends JData> JDataVersionedWrapper<T> get(Class<T> type, JObjectKey key) {
+    private <T extends JData> JDataVersionedWrapper get(Class<T> type, JObjectKey key) {
         verifyReady();
         while (true) {
             {
@@ -63,26 +63,24 @@ public class JObjectManager {
                     if (ref == null) {
                         _objects.remove(key, got);
                     } else if (type.isInstance(ref.data())) {
-                        return (JDataVersionedWrapper<T>) ref;
+                        return (JDataVersionedWrapper) ref;
                     } else {
                         throw new IllegalArgumentException("Object type mismatch: " + ref.data().getClass() + " vs " + type);
                     }
                 }
             }
-
             //noinspection unused
             try (var readLock = _objLocker.lock(key)) {
                 if (_objects.containsKey(key)) continue;
-
                 var read = writebackObjectPersistentStore.readObject(key).orElse(null);
 
                 if (read == null) return null;
 
                 if (type.isInstance(read.data())) {
-                    var wrapper = new JDataWrapper<>((JDataVersionedWrapper<T>) read);
+                    var wrapper = new JDataWrapper<>((JDataVersionedWrapper) read);
                     var old = _objects.put(key, wrapper);
                     assert old == null;
-                    return (JDataVersionedWrapper<T>) read;
+                    return (JDataVersionedWrapper) read;
                 } else {
                     throw new IllegalArgumentException("Object type mismatch: " + read.getClass() + " vs " + type);
                 }
@@ -229,7 +227,7 @@ public class JObjectManager {
                 switch (action.getValue()) {
                     case TxRecord.TxObjectRecordWrite<?> write -> {
                         Log.trace("Writing " + action.getKey());
-                        var wrapped = new JDataVersionedWrapper<>(write.data(), tx.getId());
+                        var wrapped = new JDataVersionedWrapper(write.data(), tx.getId());
                         _objects.put(action.getKey(), new JDataWrapper<>(wrapped));
                     }
                     case TxRecord.TxObjectRecordDeleted deleted -> {
@@ -285,19 +283,19 @@ public class JObjectManager {
     }
 
     private record TransactionObjectNoLock<T extends JData>
-            (Optional<JDataVersionedWrapper<T>> data)
+            (Optional<JDataVersionedWrapper> data)
             implements TransactionObject<T> {
     }
 
     private record TransactionObjectLocked<T extends JData>
-            (Optional<JDataVersionedWrapper<T>> data, AutoCloseableNoThrow lock)
+            (Optional<JDataVersionedWrapper> data, AutoCloseableNoThrow lock)
             implements TransactionObject<T> {
     }
 
-    private class JDataWrapper<T extends JData> extends WeakReference<JDataVersionedWrapper<T>> {
+    private class JDataWrapper<T extends JData> extends WeakReference<JDataVersionedWrapper> {
         private static final Cleaner CLEANER = Cleaner.create();
 
-        public JDataWrapper(JDataVersionedWrapper<T> referent) {
+        public JDataWrapper(JDataVersionedWrapper referent) {
             super(referent);
             var key = referent.data().key();
             CLEANER.register(referent, () -> {

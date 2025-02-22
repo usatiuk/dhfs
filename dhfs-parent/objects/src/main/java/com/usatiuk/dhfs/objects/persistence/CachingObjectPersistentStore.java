@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.objects.persistence;
 
-import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.*;
 import com.usatiuk.dhfs.utils.DataLocker;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.Startup;
@@ -14,6 +13,7 @@ import javax.annotation.Nonnull;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Stream;
@@ -21,6 +21,7 @@ import java.util.stream.Stream;
 @ApplicationScoped
 public class CachingObjectPersistentStore {
     private final LinkedHashMap<JObjectKey, CacheEntry> _cache = new LinkedHashMap<>(8, 0.75f, true);
+    private final ConcurrentSkipListMap<JObjectKey, CacheEntry> _sortedCache = new ConcurrentSkipListMap<>();
     private final DataLocker _locker = new DataLocker();
     @Inject
     SerializingObjectPersistentStore delegate;
@@ -57,17 +58,20 @@ public class CachingObjectPersistentStore {
         return delegate.findAllObjects();
     }
 
-    private void put(JObjectKey key, Optional<JDataVersionedWrapper<?>> obj) {
+    private void put(JObjectKey key, Optional<JDataVersionedWrapper> obj) {
         synchronized (_cache) {
             int size = obj.map(o -> o.data().estimateSize()).orElse(0);
 
             _curSize += size;
-            var old = _cache.putLast(key, new CacheEntry(obj, size));
+            var entry = new CacheEntry(obj, size);
+            var old = _cache.putLast(key, entry);
+            _sortedCache.put(key, entry);
             if (old != null)
                 _curSize -= old.size();
 
             while (_curSize >= sizeLimit) {
                 var del = _cache.pollFirstEntry();
+                _sortedCache.remove(del.getKey(), del.getValue());
                 _curSize -= del.getValue().size();
                 _evict++;
             }
@@ -75,7 +79,7 @@ public class CachingObjectPersistentStore {
     }
 
     @Nonnull
-    public Optional<JDataVersionedWrapper<?>> readObject(JObjectKey name) {
+    public Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
         try (var lock = _locker.lock(name)) {
             synchronized (_cache) {
                 var got = _cache.get(name);
@@ -90,7 +94,7 @@ public class CachingObjectPersistentStore {
         }
     }
 
-    public void commitTx(TxManifestObj<? extends JDataVersionedWrapper<?>> names) {
+    public void commitTx(TxManifestObj<? extends JDataVersionedWrapper> names) {
         // During commit, readObject shouldn't be called for these items,
         // it should be handled by the upstream store
         synchronized (_cache) {
@@ -98,11 +102,27 @@ public class CachingObjectPersistentStore {
                     names.deleted().stream()).toList()) {
                 _curSize -= Optional.ofNullable(_cache.get(key)).map(CacheEntry::size).orElse(0L);
                 _cache.remove(key);
+                _sortedCache.remove(key);
             }
         }
         delegate.commitTx(names);
     }
 
-    private record CacheEntry(Optional<JDataVersionedWrapper<?>> object, long size) {
+    // Returns an iterator with a view of all commited objects
+    // Does not have to guarantee consistent view, snapshots are handled by upper layers
+    public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
+        return new MergingKvIterator<>(
+                new PredicateKvIterator<>(
+                        new NavigableMapKvIterator<>(_sortedCache, start, key),
+                        e -> e.object().orElse(null)
+                ),
+                delegate.getIterator(start, key));
+    }
+
+    public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(JObjectKey key) {
+        return getIterator(IteratorStart.GE, key);
+    }
+
+    private record CacheEntry(Optional<JDataVersionedWrapper> object, long size) {
     }
 }
