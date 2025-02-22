@@ -13,8 +13,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @QuarkusTest
@@ -24,6 +27,17 @@ public class ObjectsTest {
 
     @Inject
     Transaction curTx;
+
+    private void deleteAndCheck(JObjectKey key) {
+        txm.run(() -> {
+            curTx.delete(key);
+        });
+
+        txm.run(() -> {
+            var parent = curTx.get(JData.class, key).orElse(null);
+            Assertions.assertNull(parent);
+        });
+    }
 
     @Test
     void createObject() {
@@ -250,6 +264,182 @@ public class ObjectsTest {
             Assertions.assertFalse(thread2Failed.get());
             Assertions.assertEquals("John2", got.name());
         }
+    }
+
+    @RepeatedTest(100)
+    void snapshotTest1() {
+        var key = "SnapshotTest1";
+        var barrier1 = new CyclicBarrier(2);
+        var barrier2 = new CyclicBarrier(2);
+        try (ExecutorService ex = Executors.newFixedThreadPool(3)) {
+            ex.invokeAll(List.of(
+                    () -> {
+                        barrier1.await();
+                        Log.info("Thread 2 starting tx");
+                        txm.run(() -> {
+                            Log.info("Thread 2 started tx");
+                            curTx.put(new Parent(JObjectKey.of(key), "John"));
+                            Log.info("Thread 2 committing");
+                        });
+                        Log.info("Thread 2 commited");
+                        try {
+                            barrier2.await();
+                        } catch (Throwable e) {
+                            throw new RuntimeException(e);
+                        }
+                        return null;
+                    },
+                    () -> {
+                        Log.info("Thread 1 starting tx");
+                        txm.run(() -> {
+                            try {
+                                Log.info("Thread 1 started tx");
+                                barrier1.await();
+                                barrier2.await();
+                            } catch (Throwable e) {
+                                throw new RuntimeException(e);
+                            }
+                            Log.info("Thread 1 reading");
+                            Assertions.assertTrue(curTx.get(Parent.class, new JObjectKey(key)).isEmpty());
+                            Log.info("Thread 1 done reading");
+                        });
+                        Log.info("Thread 1 finished");
+                        return null;
+                    }
+            )).forEach(f -> {
+                try {
+                    f.get();
+                } catch (Throwable e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        txm.run(() -> {
+            Assertions.assertEquals("John", curTx.get(Parent.class, new JObjectKey(key)).orElseThrow().name());
+        });
+        deleteAndCheck(new JObjectKey(key));
+    }
+
+    @RepeatedTest(100)
+    void snapshotTest2() {
+        var key = "SnapshotTest2";
+        var barrier1 = new CyclicBarrier(2);
+        var barrier2 = new CyclicBarrier(2);
+        txm.run(() -> {
+            curTx.put(new Parent(JObjectKey.of(key), "John"));
+        });
+        try (ExecutorService ex = Executors.newFixedThreadPool(3)) {
+            ex.invokeAll(List.of(
+                    () -> {
+                        barrier1.await();
+                        Log.info("Thread 2 starting tx");
+                        txm.run(() -> {
+                            Log.info("Thread 2 started tx");
+                            curTx.put(new Parent(JObjectKey.of(key), "John2"));
+                            Log.info("Thread 2 committing");
+                        });
+                        Log.info("Thread 2 commited");
+                        try {
+                            barrier2.await();
+                        } catch (Throwable e) {
+                            throw new RuntimeException(e);
+                        }
+                        return null;
+                    },
+                    () -> {
+                        Log.info("Thread 1 starting tx");
+                        txm.run(() -> {
+                            try {
+                                Log.info("Thread 1 started tx");
+                                barrier1.await();
+                                barrier2.await();
+                            } catch (Throwable e) {
+                                throw new RuntimeException(e);
+                            }
+                            Log.info("Thread 1 reading");
+                            Assertions.assertEquals("John", curTx.get(Parent.class, new JObjectKey(key)).orElseThrow().name());
+                            Log.info("Thread 1 done reading");
+                        });
+                        Log.info("Thread 1 finished");
+                        return null;
+                    }
+            )).forEach(f -> {
+                try {
+                    f.get();
+                } catch (Throwable e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        txm.run(() -> {
+            Assertions.assertEquals("John2", curTx.get(Parent.class, new JObjectKey(key)).orElseThrow().name());
+        });
+        deleteAndCheck(new JObjectKey(key));
+    }
+
+    @RepeatedTest(100)
+    void snapshotTest3() throws InterruptedException {
+        var key = "SnapshotTest3";
+        var barrier0 = new CountDownLatch(1);
+        var barrier1 = new CyclicBarrier(2);
+        var barrier2 = new CyclicBarrier(2);
+        txm.run(() -> {
+            curTx.put(new Parent(JObjectKey.of(key), "John"));
+        }).onFlush(barrier0::countDown);
+        barrier0.await();
+        try (ExecutorService ex = Executors.newFixedThreadPool(3)) {
+            ex.invokeAll(List.of(
+                    () -> {
+                        barrier1.await();
+                        Log.info("Thread 2 starting tx");
+                        txm.run(() -> {
+                            Log.info("Thread 2 started tx");
+                            curTx.put(new Parent(JObjectKey.of(key), "John2"));
+                            Log.info("Thread 2 committing");
+                        });
+                        Log.info("Thread 2 commited");
+                        try {
+                            barrier2.await();
+                        } catch (Throwable e) {
+                            throw new RuntimeException(e);
+                        }
+                        return null;
+                    },
+                    () -> {
+                        Log.info("Thread 1 starting tx");
+                        txm.run(() -> {
+                            try {
+                                Log.info("Thread 1 started tx");
+                                barrier1.await();
+                                barrier2.await();
+                            } catch (Throwable e) {
+                                throw new RuntimeException(e);
+                            }
+                            Log.info("Thread 1 reading");
+                            Assertions.assertEquals("John", curTx.get(Parent.class, new JObjectKey(key)).orElseThrow().name());
+                            Log.info("Thread 1 done reading");
+                        });
+                        Log.info("Thread 1 finished");
+                        return null;
+                    }
+            )).forEach(f -> {
+                try {
+                    f.get();
+                } catch (Throwable e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        txm.run(() -> {
+            Assertions.assertEquals("John2", curTx.get(Parent.class, new JObjectKey(key)).orElseThrow().name());
+        });
+        deleteAndCheck(new JObjectKey(key));
     }
 
 //    }

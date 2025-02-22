@@ -25,6 +25,9 @@ public class SnapshotManager {
     private interface SnapshotEntry {
     }
 
+    private record SnapshotEntryRead(JDataVersionedWrapper data, long whenToRemove) implements SnapshotEntry {
+    }
+
     private record SnapshotEntryObject(JDataVersionedWrapper data) implements SnapshotEntry {
     }
 
@@ -47,6 +50,7 @@ public class SnapshotManager {
     private final ConcurrentSkipListMap<SnapshotKey, SnapshotEntry> _objects = new ConcurrentSkipListMap<>();
     private final MultiValuedMap<Long, SnapshotKey> _snapshotBounds = new HashSetValuedHashMap<>();
     private final HashMap<Long, Long> _snapshotRefCounts = new HashMap<>();
+    private final ConcurrentSkipListMap<Long, Long> _snapshotVersions = new ConcurrentSkipListMap<>();
 
     private void verify() {
         assert _snapshotIds.isEmpty() == (_lastAliveSnapshotId == -1);
@@ -55,15 +59,20 @@ public class SnapshotManager {
 
     Consumer<Runnable> commitTx(Collection<TxRecord.TxObjectRecord<?>> writes, long id) {
         synchronized (this) {
+            assert id > _lastSnapshotId;
             if (!_snapshotIds.isEmpty()) {
                 verify();
+                boolean hadBackward = false;
                 for (var action : writes) {
                     var current = delegateStore.readObjectVerbose(action.key());
                     Pair<SnapshotKey, SnapshotEntry> newSnapshotEntry = switch (current) {
                         case WritebackObjectPersistentStore.VerboseReadResultPersisted(
                                 Optional<JDataVersionedWrapper> data
-                        ) -> Pair.of(new SnapshotKey(action.key(), _snapshotIds.peek()),
-                                data.<SnapshotEntry>map(SnapshotEntryObject::new).orElse(new SnapshotEntryDeleted()));
+                        ) -> {
+                            hadBackward = true;
+                            yield Pair.of(new SnapshotKey(action.key(), _snapshotIds.peek()),
+                                    data.<SnapshotEntry>map(o -> new SnapshotEntryRead(o, id)).orElse(new SnapshotEntryDeleted()));
+                        }
                         case WritebackObjectPersistentStore.VerboseReadResultPending(
                                 TxWriteback.PendingWriteEntry pending
                         ) -> switch (pending) {
@@ -79,6 +88,11 @@ public class SnapshotManager {
                     _objects.put(newSnapshotEntry.getLeft(), newSnapshotEntry.getRight());
                     _snapshotBounds.put(newSnapshotEntry.getLeft().version(), newSnapshotEntry.getLeft());
                 }
+
+                if (hadBackward)
+                    for (var sid : _snapshotIds) {
+                        _snapshotVersions.merge(sid, 1L, Long::sum);
+                    }
             }
 
             verify();
@@ -96,10 +110,22 @@ public class SnapshotManager {
 
             long curCount;
             long curId = id;
+            long nextId;
             do {
                 _snapshotIds.poll();
+                _snapshotVersions.remove(curId);
+                nextId = _snapshotIds.isEmpty() ? -1 : _snapshotIds.peek();
 
                 for (var key : _snapshotBounds.remove(curId)) {
+                    var entry = _objects.get(key);
+                    if (entry instanceof SnapshotEntryRead read) {
+                        if (curId != read.whenToRemove() - 1) {
+                            assert nextId != -1;
+                            if (nextId < read.whenToRemove()) {
+                                _objects.put(new SnapshotKey(key.key(), nextId), entry);
+                            }
+                        }
+                    }
                     _objects.remove(key);
                 }
 
@@ -137,6 +163,7 @@ public class SnapshotManager {
                     _lastAliveSnapshotId = id;
                 _snapshotIds.add(id);
                 _snapshotRefCounts.merge(id, 1L, Long::sum);
+                _snapshotVersions.put(id, 0L);
                 verify();
             }
             var closedRef = _closed;
@@ -168,6 +195,8 @@ public class SnapshotManager {
                     if (next.getKey().version() <= _id) {
                         _next = switch (next.getValue()) {
                             case SnapshotEntryObject(JDataVersionedWrapper data) ->
+                                    Pair.of(next.getKey().key(), new TombstoneMergingKvIterator.Data<>(data));
+                            case SnapshotEntryRead(JDataVersionedWrapper data, long whenToRemove) ->
                                     Pair.of(next.getKey().key(), new TombstoneMergingKvIterator.Data<>(data));
                             case SnapshotEntryDeleted() ->
                                     Pair.of(next.getKey().key(), new TombstoneMergingKvIterator.Tombstone<>());
@@ -206,8 +235,75 @@ public class SnapshotManager {
 
         }
 
+        public class AutoRefreshingSnapshotKvIterator implements CloseableKvIterator<JObjectKey, JDataVersionedWrapper> {
+            private CloseableKvIterator<JObjectKey, JDataVersionedWrapper> _backing;
+            private long _lastRefreshed = -1L;
+            private Pair<JObjectKey, JDataVersionedWrapper> _next;
+
+            public AutoRefreshingSnapshotKvIterator(IteratorStart start, JObjectKey key) {
+                synchronized (SnapshotManager.this) {
+                    long curVersion = _snapshotVersions.get(_id);
+                    _backing = new TombstoneMergingKvIterator<>(new SnapshotKvIterator(start, key), delegateStore.getIterator(start, key));
+                    _next = _backing.hasNext() ? _backing.next() : null;
+                    _lastRefreshed = curVersion;
+                }
+            }
+
+            private void doRefresh() {
+                long curVersion = _snapshotVersions.get(_id);
+                if (curVersion == _lastRefreshed) {
+                    return;
+                }
+                if (_next == null) return;
+                synchronized (SnapshotManager.this) {
+                    curVersion = _snapshotVersions.get(_id);
+                    _backing.close();
+                    _backing = new TombstoneMergingKvIterator<>(new SnapshotKvIterator(IteratorStart.GE, _next.getKey()), delegateStore.getIterator(IteratorStart.GE, _next.getKey()));
+                    var next = _backing.hasNext() ? _backing.next() : null;
+                    assert next != null;
+                    assert next.equals(_next);
+                    _next = next;
+                    _lastRefreshed = curVersion;
+                }
+            }
+
+            private void prepareNext() {
+                doRefresh();
+                if (_backing.hasNext()) {
+                    _next = _backing.next();
+                } else {
+                    _next = null;
+                }
+            }
+
+            @Override
+            public JObjectKey peekNextKey() {
+                return _next.getKey();
+            }
+
+            @Override
+            public void close() {
+                _backing.close();
+            }
+
+            @Override
+            public boolean hasNext() {
+                return _next != null;
+            }
+
+            @Override
+            public Pair<JObjectKey, JDataVersionedWrapper> next() {
+                if (_next == null) {
+                    throw new NoSuchElementException("No more elements");
+                }
+                var ret = _next;
+                prepareNext();
+                return ret;
+            }
+        }
+
         public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-            return new TombstoneMergingKvIterator<>(new SnapshotKvIterator(start, key), delegateStore.getIterator(start, key));
+            return new AutoRefreshingSnapshotKvIterator(start, key);
         }
 
         public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(JObjectKey key) {

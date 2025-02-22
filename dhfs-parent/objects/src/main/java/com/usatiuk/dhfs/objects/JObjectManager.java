@@ -173,11 +173,6 @@ public class JObjectManager {
                 Log.trace("Checking dependency " + read.getKey() + " - ok with read");
             }
 
-            Log.tracef("Flushing transaction %d to storage", newId);
-
-            var realNewId = _txCounter.getAndIncrement() + 1;
-            assert realNewId == newId;
-
             Log.tracef("Committing transaction %d to storage", newId);
             var addFlushCallback = snapshotManager.commitTx(
                     writes.values().stream()
@@ -192,6 +187,9 @@ public class JObjectManager {
                                 return true;
                             }).toList(),
                     newId);
+
+            var realNewId = _txCounter.getAndIncrement() + 1;
+            assert realNewId == newId;
 
             for (var callback : tx.getOnCommit()) {
                 callback.run();

@@ -46,10 +46,15 @@ public interface TransactionManager {
         }
     }
 
-    default void runTries(VoidFn fn, int tries) {
+    default TransactionHandle runTries(VoidFn fn, int tries) {
         if (current() != null) {
             fn.apply();
-            return;
+            return new TransactionHandle() {
+                @Override
+                public void onFlush(Runnable runnable) {
+                    current().onCommit(runnable);
+                }
+            };
         }
 
         begin();
@@ -61,25 +66,24 @@ public interface TransactionManager {
                 Log.error("Transaction commit failed", txCommitException);
                 throw txCommitException;
             }
-            runTries(fn, tries - 1);
-            return;
+            return runTries(fn, tries - 1);
         } catch (Throwable e) {
             rollback();
             throw e;
         }
         try {
-            commit();
+            return commit();
         } catch (TxCommitException txCommitException) {
             if (tries == 0) {
                 Log.error("Transaction commit failed", txCommitException);
                 throw txCommitException;
             }
-            runTries(fn, tries - 1);
+            return runTries(fn, tries - 1);
         }
     }
 
-    default void run(VoidFn fn) {
-        runTries(fn, 10);
+    default TransactionHandle run(VoidFn fn) {
+        return runTries(fn, 10);
     }
 
     default <T> T run(Supplier<T> supplier) {
