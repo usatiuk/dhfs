@@ -139,7 +139,7 @@ public class JObjectManager {
                 Log.trace("Committing transaction start");
                 // FIXME: Better way?
                 addDependency.accept(JDataDummy.TX_ID_OBJ_NAME);
-                tx.put(JDataDummy.getInstance());
+                writes.put(JDataDummy.TX_ID_OBJ_NAME, new TxRecord.TxObjectRecordWrite<>(JDataDummy.getInstance()));
             } finally {
                 readSet = tx.reads();
 
