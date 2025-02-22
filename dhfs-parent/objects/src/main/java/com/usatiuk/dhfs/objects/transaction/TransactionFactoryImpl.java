@@ -4,6 +4,7 @@ import com.usatiuk.dhfs.objects.JData;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.SnapshotManager;
 import com.usatiuk.dhfs.objects.persistence.IteratorStart;
+import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
@@ -20,6 +21,7 @@ public class TransactionFactoryImpl implements TransactionFactory {
 
     @Override
     public TransactionPrivate createTransaction(long snapshotId) {
+        Log.tracev("Trying to create transaction with snapshotId={0}", snapshotId);
         return new TransactionImpl(snapshotId);
     }
 

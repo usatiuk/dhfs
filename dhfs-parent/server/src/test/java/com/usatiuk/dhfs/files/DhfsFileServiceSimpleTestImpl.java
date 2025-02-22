@@ -10,6 +10,7 @@ import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.kleppmanntree.AlreadyExistsException;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -94,13 +95,15 @@ public class DhfsFileServiceSimpleTestImpl {
 //        }
 //    }
 
-    @Test
+    @RepeatedTest(100)
     void dontMkdirTwiceTest() {
         Assertions.assertDoesNotThrow(() -> fileService.mkdir("/dontMkdirTwiceTest", 777));
         Assertions.assertThrows(AlreadyExistsException.class, () -> fileService.mkdir("/dontMkdirTwiceTest", 777));
+        fileService.unlink("/dontMkdirTwiceTest");
+        Assertions.assertFalse(fileService.open("/dontMkdirTwiceTest").isPresent());
     }
 
-    @Test
+    @RepeatedTest(100)
     void writeTest() {
         var ret = fileService.create("/writeTest", 777);
         Assertions.assertTrue(ret.isPresent());
@@ -117,6 +120,9 @@ public class DhfsFileServiceSimpleTestImpl {
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 15, 16, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).get().toByteArray());
         fileService.write(uuid, 3, new byte[]{17, 18});
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 17, 18, 11, 15, 16, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).get().toByteArray());
+
+        fileService.unlink("/writeTest");
+        Assertions.assertFalse(fileService.open("/writeTest").isPresent());
     }
 
     @Test

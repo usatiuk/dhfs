@@ -52,7 +52,9 @@ public class JObjectManager {
         verifyReady();
         while (true) {
             try {
-                return transactionFactory.createTransaction(_txCounter.get());
+                var tx = transactionFactory.createTransaction(_txCounter.get());
+                Log.tracev("Created transaction with snapshotId={0}", tx.snapshot().id());
+                return tx;
             } catch (SnapshotManager.IllegalSnapshotIdException ignored) {
             }
         }

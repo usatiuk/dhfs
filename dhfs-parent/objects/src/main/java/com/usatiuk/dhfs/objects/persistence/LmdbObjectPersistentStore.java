@@ -139,6 +139,8 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
                     }
                 }
             }
+
+            Log.tracev("got: {0}, hasNext: {1}", got, _hasNext);
         }
 
         @Override
@@ -163,6 +165,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             }
             var ret = Pair.of(JObjectKey.fromBytes(_cursor.key()), ByteString.copyFrom(_cursor.val()));
             _hasNext = _cursor.next();
+            Log.tracev("Read: {0}, hasNext: {1}", ret, _hasNext);
             return ret;
         }
 
