@@ -232,20 +232,20 @@ public class WritebackObjectPersistentStore {
         verifyReady();
         _pendingWritesVersionLock.writeLock().lock();
         try {
-            var curPw = _pendingWrites.get();
-            for (var e : ((TxBundleImpl) bundle)._entries.values()) {
-                switch (e) {
-                    case TxBundleImpl.CommittedEntry c -> {
-                        curPw = curPw.plus(c.key(), new PendingWrite(c.data, bundle.getId()));
-                    }
-                    case TxBundleImpl.DeletedEntry d -> {
-                        curPw = curPw.plus(d.key(), new PendingDelete(d.key, bundle.getId()));
-                    }
-                    default -> throw new IllegalStateException("Unexpected value: " + e);
-                }
-            }
-            _pendingWrites.set(curPw);
             synchronized (_pendingBundles) {
+                var curPw = _pendingWrites.get();
+                for (var e : ((TxBundleImpl) bundle)._entries.values()) {
+                    switch (e) {
+                        case TxBundleImpl.CommittedEntry c -> {
+                            curPw = curPw.plus(c.key(), new PendingWrite(c.data, bundle.getId()));
+                        }
+                        case TxBundleImpl.DeletedEntry d -> {
+                            curPw = curPw.plus(d.key(), new PendingDelete(d.key, bundle.getId()));
+                        }
+                        default -> throw new IllegalStateException("Unexpected value: " + e);
+                    }
+                }
+                _pendingWrites.set(curPw);
                 ((TxBundleImpl) bundle).setReady();
                 _pendingWritesVersion.incrementAndGet();
                 if (_pendingBundles.peek() == bundle)
