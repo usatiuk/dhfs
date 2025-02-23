@@ -296,6 +296,9 @@ public class SnapshotManager {
 
         }
 
+        // In case something was added to the snapshot, it is not guaranteed that the iterators will see it,
+        // so refresh them manually. Otherwise, it could be possible that something from the writeback cache will
+        // be served instead.
         public class AutoRefreshingSnapshotKvIterator implements CloseableKvIterator<JObjectKey, JDataVersionedWrapper> {
             private CloseableKvIterator<JObjectKey, JDataVersionedWrapper> _backing;
             private long _lastRefreshed = -1L;
@@ -334,23 +337,22 @@ public class SnapshotManager {
                     _backing = new TombstoneMergingKvIterator<>(new SnapshotKvIterator(IteratorStart.GE, _next.getKey()),
                             new MappingKvIterator<>(delegateStore.getIterator(IteratorStart.GE, _next.getKey()), _downstreamTombstoneMapper));
                     var next = _backing.hasNext() ? _backing.next() : null;
-                    boolean fail = false;
                     if (next == null) {
                         Log.errorv("Failed to refresh snapshot iterator, null {0}, last refreshed {1}," +
                                 " current version {2}, current value {3}", _id, _lastRefreshed, curVersion, next);
-                        fail = true;
+                        assert false;
                     } else if (!next.equals(_next)) {
                         Log.errorv("Failed to refresh snapshot iterator, mismatch {0}, last refreshed {1}," +
                                 " current version {2}, current value {3}, read value {4}", _id, _lastRefreshed, curVersion, _next, next);
-                        fail = true;
+                        assert false;
                     }
 
-                    assert !fail;
                     _next = next;
                     _lastRefreshed = curVersion;
                 }
             }
 
+            // _next should always be valid, so it's ok to do the refresh "lazily"
             private void prepareNext() {
                 doRefresh();
                 if (_backing.hasNext()) {

@@ -11,6 +11,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.annotation.Nonnull;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -22,6 +23,7 @@ import java.util.stream.Stream;
 public class CachingObjectPersistentStore {
     private final LinkedHashMap<JObjectKey, CacheEntry> _cache = new LinkedHashMap<>(8, 0.75f, true);
     private final ConcurrentSkipListMap<JObjectKey, CacheEntry> _sortedCache = new ConcurrentSkipListMap<>();
+    private final HashSet<JObjectKey> _pendingWrites = new HashSet<>();
     private final DataLocker _locker = new DataLocker();
     @Inject
     SerializingObjectPersistentStore delegate;
@@ -61,6 +63,7 @@ public class CachingObjectPersistentStore {
     private void put(JObjectKey key, Optional<JDataVersionedWrapper> obj) {
 //        Log.tracev("Adding {0} to cache: {1}", key, obj);
         synchronized (_cache) {
+            assert !_pendingWrites.contains(key);
             int size = obj.map(o -> o.data().estimateSize()).orElse(0);
 
             _curSize += size;
@@ -105,9 +108,18 @@ public class CachingObjectPersistentStore {
                 _cache.remove(key);
                 _sortedCache.remove(key);
 //                Log.tracev("Removing {0} from cache", key);
+                var added = _pendingWrites.add(key);
+                assert added;
             }
         }
         delegate.commitTx(names);
+        synchronized (_cache) {
+            for (var key : Stream.concat(names.written().stream().map(Pair::getLeft),
+                    names.deleted().stream()).toList()) {
+                var removed = _pendingWrites.remove(key);
+                assert removed;
+            }
+        }
     }
 
 
