@@ -36,4 +36,28 @@ public abstract class Just {
             throw new RuntimeException(e);
         }
     }
+
+    public static void runAll(Runnable... callables) {
+        try {
+            try (var exs = Executors.newFixedThreadPool(callables.length)) {
+                exs.invokeAll(Arrays.stream(callables).map(c -> (Callable<?>) () -> {
+                    try {
+                        c.run();
+                        return null;
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }).toList()).forEach(f -> {
+                    try {
+                        f.get();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 }

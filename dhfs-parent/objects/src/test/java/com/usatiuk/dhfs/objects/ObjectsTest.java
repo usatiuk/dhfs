@@ -131,7 +131,7 @@ public class ObjectsTest {
 
     @Test
     @Disabled
-    void createObjectConflict() throws InterruptedException {
+    void createObjectConflict() {
         AtomicBoolean thread1Failed = new AtomicBoolean(true);
         AtomicBoolean thread2Failed = new AtomicBoolean(true);
 
@@ -179,7 +179,11 @@ public class ObjectsTest {
             }
         });
 
-        latch.await();
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
 
         var got = txm.run(() -> {
             return curTx.get(Parent.class, new JObjectKey("Parent2")).orElse(null);
@@ -197,7 +201,7 @@ public class ObjectsTest {
 
     @ParameterizedTest
     @EnumSource(LockingStrategy.class)
-    void editConflict(LockingStrategy strategy) throws InterruptedException {
+    void editConflict(LockingStrategy strategy) {
         String key = "Parent4" + strategy.name();
         txm.run(() -> {
             var newParent = new Parent(JObjectKey.of(key), "John3");
@@ -247,7 +251,11 @@ public class ObjectsTest {
             }
         });
 
-        latchEnd.await();
+        try {
+            latchEnd.await();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
 
         var got = txm.run(() -> {
             return curTx.get(Parent.class, new JObjectKey(key)).orElse(null);
@@ -383,7 +391,7 @@ public class ObjectsTest {
     }
 
     @RepeatedTest(100)
-    void snapshotTest3() throws InterruptedException {
+    void snapshotTest3() {
         var key = "SnapshotTest3";
         var barrier0 = new CountDownLatch(1);
         var barrier1 = new CyclicBarrier(2);
@@ -391,7 +399,11 @@ public class ObjectsTest {
         txm.run(() -> {
             curTx.put(new Parent(JObjectKey.of(key), "John"));
         }).onFlush(barrier0::countDown);
-        barrier0.await();
+        try {
+            barrier0.await();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         try (ExecutorService ex = Executors.newFixedThreadPool(3)) {
             ex.invokeAll(List.of(
                     () -> {
@@ -444,7 +456,7 @@ public class ObjectsTest {
     }
 
     @RepeatedTest(100)
-    void simpleIterator1() throws Exception {
+    void simpleIterator1() {
         var key = "SimpleIterator1";
         var key1 = key + "_1";
         var key2 = key + "_2";
@@ -471,7 +483,7 @@ public class ObjectsTest {
     }
 
     @RepeatedTest(100)
-    void simpleIterator2() throws Exception {
+    void simpleIterator2() {
         var key = "SimpleIterator2";
         var key1 = key + "_1";
         var key2 = key + "_2";
@@ -485,15 +497,16 @@ public class ObjectsTest {
             curTx.put(new Parent(JObjectKey.of(key4), "John4"));
         });
         txm.run(() -> {
-            var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key));
-            var got = iter.next();
-            Assertions.assertEquals(key1, got.getKey().name());
-            got = iter.next();
-            Assertions.assertEquals(key2, got.getKey().name());
-            got = iter.next();
-            Assertions.assertEquals(key3, got.getKey().name());
-            got = iter.next();
-            Assertions.assertEquals(key4, got.getKey().name());
+            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+                var got = iter.next();
+                Assertions.assertEquals(key1, got.getKey().name());
+                got = iter.next();
+                Assertions.assertEquals(key2, got.getKey().name());
+                got = iter.next();
+                Assertions.assertEquals(key3, got.getKey().name());
+                got = iter.next();
+                Assertions.assertEquals(key4, got.getKey().name());
+            }
         });
         txm.run(() -> {
             curTx.delete(new JObjectKey(key));
@@ -503,8 +516,9 @@ public class ObjectsTest {
             curTx.delete(new JObjectKey(key4));
         });
         txm.run(() -> {
-            var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key));
-            Assertions.assertTrue(!iter.hasNext() || !iter.next().getKey().name().startsWith(key));
+            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+                Assertions.assertTrue(!iter.hasNext() || !iter.next().getKey().name().startsWith(key));
+            }
         });
     }
 
@@ -543,11 +557,12 @@ public class ObjectsTest {
                 try {
                     barrier.await();
                     barrier2.await();
-                    var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key));
-                    var got = iter.next();
-                    Assertions.assertEquals(key1, got.getKey().name());
-                    got = iter.next();
-                    Assertions.assertEquals(key4, got.getKey().name());
+                    try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+                        var got = iter.next();
+                        Assertions.assertEquals(key1, got.getKey().name());
+                        got = iter.next();
+                        Assertions.assertEquals(key4, got.getKey().name());
+                    }
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
@@ -557,15 +572,16 @@ public class ObjectsTest {
         });
         Log.info("All threads finished");
         txm.run(() -> {
-            var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key));
-            var got = iter.next();
-            Assertions.assertEquals(key1, got.getKey().name());
-            got = iter.next();
-            Assertions.assertEquals(key2, got.getKey().name());
-            got = iter.next();
-            Assertions.assertEquals(key3, got.getKey().name());
-            got = iter.next();
-            Assertions.assertEquals(key4, got.getKey().name());
+            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+                var got = iter.next();
+                Assertions.assertEquals(key1, got.getKey().name());
+                got = iter.next();
+                Assertions.assertEquals(key2, got.getKey().name());
+                got = iter.next();
+                Assertions.assertEquals(key3, got.getKey().name());
+                got = iter.next();
+                Assertions.assertEquals(key4, got.getKey().name());
+            }
         });
         txm.run(() -> {
             curTx.delete(new JObjectKey(key));
@@ -575,8 +591,9 @@ public class ObjectsTest {
             curTx.delete(new JObjectKey(key4));
         });
         txm.run(() -> {
-            var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key));
-            Assertions.assertTrue(!iter.hasNext() || !iter.next().getKey().name().startsWith(key));
+            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+                Assertions.assertTrue(!iter.hasNext() || !iter.next().getKey().name().startsWith(key));
+            }
         });
     }
 
@@ -616,14 +633,15 @@ public class ObjectsTest {
                 try {
                     barrier.await();
                     barrier2.await();
-                    var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key));
-                    var got = iter.next();
-                    Assertions.assertEquals(key1, got.getKey().name());
-                    got = iter.next();
-                    Assertions.assertEquals(key2, got.getKey().name());
-                    Assertions.assertEquals("John2", ((Parent) got.getValue()).name());
-                    got = iter.next();
-                    Assertions.assertEquals(key4, got.getKey().name());
+                    try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+                        var got = iter.next();
+                        Assertions.assertEquals(key1, got.getKey().name());
+                        got = iter.next();
+                        Assertions.assertEquals(key2, got.getKey().name());
+                        Assertions.assertEquals("John2", ((Parent) got.getValue()).name());
+                        got = iter.next();
+                        Assertions.assertEquals(key4, got.getKey().name());
+                    }
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
@@ -633,16 +651,17 @@ public class ObjectsTest {
         });
         Log.info("All threads finished");
         txm.run(() -> {
-            var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key));
-            var got = iter.next();
-            Assertions.assertEquals(key1, got.getKey().name());
-            got = iter.next();
-            Assertions.assertEquals(key2, got.getKey().name());
-            Assertions.assertEquals("John5", ((Parent) got.getValue()).name());
-            got = iter.next();
-            Assertions.assertEquals(key3, got.getKey().name());
-            got = iter.next();
-            Assertions.assertEquals(key4, got.getKey().name());
+            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+                var got = iter.next();
+                Assertions.assertEquals(key1, got.getKey().name());
+                got = iter.next();
+                Assertions.assertEquals(key2, got.getKey().name());
+                Assertions.assertEquals("John5", ((Parent) got.getValue()).name());
+                got = iter.next();
+                Assertions.assertEquals(key3, got.getKey().name());
+                got = iter.next();
+                Assertions.assertEquals(key4, got.getKey().name());
+            }
         });
         txm.run(() -> {
             curTx.delete(new JObjectKey(key));
@@ -652,8 +671,9 @@ public class ObjectsTest {
             curTx.delete(new JObjectKey(key4));
         });
         txm.run(() -> {
-            var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key));
-            Assertions.assertTrue(!iter.hasNext() || !iter.next().getKey().name().startsWith(key));
+            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+                Assertions.assertTrue(!iter.hasNext() || !iter.next().getKey().name().startsWith(key));
+            }
         });
     }
 
@@ -693,14 +713,15 @@ public class ObjectsTest {
                 try {
                     barrier.await();
                     barrier2.await();
-                    var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key));
-                    var got = iter.next();
-                    Assertions.assertEquals(key1, got.getKey().name());
-                    got = iter.next();
-                    Assertions.assertEquals(key2, got.getKey().name());
-                    Assertions.assertEquals("John2", ((Parent) got.getValue()).name());
-                    got = iter.next();
-                    Assertions.assertEquals(key4, got.getKey().name());
+                    try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+                        var got = iter.next();
+                        Assertions.assertEquals(key1, got.getKey().name());
+                        got = iter.next();
+                        Assertions.assertEquals(key2, got.getKey().name());
+                        Assertions.assertEquals("John2", ((Parent) got.getValue()).name());
+                        got = iter.next();
+                        Assertions.assertEquals(key4, got.getKey().name());
+                    }
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
@@ -710,13 +731,14 @@ public class ObjectsTest {
         });
         Log.info("All threads finished");
         txm.run(() -> {
-            var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key));
-            var got = iter.next();
-            Assertions.assertEquals(key1, got.getKey().name());
-            got = iter.next();
-            Assertions.assertEquals(key3, got.getKey().name());
-            got = iter.next();
-            Assertions.assertEquals(key4, got.getKey().name());
+            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+                var got = iter.next();
+                Assertions.assertEquals(key1, got.getKey().name());
+                got = iter.next();
+                Assertions.assertEquals(key3, got.getKey().name());
+                got = iter.next();
+                Assertions.assertEquals(key4, got.getKey().name());
+            }
         });
         txm.run(() -> {
             curTx.delete(new JObjectKey(key));
@@ -725,9 +747,30 @@ public class ObjectsTest {
             curTx.delete(new JObjectKey(key4));
         });
         txm.run(() -> {
-            var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key));
-            Assertions.assertTrue(!iter.hasNext() || !iter.next().getKey().name().startsWith(key));
+            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+                Assertions.assertTrue(!iter.hasNext() || !iter.next().getKey().name().startsWith(key));
+            }
         });
+    }
+
+    @RepeatedTest(100)
+    void allParallel() {
+        Just.runAll(
+                () -> createObject(),
+                () -> createGetObject(),
+                () -> createDeleteObject(),
+                () -> createCreateObject(),
+                () -> editConflict(LockingStrategy.WRITE),
+                () -> editConflict(LockingStrategy.OPTIMISTIC),
+                () -> snapshotTest1(),
+                () -> snapshotTest2(),
+                () -> snapshotTest3(),
+                () -> simpleIterator1(),
+                () -> simpleIterator2(),
+                () -> concurrentIterator1(),
+                () -> concurrentIterator2(),
+                () -> concurrentIterator3()
+        );
     }
 
 //    }
