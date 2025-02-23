@@ -34,6 +34,14 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> implements Clo
     }
 
     @Override
+    public void skip() {
+        if (_next == null)
+            throw new NoSuchElementException();
+        _next = null;
+        fillNext();
+    }
+
+    @Override
     public void close() {
         _backing.close();
     }

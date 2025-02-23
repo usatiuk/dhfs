@@ -156,6 +156,11 @@ public class CachingObjectPersistentStore {
         }
 
         @Override
+        public void skip() {
+            _delegate.skip();
+        }
+
+        @Override
         public void close() {
             _delegate.close();
         }
@@ -179,6 +184,7 @@ public class CachingObjectPersistentStore {
     // Warning: it has a nasty side effect of global caching, so in this case don't even call next on it,
     // if some objects are still in writeback
     public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
+        Log.tracev("Getting cache iterator: {0}, {1}", start, key);
         _cacheVersionLock.readLock().lock();
         try {
             return new InconsistentSelfRefreshingKvIterator<>(

@@ -44,6 +44,11 @@ public class SerializingObjectPersistentStore {
         }
 
         @Override
+        public void skip() {
+            _delegate.skip();
+        }
+
+        @Override
         public void close() {
             _delegate.close();
         }

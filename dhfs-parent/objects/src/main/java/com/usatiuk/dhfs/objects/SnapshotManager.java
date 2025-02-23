@@ -281,6 +281,14 @@ public class SnapshotManager {
             }
 
             @Override
+            public void skip() {
+                if (_next == null)
+                    throw new NoSuchElementException();
+                _next = null;
+                fillNext();
+            }
+
+            @Override
             public void close() {
                 _backing.close();
             }
@@ -319,6 +327,11 @@ public class SnapshotManager {
             @Override
             public JObjectKey peekNextKey() {
                 return _backing.peekNextKey();
+            }
+
+            @Override
+            public void skip() {
+                _backing.skip();
             }
 
             @Override

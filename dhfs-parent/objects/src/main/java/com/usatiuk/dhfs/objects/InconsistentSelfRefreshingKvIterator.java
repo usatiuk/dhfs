@@ -92,6 +92,20 @@ public class InconsistentSelfRefreshingKvIterator<K extends Comparable<K>, V> im
     }
 
     @Override
+    public void skip() {
+        _lock.lock();
+        try {
+            maybeRefresh();
+            _lastReturnedKey = _backing.peekNextKey();
+            _backing.skip();
+            _peekedNext = false;
+            _peekedKey = null;
+        } finally {
+            _lock.unlock();
+        }
+    }
+
+    @Override
     public void close() {
         _backing.close();
     }

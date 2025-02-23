@@ -38,6 +38,17 @@ public class InvalidatableKvIterator<K extends Comparable<K>, V> implements Clos
     }
 
     @Override
+    public void skip() {
+        _lock.lock();
+        try {
+            checkVersion();
+            _backing.skip();
+        } finally {
+            _lock.unlock();
+        }
+    }
+
+    @Override
     public void close() {
         _backing.close();
     }

@@ -7,4 +7,6 @@ import java.util.Iterator;
 
 public interface CloseableKvIterator<K extends Comparable<K>, V> extends Iterator<Pair<K, V>>, AutoCloseableNoThrow {
     K peekNextKey();
+
+    void skip();
 }

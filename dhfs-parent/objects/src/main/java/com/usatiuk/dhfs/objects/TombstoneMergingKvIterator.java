@@ -42,6 +42,11 @@ public class TombstoneMergingKvIterator<K extends Comparable<K>, V> implements C
     }
 
     @Override
+    public void skip() {
+        _backing.skip();
+    }
+
+    @Override
     public void close() {
         _backing.close();
     }

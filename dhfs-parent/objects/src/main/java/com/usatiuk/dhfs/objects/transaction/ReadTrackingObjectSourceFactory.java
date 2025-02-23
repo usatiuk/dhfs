@@ -84,6 +84,11 @@ public class ReadTrackingObjectSourceFactory {
             }
 
             @Override
+            public void skip() {
+                _backing.skip();
+            }
+
+            @Override
             public void close() {
                 _backing.close();
             }

@@ -172,6 +172,11 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
         }
 
         @Override
+        public void skip() {
+            _hasNext = _cursor.next();
+        }
+
+        @Override
         public JObjectKey peekNextKey() {
             if (!_hasNext) {
                 throw new NoSuchElementException("No more elements");

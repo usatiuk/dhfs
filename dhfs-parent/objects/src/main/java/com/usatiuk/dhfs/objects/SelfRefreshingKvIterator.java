@@ -92,6 +92,14 @@ public class SelfRefreshingKvIterator<K extends Comparable<K>, V> implements Clo
     }
 
     @Override
+    public void skip() {
+        if (_next == null) {
+            throw new NoSuchElementException();
+        }
+        prepareNext();
+    }
+
+    @Override
     public void close() {
         _backing.close();
     }

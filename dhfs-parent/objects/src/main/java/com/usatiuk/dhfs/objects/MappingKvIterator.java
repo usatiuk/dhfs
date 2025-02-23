@@ -19,6 +19,11 @@ public class MappingKvIterator<K extends Comparable<K>, V, V_T> implements Close
     }
 
     @Override
+    public void skip() {
+        _backing.skip();
+    }
+
+    @Override
     public void close() {
         _backing.close();
     }

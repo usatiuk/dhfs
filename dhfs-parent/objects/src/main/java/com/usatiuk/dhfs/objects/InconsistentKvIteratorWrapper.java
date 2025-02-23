@@ -30,6 +30,7 @@ public class InconsistentKvIteratorWrapper<K extends Comparable<K>, V> implement
     }
 
     private void refresh() {
+        Log.tracev("Refreshing iterator: {0}", _backing);
         _backing.close();
         if (_peekedKey != null) {
             _backing = _iteratorSupplier.apply(Pair.of(IteratorStart.GE, _peekedKey));
@@ -66,6 +67,25 @@ public class InconsistentKvIteratorWrapper<K extends Comparable<K>, V> implement
             _peekedNext = true;
             Log.tracev("Peeked key: {0}", _peekedKey);
             return _peekedKey;
+        }
+    }
+
+    @Override
+    public void skip() {
+        while (true) {
+            try {
+                _lastReturnedKey = _backing.peekNextKey();
+                _backing.skip();
+                _peekedNext = false;
+                _peekedKey = null;
+                return;
+            } catch (NoSuchElementException ignored) {
+                assert !_peekedNext;
+                throw ignored;
+            } catch (StaleIteratorException ignored) {
+                refresh();
+                continue;
+            }
         }
     }
 

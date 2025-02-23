@@ -41,6 +41,15 @@ public class NavigableMapKvIterator<K extends Comparable<K>, V> implements Close
     }
 
     @Override
+    public void skip() {
+        if (_next == null) {
+            throw new NoSuchElementException();
+        }
+        _next = null;
+        fillNext();
+    }
+
+    @Override
     public void close() {
     }
 

@@ -49,7 +49,7 @@ public class MergingKvIterator<K extends Comparable<K>, V> implements CloseableK
             _sortedIterators.put(key, iterator);
             advanceIterator(them);
         } else {
-            iterator.next();
+            iterator.skip();
             advanceIterator(iterator);
         }
     }
@@ -59,6 +59,17 @@ public class MergingKvIterator<K extends Comparable<K>, V> implements CloseableK
         if (_sortedIterators.isEmpty())
             throw new NoSuchElementException();
         return _sortedIterators.firstKey();
+    }
+
+    @Override
+    public void skip() {
+        var cur = _sortedIterators.pollFirstEntry();
+        if (cur == null) {
+            throw new NoSuchElementException();
+        }
+        cur.getValue().skip();
+        advanceIterator(cur.getValue());
+        Log.tracev("{0} Skip: {1}, next: {2}", _name, cur, _sortedIterators);
     }
 
     @Override
@@ -81,7 +92,7 @@ public class MergingKvIterator<K extends Comparable<K>, V> implements CloseableK
         }
         var curVal = cur.getValue().next();
         advanceIterator(cur.getValue());
-        Log.tracev("{0} Read: {1}, next: {2}", _name, curVal, _sortedIterators);
+        Log.tracev("{0} Read from {1}: {2}, next: {3}", _name, cur.getValue(), curVal, _sortedIterators);
         return curVal;
     }
 
