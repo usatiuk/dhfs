@@ -20,12 +20,15 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 @ApplicationScoped
 public class TxWritebackImpl implements TxWriteback {
     private final LinkedList<TxBundleImpl> _pendingBundles = new LinkedList<>();
+    private final ReentrantReadWriteLock _pendingBundlesVersionLock = new ReentrantReadWriteLock();
 
     private final ConcurrentSkipListMap<JObjectKey, PendingWriteEntry> _pendingWrites = new ConcurrentSkipListMap<>();
+    private final AtomicLong _pendingWritesVersion = new AtomicLong();
     private final LinkedHashMap<Long, TxBundleImpl> _notFlushedBundles = new LinkedHashMap<>();
 
     private final Object _flushWaitSynchronizer = new Object();
@@ -128,12 +131,14 @@ public class TxWritebackImpl implements TxWriteback {
 
                 Log.trace("Bundle " + bundle.getId() + " committed");
 
+                // Remove from pending writes, after real commit
                 synchronized (_pendingBundles) {
                     bundle._entries.values().forEach(e -> {
                         var cur = _pendingWrites.get(e.key());
                         if (cur.bundleId() <= bundle.getId())
                             _pendingWrites.remove(e.key(), cur);
                     });
+                    // No need to increment version
                 }
 
                 List<List<Runnable>> callbacks = new ArrayList<>();
@@ -219,22 +224,28 @@ public class TxWritebackImpl implements TxWriteback {
     @Override
     public void commitBundle(TxBundle bundle) {
         verifyReady();
-        synchronized (_pendingBundles) {
-            ((TxBundleImpl) bundle).setReady();
-            ((TxBundleImpl) bundle)._entries.values().forEach(e -> {
-                switch (e) {
-                    case TxBundleImpl.CommittedEntry c ->
-                            _pendingWrites.put(c.key(), new PendingWrite(c.data, bundle.getId()));
-                    case TxBundleImpl.DeletedEntry d ->
-                            _pendingWrites.put(d.key(), new PendingDelete(d.key, bundle.getId()));
-                    default -> throw new IllegalStateException("Unexpected value: " + e);
+        _pendingBundlesVersionLock.writeLock().lock();
+        try {
+            synchronized (_pendingBundles) {
+                ((TxBundleImpl) bundle).setReady();
+                ((TxBundleImpl) bundle)._entries.values().forEach(e -> {
+                    switch (e) {
+                        case TxBundleImpl.CommittedEntry c ->
+                                _pendingWrites.put(c.key(), new PendingWrite(c.data, bundle.getId()));
+                        case TxBundleImpl.DeletedEntry d ->
+                                _pendingWrites.put(d.key(), new PendingDelete(d.key, bundle.getId()));
+                        default -> throw new IllegalStateException("Unexpected value: " + e);
+                    }
+                });
+                _pendingWritesVersion.incrementAndGet();
+                if (_pendingBundles.peek() == bundle)
+                    _pendingBundles.notify();
+                synchronized (_flushWaitSynchronizer) {
+                    currentSize += ((TxBundleImpl) bundle).calculateTotalSize();
                 }
-            });
-            if (_pendingBundles.peek() == bundle)
-                _pendingBundles.notify();
-            synchronized (_flushWaitSynchronizer) {
-                currentSize += ((TxBundleImpl) bundle).calculateTotalSize();
             }
+        } finally {
+            _pendingBundlesVersionLock.writeLock().unlock();
         }
     }
 
@@ -378,14 +389,20 @@ public class TxWritebackImpl implements TxWriteback {
 
     // Returns an iterator with a view of all commited objects
     // Does not have to guarantee consistent view, snapshots are handled by upper layers
+    // Invalidated by commitBundle, but might return data after it has been really committed
     @Override
     public CloseableKvIterator<JObjectKey, TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>> getIterator(IteratorStart start, JObjectKey key) {
-        return new MappingKvIterator<>(
-                new NavigableMapKvIterator<>(_pendingWrites, start, key),
-                e -> switch (e) {
-                    case PendingWrite p -> new TombstoneMergingKvIterator.Data<>(p.data());
-                    case PendingDelete d -> new TombstoneMergingKvIterator.Tombstone<>();
-                    default -> throw new IllegalStateException("Unexpected value: " + e);
-                });
+        _pendingBundlesVersionLock.readLock().lock();
+        try {
+            return new InvalidatableKvIterator<>(new MappingKvIterator<>(
+                    new NavigableMapKvIterator<>(_pendingWrites, start, key),
+                    e -> switch (e) {
+                        case PendingWrite p -> new TombstoneMergingKvIterator.Data<>(p.data());
+                        case PendingDelete d -> new TombstoneMergingKvIterator.Tombstone<>();
+                        default -> throw new IllegalStateException("Unexpected value: " + e);
+                    }), _pendingWritesVersion::get, _pendingBundlesVersionLock.readLock());
+        } finally {
+            _pendingBundlesVersionLock.readLock().unlock();
+        }
     }
 }

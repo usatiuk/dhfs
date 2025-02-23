@@ -113,6 +113,7 @@ public class CachingObjectPersistentStore {
             }
         }
         delegate.commitTx(names);
+        // Now, reading from the backing store should return the new data
         synchronized (_cache) {
             for (var key : Stream.concat(names.written().stream().map(Pair::getLeft),
                     names.deleted().stream()).toList()) {

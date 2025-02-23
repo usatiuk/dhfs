@@ -11,6 +11,8 @@ import javax.annotation.Nonnull;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
 @ApplicationScoped
@@ -19,6 +21,8 @@ public class WritebackObjectPersistentStore {
     CachingObjectPersistentStore delegate;
     @Inject
     TxWriteback txWriteback;
+    private final AtomicLong _commitCounter = new AtomicLong(0);
+    private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
 
     @Nonnull
     public Collection<JObjectKey> findAllObjects() {
@@ -88,6 +92,7 @@ public class WritebackObjectPersistentStore {
 
         Log.tracef("Committing transaction %d to storage", id);
         txWriteback.commitBundle(bundle);
+        _commitCounter.incrementAndGet();
 
         long bundleId = bundle.getId();
 
@@ -96,9 +101,16 @@ public class WritebackObjectPersistentStore {
 
     // Returns an iterator with a view of all commited objects
     // Does not have to guarantee consistent view, snapshots are handled by upper layers
+    // Should be refreshed after each commit
     public CloseableKvIterator<JObjectKey, TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>> getIterator(IteratorStart start, JObjectKey key) {
-        return new MergingKvIterator<>(txWriteback.getIterator(start, key),
-                new MappingKvIterator<>(delegate.getIterator(start, key), TombstoneMergingKvIterator.Data::new));
+        _lock.readLock().lock();
+        try {
+            return new InvalidatableKvIterator<>(new MergingKvIterator<>(txWriteback.getIterator(start, key),
+                    new MappingKvIterator<>(delegate.getIterator(start, key), TombstoneMergingKvIterator.Data::new)),
+                    _commitCounter::get, _lock.readLock());
+        } finally {
+            _lock.readLock().unlock();
+        }
     }
 
     public CloseableKvIterator<JObjectKey, TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>> getIterator(JObjectKey key) {

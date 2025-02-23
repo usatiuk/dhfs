@@ -14,12 +14,15 @@ import java.lang.ref.Cleaner;
 import java.util.*;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
 @ApplicationScoped
 public class SnapshotManager {
     @Inject
     WritebackObjectPersistentStore delegateStore;
+
+    private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
 
     private interface SnapshotEntry {
         long whenToRemove();
@@ -55,7 +58,8 @@ public class SnapshotManager {
     }
 
     Consumer<Runnable> commitTx(Collection<TxRecord.TxObjectRecord<?>> writes, long id) {
-        synchronized (this) {
+        _lock.writeLock().lock();
+        try {
             assert id > _lastSnapshotId;
             if (!_snapshotIds.isEmpty()) {
                 verify();
@@ -67,10 +71,9 @@ public class SnapshotManager {
                     Pair<SnapshotKey, SnapshotEntry> newSnapshotEntry = switch (current) {
                         case WritebackObjectPersistentStore.VerboseReadResultPersisted(
                                 Optional<JDataVersionedWrapper> data
-                        ) -> {
-                            yield Pair.of(new SnapshotKey(action.key(), Math.max(_snapshotIds.peek(), data.map(JDataVersionedWrapper::version).orElse(0L))),
-                                    data.<SnapshotEntry>map(o -> new SnapshotEntryObject(o, id)).orElse(new SnapshotEntryDeleted(id)));
-                        }
+                        ) ->
+                                Pair.of(new SnapshotKey(action.key(), Math.max(_snapshotIds.peek(), data.map(JDataVersionedWrapper::version).orElse(0L))),
+                                        data.<SnapshotEntry>map(o -> new SnapshotEntryObject(o, id)).orElse(new SnapshotEntryDeleted(id)));
                         case WritebackObjectPersistentStore.VerboseReadResultPending(
                                 TxWriteback.PendingWriteEntry pending
                         ) -> {
@@ -108,13 +111,19 @@ public class SnapshotManager {
             }
 
             verify();
+            // Commit under lock, iterators will see new version after the lock is released and writeback
+            // cache is updated
+            // TODO: Maybe writeback iterator being invalidated wouldn't be a problem?
             return delegateStore.commitTx(writes, id);
+        } finally {
+            _lock.writeLock().unlock();
         }
     }
 
     private void unrefSnapshot(long id) {
         Log.tracev("Unref snapshot {0}", id);
-        synchronized (this) {
+        _lock.writeLock().lock();
+        try {
             verify();
             var refCount = _snapshotRefCounts.merge(id, -1L, (a, b) -> a + b == 0 ? null : a + b);
             if (!(refCount == null && id == _lastAliveSnapshotId)) {
@@ -176,6 +185,8 @@ public class SnapshotManager {
                 curCount = _snapshotRefCounts.getOrDefault(curId, 0L);
             } while (curCount == 0);
             verify();
+        } finally {
+            _lock.writeLock().unlock();
         }
     }
 
@@ -201,7 +212,8 @@ public class SnapshotManager {
 
         private Snapshot(long id) {
             _id = id;
-            synchronized (SnapshotManager.this) {
+            _lock.writeLock().lock();
+            try {
                 verify();
                 if (_lastSnapshotId > id)
                     throw new IllegalSnapshotIdException("Snapshot id " + id + " is less than last snapshot id " + _lastSnapshotId);
@@ -212,6 +224,8 @@ public class SnapshotManager {
                     _snapshotIds.add(id);
                 }
                 verify();
+            } finally {
+                _lock.writeLock().unlock();
             }
             var closedRef = _closed;
             var idRef = _id;
@@ -295,9 +309,6 @@ public class SnapshotManager {
 
         }
 
-        // In case something was added to the snapshot, it is not guaranteed that the iterators will see it,
-        // so refresh them manually. Otherwise, it could be possible that something from the writeback cache will
-        // be served instead.
         public class CheckingSnapshotKvIterator implements CloseableKvIterator<JObjectKey, JDataVersionedWrapper> {
             private final CloseableKvIterator<JObjectKey, JDataVersionedWrapper> _backing;
 
@@ -329,14 +340,18 @@ public class SnapshotManager {
         }
 
         public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-            return new CheckingSnapshotKvIterator(new SelfRefreshingKvIterator<>(() ->
-                    new TombstoneMergingKvIterator<>(new SnapshotKvIterator(start, key),
-                            new MappingKvIterator<>(delegateStore.getIterator(start, key), d -> switch (d) {
+            // In case something was added to the snapshot, it is not guaranteed that the iterators will see it,
+            // so refresh them manually. Otherwise, it could be possible that something from the writeback cache will
+            // be served instead. Note that refreshing the iterator will also refresh the writeback iterator,
+            // so it also should be consistent.
+            return new CheckingSnapshotKvIterator(new SelfRefreshingKvIterator<>((params) ->
+                    new TombstoneMergingKvIterator<>(new SnapshotKvIterator(params.getLeft(), params.getRight()),
+                            new MappingKvIterator<>(delegateStore.getIterator(params.getLeft(), params.getRight()), d -> switch (d) {
                                 case TombstoneMergingKvIterator.Tombstone<JDataVersionedWrapper>() -> d;
                                 case TombstoneMergingKvIterator.Data<JDataVersionedWrapper> data ->
                                         data.value().version() <= _id ? data : new TombstoneMergingKvIterator.Tombstone<>();
                                 default -> throw new IllegalStateException("Unexpected value: " + d);
-                            })), _snapshotVersion::get, SnapshotManager.this));
+                            })), _snapshotVersion::get, _lock.readLock(), start, key));
         }
 
         public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(JObjectKey key) {

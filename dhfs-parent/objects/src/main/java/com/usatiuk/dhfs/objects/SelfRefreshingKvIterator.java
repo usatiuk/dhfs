@@ -1,69 +1,84 @@
 package com.usatiuk.dhfs.objects;
 
+import com.usatiuk.dhfs.objects.persistence.IteratorStart;
 import io.quarkus.logging.Log;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.NoSuchElementException;
+import java.util.concurrent.locks.Lock;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
+// Also checks that the next provided item is always consistent after a refresh
 public class SelfRefreshingKvIterator<K extends Comparable<K>, V> implements CloseableKvIterator<K, V> {
     private CloseableKvIterator<K, V> _backing;
-    private long _lastRefreshed = -1L;
-    private Pair<K, V> _next;
-    private final Object _synchronizer;
-    private final Supplier<CloseableKvIterator<K, V>> _iteratorSupplier;
+    private long _curVersion = -1L;
+    private final Lock _lock;
+    private final Function<Pair<IteratorStart, K>, CloseableKvIterator<K, V>> _iteratorSupplier;
     private final Supplier<Long> _versionSupplier;
+    private Pair<K, V> _next;
 
-    public SelfRefreshingKvIterator(Supplier<CloseableKvIterator<K, V>> iteratorSupplier, Supplier<Long> versionSupplier, Object synchronizer) {
+    public SelfRefreshingKvIterator(Function<Pair<IteratorStart, K>, CloseableKvIterator<K, V>> iteratorSupplier, Supplier<Long> versionSupplier, Lock lock,
+                                    IteratorStart start, K key) {
         _iteratorSupplier = iteratorSupplier;
         _versionSupplier = versionSupplier;
-        _synchronizer = synchronizer;
+        _lock = lock;
 
-        synchronized (_synchronizer) {
+        _lock.lock();
+        try {
             long curVersion = _versionSupplier.get();
-            _backing = _iteratorSupplier.get();
+            _backing = _iteratorSupplier.apply(Pair.of(start, key));
             _next = _backing.hasNext() ? _backing.next() : null;
-//            if (_next != null)
-//                assert _next.getValue().version() <= _id;
-            _lastRefreshed = curVersion;
+            _curVersion = curVersion;
+        } finally {
+            _lock.unlock();
         }
     }
 
-    private void doRefresh() {
-        long curVersion = _versionSupplier.get();
-        if (curVersion == _lastRefreshed) {
-            return;
-        }
-        if (_next == null) return;
-        synchronized (_synchronizer) {
-            curVersion = _versionSupplier.get();
-            Log.tracev("Refreshing iterator last refreshed {0}, current version {1}", _lastRefreshed, curVersion);
-            _backing.close();
-            _backing = _iteratorSupplier.get();
+    private void maybeRefresh() {
+        _lock.lock();
+        CloseableKvIterator<K, V> oldBacking = null;
+        try {
+            if (_versionSupplier.get() == _curVersion) {
+                return;
+            }
+            long newVersion = _versionSupplier.get();
+            Log.tracev("Refreshing iterator last refreshed {0}, current version {1}", _curVersion, newVersion);
+            oldBacking = _backing;
+            _backing = _iteratorSupplier.apply(Pair.of(IteratorStart.GE, _next.getKey()));
             var next = _backing.hasNext() ? _backing.next() : null;
             if (next == null) {
                 Log.errorv("Failed to refresh iterator, null last refreshed {0}," +
-                        " current version {1}, current value {2}", _lastRefreshed, curVersion, next);
+                        " current version {1}, current value {2}", _curVersion, newVersion, next);
                 assert false;
             } else if (!next.equals(_next)) {
                 Log.errorv("Failed to refresh iterator, mismatch last refreshed {0}," +
-                        " current version {1}, current value {2}, read value {3}", _lastRefreshed, curVersion, _next, next);
+                        " current version {1}, current value {2}, read value {3}", _curVersion, newVersion, _next, next);
                 assert false;
             }
 
             _next = next;
-            _lastRefreshed = curVersion;
+            _curVersion = newVersion;
+        } finally {
+            _lock.unlock();
+            if (oldBacking != null) {
+                oldBacking.close();
+            }
         }
     }
 
     // _next should always be valid, so it's ok to do the refresh "lazily"
     private void prepareNext() {
-        doRefresh();
-        if (_backing.hasNext()) {
-            _next = _backing.next();
-//            assert _next.getValue().version() <= _id;
-        } else {
-            _next = null;
+        _lock.lock();
+        try {
+            maybeRefresh();
+            if (_backing.hasNext()) {
+                _next = _backing.next();
+            } else {
+                _next = null;
+            }
+        } finally {
+            _lock.unlock();
         }
     }
 
@@ -91,7 +106,6 @@ public class SelfRefreshingKvIterator<K extends Comparable<K>, V> implements Clo
             throw new NoSuchElementException("No more elements");
         }
         var ret = _next;
-//        assert ret.getValue().version() <= _id;
         prepareNext();
         Log.tracev("Read: {0}, next: {1}", ret, _next);
         return ret;
