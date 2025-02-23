@@ -15,7 +15,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 @ApplicationScoped
 public class SnapshotManager {
@@ -299,76 +298,16 @@ public class SnapshotManager {
         // In case something was added to the snapshot, it is not guaranteed that the iterators will see it,
         // so refresh them manually. Otherwise, it could be possible that something from the writeback cache will
         // be served instead.
-        public class AutoRefreshingSnapshotKvIterator implements CloseableKvIterator<JObjectKey, JDataVersionedWrapper> {
-            private CloseableKvIterator<JObjectKey, JDataVersionedWrapper> _backing;
-            private long _lastRefreshed = -1L;
-            private Pair<JObjectKey, JDataVersionedWrapper> _next;
+        public class CheckingSnapshotKvIterator implements CloseableKvIterator<JObjectKey, JDataVersionedWrapper> {
+            private final CloseableKvIterator<JObjectKey, JDataVersionedWrapper> _backing;
 
-            private final Function<TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>, TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>> _downstreamTombstoneMapper
-                    = d -> switch (d) {
-                case TombstoneMergingKvIterator.Tombstone<JDataVersionedWrapper>() -> d;
-                case TombstoneMergingKvIterator.Data<JDataVersionedWrapper> data ->
-                        data.value().version() <= _id ? data : new TombstoneMergingKvIterator.Tombstone<>();
-                default -> throw new IllegalStateException("Unexpected value: " + d);
-            };
-
-            public AutoRefreshingSnapshotKvIterator(IteratorStart start, JObjectKey key) {
-                synchronized (SnapshotManager.this) {
-                    long curVersion = _snapshotVersion.get();
-                    _backing = new TombstoneMergingKvIterator<>(new SnapshotKvIterator(start, key),
-                            new MappingKvIterator<>(delegateStore.getIterator(start, key), _downstreamTombstoneMapper));
-                    _next = _backing.hasNext() ? _backing.next() : null;
-                    if (_next != null)
-                        assert _next.getValue().version() <= _id;
-                    _lastRefreshed = curVersion;
-                }
-            }
-
-            private void doRefresh() {
-                long curVersion = _snapshotVersion.get();
-                if (curVersion == _lastRefreshed) {
-                    return;
-                }
-                if (_next == null) return;
-                synchronized (SnapshotManager.this) {
-                    curVersion = _snapshotVersion.get();
-                    Log.tracev("Refreshing snapshot iterator {0}, last refreshed {1}, current version {2}", _id, _lastRefreshed, curVersion);
-                    _backing.close();
-                    _backing = new TombstoneMergingKvIterator<>(new SnapshotKvIterator(IteratorStart.GE, _next.getKey()),
-                            new MappingKvIterator<>(delegateStore.getIterator(IteratorStart.GE, _next.getKey()), _downstreamTombstoneMapper));
-                    var next = _backing.hasNext() ? _backing.next() : null;
-                    if (next == null) {
-                        Log.errorv("Failed to refresh snapshot iterator, null {0}, last refreshed {1}," +
-                                " current version {2}, current value {3}", _id, _lastRefreshed, curVersion, next);
-                        assert false;
-                    } else if (!next.equals(_next)) {
-                        Log.errorv("Failed to refresh snapshot iterator, mismatch {0}, last refreshed {1}," +
-                                " current version {2}, current value {3}, read value {4}", _id, _lastRefreshed, curVersion, _next, next);
-                        assert false;
-                    }
-
-                    _next = next;
-                    _lastRefreshed = curVersion;
-                }
-            }
-
-            // _next should always be valid, so it's ok to do the refresh "lazily"
-            private void prepareNext() {
-                doRefresh();
-                if (_backing.hasNext()) {
-                    _next = _backing.next();
-                    assert _next.getValue().version() <= _id;
-                } else {
-                    _next = null;
-                }
+            public CheckingSnapshotKvIterator(CloseableKvIterator<JObjectKey, JDataVersionedWrapper> backing) {
+                _backing = backing;
             }
 
             @Override
             public JObjectKey peekNextKey() {
-                if (_next == null) {
-                    throw new NoSuchElementException();
-                }
-                return _next.getKey();
+                return _backing.peekNextKey();
             }
 
             @Override
@@ -378,24 +317,26 @@ public class SnapshotManager {
 
             @Override
             public boolean hasNext() {
-                return _next != null;
+                return _backing.hasNext();
             }
 
             @Override
             public Pair<JObjectKey, JDataVersionedWrapper> next() {
-                if (_next == null) {
-                    throw new NoSuchElementException("No more elements");
-                }
-                var ret = _next;
+                var ret = _backing.next();
                 assert ret.getValue().version() <= _id;
-                prepareNext();
-                Log.tracev("Read: {0}, next: {1}", ret, _next);
                 return ret;
             }
         }
 
         public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-            return new AutoRefreshingSnapshotKvIterator(start, key);
+            return new CheckingSnapshotKvIterator(new SelfRefreshingKvIterator<>(() ->
+                    new TombstoneMergingKvIterator<>(new SnapshotKvIterator(start, key),
+                            new MappingKvIterator<>(delegateStore.getIterator(start, key), d -> switch (d) {
+                                case TombstoneMergingKvIterator.Tombstone<JDataVersionedWrapper>() -> d;
+                                case TombstoneMergingKvIterator.Data<JDataVersionedWrapper> data ->
+                                        data.value().version() <= _id ? data : new TombstoneMergingKvIterator.Tombstone<>();
+                                default -> throw new IllegalStateException("Unexpected value: " + d);
+                            })), _snapshotVersion::get, SnapshotManager.this));
         }
 
         public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(JObjectKey key) {
