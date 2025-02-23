@@ -111,13 +111,17 @@ public class CachingObjectPersistentStore {
             // During commit, readObject shouldn't be called for these items,
             // it should be handled by the upstream store
             synchronized (_cache) {
-                for (var key : Stream.concat(names.written().stream().map(Pair::getLeft),
-                        names.deleted().stream()).toList()) {
-                    _curSize -= Optional.ofNullable(_cache.get(key)).map(CacheEntry::size).orElse(0L);
-                    _cache.remove(key);
-                    _sortedCache.remove(key);
-//                Log.tracev("Removing {0} from cache", key);
-                    var added = _pendingWrites.add(key);
+                for (var write : names.written()) {
+                    put(write.getLeft(), Optional.of(write.getRight()));
+                    var added = _pendingWrites.add(write.getLeft());
+                    assert added;
+                }
+                for (var del : names.deleted()) {
+                    // TODO: tombstone cache?
+                    _curSize -= Optional.ofNullable(_cache.get(del)).map(CacheEntry::size).orElse(0L);
+                    _cache.remove(del);
+                    _sortedCache.remove(del);
+                    var added = _pendingWrites.add(del);
                     assert added;
                 }
             }
