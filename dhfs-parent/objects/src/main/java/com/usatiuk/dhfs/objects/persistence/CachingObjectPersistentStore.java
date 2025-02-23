@@ -17,12 +17,18 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Stream;
 
 @ApplicationScoped
 public class CachingObjectPersistentStore {
     private final LinkedHashMap<JObjectKey, CacheEntry> _cache = new LinkedHashMap<>(8, 0.75f, true);
     private final ConcurrentSkipListMap<JObjectKey, CacheEntry> _sortedCache = new ConcurrentSkipListMap<>();
+
+    private final AtomicLong _cacheVersion = new AtomicLong(0);
+    private final ReentrantReadWriteLock _cacheVersionLock = new ReentrantReadWriteLock();
+
     private final HashSet<JObjectKey> _pendingWrites = new HashSet<>();
     private final DataLocker _locker = new DataLocker();
     @Inject
@@ -99,27 +105,33 @@ public class CachingObjectPersistentStore {
     }
 
     public void commitTx(TxManifestObj<? extends JDataVersionedWrapper> names) {
-        // During commit, readObject shouldn't be called for these items,
-        // it should be handled by the upstream store
-        synchronized (_cache) {
-            for (var key : Stream.concat(names.written().stream().map(Pair::getLeft),
-                    names.deleted().stream()).toList()) {
-                _curSize -= Optional.ofNullable(_cache.get(key)).map(CacheEntry::size).orElse(0L);
-                _cache.remove(key);
-                _sortedCache.remove(key);
+        _cacheVersionLock.writeLock().lock();
+        try {
+            // During commit, readObject shouldn't be called for these items,
+            // it should be handled by the upstream store
+            synchronized (_cache) {
+                for (var key : Stream.concat(names.written().stream().map(Pair::getLeft),
+                        names.deleted().stream()).toList()) {
+                    _curSize -= Optional.ofNullable(_cache.get(key)).map(CacheEntry::size).orElse(0L);
+                    _cache.remove(key);
+                    _sortedCache.remove(key);
 //                Log.tracev("Removing {0} from cache", key);
-                var added = _pendingWrites.add(key);
-                assert added;
+                    var added = _pendingWrites.add(key);
+                    assert added;
+                }
             }
-        }
-        delegate.commitTx(names);
-        // Now, reading from the backing store should return the new data
-        synchronized (_cache) {
-            for (var key : Stream.concat(names.written().stream().map(Pair::getLeft),
-                    names.deleted().stream()).toList()) {
-                var removed = _pendingWrites.remove(key);
-                assert removed;
+            delegate.commitTx(names);
+            // Now, reading from the backing store should return the new data
+            synchronized (_cache) {
+                for (var key : Stream.concat(names.written().stream().map(Pair::getLeft),
+                        names.deleted().stream()).toList()) {
+                    var removed = _pendingWrites.remove(key);
+                    assert removed;
+                }
             }
+            _cacheVersion.incrementAndGet();
+        } finally {
+            _cacheVersionLock.writeLock().unlock();
         }
     }
 
@@ -159,11 +171,13 @@ public class CachingObjectPersistentStore {
     // Warning: it has a nasty side effect of global caching, so in this case don't even call next on it,
     // if some objects are still in writeback
     public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-        return new MergingKvIterator<>(
-                new PredicateKvIterator<>(
-                        new NavigableMapKvIterator<>(_sortedCache, start, key),
-                        e -> e.object().orElse(null)
-                ), new CachingKvIterator(delegate.getIterator(start, key)));
+        return new InconsistentSelfRefreshingKvIterator<>(
+                (bp) -> new MergingKvIterator<>(
+                        new PredicateKvIterator<>(
+                                new NavigableMapKvIterator<>(_sortedCache, bp.getLeft(), bp.getRight()),
+                                e -> e.object().orElse(null)
+                        ), new CachingKvIterator(delegate.getIterator(bp.getLeft(), bp.getRight()))), _cacheVersion::get,
+                _cacheVersionLock.readLock(), start, key);
     }
 
     public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(JObjectKey key) {
