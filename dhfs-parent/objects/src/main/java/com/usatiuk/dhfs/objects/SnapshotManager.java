@@ -362,10 +362,10 @@ public class SnapshotManager {
         public Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
             try (var it = getIterator(name)) {
                 if (it.hasNext()) {
-                    var read = it.next();
-                    if (read.getKey().equals(name)) {
-                        return Optional.of(read.getValue());
+                    if (!it.peekNextKey().equals(name)) {
+                        return Optional.empty();
                     }
+                    return Optional.of(it.next().getValue());
                 }
             }
             return Optional.empty();
