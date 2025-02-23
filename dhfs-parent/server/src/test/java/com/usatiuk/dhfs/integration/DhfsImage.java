@@ -69,6 +69,7 @@ public class DhfsImage implements Future<String> {
                                 .cmd("java", "-ea", "-Xmx128M",
                                         "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
                                         "--add-exports", "java.base/jdk.internal.access=ALL-UNNAMED",
+                                        "--add-opens=java.base/java.nio=ALL-UNNAMED",
                                         "-Ddhfs.objects.peerdiscovery.interval=1s",
                                         "-Ddhfs.objects.invalidation.delay=100",
                                         "-Ddhfs.objects.deletion.delay=0",

@@ -121,6 +121,7 @@
                     <argLine>
                         --add-exports java.base/sun.nio.ch=ALL-UNNAMED
                         --add-exports java.base/jdk.internal.access=ALL-UNNAMED
+                        --add-opens=java.base/java.nio=ALL-UNNAMED
                     </argLine>
                     <skipTests>${skip.unit}</skipTests>
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
