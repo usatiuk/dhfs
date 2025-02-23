@@ -105,6 +105,7 @@ public class CachingObjectPersistentStore {
     }
 
     public void commitTx(TxManifestObj<? extends JDataVersionedWrapper> names) {
+        var serialized = delegate.prepareManifest(names);
         _cacheVersionLock.writeLock().lock();
         try {
             // During commit, readObject shouldn't be called for these items,
@@ -120,7 +121,7 @@ public class CachingObjectPersistentStore {
                     assert added;
                 }
             }
-            delegate.commitTx(names);
+            delegate.commitTx(serialized);
             // Now, reading from the backing store should return the new data
             synchronized (_cache) {
                 for (var key : Stream.concat(names.written().stream().map(Pair::getLeft),

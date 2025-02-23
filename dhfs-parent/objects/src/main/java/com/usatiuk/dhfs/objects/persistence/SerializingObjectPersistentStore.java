@@ -70,11 +70,19 @@ public class SerializingObjectPersistentStore {
         return getIterator(IteratorStart.GE, key);
     }
 
-    void commitTx(TxManifestObj<? extends JDataVersionedWrapper> names) {
-        delegateStore.commitTx(new TxManifestRaw(
+    public TxManifestRaw prepareManifest(TxManifestObj<? extends JDataVersionedWrapper> names) {
+        return new TxManifestRaw(
                 names.written().stream()
                         .map(e -> Pair.of(e.getKey(), serializer.serialize(e.getValue())))
                         .toList()
-                , names.deleted()));
+                , names.deleted());
+    }
+
+    void commitTx(TxManifestObj<? extends JDataVersionedWrapper> names) {
+        delegateStore.commitTx(prepareManifest(names));
+    }
+
+    void commitTx(TxManifestRaw names) {
+        delegateStore.commitTx(names);
     }
 }
