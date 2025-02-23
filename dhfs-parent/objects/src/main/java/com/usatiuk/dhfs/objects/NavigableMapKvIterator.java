@@ -60,4 +60,11 @@ public class NavigableMapKvIterator<K extends Comparable<K>, V> implements Close
         return Pair.of(ret);
     }
 
+    @Override
+    public String toString() {
+        return "NavigableMapKvIterator{" +
+                "_iterator=" + _iterator +
+                ", _next=" + _next +
+                '}';
+    }
 }

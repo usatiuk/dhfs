@@ -125,6 +125,7 @@ public class CachingObjectPersistentStore {
                     assert added;
                 }
             }
+            Log.tracev("Committing: {0} writes, {1} deletes", names.written().size(), names.deleted().size());
             delegate.commitTx(serialized);
             // Now, reading from the backing store should return the new data
             synchronized (_cache) {
@@ -135,6 +136,7 @@ public class CachingObjectPersistentStore {
                 }
             }
             _cacheVersion.incrementAndGet();
+            Log.tracev("Committed: {0} writes, {1} deletes", names.written().size(), names.deleted().size());
         } finally {
             _cacheVersionLock.writeLock().unlock();
         }
@@ -166,6 +168,7 @@ public class CachingObjectPersistentStore {
         @Override
         public Pair<JObjectKey, JDataVersionedWrapper> next() {
             var next = _delegate.next();
+            Log.tracev("Caching: {0}", next);
             put(next.getKey(), Optional.of(next.getValue()));
             return next;
         }
@@ -176,13 +179,21 @@ public class CachingObjectPersistentStore {
     // Warning: it has a nasty side effect of global caching, so in this case don't even call next on it,
     // if some objects are still in writeback
     public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-        return new InconsistentSelfRefreshingKvIterator<>(
-                (bp) -> new MergingKvIterator<>(
-                        new PredicateKvIterator<>(
-                                new NavigableMapKvIterator<>(_sortedCache, bp.getLeft(), bp.getRight()),
-                                e -> e.object().orElse(null)
-                        ), new CachingKvIterator(delegate.getIterator(bp.getLeft(), bp.getRight()))), _cacheVersion::get,
-                _cacheVersionLock.readLock(), start, key);
+        _cacheVersionLock.readLock().lock();
+        try {
+            return new InconsistentSelfRefreshingKvIterator<>(
+                    (bp) -> new MergingKvIterator<>("cache",
+                            new PredicateKvIterator<>(
+                                    new NavigableMapKvIterator<>(_sortedCache, bp.getLeft(), bp.getRight()),
+                                    e -> {
+                                        Log.tracev("Taken from cache: {0}", e);
+                                        return e.object().orElse(null);
+                                    }
+                            ), new CachingKvIterator(delegate.getIterator(bp.getLeft(), bp.getRight()))), _cacheVersion::get,
+                    _cacheVersionLock.readLock(), start, key);
+        } finally {
+            _cacheVersionLock.readLock().unlock();
+        }
     }
 
     public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(JObjectKey key) {

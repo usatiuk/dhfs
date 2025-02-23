@@ -53,4 +53,11 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> implements Clo
         return ret;
     }
 
+    @Override
+    public String toString() {
+        return "PredicateKvIterator{" +
+                "_backing=" + _backing +
+                ", _next=" + _next +
+                '}';
+    }
 }

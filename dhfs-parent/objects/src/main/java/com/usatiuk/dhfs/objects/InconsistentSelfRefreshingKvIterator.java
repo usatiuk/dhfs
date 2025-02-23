@@ -45,7 +45,6 @@ public class InconsistentSelfRefreshingKvIterator<K extends Comparable<K>, V> im
                 return;
             }
             long newVersion = _versionSupplier.get();
-            Log.tracev("Refreshing iterator last refreshed {0}, current version {1}", _curVersion, newVersion);
             oldBacking = _backing;
             if (_peekedKey != null) {
                 _backing = _iteratorSupplier.apply(Pair.of(IteratorStart.GE, _peekedKey));
@@ -61,6 +60,9 @@ public class InconsistentSelfRefreshingKvIterator<K extends Comparable<K>, V> im
             if (_peekedNext && !_backing.hasNext()) {
                 throw new StaleIteratorException();
             }
+
+            Log.tracev("Refreshed iterator last refreshed {0}, current version {1}",
+                    _curVersion, newVersion);
 
             _curVersion = newVersion;
         } finally {
@@ -80,7 +82,9 @@ public class InconsistentSelfRefreshingKvIterator<K extends Comparable<K>, V> im
         try {
             maybeRefresh();
             _peekedKey = _backing.peekNextKey();
+            assert _lastReturnedKey == null || _peekedKey.compareTo(_lastReturnedKey) > 0;
             _peekedNext = true;
+            Log.tracev("Peeked key: {0}", _peekedKey);
             return _peekedKey;
         } finally {
             _lock.unlock();
@@ -101,6 +105,7 @@ public class InconsistentSelfRefreshingKvIterator<K extends Comparable<K>, V> im
         try {
             maybeRefresh();
             _peekedNext = _backing.hasNext();
+            Log.tracev("Peeked next: {0}", _peekedNext);
             return _peekedNext;
         } finally {
             _lock.unlock();
@@ -113,6 +118,7 @@ public class InconsistentSelfRefreshingKvIterator<K extends Comparable<K>, V> im
         try {
             maybeRefresh();
             var got = _backing.next();
+            assert _lastReturnedKey == null || got.getKey().compareTo(_lastReturnedKey) > 0;
             _peekedNext = false;
             _peekedKey = null;
             _lastReturnedKey = got.getKey();

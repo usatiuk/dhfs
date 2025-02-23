@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.objects.repository.peersync;
 
+import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.JDataRemote;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.PeerId;
@@ -7,12 +8,12 @@ import com.usatiuk.dhfs.objects.repository.CertificateTools;
 
 import java.security.cert.X509Certificate;
 
-public record PeerInfo(JObjectKey key, PeerId id, byte[] cert) implements JDataRemote {
+public record PeerInfo(JObjectKey key, PeerId id, ByteString cert) implements JDataRemote {
     public PeerInfo(PeerId id, byte[] cert) {
-        this(id.toJObjectKey(), id, cert);
+        this(id.toJObjectKey(), id, ByteString.copyFrom(cert));
     }
 
     public X509Certificate parsedCert() {
-        return CertificateTools.certFromBytes(cert);
+        return CertificateTools.certFromBytes(cert.toByteArray());
     }
 }

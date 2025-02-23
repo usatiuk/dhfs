@@ -43,7 +43,6 @@ public class SelfRefreshingKvIterator<K extends Comparable<K>, V> implements Clo
                 return;
             }
             long newVersion = _versionSupplier.get();
-            Log.tracev("Refreshing iterator last refreshed {0}, current version {1}", _curVersion, newVersion);
             oldBacking = _backing;
             _backing = _iteratorSupplier.apply(Pair.of(IteratorStart.GE, _next.getKey()));
             var next = _backing.hasNext() ? _backing.next() : null;
@@ -56,6 +55,8 @@ public class SelfRefreshingKvIterator<K extends Comparable<K>, V> implements Clo
                         " current version {1}, current value {2}, read value {3}", _curVersion, newVersion, _next, next);
                 assert false;
             }
+            Log.tracev("Refreshed iterator last refreshed {0}, current version {1}, old value {2}, new value {3}",
+                    _curVersion, newVersion, _next, next);
 
             _next = next;
             _curVersion = newVersion;

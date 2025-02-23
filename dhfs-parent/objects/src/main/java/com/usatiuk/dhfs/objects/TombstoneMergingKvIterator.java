@@ -1,16 +1,20 @@
 package com.usatiuk.dhfs.objects;
 
+import io.quarkus.logging.Log;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.List;
 
 public class TombstoneMergingKvIterator<K extends Comparable<K>, V> implements CloseableKvIterator<K, V> {
     private final CloseableKvIterator<K, V> _backing;
+    private final String _name;
 
-    public TombstoneMergingKvIterator(List<CloseableKvIterator<K, DataType<V>>> iterators) {
+    public TombstoneMergingKvIterator(String name, List<CloseableKvIterator<K, DataType<V>>> iterators) {
+        _name = name;
         _backing = new PredicateKvIterator<>(
-                new MergingKvIterator<>(iterators),
+                new MergingKvIterator<>(name + "-merging", iterators),
                 pair -> {
+                    Log.tracev("{0} - Processing pair {1}", _name, pair);
                     if (pair instanceof Tombstone) {
                         return null;
                     }
@@ -19,8 +23,8 @@ public class TombstoneMergingKvIterator<K extends Comparable<K>, V> implements C
     }
 
     @SafeVarargs
-    public TombstoneMergingKvIterator(CloseableKvIterator<K, DataType<V>>... iterators) {
-        this(List.of(iterators));
+    public TombstoneMergingKvIterator(String name, CloseableKvIterator<K, DataType<V>>... iterators) {
+        this(name, List.of(iterators));
     }
 
     public interface DataType<T> {
@@ -50,5 +54,13 @@ public class TombstoneMergingKvIterator<K extends Comparable<K>, V> implements C
     @Override
     public Pair<K, V> next() {
         return _backing.next();
+    }
+
+    @Override
+    public String toString() {
+        return "TombstoneMergingKvIterator{" +
+                "_backing=" + _backing +
+                ", _name='" + _name + '\'' +
+                '}';
     }
 }

@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.data.Parent;
+import com.usatiuk.dhfs.objects.persistence.IteratorStart;
 import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import io.quarkus.logging.Log;
@@ -440,6 +441,139 @@ public class ObjectsTest {
             Assertions.assertEquals("John2", curTx.get(Parent.class, new JObjectKey(key)).orElseThrow().name());
         });
         deleteAndCheck(new JObjectKey(key));
+    }
+
+    @RepeatedTest(100)
+    void simpleIterator1() throws Exception {
+        var key = "SimpleIterator1";
+        var key1 = key + "_1";
+        var key2 = key + "_2";
+        var key3 = key + "_3";
+        var key4 = key + "_4";
+        txm.run(() -> {
+            curTx.put(new Parent(JObjectKey.of(key), "John"));
+            curTx.put(new Parent(JObjectKey.of(key1), "John1"));
+            curTx.put(new Parent(JObjectKey.of(key2), "John2"));
+            curTx.put(new Parent(JObjectKey.of(key3), "John3"));
+            curTx.put(new Parent(JObjectKey.of(key4), "John4"));
+        });
+        txm.run(() -> {
+            var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key));
+            var got = iter.next();
+            Assertions.assertEquals(key1, got.getKey().name());
+            got = iter.next();
+            Assertions.assertEquals(key2, got.getKey().name());
+            got = iter.next();
+            Assertions.assertEquals(key3, got.getKey().name());
+            got = iter.next();
+            Assertions.assertEquals(key4, got.getKey().name());
+        });
+    }
+
+    @RepeatedTest(100)
+    void simpleIterator2() throws Exception {
+        var key = "SimpleIterator2";
+        var key1 = key + "_1";
+        var key2 = key + "_2";
+        var key3 = key + "_3";
+        var key4 = key + "_4";
+        txm.run(() -> {
+            curTx.put(new Parent(JObjectKey.of(key), "John"));
+            curTx.put(new Parent(JObjectKey.of(key1), "John1"));
+            curTx.put(new Parent(JObjectKey.of(key2), "John2"));
+            curTx.put(new Parent(JObjectKey.of(key3), "John3"));
+            curTx.put(new Parent(JObjectKey.of(key4), "John4"));
+        });
+        txm.run(() -> {
+            var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key));
+            var got = iter.next();
+            Assertions.assertEquals(key1, got.getKey().name());
+            got = iter.next();
+            Assertions.assertEquals(key2, got.getKey().name());
+            got = iter.next();
+            Assertions.assertEquals(key3, got.getKey().name());
+            got = iter.next();
+            Assertions.assertEquals(key4, got.getKey().name());
+        });
+        txm.run(() -> {
+            curTx.delete(new JObjectKey(key));
+            curTx.delete(new JObjectKey(key1));
+            curTx.delete(new JObjectKey(key2));
+            curTx.delete(new JObjectKey(key3));
+            curTx.delete(new JObjectKey(key4));
+        });
+        txm.run(() -> {
+            var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key));
+            Assertions.assertTrue(!iter.hasNext() || !iter.next().getKey().name().startsWith(key));
+        });
+    }
+
+    @RepeatedTest(100)
+    void concurrentIterator1() {
+        var key = "ConcurrentIterator1";
+        var key1 = key + "_1";
+        var key2 = key + "_2";
+        var key3 = key + "_3";
+        var key4 = key + "_4";
+        txm.run(() -> {
+            curTx.put(new Parent(JObjectKey.of(key), "John"));
+            curTx.put(new Parent(JObjectKey.of(key1), "John1"));
+            curTx.put(new Parent(JObjectKey.of(key4), "John4"));
+        });
+        var barrier = new CyclicBarrier(2);
+        var barrier2 = new CyclicBarrier(2);
+        Just.runAll(() -> {
+            barrier.await();
+            txm.run(() -> {
+                Log.info("Thread 1 starting tx");
+                try {
+                    barrier2.await();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+                curTx.put(new Parent(JObjectKey.of(key2), "John2"));
+                curTx.put(new Parent(JObjectKey.of(key3), "John3"));
+                Log.info("Thread 1 committing");
+            });
+            Log.info("Thread 1 commited");
+            return null;
+        }, () -> {
+            txm.run(() -> {
+                Log.info("Thread 2 starting tx");
+                try {
+                    barrier.await();
+                    barrier2.await();
+                    var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key));
+                    var got = iter.next();
+                    Assertions.assertEquals(key1, got.getKey().name());
+                    got = iter.next();
+                    Assertions.assertEquals(key4, got.getKey().name());
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            Log.info("Thread 2 finished");
+            return null;
+        });
+        Log.info("All threads finished");
+        txm.run(() -> {
+            var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key));
+            var got = iter.next();
+            Assertions.assertEquals(key1, got.getKey().name());
+            got = iter.next();
+            Assertions.assertEquals(key2, got.getKey().name());
+            got = iter.next();
+            Assertions.assertEquals(key3, got.getKey().name());
+            got = iter.next();
+            Assertions.assertEquals(key4, got.getKey().name());
+        });
+        txm.run(() -> {
+            curTx.delete(new JObjectKey(key));
+            curTx.delete(new JObjectKey(key1));
+            curTx.delete(new JObjectKey(key2));
+            curTx.delete(new JObjectKey(key3));
+            curTx.delete(new JObjectKey(key4));
+        });
     }
 
 //    }

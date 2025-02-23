@@ -20,7 +20,7 @@ import java.util.function.Consumer;
 @ApplicationScoped
 public class SnapshotManager {
     @Inject
-    WritebackObjectPersistentStore delegateStore;
+    WritebackObjectPersistentStore writebackStore;
 
     private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
 
@@ -64,7 +64,7 @@ public class SnapshotManager {
             if (!_snapshotIds.isEmpty()) {
                 verify();
                 for (var action : writes) {
-                    var current = delegateStore.readObjectVerbose(action.key());
+                    var current = writebackStore.readObjectVerbose(action.key());
                     // Add to snapshot the previous visible version of the replaced object
                     // I.e. should be visible to all transactions with id <= id
                     // and at least as its corresponding version
@@ -75,13 +75,13 @@ public class SnapshotManager {
                                 Pair.of(new SnapshotKey(action.key(), Math.max(_snapshotIds.peek(), data.map(JDataVersionedWrapper::version).orElse(0L))),
                                         data.<SnapshotEntry>map(o -> new SnapshotEntryObject(o, id)).orElse(new SnapshotEntryDeleted(id)));
                         case WritebackObjectPersistentStore.VerboseReadResultPending(
-                                TxWriteback.PendingWriteEntry pending
+                                PendingWriteEntry pending
                         ) -> {
                             assert pending.bundleId() < id;
                             yield switch (pending) {
-                                case TxWriteback.PendingWrite write ->
+                                case PendingWrite write ->
                                         Pair.of(new SnapshotKey(action.key(), write.bundleId()), new SnapshotEntryObject(write.data(), id));
-                                case TxWriteback.PendingDelete delete ->
+                                case PendingDelete delete ->
                                         Pair.of(new SnapshotKey(action.key(), delete.bundleId()), new SnapshotEntryDeleted(id));
                                 default -> throw new IllegalStateException("Unexpected value: " + pending);
                             };
@@ -114,7 +114,7 @@ public class SnapshotManager {
             // Commit under lock, iterators will see new version after the lock is released and writeback
             // cache is updated
             // TODO: Maybe writeback iterator being invalidated wouldn't be a problem?
-            return delegateStore.commitTx(writes, id);
+            return writebackStore.commitTx(writes, id);
         } finally {
             _lock.writeLock().unlock();
         }
@@ -345,13 +345,10 @@ public class SnapshotManager {
             // be served instead. Note that refreshing the iterator will also refresh the writeback iterator,
             // so it also should be consistent.
             return new CheckingSnapshotKvIterator(new SelfRefreshingKvIterator<>((params) ->
-                    new TombstoneMergingKvIterator<>(new SnapshotKvIterator(params.getLeft(), params.getRight()),
-                            new MappingKvIterator<>(delegateStore.getIterator(params.getLeft(), params.getRight()), d -> switch (d) {
-                                case TombstoneMergingKvIterator.Tombstone<JDataVersionedWrapper>() -> d;
-                                case TombstoneMergingKvIterator.Data<JDataVersionedWrapper> data ->
-                                        data.value().version() <= _id ? data : new TombstoneMergingKvIterator.Tombstone<>();
-                                default -> throw new IllegalStateException("Unexpected value: " + d);
-                            })), _snapshotVersion::get, _lock.readLock(), start, key));
+                    new TombstoneMergingKvIterator<>("snapshot", new SnapshotKvIterator(params.getLeft(), params.getRight()),
+                            new MappingKvIterator<>(writebackStore.getIterator(params.getLeft(), params.getRight()), d ->
+                                    d.version() <= _id ? new TombstoneMergingKvIterator.Data<>(d) : new TombstoneMergingKvIterator.Tombstone<>()
+                            )), _snapshotVersion::get, _lock.readLock(), start, key));
         }
 
         public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(JObjectKey key) {
@@ -387,6 +384,6 @@ public class SnapshotManager {
 
     @Nonnull
     Optional<JDataVersionedWrapper> readObjectDirect(JObjectKey name) {
-        return delegateStore.readObject(name);
+        return writebackStore.readObject(name);
     }
 }

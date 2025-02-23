@@ -34,4 +34,10 @@ public class MappingKvIterator<K extends Comparable<K>, V, V_T> implements Close
         return Pair.of(got.getKey(), _transformer.apply(got.getValue()));
     }
 
+    @Override
+    public String toString() {
+        return "MappingKvIterator{" +
+                "_backing=" + _backing +
+                '}';
+    }
 }
