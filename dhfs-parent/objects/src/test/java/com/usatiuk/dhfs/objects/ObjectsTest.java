@@ -261,6 +261,92 @@ public class ObjectsTest {
             return curTx.get(Parent.class, new JObjectKey(key)).orElse(null);
         });
 
+        if (!thread1Failed.get() && !thread2Failed.get()) {
+            Assertions.assertTrue(got.name().equals("John") || got.name().equals("John2"));
+            return;
+        }
+
+        Assertions.assertFalse(!thread1Failed.get() && !thread2Failed.get());
+
+        if (!thread1Failed.get()) {
+            if (!thread2Failed.get()) {
+                Assertions.assertEquals("John2", got.name());
+            } else {
+                Assertions.assertEquals("John", got.name());
+            }
+        } else {
+            Assertions.assertFalse(thread2Failed.get());
+            Assertions.assertEquals("John2", got.name());
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(LockingStrategy.class)
+    void editConflict2(LockingStrategy strategy) {
+        String key = "EditConflict2" + strategy.name();
+        txm.run(() -> {
+            var newParent = new Parent(JObjectKey.of(key), "John3");
+            curTx.put(newParent);
+        });
+
+        AtomicBoolean thread1Failed = new AtomicBoolean(true);
+        AtomicBoolean thread2Failed = new AtomicBoolean(true);
+
+        var barrier = new CyclicBarrier(2);
+        var latchEnd = new CountDownLatch(2);
+
+        Just.run(() -> {
+            try {
+                Log.warn("Thread 1");
+                txm.runTries(() -> {
+                    try {
+                        barrier.await();
+                    } catch (Throwable e) {
+                        throw new RuntimeException(e);
+                    }
+                    var parent = curTx.get(Parent.class, new JObjectKey(key), strategy).orElse(null);
+                    curTx.put(parent.withName("John"));
+                    Log.warn("Thread 1 commit");
+                }, 0);
+                Log.warn("Thread 1 commit done");
+                thread1Failed.set(false);
+                return null;
+            } finally {
+                latchEnd.countDown();
+            }
+        });
+        Just.run(() -> {
+            try {
+                Log.warn("Thread 2");
+                txm.runTries(() -> {
+                    // Ensure they will conflict
+                    try {
+                        barrier.await();
+                    } catch (Throwable e) {
+                        throw new RuntimeException(e);
+                    }
+                    var parent = curTx.get(Parent.class, new JObjectKey(key), strategy).orElse(null);
+                    curTx.put(parent.withName("John2"));
+                    Log.warn("Thread 2 commit");
+                }, 0);
+                Log.warn("Thread 2 commit done");
+                thread2Failed.set(false);
+                return null;
+            } finally {
+                latchEnd.countDown();
+            }
+        });
+
+        try {
+            latchEnd.await();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        var got = txm.run(() -> {
+            return curTx.get(Parent.class, new JObjectKey(key)).orElse(null);
+        });
+
         Assertions.assertFalse(!thread1Failed.get() && !thread2Failed.get());
 
         if (!thread1Failed.get()) {
@@ -762,6 +848,8 @@ public class ObjectsTest {
                 () -> createCreateObject(),
                 () -> editConflict(LockingStrategy.WRITE),
                 () -> editConflict(LockingStrategy.OPTIMISTIC),
+                () -> editConflict2(LockingStrategy.WRITE),
+                () -> editConflict2(LockingStrategy.OPTIMISTIC),
                 () -> snapshotTest1(),
                 () -> snapshotTest2(),
                 () -> snapshotTest3(),
