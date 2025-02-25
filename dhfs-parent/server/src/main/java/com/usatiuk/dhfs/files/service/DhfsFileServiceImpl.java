@@ -10,6 +10,10 @@ import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaDirectory;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaFile;
+import com.usatiuk.dhfs.objects.jmap.JMapEntry;
+import com.usatiuk.dhfs.objects.jmap.JMapHelper;
+import com.usatiuk.dhfs.objects.jmap.JMapLongKey;
+import com.usatiuk.dhfs.objects.persistence.IteratorStart;
 import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.dhfs.utils.StatusRuntimeExceptionNoStacktrace;
@@ -23,7 +27,6 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.pcollections.TreePMap;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -68,6 +71,9 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     @Inject
     JKleppmannTreeManager jKleppmannTreeManager;
+
+    @Inject
+    JMapHelper jMapHelper;
 
     private JKleppmannTreeManager.JKleppmannTree getTree() {
         return jKleppmannTreeManager.getTree(new JObjectKey("fs"));
@@ -156,7 +162,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             var fuuid = UUID.randomUUID();
             Log.debug("Creating file " + fuuid);
-            File f = new File(JObjectKey.of(fuuid.toString()), mode, System.currentTimeMillis(), System.currentTimeMillis(), TreePMap.empty(), false, 0);
+            File f = new File(JObjectKey.of(fuuid.toString()), mode, System.currentTimeMillis(), System.currentTimeMillis(), false, 0);
             remoteTx.putData(f);
 
             try {
@@ -270,31 +276,27 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 return Optional.empty();
             }
 
-            try {
-                var chunksAll = file.chunks();
-                if (chunksAll.isEmpty()) {
+            try (var it = jMapHelper.getIterator(file, IteratorStart.LE, JMapLongKey.of(offset))) {
+                if (!it.hasNext())
                     return Optional.of(ByteString.empty());
-                }
-                var chunksList = chunksAll.tailMap(chunksAll.floorKey(offset)).entrySet();
 
-                if (chunksList.isEmpty()) {
-                    return Optional.of(ByteString.empty());
-                }
-
-                var chunks = chunksList.iterator();
+//                if (it.peekNextKey().key() != offset) {
+//                    Log.warnv("Read over the end of file: {0} {1} {2}, next chunk: {3}", fileUuid, offset, length, it.peekNextKey());
+//                    return Optional.of(ByteString.empty());
+//                }
+                long curPos = offset;
                 ByteString buf = ByteString.empty();
 
-                long curPos = offset;
-                var chunk = chunks.next();
+                var chunk = it.next();
 
                 while (curPos < offset + length) {
-                    var chunkPos = chunk.getKey();
+                    var chunkPos = chunk.getKey().key();
 
                     long offInChunk = curPos - chunkPos;
 
                     long toReadInChunk = (offset + length) - curPos;
 
-                    var chunkBytes = readChunk(chunk.getValue());
+                    var chunkBytes = readChunk(chunk.getValue().ref());
 
                     long readableLen = chunkBytes.size() - offInChunk;
 
@@ -309,12 +311,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                     if (readableLen > toReadInChunk)
                         break;
 
-                    if (!chunks.hasNext()) break;
+                    if (!it.hasNext()) break;
 
-                    chunk = chunks.next();
+                    chunk = it.next();
                 }
 
-                // FIXME:
                 return Optional.of(buf);
             } catch (Exception e) {
                 Log.error("Error reading file: " + fileUuid, e);
@@ -379,41 +380,68 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 file = remoteTx.getData(File.class, fileUuid).orElse(null);
             }
 
-            var chunksAll = file.chunks();
-            var first = chunksAll.floorEntry(offset);
-            var last = chunksAll.lowerEntry(offset + data.size());
+            Pair<JMapLongKey, JMapEntry<JMapLongKey>> first;
+            Pair<JMapLongKey, JMapEntry<JMapLongKey>> last;
+            Log.tracev("Getting last");
+            try (var it = jMapHelper.getIterator(file, IteratorStart.LT, JMapLongKey.of(offset + data.size()))) {
+                last = it.hasNext() ? it.next() : null;
+                Log.tracev("Last: {0}", last);
+            }
+
             NavigableMap<Long, JObjectKey> removedChunks = new TreeMap<>();
 
             long start = 0;
 
-            NavigableMap<Long, JObjectKey> beforeFirst = first != null ? chunksAll.headMap(first.getKey(), false) : Collections.emptyNavigableMap();
-            NavigableMap<Long, JObjectKey> afterLast = last != null ? chunksAll.tailMap(last.getKey(), false) : Collections.emptyNavigableMap();
-
-            if (first != null && (getChunkSize(first.getValue()) + first.getKey() <= offset)) {
-                beforeFirst = chunksAll;
-                afterLast = Collections.emptyNavigableMap();
-                first = null;
-                last = null;
-                start = offset;
-            } else if (!chunksAll.isEmpty()) {
-                var between = chunksAll.subMap(first.getKey(), true, last.getKey(), true);
-                removedChunks.putAll(between);
-                start = first.getKey();
+            try (var it = jMapHelper.getIterator(file, IteratorStart.LE, JMapLongKey.of(offset))) {
+                first = it.hasNext() ? it.next() : null;
+                Log.tracev("First: {0}", first);
+                boolean empty = last == null;
+                if (first != null && getChunkSize(first.getValue().ref()) + first.getKey().key() <= offset) {
+                    first = null;
+                    last = null;
+                    start = offset;
+                } else if (!empty) {
+                    assert first != null;
+                    removedChunks.put(first.getKey().key(), first.getValue().ref());
+                    while (it.hasNext() && it.peekNextKey().compareTo(last.getKey()) <= 0) {
+                        var next = it.next();
+                        Log.tracev("Next: {0}", next);
+                        removedChunks.put(next.getKey().key(), next.getValue().ref());
+                    }
+                    removedChunks.put(last.getKey().key(), last.getValue().ref());
+                    start = first.getKey().key();
+                }
             }
+
+
+//            NavigableMap<Long, JObjectKey> beforeFirst = first != null ? chunksAll.headMap(first.getKey(), false) : Collections.emptyNavigableMap();
+//            NavigableMap<Long, JObjectKey> afterLast = last != null ? chunksAll.tailMap(last.getKey(), false) : Collections.emptyNavigableMap();
+
+//            if (first != null && (getChunkSize(first.getValue()) + first.getKey() <= offset)) {
+//                beforeFirst = chunksAll;
+//                afterLast = Collections.emptyNavigableMap();
+//                first = null;
+//                last = null;
+//                start = offset;
+//            } else if (!chunksAll.isEmpty()) {
+//                var between = chunksAll.subMap(first.getKey(), true, last.getKey(), true);
+//                removedChunks.putAll(between);
+//                start = first.getKey();
+//            }
 
             ByteString pendingWrites = ByteString.empty();
 
-            if (first != null && first.getKey() < offset) {
-                var chunkBytes = readChunk(first.getValue());
-                pendingWrites = pendingWrites.concat(chunkBytes.substring(0, (int) (offset - first.getKey())));
+            if (first != null && first.getKey().key() < offset) {
+                var chunkBytes = readChunk(first.getValue().ref());
+                pendingWrites = pendingWrites.concat(chunkBytes.substring(0, (int) (offset - first.getKey().key())));
             }
             pendingWrites = pendingWrites.concat(data);
 
             if (last != null) {
-                var lchunkBytes = readChunk(last.getValue());
-                if (last.getKey() + lchunkBytes.size() > offset + data.size()) {
+                var lchunkBytes = readChunk(last.getValue().ref());
+                if (last.getKey().key() + lchunkBytes.size() > offset + data.size()) {
                     var startInFile = offset + data.size();
-                    var startInChunk = startInFile - last.getKey();
+                    var startInChunk = startInFile - last.getKey().key();
                     pendingWrites = pendingWrites.concat(lchunkBytes.substring((int) startInChunk, lchunkBytes.size()));
                 }
             }
@@ -421,57 +449,57 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             int combinedSize = pendingWrites.size();
 
             if (targetChunkSize > 0) {
-                if (combinedSize < (targetChunkSize * writeMergeThreshold)) {
-                    boolean leftDone = false;
-                    boolean rightDone = false;
-                    while (!leftDone && !rightDone) {
-                        if (beforeFirst.isEmpty()) leftDone = true;
-                        if (!beforeFirst.isEmpty() || !leftDone) {
-                            var takeLeft = beforeFirst.lastEntry();
-
-                            var cuuid = takeLeft.getValue();
-
-                            if (getChunkSize(cuuid) >= (targetChunkSize * writeMergeMaxChunkToTake)) {
-                                leftDone = true;
-                                continue;
-                            }
-
-                            if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * writeMergeLimit)) {
-                                leftDone = true;
-                                continue;
-                            }
-
-                            // FIXME: (and test this)
-                            beforeFirst = beforeFirst.headMap(takeLeft.getKey(), false);
-                            start = takeLeft.getKey();
-                            pendingWrites = readChunk(cuuid).concat(pendingWrites);
-                            combinedSize += getChunkSize(cuuid);
-                            removedChunks.put(takeLeft.getKey(), takeLeft.getValue());
-                        }
-                        if (afterLast.isEmpty()) rightDone = true;
-                        if (!afterLast.isEmpty() && !rightDone) {
-                            var takeRight = afterLast.firstEntry();
-
-                            var cuuid = takeRight.getValue();
-
-                            if (getChunkSize(cuuid) >= (targetChunkSize * writeMergeMaxChunkToTake)) {
-                                rightDone = true;
-                                continue;
-                            }
-
-                            if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * writeMergeLimit)) {
-                                rightDone = true;
-                                continue;
-                            }
-
-                            // FIXME: (and test this)
-                            afterLast = afterLast.tailMap(takeRight.getKey(), false);
-                            pendingWrites = pendingWrites.concat(readChunk(cuuid));
-                            combinedSize += getChunkSize(cuuid);
-                            removedChunks.put(takeRight.getKey(), takeRight.getValue());
-                        }
-                    }
-                }
+//                if (combinedSize < (targetChunkSize * writeMergeThreshold)) {
+//                    boolean leftDone = false;
+//                    boolean rightDone = false;
+//                    while (!leftDone && !rightDone) {
+//                        if (beforeFirst.isEmpty()) leftDone = true;
+//                        if (!beforeFirst.isEmpty() || !leftDone) {
+//                            var takeLeft = beforeFirst.lastEntry();
+//
+//                            var cuuid = takeLeft.getValue();
+//
+//                            if (getChunkSize(cuuid) >= (targetChunkSize * writeMergeMaxChunkToTake)) {
+//                                leftDone = true;
+//                                continue;
+//                            }
+//
+//                            if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * writeMergeLimit)) {
+//                                leftDone = true;
+//                                continue;
+//                            }
+//
+//                            // FIXME: (and test this)
+//                            beforeFirst = beforeFirst.headMap(takeLeft.getKey(), false);
+//                            start = takeLeft.getKey();
+//                            pendingWrites = readChunk(cuuid).concat(pendingWrites);
+//                            combinedSize += getChunkSize(cuuid);
+//                            removedChunks.put(takeLeft.getKey(), takeLeft.getValue());
+//                        }
+//                        if (afterLast.isEmpty()) rightDone = true;
+//                        if (!afterLast.isEmpty() && !rightDone) {
+//                            var takeRight = afterLast.firstEntry();
+//
+//                            var cuuid = takeRight.getValue();
+//
+//                            if (getChunkSize(cuuid) >= (targetChunkSize * writeMergeMaxChunkToTake)) {
+//                                rightDone = true;
+//                                continue;
+//                            }
+//
+//                            if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * writeMergeLimit)) {
+//                                rightDone = true;
+//                                continue;
+//                            }
+//
+//                            // FIXME: (and test this)
+//                            afterLast = afterLast.tailMap(takeRight.getKey(), false);
+//                            pendingWrites = pendingWrites.concat(readChunk(cuuid));
+//                            combinedSize += getChunkSize(cuuid);
+//                            removedChunks.put(takeRight.getKey(), takeRight.getValue());
+//                        }
+//                    }
+//                }
             }
 
             NavigableMap<Long, JObjectKey> newChunks = new TreeMap<>();
@@ -501,7 +529,16 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 }
             }
 
-            file = file.withChunks(file.chunks().minusAll(removedChunks.keySet()).plusAll(newChunks)).withMTime(System.currentTimeMillis());
+            for (var e : removedChunks.entrySet()) {
+                Log.tracev("Removing chunk {0}-{1}", e.getKey(), e.getValue());
+                jMapHelper.delete(file, JMapLongKey.of(e.getKey()));
+            }
+
+            for (var e : newChunks.entrySet()) {
+                Log.tracev("Adding chunk {0}-{1}", e.getKey(), e.getValue());
+                jMapHelper.put(file, JMapLongKey.of(e.getKey()), e.getValue());
+            }
+
             remoteTx.putData(file);
             cleanupChunks(file, removedChunks.values());
             updateFileSize(file);
@@ -523,11 +560,17 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
 
             if (length == 0) {
-                var oldChunks = file.chunks();
-
-                file = file.withChunks(TreePMap.empty()).withMTime(System.currentTimeMillis());
+                try (var it = jMapHelper.getIterator(file, IteratorStart.GE, JMapLongKey.of(0))) {
+                    while (it.hasNext()) {
+                        var next = it.next();
+                        jMapHelper.delete(file, next.getKey());
+                    }
+                }
+//                var oldChunks = file.chunks();
+//
+//                file = file.withChunks(TreePMap.empty()).withMTime(System.currentTimeMillis());
                 remoteTx.putData(file);
-                cleanupChunks(file, oldChunks.values());
+//                cleanupChunks(file, oldChunks.values());
                 updateFileSize(file);
                 return true;
             }
@@ -535,7 +578,6 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             var curSize = size(fileUuid);
             if (curSize == length) return true;
 
-            var chunksAll = file.chunks();
             NavigableMap<Long, JObjectKey> removedChunks = new TreeMap<>();
             NavigableMap<Long, JObjectKey> newChunks = new TreeMap<>();
 
@@ -573,20 +615,64 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                     }
                 }
             } else {
-                var tail = chunksAll.lowerEntry(length);
-                var afterTail = chunksAll.tailMap(tail.getKey(), false);
+//                Pair<JMapLongKey, JMapEntry<JMapLongKey>> first;
+                Pair<JMapLongKey, JMapEntry<JMapLongKey>> last;
+                try (var it = jMapHelper.getIterator(file, IteratorStart.LT, JMapLongKey.of(length))) {
+                    last = it.hasNext() ? it.next() : null;
+                    while (it.hasNext()) {
+                        var next = it.next();
+                        removedChunks.put(next.getKey().key(), next.getValue().ref());
+                    }
+                }
+                removedChunks.put(last.getKey().key(), last.getValue().ref());
+//
+//                NavigableMap<Long, JObjectKey> removedChunks = new TreeMap<>();
+//
+//                long start = 0;
+//
+//                try (var it = jMapHelper.getIterator(file, IteratorStart.LE, JMapLongKey.of(offset))) {
+//                    first = it.hasNext() ? it.next() : null;
+//                    boolean empty = last == null;
+//                    if (first != null && getChunkSize(first.getValue().ref()) + first.getKey().key() <= offset) {
+//                        first = null;
+//                        last = null;
+//                        start = offset;
+//                    } else if (!empty) {
+//                        assert first != null;
+//                        removedChunks.put(first.getKey().key(), first.getValue().ref());
+//                        while (it.hasNext() && it.peekNextKey() != last.getKey()) {
+//                            var next = it.next();
+//                            removedChunks.put(next.getKey().key(), next.getValue().ref());
+//                        }
+//                        removedChunks.put(last.getKey().key(), last.getValue().ref());
+//                    }
+//                }
+//
+//                var tail = chunksAll.lowerEntry(length);
+//                var afterTail = chunksAll.tailMap(tail.getKey(), false);
+//
+//                removedChunks.put(tail.getKey(), tail.getValue());
+//                removedChunks.putAll(afterTail);
 
-                removedChunks.put(tail.getKey(), tail.getValue());
-                removedChunks.putAll(afterTail);
-
-                var tailBytes = readChunk(tail.getValue());
-                var newChunk = tailBytes.substring(0, (int) (length - tail.getKey()));
+                var tailBytes = readChunk(last.getValue().ref());
+                var newChunk = tailBytes.substring(0, (int) (length - last.getKey().key()));
 
                 ChunkData newChunkData = createChunk(newChunk);
-                newChunks.put(tail.getKey(), newChunkData.key());
+                newChunks.put(last.getKey().key(), newChunkData.key());
             }
 
-            file = file.withChunks(file.chunks().minusAll(removedChunks.keySet()).plusAll(newChunks)).withMTime(System.currentTimeMillis());
+//            file = file.withChunks(file.chunks().minusAll(removedChunks.keySet()).plusAll(newChunks)).withMTime(System.currentTimeMillis());
+
+            for (var e : removedChunks.entrySet()) {
+                Log.tracev("Removing chunk {0}-{1}", e.getKey(), e.getValue());
+                jMapHelper.delete(file, JMapLongKey.of(e.getKey()));
+            }
+
+            for (var e : newChunks.entrySet()) {
+                Log.tracev("Adding chunk {0}-{1}", e.getKey(), e.getValue());
+                jMapHelper.put(file, JMapLongKey.of(e.getKey()), e.getValue());
+            }
+
             remoteTx.putData(file);
             cleanupChunks(file, removedChunks.values());
             updateFileSize(file);
@@ -623,7 +709,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             Log.debug("Creating file " + fuuid);
 
             ChunkData newChunkData = createChunk(UnsafeByteOperations.unsafeWrap(oldpath.getBytes(StandardCharsets.UTF_8)));
-            File f = new File(JObjectKey.of(fuuid.toString()), 0, System.currentTimeMillis(), System.currentTimeMillis(), TreePMap.<Long, JObjectKey>empty().plus(0L, newChunkData.key()), true, 0);
+            File f = new File(JObjectKey.of(fuuid.toString()), 0, System.currentTimeMillis(), System.currentTimeMillis(), true, 0);
+            jMapHelper.put(f, JMapLongKey.of(0), newChunkData.key());
 
             updateFileSize(f);
 
@@ -650,10 +737,14 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         jObjectTxManager.executeTx(() -> {
             long realSize = 0;
 
-            if (!file.chunks().isEmpty()) {
-                var last = file.chunks().lastEntry();
-                var lastSize = getChunkSize(last.getValue());
-                realSize = last.getKey() + lastSize;
+            Pair<JMapLongKey, JMapEntry<JMapLongKey>> last;
+            Log.tracev("Getting last");
+            try (var it = jMapHelper.getIterator(file, IteratorStart.LT, JMapLongKey.max())) {
+                last = it.hasNext() ? it.next() : null;
+            }
+
+            if (last != null) {
+                realSize = last.getKey().key() + getChunkSize(last.getValue().ref());
             }
 
             if (realSize != file.size()) {

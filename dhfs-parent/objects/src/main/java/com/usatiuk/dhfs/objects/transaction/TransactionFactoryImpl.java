@@ -1,13 +1,10 @@
 package com.usatiuk.dhfs.objects.transaction;
 
-import com.usatiuk.dhfs.objects.JData;
-import com.usatiuk.dhfs.objects.JObjectKey;
-import com.usatiuk.dhfs.objects.SnapshotManager;
+import com.usatiuk.dhfs.objects.*;
 import com.usatiuk.dhfs.objects.persistence.IteratorStart;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nonnull;
 import java.util.*;
@@ -27,7 +24,10 @@ public class TransactionFactoryImpl implements TransactionFactory {
 
     private class TransactionImpl implements TransactionPrivate {
         private final ReadTrackingTransactionObjectSource _source;
-        private final Map<JObjectKey, TxRecord.TxObjectRecord<?>> _writes = new HashMap<>();
+
+        private final NavigableMap<JObjectKey, TxRecord.TxObjectRecord<?>> _writes = new TreeMap<>();
+        private long _writeVersion = 0;
+
         private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _newWrites = new HashMap<>();
         private final List<Runnable> _onCommit = new ArrayList<>();
         private final List<Runnable> _onFlush = new ArrayList<>();
@@ -103,8 +103,16 @@ public class TransactionFactoryImpl implements TransactionFactory {
         }
 
         @Override
-        public Iterator<Pair<JObjectKey, JData>> getIterator(IteratorStart start, JObjectKey key) {
-            return _source.getIterator(start, key);
+        public CloseableKvIterator<JObjectKey, JData> getIterator(IteratorStart start, JObjectKey key) {
+            Log.tracev("Getting tx iterator with start={0}, key={1}", start, key);
+            return new TombstoneMergingKvIterator<>("tx", start, key,
+                    (tS, tK) -> new MappingKvIterator<>(new NavigableMapKvIterator<>(_writes, tS, tK), t -> switch (t) {
+                        case TxRecord.TxObjectRecordWrite<?> write ->
+                                new TombstoneMergingKvIterator.Data<>(write.data());
+                        case TxRecord.TxObjectRecordDeleted deleted -> new TombstoneMergingKvIterator.Tombstone<>();
+                        case null, default -> null;
+                    }),
+                    (tS, tK) -> new MappingKvIterator<>(_source.getIterator(tS, tK), TombstoneMergingKvIterator.Data::new));
         }
 
         @Override

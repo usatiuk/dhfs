@@ -16,4 +16,12 @@ public record PeerInfo(JObjectKey key, PeerId id, ByteString cert) implements JD
     public X509Certificate parsedCert() {
         return CertificateTools.certFromBytes(cert.toByteArray());
     }
+
+    @Override
+    public String toString() {
+        return "PeerInfo{" +
+                "key=" + key +
+                ", id=" + id +
+                '}';
+    }
 }

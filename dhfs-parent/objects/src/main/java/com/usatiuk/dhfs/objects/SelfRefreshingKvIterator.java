@@ -42,13 +42,15 @@ public class SelfRefreshingKvIterator<K extends Comparable<K>, V> implements Clo
             if (_versionSupplier.get() == _curVersion) {
                 return;
             }
+            Log.tracev("Refreshing iterator last refreshed {0}, current version {1}, current value {2}",
+                    _curVersion, _versionSupplier.get(), _next);
             long newVersion = _versionSupplier.get();
             oldBacking = _backing;
             _backing = _iteratorSupplier.apply(Pair.of(IteratorStart.GE, _next.getKey()));
             var next = _backing.hasNext() ? _backing.next() : null;
             if (next == null) {
                 Log.errorv("Failed to refresh iterator, null last refreshed {0}," +
-                        " current version {1}, current value {2}", _curVersion, newVersion, next);
+                        " current version {1}, current value {2}, read value {3}", _curVersion, newVersion, _next, next);
                 assert false;
             } else if (!next.equals(_next)) {
                 Log.errorv("Failed to refresh iterator, mismatch last refreshed {0}," +

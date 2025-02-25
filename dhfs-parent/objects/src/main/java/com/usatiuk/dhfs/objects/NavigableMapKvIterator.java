@@ -15,11 +15,15 @@ public class NavigableMapKvIterator<K extends Comparable<K>, V> implements Close
             case GE -> _view = map.tailMap(key, true);
             case GT -> _view = map.tailMap(key, false);
             case LE -> {
-                var tail = map.tailMap(key, true);
-                if (tail.firstKey().equals(key)) _view = tail;
-                else _view = map.tailMap(map.lowerKey(key), true);
+                var floorKey = map.floorKey(key);
+                if (floorKey == null) _view = Collections.emptyNavigableMap();
+                else _view = map.tailMap(floorKey, true);
             }
-            case LT -> _view = map.tailMap(map.lowerKey(key), true);
+            case LT -> {
+                var lowerKey = map.lowerKey(key);
+                if (lowerKey == null) _view = Collections.emptyNavigableMap();
+                else _view = map.tailMap(lowerKey, true);
+            }
             default -> throw new IllegalArgumentException("Unknown start type");
         }
         _iterator = _view.entrySet().iterator();

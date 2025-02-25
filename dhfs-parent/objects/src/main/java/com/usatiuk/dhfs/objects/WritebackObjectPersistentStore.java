@@ -447,22 +447,26 @@ public class WritebackObjectPersistentStore {
     // Does not have to guarantee consistent view, snapshots are handled by upper layers
     // Invalidated by commitBundle, but might return data after it has been really committed
     public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
+        Log.tracev("Getting writeback iterator: {0}, {1}", start, key);
         _pendingWritesVersionLock.readLock().lock();
         try {
-            CloseableKvIterator<JObjectKey, TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>> oursIterator = new MappingKvIterator<>(
-                    new NavigableMapKvIterator<>(_pendingWrites.get(), start, key),
-                    e -> switch (e) {
-                        case PendingWrite p -> new TombstoneMergingKvIterator.Data<>(p.data());
-                        case PendingDelete d -> new TombstoneMergingKvIterator.Tombstone<>();
-                        default -> throw new IllegalStateException("Unexpected value: " + e);
-                    });
+            var curPending = _pendingWrites.get();
 
             return new InvalidatableKvIterator<>(
                     new InconsistentKvIteratorWrapper<>(
-                            (p) ->
-                                    new TombstoneMergingKvIterator<>("writeback-ps",
-                                            oursIterator,
-                                            new MappingKvIterator<>(cachedStore.getIterator(p.getLeft(), p.getRight()), TombstoneMergingKvIterator.Data::new)), start, key),
+                            p ->
+                                    new TombstoneMergingKvIterator<>("writeback-ps", p.getLeft(), p.getRight(),
+                                            (tS, tK) -> new MappingKvIterator<>(
+                                                    new NavigableMapKvIterator<>(curPending, tS, tK),
+                                                    e -> switch (e) {
+                                                        case PendingWrite pw ->
+                                                                new TombstoneMergingKvIterator.Data<>(pw.data());
+                                                        case PendingDelete d ->
+                                                                new TombstoneMergingKvIterator.Tombstone<>();
+                                                        default ->
+                                                                throw new IllegalStateException("Unexpected value: " + e);
+                                                    }),
+                                            (tS, tK) -> new MappingKvIterator<>(cachedStore.getIterator(tS, tK), TombstoneMergingKvIterator.Data::new)), start, key),
                     _pendingWritesVersion::get, _pendingWritesVersionLock.readLock());
         } finally {
             _pendingWritesVersionLock.readLock().unlock();

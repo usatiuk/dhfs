@@ -188,14 +188,15 @@ public class CachingObjectPersistentStore {
         _cacheVersionLock.readLock().lock();
         try {
             return new InconsistentSelfRefreshingKvIterator<>(
-                    (bp) -> new MergingKvIterator<>("cache",
-                            new PredicateKvIterator<>(
-                                    new NavigableMapKvIterator<>(_sortedCache, bp.getLeft(), bp.getRight()),
+                    p -> new MergingKvIterator<>("cache", p.getLeft(), p.getRight(),
+                            (mS, mK) -> new PredicateKvIterator<>(
+                                    new NavigableMapKvIterator<>(_sortedCache, mS, mK),
+                                    mS, mK,
                                     e -> {
                                         Log.tracev("Taken from cache: {0}", e);
                                         return e.object().orElse(null);
                                     }
-                            ), new CachingKvIterator(delegate.getIterator(bp.getLeft(), bp.getRight()))), _cacheVersion::get,
+                            ), (mS, mK) -> new CachingKvIterator(delegate.getIterator(mS, mK))), _cacheVersion::get,
                     _cacheVersionLock.readLock(), start, key);
         } finally {
             _cacheVersionLock.readLock().unlock();

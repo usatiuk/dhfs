@@ -142,7 +142,24 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
                 }
             }
 
-            Log.tracev("got: {0}, hasNext: {1}", got, _hasNext);
+            var realGot = JObjectKey.fromByteBuffer(_cursor.key());
+            _cursor.key().flip();
+
+            switch (start) {
+                case LT -> {
+                    assert !_hasNext || realGot.compareTo(key) < 0;
+                }
+                case LE -> {
+                    assert !_hasNext || realGot.compareTo(key) <= 0;
+                }
+                case GT -> {
+                    assert !_hasNext || realGot.compareTo(key) > 0;
+                }
+                case GE -> {
+                    assert !_hasNext || realGot.compareTo(key) >= 0;
+                }
+            }
+            Log.tracev("got: {0}, hasNext: {1}", realGot, _hasNext);
         }
 
         @Override

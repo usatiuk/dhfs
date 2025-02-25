@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.objects.transaction;
 
+import com.usatiuk.dhfs.objects.CloseableKvIterator;
 import com.usatiuk.dhfs.objects.JData;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.persistence.IteratorStart;
@@ -15,9 +16,9 @@ public interface ReadTrackingTransactionObjectSource extends AutoCloseableNoThro
 
     <T extends JData> Optional<T> getWriteLocked(Class<T> type, JObjectKey key);
 
-    Iterator<Pair<JObjectKey, JData>> getIterator(IteratorStart start, JObjectKey key);
+    CloseableKvIterator<JObjectKey, JData> getIterator(IteratorStart start, JObjectKey key);
 
-    default Iterator<Pair<JObjectKey, JData>> getIterator(JObjectKey key) {
+    default CloseableKvIterator<JObjectKey, JData> getIterator(JObjectKey key) {
         return getIterator(IteratorStart.GE, key);
     }
 

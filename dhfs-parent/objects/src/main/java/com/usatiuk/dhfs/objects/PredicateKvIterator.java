@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.objects;
 
+import com.usatiuk.dhfs.objects.persistence.IteratorStart;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.NoSuchElementException;
@@ -10,10 +11,22 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> implements Clo
     private final Function<V, V_T> _transformer;
     private Pair<K, V_T> _next;
 
-    public PredicateKvIterator(CloseableKvIterator<K, V> backing, Function<V, V_T> transformer) {
+    public PredicateKvIterator(CloseableKvIterator<K, V> backing, IteratorStart start, K startKey, Function<V, V_T> transformer) {
         _backing = backing;
         _transformer = transformer;
         fillNext();
+        if (_next == null) {
+            return;
+        }
+        if (start == IteratorStart.LE) {
+            if (_next.getKey().compareTo(startKey) > 0) {
+                _next = null;
+            }
+        } else if (start == IteratorStart.LT) {
+            if (_next.getKey().compareTo(startKey) >= 0) {
+                _next = null;
+            }
+        }
     }
 
     private void fillNext() {

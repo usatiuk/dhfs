@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.objects;
 
+import com.usatiuk.dhfs.objects.persistence.IteratorStart;
 import io.quarkus.logging.Log;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -9,10 +10,11 @@ public class TombstoneMergingKvIterator<K extends Comparable<K>, V> implements C
     private final CloseableKvIterator<K, V> _backing;
     private final String _name;
 
-    public TombstoneMergingKvIterator(String name, List<CloseableKvIterator<K, DataType<V>>> iterators) {
+    public TombstoneMergingKvIterator(String name, IteratorStart startType, K startKey, List<IterProdFn<K, DataType<V>>> iterators) {
         _name = name;
         _backing = new PredicateKvIterator<>(
-                new MergingKvIterator<>(name + "-merging", iterators),
+                new MergingKvIterator<>(name + "-merging", startType, startKey, iterators),
+                startType, startKey,
                 pair -> {
                     Log.tracev("{0} - Processing pair {1}", _name, pair);
                     if (pair instanceof Tombstone) {
@@ -23,8 +25,8 @@ public class TombstoneMergingKvIterator<K extends Comparable<K>, V> implements C
     }
 
     @SafeVarargs
-    public TombstoneMergingKvIterator(String name, CloseableKvIterator<K, DataType<V>>... iterators) {
-        this(name, List.of(iterators));
+    public TombstoneMergingKvIterator(String name, IteratorStart startType, K startKey, IterProdFn<K, DataType<V>>... iterators) {
+        this(name, startType, startKey, List.of(iterators));
     }
 
     public interface DataType<T> {

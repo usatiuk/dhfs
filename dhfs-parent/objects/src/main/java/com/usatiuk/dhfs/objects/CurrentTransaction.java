@@ -44,7 +44,7 @@ public class CurrentTransaction implements Transaction {
     }
 
     @Override
-    public Iterator<Pair<JObjectKey, JData>> getIterator(IteratorStart start, JObjectKey key) {
+    public CloseableKvIterator<JObjectKey, JData> getIterator(IteratorStart start, JObjectKey key) {
         return transactionManager.current().getIterator(start, key);
     }
 

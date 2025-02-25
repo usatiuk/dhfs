@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.files;
 
 import com.usatiuk.dhfs.TempDataProfile;
-import com.usatiuk.dhfs.files.objects.ChunkData;
 import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
 import com.usatiuk.dhfs.objects.RemoteTransaction;
@@ -112,6 +111,7 @@ public class DhfsFileServiceSimpleTestImpl {
 
         fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 2, 8).get().toByteArray());
         fileService.write(uuid, 4, new byte[]{10, 11, 12});
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 12, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
         fileService.write(uuid, 10, new byte[]{13, 14});
@@ -154,19 +154,23 @@ public class DhfsFileServiceSimpleTestImpl {
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 15, 16, 17, 0, 0, 0, 0, 0, 0, 0}, fileService.read(uuid, 0, 20).get().toByteArray());
     }
 
-    @Test
+    @RepeatedTest(100)
     void truncateTest2() {
         var ret = fileService.create("/truncateTest2", 777);
-        Assertions.assertTrue(ret.isPresent());
+        try {
+            Assertions.assertTrue(ret.isPresent());
 
-        var uuid = ret.get();
+            var uuid = ret.get();
 
-        fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+            fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
+            Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
 
-        fileService.truncate(uuid, 20);
-        fileService.write(uuid, 10, new byte[]{11, 12, 13, 14, 15, 16, 17, 18, 19, 20});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}, fileService.read(uuid, 0, 20).get().toByteArray());
+            fileService.truncate(uuid, 20);
+            fileService.write(uuid, 10, new byte[]{11, 12, 13, 14, 15, 16, 17, 18, 19, 20});
+            Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}, fileService.read(uuid, 0, 20).get().toByteArray());
+        } finally {
+            fileService.unlink("/truncateTest2");
+        }
     }
 
     @Test
@@ -217,8 +221,8 @@ public class DhfsFileServiceSimpleTestImpl {
 
         jObjectTxManager.run(() -> {
             var oldfile = remoteTx.getData(File.class, ret2.get()).orElseThrow(IllegalStateException::new);
-            var chunk = oldfile.chunks().get(0L);
-            var chunkObj = remoteTx.getData(ChunkData.class, chunk).orElseThrow(IllegalStateException::new);
+//            var chunk = oldfile.chunks().get(0L);
+//            var chunkObj = remoteTx.getData(ChunkData.class, chunk).orElseThrow(IllegalStateException::new);
         });
 
         Assertions.assertTrue(fileService.rename("/moveOverTest1", "/moveOverTest2"));

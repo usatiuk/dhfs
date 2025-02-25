@@ -24,4 +24,12 @@ public record PersistentRemoteHostsData(PeerId selfUuid,
     public PersistentRemoteHostsData withInitialSyncDone(PSet<PeerId> initialSyncDone) {
         return new PersistentRemoteHostsData(selfUuid, selfCertificate, selfKeyPair, initialSyncDone);
     }
+
+    @Override
+    public String toString() {
+        return "PersistentRemoteHostsData{" +
+                "selfUuid=" + selfUuid +
+                ", initialSyncDone=" + initialSyncDone +
+                '}';
+    }
 }

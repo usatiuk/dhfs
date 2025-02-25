@@ -2,12 +2,14 @@ package com.usatiuk.dhfs.objects.transaction;
 
 import com.usatiuk.dhfs.objects.*;
 import com.usatiuk.dhfs.objects.persistence.IteratorStart;
-import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 
 @ApplicationScoped
 public class ReadTrackingObjectSourceFactory {
@@ -22,7 +24,6 @@ public class ReadTrackingObjectSourceFactory {
         private final SnapshotManager.Snapshot _snapshot;
 
         private final Map<JObjectKey, TransactionObject<?>> _readSet = new HashMap<>();
-        private final Queue<AutoCloseableNoThrow> _iterators = new ArrayDeque<>();
 
         public ReadTrackingObjectSourceImpl(SnapshotManager.Snapshot snapshot) {
             _snapshot = snapshot;
@@ -66,9 +67,9 @@ public class ReadTrackingObjectSourceFactory {
 
         @Override
         public void close() {
-            for (var it : _iterators) {
-                it.close();
-            }
+//            for (var it : _iterators) {
+//                it.close();
+//            }
         }
 
         private class ReadTrackingIterator implements CloseableKvIterator<JObjectKey, JData> {
@@ -108,9 +109,7 @@ public class ReadTrackingObjectSourceFactory {
 
         @Override
         public CloseableKvIterator<JObjectKey, JData> getIterator(IteratorStart start, JObjectKey key) {
-            var got = new ReadTrackingIterator(start, key);
-            _iterators.add(got);
-            return got;
+            return new ReadTrackingIterator(start, key);
         }
     }
 }

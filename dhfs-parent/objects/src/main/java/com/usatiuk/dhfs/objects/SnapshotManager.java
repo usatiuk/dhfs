@@ -240,9 +240,21 @@ public class SnapshotManager {
             private final CloseableKvIterator<SnapshotKey, SnapshotEntry> _backing;
             private Pair<JObjectKey, TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>> _next;
 
-            public SnapshotKvIterator(IteratorStart start, JObjectKey key) {
-                _backing = new NavigableMapKvIterator<>(_objects, start, new SnapshotKey(key, 0L));
+            public SnapshotKvIterator(IteratorStart start, JObjectKey startKey) {
+                _backing = new NavigableMapKvIterator<>(_objects, start, new SnapshotKey(startKey, 0L));
                 fillNext();
+                if (_next == null) {
+                    return;
+                }
+                if (start == IteratorStart.LE) {
+                    if (_next.getKey().compareTo(startKey) > 0) {
+                        _next = null;
+                    }
+                } else if (start == IteratorStart.LT) {
+                    if (_next.getKey().compareTo(startKey) >= 0) {
+                        _next = null;
+                    }
+                }
             }
 
             private void fillNext() {
@@ -357,11 +369,21 @@ public class SnapshotManager {
             // so refresh them manually. Otherwise, it could be possible that something from the writeback cache will
             // be served instead. Note that refreshing the iterator will also refresh the writeback iterator,
             // so it also should be consistent.
-            return new CheckingSnapshotKvIterator(new SelfRefreshingKvIterator<>((params) ->
-                    new TombstoneMergingKvIterator<>("snapshot", new SnapshotKvIterator(params.getLeft(), params.getRight()),
-                            new MappingKvIterator<>(writebackStore.getIterator(params.getLeft(), params.getRight()), d ->
-                                    d.version() <= _id ? new TombstoneMergingKvIterator.Data<>(d) : new TombstoneMergingKvIterator.Tombstone<>()
-                            )), _snapshotVersion::get, _lock.readLock(), start, key));
+            Log.tracev("Getting snapshot {0} iterator for {1} {2}", _id, start, key);
+            _lock.readLock().lock();
+            try {
+                return new CheckingSnapshotKvIterator(new SelfRefreshingKvIterator<>(
+                        p ->
+                                new TombstoneMergingKvIterator<>("snapshot", p.getKey(), p.getValue(),
+                                        SnapshotKvIterator::new,
+                                        (tS, tK) -> new MappingKvIterator<>(
+                                                writebackStore.getIterator(tS, tK),
+                                                d -> d.version() <= _id ? new TombstoneMergingKvIterator.Data<>(d) : new TombstoneMergingKvIterator.Tombstone<>())
+                                )
+                        , _snapshotVersion::get, _lock.readLock(), start, key));
+            } finally {
+                _lock.readLock().unlock();
+            }
         }
 
         public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(JObjectKey key) {
