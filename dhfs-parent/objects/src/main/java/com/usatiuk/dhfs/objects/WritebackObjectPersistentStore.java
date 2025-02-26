@@ -384,7 +384,7 @@ public class WritebackObjectPersistentStore {
     }
 
     @Nonnull
-    Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
+    public Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
         var pending = getPendingWrite(name).orElse(null);
         return switch (pending) {
             case PendingWrite write -> Optional.of(write.data());
@@ -404,7 +404,7 @@ public class WritebackObjectPersistentStore {
     }
 
     @Nonnull
-    VerboseReadResult readObjectVerbose(JObjectKey key) {
+    public VerboseReadResult readObjectVerbose(JObjectKey key) {
         var pending = getPendingWrite(key).orElse(null);
         if (pending != null) {
             return new VerboseReadResultPending(pending);
@@ -412,7 +412,7 @@ public class WritebackObjectPersistentStore {
         return new VerboseReadResultPersisted(cachedStore.readObject(key));
     }
 
-    Consumer<Runnable> commitTx(Collection<TxRecord.TxObjectRecord<?>> writes, long id) {
+    public Consumer<Runnable> commitTx(Collection<TxRecord.TxObjectRecord<?>> writes, long id) {
         var bundle = createBundle();
         try {
             for (var action : writes) {

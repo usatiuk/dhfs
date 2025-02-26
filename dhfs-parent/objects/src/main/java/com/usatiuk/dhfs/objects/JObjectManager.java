@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.objects;
 
+import com.usatiuk.dhfs.objects.snapshot.SnapshotManager;
 import com.usatiuk.dhfs.objects.transaction.*;
 import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
 import io.quarkus.logging.Log;

@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects.transaction;
 
 import com.usatiuk.dhfs.objects.*;
 import com.usatiuk.dhfs.objects.persistence.IteratorStart;
+import com.usatiuk.dhfs.objects.snapshot.SnapshotManager;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
