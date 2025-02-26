@@ -53,6 +53,9 @@ public class InconsistentSelfRefreshingKvIterator<K extends Comparable<K>, V> im
                 }
             } else if (_lastReturnedKey != null) {
                 _backing = _iteratorSupplier.apply(Pair.of(IteratorStart.GT, _lastReturnedKey));
+                if (_backing.hasNext() && !(_backing.peekNextKey().compareTo(_lastReturnedKey) > 0)) {
+                    throw new StaleIteratorException();
+                }
             } else {
                 _backing = _iteratorSupplier.apply(_initialStart);
             }

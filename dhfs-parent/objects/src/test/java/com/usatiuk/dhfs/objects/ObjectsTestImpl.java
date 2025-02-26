@@ -5,7 +5,7 @@ import com.usatiuk.dhfs.objects.persistence.IteratorStart;
 import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import io.quarkus.logging.Log;
-import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
@@ -13,16 +13,33 @@ import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.pcollections.TreePMap;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-@QuarkusTest
-public class ObjectsTest {
+class Profiles {
+    public static class ObjectsTestProfileExtraChecks implements QuarkusTestProfile {
+        @Override
+        final public Map<String, String> getConfigOverrides() {
+            return TreePMap.<String, String>empty().plus("dhfs.objects.persistence.snapshot-extra-checks", "true");
+        }
+    }
+
+    public static class ObjectsTestProfileNoExtraChecks implements QuarkusTestProfile {
+        @Override
+        final public Map<String, String> getConfigOverrides() {
+            return TreePMap.<String, String>empty().plus("dhfs.objects.persistence.snapshot-extra-checks", "false");
+        }
+    }
+}
+
+public abstract class ObjectsTestImpl {
     @Inject
     TransactionManager txm;
 

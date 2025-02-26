@@ -8,6 +8,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.tuple.Pair;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.annotation.Nonnull;
 import java.lang.ref.Cleaner;
@@ -16,6 +17,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 @ApplicationScoped
 public class SnapshotManager {
@@ -42,6 +44,9 @@ public class SnapshotManager {
                     .compare(this, o);
         }
     }
+
+    @ConfigProperty(name = "dhfs.objects.persistence.snapshot-extra-checks")
+    boolean extraChecks;
 
     private long _lastSnapshotId = 0;
     private long _lastAliveSnapshotId = -1;
@@ -238,7 +243,7 @@ public class SnapshotManager {
 
         public class SnapshotKvIterator implements CloseableKvIterator<JObjectKey, TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>> {
             private final CloseableKvIterator<SnapshotKey, SnapshotEntry> _backing;
-            private Pair<JObjectKey, TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>> _next;
+            private Pair<JObjectKey, TombstoneMergingKvIterator.DataType<JDataVersionedWrapper>> _next = null;
 
             public SnapshotKvIterator(IteratorStart start, JObjectKey startKey) {
                 _backing = new NavigableMapKvIterator<>(_objects, start, new SnapshotKey(startKey, 0L));
@@ -246,13 +251,18 @@ public class SnapshotManager {
                 if (_next == null) {
                     return;
                 }
-                if (start == IteratorStart.LE) {
-                    if (_next.getKey().compareTo(startKey) > 0) {
-                        _next = null;
+                switch (start) {
+                    case LT -> {
+                        assert _next.getKey().compareTo(startKey) < 0;
                     }
-                } else if (start == IteratorStart.LT) {
-                    if (_next.getKey().compareTo(startKey) >= 0) {
-                        _next = null;
+                    case LE -> {
+                        assert _next.getKey().compareTo(startKey) <= 0;
+                    }
+                    case GT -> {
+                        assert _next.getKey().compareTo(startKey) > 0;
+                    }
+                    case GE -> {
+                        assert _next.getKey().compareTo(startKey) >= 0;
                     }
                 }
             }
@@ -338,29 +348,54 @@ public class SnapshotManager {
 
             @Override
             public JObjectKey peekNextKey() {
-                return _backing.peekNextKey();
+                try {
+                    return _backing.peekNextKey();
+                } catch (StaleIteratorException e) {
+                    assert false;
+                    throw e;
+                }
             }
 
             @Override
             public void skip() {
-                _backing.skip();
+                try {
+                    _backing.skip();
+                } catch (StaleIteratorException e) {
+                    assert false;
+                    throw e;
+                }
             }
 
             @Override
             public void close() {
-                _backing.close();
+                try {
+                    _backing.close();
+                } catch (StaleIteratorException e) {
+                    assert false;
+                    throw e;
+                }
             }
 
             @Override
             public boolean hasNext() {
-                return _backing.hasNext();
+                try {
+                    return _backing.hasNext();
+                } catch (StaleIteratorException e) {
+                    assert false;
+                    throw e;
+                }
             }
 
             @Override
             public Pair<JObjectKey, JDataVersionedWrapper> next() {
-                var ret = _backing.next();
-                assert ret.getValue().version() <= _id;
-                return ret;
+                try {
+                    var ret = _backing.next();
+                    assert ret.getValue().version() <= _id;
+                    return ret;
+                } catch (StaleIteratorException e) {
+                    assert false;
+                    throw e;
+                }
             }
         }
 
@@ -372,15 +407,21 @@ public class SnapshotManager {
             Log.tracev("Getting snapshot {0} iterator for {1} {2}", _id, start, key);
             _lock.readLock().lock();
             try {
-                return new CheckingSnapshotKvIterator(new SelfRefreshingKvIterator<>(
-                        p ->
-                                new TombstoneMergingKvIterator<>("snapshot", p.getKey(), p.getValue(),
-                                        SnapshotKvIterator::new,
-                                        (tS, tK) -> new MappingKvIterator<>(
-                                                writebackStore.getIterator(tS, tK),
-                                                d -> d.version() <= _id ? new TombstoneMergingKvIterator.Data<>(d) : new TombstoneMergingKvIterator.Tombstone<>())
-                                )
-                        , _snapshotVersion::get, _lock.readLock(), start, key));
+                Function<Pair<IteratorStart, JObjectKey>, CloseableKvIterator<JObjectKey, JDataVersionedWrapper>> iteratorFactory =
+                        p -> new TombstoneMergingKvIterator<>("snapshot", p.getKey(), p.getValue(),
+                                SnapshotKvIterator::new,
+                                (tS, tK) -> new MappingKvIterator<>(
+                                        writebackStore.getIterator(tS, tK),
+                                        d -> d.version() <= _id ? new TombstoneMergingKvIterator.Data<>(d) : new TombstoneMergingKvIterator.Tombstone<>())
+                        );
+
+                var backing = extraChecks ? new SelfRefreshingKvIterator<>(
+                        iteratorFactory, _snapshotVersion::get, _lock.readLock(), start, key
+                ) : new InconsistentSelfRefreshingKvIterator<>(
+                        iteratorFactory, _snapshotVersion::get, _lock.readLock(), start, key
+                );
+
+                return new CheckingSnapshotKvIterator(backing);
             } finally {
                 _lock.readLock().unlock();
             }
