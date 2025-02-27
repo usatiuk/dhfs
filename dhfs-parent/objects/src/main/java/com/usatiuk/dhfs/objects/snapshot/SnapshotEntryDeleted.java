@@ -1,4 +1,4 @@
 package com.usatiuk.dhfs.objects.snapshot;
 
-record SnapshotEntryDeleted(long whenToRemove) implements SnapshotEntry {
+public record SnapshotEntryDeleted(long whenToRemove) implements SnapshotEntry {
 }

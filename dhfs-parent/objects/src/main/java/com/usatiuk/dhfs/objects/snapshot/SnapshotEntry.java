@@ -1,5 +1,5 @@
 package com.usatiuk.dhfs.objects.snapshot;
 
-interface SnapshotEntry {
+public interface SnapshotEntry {
     long whenToRemove();
 }

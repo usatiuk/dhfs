@@ -9,4 +9,24 @@ public interface CloseableKvIterator<K extends Comparable<K>, V> extends Iterato
     K peekNextKey();
 
     void skip();
+
+    default K peekPrevKey() {
+        throw new UnsupportedOperationException();
+    }
+
+    default Pair<K, V> prev() {
+        throw new UnsupportedOperationException();
+    }
+
+    default boolean hasPrev() {
+        throw new UnsupportedOperationException();
+    }
+
+    default void skipPrev() {
+        throw new UnsupportedOperationException();
+    }
+
+    default CloseableKvIterator<K, V> reversed() {
+        return new ReversedKvIterator<>(this);
+    }
 }

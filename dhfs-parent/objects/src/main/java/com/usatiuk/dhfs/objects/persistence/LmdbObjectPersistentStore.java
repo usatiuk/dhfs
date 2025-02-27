@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.objects.persistence;
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.CloseableKvIterator;
 import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.ReversibleKvIterator;
 import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
 import io.quarkus.arc.properties.IfBuildProperty;
 import io.quarkus.logging.Log;
@@ -92,7 +93,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
         }
     }
 
-    private class LmdbKvIterator implements CloseableKvIterator<JObjectKey, ByteString> {
+    private class LmdbKvIterator extends ReversibleKvIterator<JObjectKey, ByteString> {
         private final Txn<ByteBuffer> _txn = _env.txnRead();
         private final Cursor<ByteBuffer> _cursor = _db.openCursor(_txn);
         private boolean _hasNext = false;
@@ -101,6 +102,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
         private final MutableObject<Boolean> _closed = new MutableObject<>(false);
 
         LmdbKvIterator(IteratorStart start, JObjectKey key) {
+            _goingForward = true;
             var closedRef = _closed;
             CLEANER.register(this, () -> {
                 if (!closedRef.getValue()) {
@@ -125,6 +127,9 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
                 switch (start) {
                     case LT -> {
                         _hasNext = _cursor.prev();
+                        if (!_hasNext) {
+                            _hasNext = _cursor.first();
+                        }
                     }
                     case GT -> {
                         _hasNext = _cursor.next();
@@ -136,6 +141,9 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
                 switch (start) {
                     case LT, LE -> {
                         _hasNext = _cursor.prev();
+                        if (!_hasNext) {
+                            _hasNext = _cursor.first();
+                        }
                     }
                     case GT, GE -> {
                     }
@@ -147,10 +155,10 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
 
             switch (start) {
                 case LT -> {
-                    assert !_hasNext || realGot.compareTo(key) < 0;
+//                    assert !_hasNext || realGot.compareTo(key) < 0;
                 }
                 case LE -> {
-                    assert !_hasNext || realGot.compareTo(key) <= 0;
+//                    assert !_hasNext || realGot.compareTo(key) <= 0;
                 }
                 case GT -> {
                     assert !_hasNext || realGot.compareTo(key) > 0;
@@ -173,33 +181,57 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
         }
 
         @Override
-        public boolean hasNext() {
-            return _hasNext;
-        }
-
-        @Override
-        public Pair<JObjectKey, ByteString> next() {
-            if (!_hasNext) {
-                throw new NoSuchElementException("No more elements");
+        protected void reverse() {
+            if (_hasNext) {
+                if (_goingForward) {
+                    _hasNext = _cursor.prev();
+                } else {
+                    _hasNext = _cursor.next();
+                }
+            } else {
+                if (_goingForward) {
+                    _hasNext = _cursor.last();
+                } else {
+                    _hasNext = _cursor.first();
+                }
             }
-            var ret = Pair.of(JObjectKey.fromByteBuffer(_cursor.key()), ByteString.copyFrom(_cursor.val()));
-            _hasNext = _cursor.next();
-            Log.tracev("Read: {0}, hasNext: {1}", ret, _hasNext);
-            return ret;
+            _goingForward = !_goingForward;
         }
 
         @Override
-        public void skip() {
-            _hasNext = _cursor.next();
-        }
-
-        @Override
-        public JObjectKey peekNextKey() {
+        protected JObjectKey peekImpl() {
             if (!_hasNext) {
                 throw new NoSuchElementException("No more elements");
             }
             var ret = JObjectKey.fromByteBuffer(_cursor.key());
             _cursor.key().flip();
+            return ret;
+        }
+
+        @Override
+        protected void skipImpl() {
+            if (_goingForward)
+                _hasNext = _cursor.next();
+            else
+                _hasNext = _cursor.prev();
+        }
+
+        @Override
+        protected boolean hasImpl() {
+            return _hasNext;
+        }
+
+        @Override
+        protected Pair<JObjectKey, ByteString> nextImpl() {
+            if (!_hasNext) {
+                throw new NoSuchElementException("No more elements");
+            }
+            var ret = Pair.of(JObjectKey.fromByteBuffer(_cursor.key()), ByteString.copyFrom(_cursor.val()));
+            if (_goingForward)
+                _hasNext = _cursor.next();
+            else
+                _hasNext = _cursor.prev();
+            Log.tracev("Read: {0}, hasNext: {1}", ret, _hasNext);
             return ret;
         }
     }

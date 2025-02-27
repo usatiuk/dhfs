@@ -34,6 +34,27 @@ public class MappingKvIterator<K extends Comparable<K>, V, V_T> implements Close
     }
 
     @Override
+    public K peekPrevKey() {
+        return _backing.peekPrevKey();
+    }
+
+    @Override
+    public Pair<K, V_T> prev() {
+        var got = _backing.prev();
+        return Pair.of(got.getKey(), _transformer.apply(got.getValue()));
+    }
+
+    @Override
+    public boolean hasPrev() {
+        return _backing.hasPrev();
+    }
+
+    @Override
+    public void skipPrev() {
+        _backing.skipPrev();
+    }
+
+    @Override
     public Pair<K, V_T> next() {
         var got = _backing.next();
         return Pair.of(got.getKey(), _transformer.apply(got.getValue()));

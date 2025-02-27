@@ -34,4 +34,123 @@ public class PredicateKvIteratorTest {
         }
         Assertions.assertFalse(pit.hasNext());
     }
+
+    @Test
+    public void ltTest2() {
+        var source1 = TreePMap.<Integer, Integer>empty().plus(1, 3).plus(3, 5).plus(4, 6);
+        var pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LT, 1),
+                IteratorStart.LT, 1, v -> (v % 2 == 0) ? v : null);
+        Just.checkIterator(pit, Pair.of(4, 6));
+        Assertions.assertFalse(pit.hasNext());
+
+        pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LT, 2),
+                IteratorStart.LT, 2, v -> (v % 2 == 0) ? v : null);
+        Just.checkIterator(pit, Pair.of(4, 6));
+        Assertions.assertFalse(pit.hasNext());
+
+        pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LT, 4),
+                IteratorStart.LT, 4, v -> (v % 2 == 0) ? v : null);
+        Just.checkIterator(pit, Pair.of(4, 6));
+        Assertions.assertFalse(pit.hasNext());
+
+        pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LE, 4),
+                IteratorStart.LE, 4, v -> (v % 2 == 0) ? v : null);
+        Just.checkIterator(pit, Pair.of(4, 6));
+        Assertions.assertFalse(pit.hasNext());
+    }
+
+    @Test
+    public void ltTest3() {
+        var source1 = TreePMap.<Integer, Integer>empty().plus(1, 3).plus(3, 5).plus(4, 6).plus(5, 7).plus(6, 8);
+        var pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LT, 4),
+                IteratorStart.LT, 4, v -> (v % 2 == 0) ? v : null);
+        Just.checkIterator(pit, Pair.of(4, 6), Pair.of(6, 8));
+        Assertions.assertFalse(pit.hasNext());
+
+        pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LT, 5),
+                IteratorStart.LT, 5, v -> (v % 2 == 0) ? v : null);
+        Just.checkIterator(pit, Pair.of(4, 6), Pair.of(6, 8));
+        Assertions.assertFalse(pit.hasNext());
+
+        pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LT, 6),
+                IteratorStart.LT, 6, v -> (v % 2 == 0) ? v : null);
+        Just.checkIterator(pit, Pair.of(4, 6), Pair.of(6, 8));
+        Assertions.assertFalse(pit.hasNext());
+
+        pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LT, 7),
+                IteratorStart.LT, 7, v -> (v % 2 == 0) ? v : null);
+        Just.checkIterator(pit, Pair.of(6, 8));
+        Assertions.assertFalse(pit.hasNext());
+
+        pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LT, 8),
+                IteratorStart.LT, 8, v -> (v % 2 == 0) ? v : null);
+        Just.checkIterator(pit, Pair.of(6, 8));
+        Assertions.assertFalse(pit.hasNext());
+
+        pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LE, 6),
+                IteratorStart.LE, 6, v -> (v % 2 == 0) ? v : null);
+        Just.checkIterator(pit, Pair.of(6, 8));
+        Assertions.assertFalse(pit.hasNext());
+
+        pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LT, 6),
+                IteratorStart.LT, 6, v -> (v % 2 == 0) ? v : null);
+        Assertions.assertTrue(pit.hasNext());
+        Assertions.assertEquals(4, pit.peekNextKey());
+        Assertions.assertFalse(pit.hasPrev());
+        Assertions.assertEquals(4, pit.peekNextKey());
+        Assertions.assertFalse(pit.hasPrev());
+        Assertions.assertEquals(Pair.of(4, 6), pit.next());
+        Assertions.assertTrue(pit.hasNext());
+        Assertions.assertEquals(6, pit.peekNextKey());
+        Assertions.assertEquals(4, pit.peekPrevKey());
+        Assertions.assertEquals(6, pit.peekNextKey());
+        Assertions.assertEquals(4, pit.peekPrevKey());
+    }
+
+    @Test
+    public void itTest4() {
+        var source1 = TreePMap.<Integer, Integer>empty().plus(1, 3).plus(3, 5).plus(4, 6).plus(5, 8).plus(6, 10);
+        var pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LT, 4),
+                IteratorStart.LT, 4, v -> (v % 2 == 0) ? v : null);
+        Just.checkIterator(pit, Pair.of(4, 6), Pair.of(5, 8), Pair.of(6, 10));
+        Assertions.assertFalse(pit.hasNext());
+
+        pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LT, 5),
+                IteratorStart.LT, 5, v -> (v % 2 == 0) ? v : null);
+        Just.checkIterator(pit, Pair.of(4, 6), Pair.of(5, 8), Pair.of(6, 10));
+        Assertions.assertFalse(pit.hasNext());
+
+        pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LT, 6),
+                IteratorStart.LT, 6, v -> (v % 2 == 0) ? v : null);
+        Just.checkIterator(pit, Pair.of(5, 8), Pair.of(6, 10));
+        Assertions.assertFalse(pit.hasNext());
+
+        pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LT, 7),
+                IteratorStart.LT, 7, v -> (v % 2 == 0) ? v : null);
+        Just.checkIterator(pit, Pair.of(6, 10));
+        Assertions.assertFalse(pit.hasNext());
+
+        pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LT, 6),
+                IteratorStart.LT, 6, v -> (v % 2 == 0) ? v : null);
+        Assertions.assertTrue(pit.hasNext());
+        Assertions.assertEquals(5, pit.peekNextKey());
+        Assertions.assertTrue(pit.hasPrev());
+        Assertions.assertEquals(4, pit.peekPrevKey());
+        Assertions.assertEquals(5, pit.peekNextKey());
+        Assertions.assertEquals(4, pit.peekPrevKey());
+        Assertions.assertEquals(Pair.of(5, 8), pit.next());
+        Assertions.assertTrue(pit.hasNext());
+        Assertions.assertEquals(6, pit.peekNextKey());
+        Assertions.assertEquals(5, pit.peekPrevKey());
+        Assertions.assertEquals(6, pit.peekNextKey());
+        Assertions.assertEquals(5, pit.peekPrevKey());
+    }
+
+//    @Test
+//    public void reverseTest() {
+//        var source1 = TreePMap.<Integer, Integer>empty().plus(1, 3).plus(3, 5).plus(4, 6);
+//        var pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LT, 4),
+//                IteratorStart.LT, 4, v -> (v % 2 == 0) ? v : null);
+//
+//    }
 }

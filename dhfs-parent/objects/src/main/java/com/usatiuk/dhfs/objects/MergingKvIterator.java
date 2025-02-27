@@ -6,12 +6,13 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
 
-public class MergingKvIterator<K extends Comparable<K>, V> implements CloseableKvIterator<K, V> {
+public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, V> {
     private final Map<CloseableKvIterator<K, V>, Integer> _iterators;
     private final NavigableMap<K, CloseableKvIterator<K, V>> _sortedIterators = new TreeMap<>();
     private final String _name;
 
     public MergingKvIterator(String name, IteratorStart startType, K startKey, List<IterProdFn<K, V>> iterators) {
+        _goingForward = true;
         _name = name;
 
         IteratorStart initialStartType = startType;
@@ -92,9 +93,10 @@ public class MergingKvIterator<K extends Comparable<K>, V> implements CloseableK
             return;
         }
 
-        var oursPrio = _iterators.get(iterator);
+        // Expects that reversed iterator returns itself when reversed again
+        var oursPrio = _iterators.get(_goingForward ? iterator : iterator.reversed());
         var them = _sortedIterators.get(key);
-        var theirsPrio = _iterators.get(them);
+        var theirsPrio = _iterators.get(_goingForward ? them : them.reversed());
         if (oursPrio < theirsPrio) {
             _sortedIterators.put(key, iterator);
             advanceIterator(them);
@@ -106,15 +108,36 @@ public class MergingKvIterator<K extends Comparable<K>, V> implements CloseableK
     }
 
     @Override
-    public K peekNextKey() {
-        if (_sortedIterators.isEmpty())
-            throw new NoSuchElementException();
-        return _sortedIterators.firstKey();
+    protected void reverse() {
+        var cur = _goingForward ? _sortedIterators.pollFirstEntry() : _sortedIterators.pollLastEntry();
+        _goingForward = !_goingForward;
+        _sortedIterators.clear();
+        for (CloseableKvIterator<K, V> iterator : _iterators.keySet()) {
+            // _goingForward inverted already
+            advanceIterator(!_goingForward ? iterator.reversed() : iterator);
+        }
+        if (_sortedIterators.isEmpty() || cur == null) {
+            return;
+        }
+        // Advance to the expected key, as we might have brought back some iterators
+        // that were at their ends
+        while (!_sortedIterators.isEmpty()
+                && ((_goingForward && peekImpl().compareTo(cur.getKey()) <= 0)
+                || (!_goingForward && peekImpl().compareTo(cur.getKey()) >= 0))) {
+            skipImpl();
+        }
     }
 
     @Override
-    public void skip() {
-        var cur = _sortedIterators.pollFirstEntry();
+    protected K peekImpl() {
+        if (_sortedIterators.isEmpty())
+            throw new NoSuchElementException();
+        return _goingForward ? _sortedIterators.firstKey() : _sortedIterators.lastKey();
+    }
+
+    @Override
+    protected void skipImpl() {
+        var cur = _goingForward ? _sortedIterators.pollFirstEntry() : _sortedIterators.pollLastEntry();
         if (cur == null) {
             throw new NoSuchElementException();
         }
@@ -124,20 +147,13 @@ public class MergingKvIterator<K extends Comparable<K>, V> implements CloseableK
     }
 
     @Override
-    public void close() {
-        for (CloseableKvIterator<K, V> iterator : _iterators.keySet()) {
-            iterator.close();
-        }
-    }
-
-    @Override
-    public boolean hasNext() {
+    protected boolean hasImpl() {
         return !_sortedIterators.isEmpty();
     }
 
     @Override
-    public Pair<K, V> next() {
-        var cur = _sortedIterators.pollFirstEntry();
+    protected Pair<K, V> nextImpl() {
+        var cur = _goingForward ? _sortedIterators.pollFirstEntry() : _sortedIterators.pollLastEntry();
         if (cur == null) {
             throw new NoSuchElementException();
         }
@@ -145,6 +161,14 @@ public class MergingKvIterator<K extends Comparable<K>, V> implements CloseableK
         advanceIterator(cur.getValue());
 //        Log.tracev("{0} Read from {1}: {2}, next: {3}", _name, cur.getValue(), curVal, _sortedIterators.keySet());
         return curVal;
+    }
+
+
+    @Override
+    public void close() {
+        for (CloseableKvIterator<K, V> iterator : _iterators.keySet()) {
+            iterator.close();
+        }
     }
 
     @Override

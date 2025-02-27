@@ -171,6 +171,29 @@ public class CachingObjectPersistentStore {
         }
 
         @Override
+        public JObjectKey peekPrevKey() {
+            return _delegate.peekPrevKey();
+        }
+
+        @Override
+        public Pair<JObjectKey, JDataVersionedWrapper> prev() {
+            var prev = _delegate.prev();
+            Log.tracev("Caching: {0}", prev);
+            put(prev.getKey(), Optional.of(prev.getValue()));
+            return prev;
+        }
+
+        @Override
+        public boolean hasPrev() {
+            return _delegate.hasPrev();
+        }
+
+        @Override
+        public void skipPrev() {
+            _delegate.skipPrev();
+        }
+
+        @Override
         public Pair<JObjectKey, JDataVersionedWrapper> next() {
             var next = _delegate.next();
             Log.tracev("Caching: {0}", next);

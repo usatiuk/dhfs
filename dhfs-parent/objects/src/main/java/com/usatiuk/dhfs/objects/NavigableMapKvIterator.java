@@ -5,28 +5,50 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
 
-public class NavigableMapKvIterator<K extends Comparable<K>, V> implements CloseableKvIterator<K, V> {
-    private final Iterator<Map.Entry<K, V>> _iterator;
+public class NavigableMapKvIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, V> {
+    private final NavigableMap<K, V> _map;
+    private Iterator<Map.Entry<K, V>> _iterator;
     private Map.Entry<K, V> _next;
 
     public NavigableMapKvIterator(NavigableMap<K, V> map, IteratorStart start, K key) {
+        _map = map;
         SortedMap<K, V> _view;
+        _goingForward = true;
         switch (start) {
             case GE -> _view = map.tailMap(key, true);
             case GT -> _view = map.tailMap(key, false);
             case LE -> {
                 var floorKey = map.floorKey(key);
-                if (floorKey == null) _view = Collections.emptyNavigableMap();
+                if (floorKey == null) _view = _map;
                 else _view = map.tailMap(floorKey, true);
             }
             case LT -> {
                 var lowerKey = map.lowerKey(key);
-                if (lowerKey == null) _view = Collections.emptyNavigableMap();
+                if (lowerKey == null) _view = _map;
                 else _view = map.tailMap(lowerKey, true);
             }
             default -> throw new IllegalArgumentException("Unknown start type");
         }
         _iterator = _view.entrySet().iterator();
+        fillNext();
+    }
+
+    @Override
+    protected void reverse() {
+        var oldNext = _next;
+        _next = null;
+        if (_goingForward) {
+            _iterator
+                    = oldNext == null
+                    ? _map.descendingMap().entrySet().iterator()
+                    : _map.headMap(oldNext.getKey(), false).descendingMap().entrySet().iterator();
+        } else {
+            _iterator
+                    = oldNext == null
+                    ? _map.entrySet().iterator()
+                    : _map.tailMap(oldNext.getKey(), false).entrySet().iterator();
+        }
+        _goingForward = !_goingForward;
         fillNext();
     }
 
@@ -37,7 +59,7 @@ public class NavigableMapKvIterator<K extends Comparable<K>, V> implements Close
     }
 
     @Override
-    public K peekNextKey() {
+    protected K peekImpl() {
         if (_next == null) {
             throw new NoSuchElementException();
         }
@@ -45,7 +67,7 @@ public class NavigableMapKvIterator<K extends Comparable<K>, V> implements Close
     }
 
     @Override
-    public void skip() {
+    protected void skipImpl() {
         if (_next == null) {
             throw new NoSuchElementException();
         }
@@ -54,16 +76,12 @@ public class NavigableMapKvIterator<K extends Comparable<K>, V> implements Close
     }
 
     @Override
-    public void close() {
-    }
-
-    @Override
-    public boolean hasNext() {
+    protected boolean hasImpl() {
         return _next != null;
     }
 
     @Override
-    public Pair<K, V> next() {
+    protected Pair<K, V> nextImpl() {
         if (_next == null) {
             throw new NoSuchElementException("No more elements");
         }
@@ -74,9 +92,12 @@ public class NavigableMapKvIterator<K extends Comparable<K>, V> implements Close
     }
 
     @Override
+    public void close() {
+    }
+
+    @Override
     public String toString() {
         return "NavigableMapKvIterator{" +
-                "_iterator=" + _iterator +
                 ", _next=" + _next +
                 '}';
     }

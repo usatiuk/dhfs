@@ -1,6 +1,10 @@
 package com.usatiuk.dhfs.objects;
 
+import org.junit.jupiter.api.Assertions;
+
 import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 
@@ -60,4 +64,16 @@ public abstract class Just {
         }
     }
 
+    public static <K> void checkIterator(Iterator<K> it, List<K> expected) {
+        for (var e : expected) {
+            Assertions.assertTrue(it.hasNext());
+            var next = it.next();
+            Assertions.assertEquals(e, next);
+        }
+    }
+
+    @SafeVarargs
+    public static <K> void checkIterator(Iterator<K> it, K... expected) {
+        checkIterator(it, Arrays.asList(expected));
+    }
 }
