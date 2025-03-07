@@ -5,7 +5,6 @@ import com.usatiuk.dhfs.objects.persistence.IteratorStart;
 import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import io.quarkus.logging.Log;
-import io.quarkus.test.junit.QuarkusTestProfile;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
@@ -13,7 +12,6 @@ import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.pcollections.TreePMap;
 
 import java.util.List;
 import java.util.Map;
@@ -24,17 +22,17 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 class Profiles {
-    public static class ObjectsTestProfileExtraChecks implements QuarkusTestProfile {
+    public static class ObjectsTestProfileExtraChecks extends TempDataProfile {
         @Override
-        final public Map<String, String> getConfigOverrides() {
-            return TreePMap.<String, String>empty().plus("dhfs.objects.persistence.snapshot-extra-checks", "true");
+        protected void getConfigOverrides(Map<String, String> toPut) {
+            toPut.put("dhfs.objects.persistence.snapshot-extra-checks", "true");
         }
     }
 
-    public static class ObjectsTestProfileNoExtraChecks implements QuarkusTestProfile {
+    public static class ObjectsTestProfileNoExtraChecks extends TempDataProfile {
         @Override
-        final public Map<String, String> getConfigOverrides() {
-            return TreePMap.<String, String>empty().plus("dhfs.objects.persistence.snapshot-extra-checks", "false");
+        protected void getConfigOverrides(Map<String, String> toPut) {
+            toPut.put("dhfs.objects.persistence.snapshot-extra-checks", "false");
         }
     }
 }
@@ -582,6 +580,7 @@ public abstract class ObjectsTestImpl {
             Assertions.assertEquals(key3, got.getKey().name());
             got = iter.next();
             Assertions.assertEquals(key4, got.getKey().name());
+            iter.close();
         });
     }
 
@@ -607,6 +606,18 @@ public abstract class ObjectsTestImpl {
                 Assertions.assertEquals(key2, got.getKey().name());
                 got = iter.next();
                 Assertions.assertEquals(key3, got.getKey().name());
+                got = iter.next();
+                Assertions.assertEquals(key4, got.getKey().name());
+            }
+        });
+        txm.run(() -> {
+            try (var iter = curTx.getIterator(IteratorStart.LT, new JObjectKey(key + "_5"))) {
+                var got = iter.next();
+                Assertions.assertEquals(key4, got.getKey().name());
+                Assertions.assertTrue(iter.hasPrev());
+                got = iter.prev();
+                Assertions.assertEquals(key4, got.getKey().name());
+                Assertions.assertTrue(iter.hasNext());
                 got = iter.next();
                 Assertions.assertEquals(key4, got.getKey().name());
             }
@@ -816,6 +827,32 @@ public abstract class ObjectsTestImpl {
                 try {
                     barrier.await();
                     barrier2.await();
+                    try (var iter = curTx.getIterator(IteratorStart.LE, new JObjectKey(key3))) {
+                        var got = iter.next();
+                        Assertions.assertEquals(key2, got.getKey().name());
+                        Assertions.assertEquals("John2", ((Parent) got.getValue()).name());
+                        Assertions.assertTrue(iter.hasNext());
+                        Assertions.assertTrue(iter.hasPrev());
+                        got = iter.next();
+                        Assertions.assertEquals(key4, got.getKey().name());
+                        Assertions.assertTrue(iter.hasPrev());
+                        got = iter.prev();
+                        Assertions.assertEquals(key4, got.getKey().name());
+                        Assertions.assertTrue(iter.hasPrev());
+                        got = iter.prev();
+                        Assertions.assertEquals("John2", ((Parent) got.getValue()).name());
+                        Assertions.assertTrue(iter.hasPrev());
+                        got = iter.prev();
+                        Assertions.assertEquals(key1, got.getKey().name());
+                        Assertions.assertTrue(iter.hasNext());
+                        got = iter.next();
+                        Assertions.assertEquals(key1, got.getKey().name());
+                        got = iter.next();
+                        Assertions.assertEquals(key2, got.getKey().name());
+                        Assertions.assertEquals("John2", ((Parent) got.getValue()).name());
+                        got = iter.next();
+                        Assertions.assertEquals(key4, got.getKey().name());
+                    }
                     try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
                         var got = iter.next();
                         Assertions.assertEquals(key1, got.getKey().name());

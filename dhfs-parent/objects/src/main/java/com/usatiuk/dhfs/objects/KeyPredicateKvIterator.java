@@ -1,30 +1,29 @@
 package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.persistence.IteratorStart;
-import io.quarkus.logging.Log;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.NoSuchElementException;
 import java.util.function.Function;
 
-public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends ReversibleKvIterator<K, V_T> {
+public class KeyPredicateKvIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, V> {
     private final CloseableKvIterator<K, V> _backing;
-    private final Function<V, V_T> _transformer;
-    private Pair<K, V_T> _next;
+    private final Function<K, Boolean> _filter;
+    private K _next;
 
-    public PredicateKvIterator(CloseableKvIterator<K, V> backing, IteratorStart start, K startKey, Function<V, V_T> transformer) {
+    public KeyPredicateKvIterator(CloseableKvIterator<K, V> backing, IteratorStart start, K startKey, Function<K, Boolean> filter) {
         _goingForward = true;
         _backing = backing;
-        _transformer = transformer;
+        _filter = filter;
         fillNext();
 
         boolean shouldGoBack = false;
         if (start == IteratorStart.LE) {
-            if (_next == null || _next.getKey().compareTo(startKey) > 0) {
+            if (_next == null || _next.compareTo(startKey) > 0) {
                 shouldGoBack = true;
             }
         } else if (start == IteratorStart.LT) {
-            if (_next == null || _next.getKey().compareTo(startKey) >= 0) {
+            if (_next == null || _next.compareTo(startKey) >= 0) {
                 shouldGoBack = true;
             }
         }
@@ -32,10 +31,11 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends Revers
         if (shouldGoBack && _backing.hasPrev()) {
             _goingForward = false;
             _next = null;
-            _backing.skipPrev();
             fillNext();
+            if (_next != null)
+                _backing.skipPrev();
             _goingForward = true;
-            _backing.skip();
+//            _backing.skip();
             fillNext();
         }
 
@@ -48,37 +48,31 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends Revers
 //                assert _next == null || _next.getKey().compareTo(startKey) <= 0;
             }
             case GT -> {
-                assert _next == null || _next.getKey().compareTo(startKey) > 0;
+                assert _next == null || _next.compareTo(startKey) > 0;
             }
             case GE -> {
-                assert _next == null || _next.getKey().compareTo(startKey) >= 0;
+                assert _next == null || _next.compareTo(startKey) >= 0;
             }
         }
     }
 
     private void fillNext() {
         while ((_goingForward ? _backing.hasNext() : _backing.hasPrev()) && _next == null) {
-            var next = _goingForward ? _backing.next() : _backing.prev();
-            var transformed = _transformer.apply(next.getValue());
-            if (transformed == null)
+            var next = _goingForward ? _backing.peekNextKey() : _backing.peekPrevKey();
+            if (!_filter.apply(next)) {
+                if (_goingForward)
+                    _backing.skip();
+                else
+                    _backing.skipPrev();
                 continue;
-            _next = Pair.of(next.getKey(), transformed);
+            }
+            _next = next;
         }
     }
 
     @Override
     protected void reverse() {
         _goingForward = !_goingForward;
-        boolean wasAtEnd = _next == null;
-
-        if (_goingForward && !wasAtEnd)
-            _backing.skip();
-        else if (!_goingForward && !wasAtEnd)
-            _backing.skipPrev();
-
-        if (!wasAtEnd)
-            Log.tracev("Skipped in reverse: {0}", _next);
-
         _next = null;
 
         fillNext();
@@ -88,7 +82,7 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends Revers
     protected K peekImpl() {
         if (_next == null)
             throw new NoSuchElementException();
-        return _next.getKey();
+        return _next;
     }
 
     @Override
@@ -96,6 +90,10 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends Revers
         if (_next == null)
             throw new NoSuchElementException();
         _next = null;
+        if (_goingForward)
+            _backing.skip();
+        else
+            _backing.skipPrev();
         fillNext();
     }
 
@@ -105,13 +103,15 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends Revers
     }
 
     @Override
-    protected Pair<K, V_T> nextImpl() {
+    protected Pair<K, V> nextImpl() {
         if (_next == null)
             throw new NoSuchElementException("No more elements");
-        var ret = _next;
+        var retKey = _next;
         _next = null;
+        var got = _goingForward ? _backing.next() : _backing.prev();
+        assert got.getKey().equals(retKey);
         fillNext();
-        return ret;
+        return got;
     }
 
     @Override
@@ -121,7 +121,7 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends Revers
 
     @Override
     public String toString() {
-        return "PredicateKvIterator{" +
+        return "KeyPredicateKvIterator{" +
                 "_backing=" + _backing +
                 ", _next=" + _next +
                 '}';

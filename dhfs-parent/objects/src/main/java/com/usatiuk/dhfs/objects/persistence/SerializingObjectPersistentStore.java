@@ -8,6 +8,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import javax.annotation.Nonnull;
 import java.util.Collection;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 @ApplicationScoped
 public class SerializingObjectPersistentStore {
@@ -41,11 +42,15 @@ public class SerializingObjectPersistentStore {
                 , names.deleted());
     }
 
-    void commitTx(TxManifestObj<? extends JDataVersionedWrapper> names) {
-        delegateStore.commitTx(prepareManifest(names));
+//    void commitTx(TxManifestObj<? extends JDataVersionedWrapper> names, Consumer<Runnable> commitLocked) {
+//        delegateStore.commitTx(prepareManifest(names), commitLocked);
+//    }
+
+    void commitTx(TxManifestRaw names, long txId, Consumer<Runnable> commitLocked) {
+        delegateStore.commitTx(names, txId, commitLocked);
     }
 
-    void commitTx(TxManifestRaw names) {
-        delegateStore.commitTx(names);
+    long getLastCommitId() {
+        return delegateStore.getLastCommitId();
     }
 }

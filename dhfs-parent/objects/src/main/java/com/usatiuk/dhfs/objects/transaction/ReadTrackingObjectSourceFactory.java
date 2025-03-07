@@ -91,6 +91,28 @@ public class ReadTrackingObjectSourceFactory {
             }
 
             @Override
+            public JObjectKey peekPrevKey() {
+                return _backing.peekPrevKey();
+            }
+
+            @Override
+            public Pair<JObjectKey, JData> prev() {
+                var got = _backing.prev();
+                _readSet.putIfAbsent(got.getKey(), new TransactionObjectNoLock<>(Optional.of(got.getValue())));
+                return Pair.of(got.getKey(), got.getValue().data());
+            }
+
+            @Override
+            public boolean hasPrev() {
+                return _backing.hasPrev();
+            }
+
+            @Override
+            public void skipPrev() {
+                _backing.skipPrev();
+            }
+
+            @Override
             public void close() {
                 _backing.close();
             }

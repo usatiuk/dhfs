@@ -25,20 +25,21 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 @ApplicationScoped
 public class WritebackObjectPersistentStore {
-    private final LinkedList<TxBundleImpl> _pendingBundles = new LinkedList<>();
+    private final LinkedList<TxBundle> _pendingBundles = new LinkedList<>();
 
     private final AtomicReference<PSortedMap<JObjectKey, PendingWriteEntry>> _pendingWrites = new AtomicReference<>(TreePMap.empty());
     private final ReentrantReadWriteLock _pendingWritesVersionLock = new ReentrantReadWriteLock();
-    private final AtomicLong _pendingWritesVersion = new AtomicLong();
-    private final LinkedHashMap<Long, TxBundleImpl> _notFlushedBundles = new LinkedHashMap<>();
+    private final LinkedHashMap<Long, TxBundle> _notFlushedBundles = new LinkedHashMap<>();
 
     private final Object _flushWaitSynchronizer = new Object();
     private final AtomicLong _lastWrittenTx = new AtomicLong(-1);
     private final AtomicLong _counter = new AtomicLong();
+    private final AtomicLong _lastCommittedTx = new AtomicLong(-1);
     private final AtomicLong _waitedTotal = new AtomicLong(0);
     @Inject
     CachingObjectPersistentStore cachedStore;
@@ -70,6 +71,8 @@ public class WritebackObjectPersistentStore {
             } catch (InterruptedException ignored) {
             }
         });
+        _counter.set(cachedStore.getLastTxId());
+        _lastCommittedTx.set(cachedStore.getLastTxId());
         _ready = true;
     }
 
@@ -94,7 +97,7 @@ public class WritebackObjectPersistentStore {
     private void writeback() {
         while (!Thread.interrupted()) {
             try {
-                TxBundleImpl bundle = new TxBundleImpl(0);
+                TxBundle bundle = new TxBundle(0);
                 synchronized (_pendingBundles) {
                     while (_pendingBundles.isEmpty() || !_pendingBundles.peek()._ready)
                         _pendingBundles.wait();
@@ -116,11 +119,11 @@ public class WritebackObjectPersistentStore {
 
                 for (var e : bundle._entries.values()) {
                     switch (e) {
-                        case TxBundleImpl.CommittedEntry(JObjectKey key, JDataVersionedWrapper data, int size) -> {
+                        case TxBundle.CommittedEntry(JObjectKey key, JDataVersionedWrapper data, int size) -> {
                             Log.trace("Writing new " + key);
                             toWrite.add(Pair.of(key, data));
                         }
-                        case TxBundleImpl.DeletedEntry(JObjectKey key) -> {
+                        case TxBundle.DeletedEntry(JObjectKey key) -> {
                             Log.trace("Deleting from persistent storage " + key);
                             toDelete.add(key);
                         }
@@ -132,11 +135,13 @@ public class WritebackObjectPersistentStore {
                         new TxManifestObj<>(
                                 Collections.unmodifiableList(toWrite),
                                 Collections.unmodifiableList(toDelete)
-                        ));
+                        ), bundle.getId());
 
                 Log.trace("Bundle " + bundle.getId() + " committed");
 
                 // Remove from pending writes, after real commit
+                // As we are the only writers to _pendingWrites, no need to synchronize with iterator creation
+                // if they get the older version, as it will still contain all the new changes
                 synchronized (_pendingBundles) {
                     var curPw = _pendingWrites.get();
                     for (var e : bundle._entries.values()) {
@@ -219,7 +224,7 @@ public class WritebackObjectPersistentStore {
                     }
                 }
                 synchronized (_notFlushedBundles) {
-                    var bundle = new TxBundleImpl(_counter.incrementAndGet());
+                    var bundle = new TxBundle(_counter.incrementAndGet());
                     _pendingBundles.addLast(bundle);
                     _notFlushedBundles.put(bundle.getId(), bundle);
                     return bundle;
@@ -234,26 +239,28 @@ public class WritebackObjectPersistentStore {
         try {
             synchronized (_pendingBundles) {
                 var curPw = _pendingWrites.get();
-                for (var e : ((TxBundleImpl) bundle)._entries.values()) {
+                for (var e : ((TxBundle) bundle)._entries.values()) {
                     switch (e) {
-                        case TxBundleImpl.CommittedEntry c -> {
+                        case TxBundle.CommittedEntry c -> {
                             curPw = curPw.plus(c.key(), new PendingWrite(c.data, bundle.getId()));
                         }
-                        case TxBundleImpl.DeletedEntry d -> {
+                        case TxBundle.DeletedEntry d -> {
                             curPw = curPw.plus(d.key(), new PendingDelete(d.key, bundle.getId()));
                         }
                         default -> throw new IllegalStateException("Unexpected value: " + e);
                     }
                 }
+                // Now, make the changes visible to new iterators
                 _pendingWrites.set(curPw);
-                ((TxBundleImpl) bundle).setReady();
-                _pendingWritesVersion.incrementAndGet();
+                ((TxBundle) bundle).setReady();
                 if (_pendingBundles.peek() == bundle)
                     _pendingBundles.notify();
                 synchronized (_flushWaitSynchronizer) {
-                    currentSize += ((TxBundleImpl) bundle).calculateTotalSize();
+                    currentSize += ((TxBundle) bundle).calculateTotalSize();
                 }
             }
+            assert bundle.getId() > _lastCommittedTx.get();
+            _lastCommittedTx.set(bundle.getId());
         } finally {
             _pendingWritesVersionLock.writeLock().unlock();
         }
@@ -263,9 +270,9 @@ public class WritebackObjectPersistentStore {
         verifyReady();
         synchronized (_pendingBundles) {
             Log.warn("Dropped bundle: " + bundle);
-            _pendingBundles.remove((TxBundleImpl) bundle);
+            _pendingBundles.remove((TxBundle) bundle);
             synchronized (_flushWaitSynchronizer) {
-                currentSize -= ((TxBundleImpl) bundle).calculateTotalSize();
+                currentSize -= ((TxBundle) bundle).calculateTotalSize();
             }
         }
     }
@@ -296,7 +303,7 @@ public class WritebackObjectPersistentStore {
         }
     }
 
-    private static class TxBundleImpl implements TxBundle {
+    private static class TxBundle {
         private final LinkedHashMap<JObjectKey, BundleEntry> _entries = new LinkedHashMap<>();
         private final ArrayList<Runnable> _callbacks = new ArrayList<>();
         private long _txId;
@@ -304,7 +311,7 @@ public class WritebackObjectPersistentStore {
         private long _size = -1;
         private boolean _wasCommitted = false;
 
-        private TxBundleImpl(long txId) {
+        private TxBundle(long txId) {
             _txId = txId;
         }
 
@@ -348,7 +355,7 @@ public class WritebackObjectPersistentStore {
             return _size;
         }
 
-        public void compress(TxBundleImpl other) {
+        public void compress(TxBundle other) {
             if (_txId >= other._txId)
                 throw new IllegalArgumentException("Compressing an older bundle into newer");
 
@@ -412,14 +419,20 @@ public class WritebackObjectPersistentStore {
         return new VerboseReadResultPersisted(cachedStore.readObject(key));
     }
 
-    public Consumer<Runnable> commitTx(Collection<TxRecord.TxObjectRecord<?>> writes, long id) {
+    /**
+     * @param commitLocked - a function that will be called with a Consumer of a new transaction id,
+     *                     that will commit the transaction the changes in the store will be visible to new transactions
+     *                     only after the runnable is called
+     */
+    public Consumer<Runnable> commitTx(Collection<TxRecord.TxObjectRecord<?>> writes, BiConsumer<Long, Runnable> commitLocked) {
         var bundle = createBundle();
+        long bundleId = bundle.getId();
         try {
             for (var action : writes) {
                 switch (action) {
                     case TxRecord.TxObjectRecordWrite<?> write -> {
                         Log.trace("Flushing object " + write.key());
-                        bundle.commit(new JDataVersionedWrapper(write.data(), id));
+                        bundle.commit(new JDataVersionedWrapper(write.data(), bundleId));
                     }
                     case TxRecord.TxObjectRecordDeleted deleted -> {
                         Log.trace("Deleting object " + deleted.key());
@@ -435,10 +448,11 @@ public class WritebackObjectPersistentStore {
             throw new TxCommitException(t.getMessage(), t);
         }
 
-        Log.tracef("Committing transaction %d to storage", id);
-        commitBundle(bundle);
 
-        long bundleId = bundle.getId();
+        Log.tracef("Committing transaction %d to storage", bundleId);
+        commitLocked.accept(bundleId, () -> {
+            commitBundle(bundle);
+        });
 
         return r -> asyncFence(bundleId, r);
     }
@@ -451,29 +465,26 @@ public class WritebackObjectPersistentStore {
         _pendingWritesVersionLock.readLock().lock();
         try {
             var curPending = _pendingWrites.get();
-
-            return new InvalidatableKvIterator<>(
-                    new InconsistentKvIteratorWrapper<>(
-                            p ->
-                                    new TombstoneMergingKvIterator<>("writeback-ps", p.getLeft(), p.getRight(),
-                                            (tS, tK) -> new MappingKvIterator<>(
-                                                    new NavigableMapKvIterator<>(curPending, tS, tK),
-                                                    e -> switch (e) {
-                                                        case PendingWrite pw ->
-                                                                new TombstoneMergingKvIterator.Data<>(pw.data());
-                                                        case PendingDelete d ->
-                                                                new TombstoneMergingKvIterator.Tombstone<>();
-                                                        default ->
-                                                                throw new IllegalStateException("Unexpected value: " + e);
-                                                    }),
-                                            (tS, tK) -> new MappingKvIterator<>(cachedStore.getIterator(tS, tK), TombstoneMergingKvIterator.Data::new)), start, key),
-                    _pendingWritesVersion::get, _pendingWritesVersionLock.readLock());
+            return new TombstoneMergingKvIterator<>("writeback-ps", start, key,
+                    (tS, tK) -> new MappingKvIterator<>(
+                            new NavigableMapKvIterator<>(curPending, tS, tK),
+                            e -> switch (e) {
+                                case PendingWrite pw -> new Data<>(pw.data());
+                                case PendingDelete d -> new Tombstone<>();
+                                default -> throw new IllegalStateException("Unexpected value: " + e);
+                            }),
+                    (tS, tK) -> cachedStore.getIterator(tS, tK));
         } finally {
             _pendingWritesVersionLock.readLock().unlock();
         }
     }
 
-    public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(JObjectKey key) {
-        return getIterator(IteratorStart.GE, key);
+    public long getLastTxId() {
+        _pendingWritesVersionLock.readLock().lock();
+        try {
+            return _lastCommittedTx.get();
+        } finally {
+            _pendingWritesVersionLock.readLock().unlock();
+        }
     }
 }

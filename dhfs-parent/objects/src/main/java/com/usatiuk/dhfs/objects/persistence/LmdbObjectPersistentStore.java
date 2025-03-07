@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.objects.persistence;
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.CloseableKvIterator;
 import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.KeyPredicateKvIterator;
 import com.usatiuk.dhfs.objects.ReversibleKvIterator;
 import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
 import io.quarkus.arc.properties.IfBuildProperty;
@@ -21,11 +22,11 @@ import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.lang.ref.Cleaner;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.Collection;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
 
 import static org.lmdbjava.DbiFlags.MDB_CREATE;
 import static org.lmdbjava.Env.create;
@@ -38,7 +39,12 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
     private Dbi<ByteBuffer> _db;
     private boolean _ready = false;
 
+    private long _lastTxId = 0;
+
+    private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
+
     private static final String DB_NAME = "objects";
+    private static final byte[] DB_VER_OBJ_NAME = "__DB_VER_OBJ".getBytes(StandardCharsets.UTF_8);
 
     public LmdbObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.persistence.files.root") String root) {
         _root = Path.of(root).resolve("objects");
@@ -54,6 +60,20 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
                 .setMaxDbs(1)
                 .open(_root.toFile(), EnvFlags.MDB_NOTLS);
         _db = _env.openDbi(DB_NAME, MDB_CREATE);
+
+        var bb = ByteBuffer.allocateDirect(DB_VER_OBJ_NAME.length);
+        bb.put(DB_VER_OBJ_NAME);
+        bb.flip();
+
+        try (Txn<ByteBuffer> txn = _env.txnRead()) {
+            var value = _db.get(txn, bb);
+            if (value != null) {
+                var ver = value.getLong();
+                Log.infov("Read version: {0}", ver);
+                _lastTxId = ver;
+            }
+        }
+
         _ready = true;
     }
 
@@ -100,13 +120,16 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
 
         private static final Cleaner CLEANER = Cleaner.create();
         private final MutableObject<Boolean> _closed = new MutableObject<>(false);
+        private final Exception _allocationStacktrace = new Exception();
 
         LmdbKvIterator(IteratorStart start, JObjectKey key) {
             _goingForward = true;
             var closedRef = _closed;
+            var bt = _allocationStacktrace;
             CLEANER.register(this, () -> {
                 if (!closedRef.getValue()) {
-                    Log.error("Iterator was not closed before GC");
+                    Log.error("Iterator was not closed before GC, allocated at: {0}", bt);
+                    System.exit(-1);
                 }
             });
 
@@ -238,11 +261,11 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
 
     @Override
     public CloseableKvIterator<JObjectKey, ByteString> getIterator(IteratorStart start, JObjectKey key) {
-        return new LmdbKvIterator(start, key);
+        return new KeyPredicateKvIterator<>(new LmdbKvIterator(start, key), start, key, (k) -> !Arrays.equals(k.name().getBytes(StandardCharsets.UTF_8), DB_VER_OBJ_NAME));
     }
 
     @Override
-    public void commitTx(TxManifestRaw names) {
+    public void commitTx(TxManifestRaw names, long txId, Consumer<Runnable> commitLocked) {
         verifyReady();
         try (Txn<ByteBuffer> txn = _env.txnWrite()) {
             for (var written : names.written()) {
@@ -255,7 +278,31 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             for (JObjectKey key : names.deleted()) {
                 _db.delete(txn, key.toByteBuffer());
             }
-            txn.commit();
+
+            var bb = ByteBuffer.allocateDirect(DB_VER_OBJ_NAME.length);
+            bb.put(DB_VER_OBJ_NAME);
+            bb.flip();
+            var bbData = ByteBuffer.allocateDirect(8);
+
+            commitLocked.accept(() -> {
+                _lock.writeLock().lock();
+                try {
+                    var realTxId = txId;
+                    if (realTxId == -1)
+                        realTxId = _lastTxId + 1;
+
+                    assert realTxId > _lastTxId;
+                    _lastTxId = realTxId;
+
+                    bbData.putLong(realTxId);
+                    bbData.flip();
+                    _db.put(txn, bb, bbData);
+
+                    txn.commit();
+                } finally {
+                    _lock.writeLock().unlock();
+                }
+            });
         }
     }
 
@@ -275,6 +322,16 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
     public long getUsableSpace() {
         verifyReady();
         return _root.toFile().getUsableSpace();
+    }
+
+    @Override
+    public long getLastCommitId() {
+        _lock.readLock().lock();
+        try {
+            return _lastTxId;
+        } finally {
+            _lock.readLock().unlock();
+        }
     }
 
 }

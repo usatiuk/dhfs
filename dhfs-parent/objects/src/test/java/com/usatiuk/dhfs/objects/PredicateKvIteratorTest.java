@@ -27,7 +27,7 @@ public class PredicateKvIteratorTest {
         var source1 = TreePMap.<Integer, Integer>empty().plus(1, 3).plus(3, 5).plus(4, 6);
         var pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LT, 4),
                 IteratorStart.LT, 4, v -> (v % 2 == 0) ? v : null);
-        var expected = List.of();
+        var expected = List.of(Pair.of(4, 6));
         for (var pair : expected) {
             Assertions.assertTrue(pit.hasNext());
             Assertions.assertEquals(pair, pit.next());
@@ -129,6 +129,11 @@ public class PredicateKvIteratorTest {
                 IteratorStart.LT, 7, v -> (v % 2 == 0) ? v : null);
         Just.checkIterator(pit, Pair.of(6, 10));
         Assertions.assertFalse(pit.hasNext());
+        Assertions.assertTrue(pit.hasPrev());
+        Assertions.assertEquals(6, pit.peekPrevKey());
+        Assertions.assertEquals(Pair.of(6, 10), pit.prev());
+        Assertions.assertTrue(pit.hasNext());
+        Assertions.assertEquals(6, pit.peekNextKey());
 
         pit = new PredicateKvIterator<>(new NavigableMapKvIterator<>(source1, IteratorStart.LT, 6),
                 IteratorStart.LT, 6, v -> (v % 2 == 0) ? v : null);

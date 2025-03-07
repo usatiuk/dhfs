@@ -12,7 +12,6 @@ import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -24,7 +23,6 @@ import java.util.stream.Stream;
 @ApplicationScoped
 public class JObjectManager {
     private final List<PreCommitTxHook> _preCommitTxHooks;
-    private final AtomicLong _txCounter = new AtomicLong();
     private boolean _ready = false;
     @Inject
     SnapshotManager snapshotManager;
@@ -38,10 +36,6 @@ public class JObjectManager {
     }
 
     void init(@Observes @Priority(200) StartupEvent event) {
-        var read = snapshotManager.readObjectDirect(JDataDummy.TX_ID_OBJ_NAME).orElse(null);
-        if (read != null) {
-            _txCounter.set(read.version());
-        }
         _ready = true;
     }
 
@@ -51,14 +45,9 @@ public class JObjectManager {
 
     public TransactionPrivate createTransaction() {
         verifyReady();
-        while (true) {
-            try {
-                var tx = transactionFactory.createTransaction(_txCounter.get());
-                Log.tracev("Created transaction with snapshotId={0}", tx.snapshot().id());
-                return tx;
-            } catch (SnapshotManager.IllegalSnapshotIdException ignored) {
-            }
-        }
+        var tx = transactionFactory.createTransaction();
+        Log.tracev("Created transaction with snapshotId={0}", tx.snapshot().id());
+        return tx;
     }
 
     public TransactionHandle commit(TransactionPrivate tx) {
@@ -102,10 +91,6 @@ public class JObjectManager {
                         Log.trace("Commit iteration with " + currentIteration.size() + " records for hook " + hook.getClass());
 
                         for (var entry : currentIteration.entrySet()) {
-                            // FIXME: Kinda hack?
-                            if (entry.getKey().equals(JDataDummy.TX_ID_OBJ_NAME)) {
-                                continue;
-                            }
                             somethingChanged = true;
                             Log.trace("Running pre-commit hook " + hook.getClass() + " for" + entry.getKey());
                             var oldObj = getCurrent.apply(entry.getKey());
@@ -150,14 +135,9 @@ public class JObjectManager {
                     }
                 }
             }
-            
-            Log.trace("Committing transaction start");
-            // FIXME: Better way?
-            addDependency.accept(JDataDummy.TX_ID_OBJ_NAME);
-            writes.put(JDataDummy.TX_ID_OBJ_NAME, new TxRecord.TxObjectRecordWrite<>(JDataDummy.getInstance()));
 
+            Log.trace("Committing transaction start");
             var snapshotId = tx.snapshot().id();
-            var newId = _txCounter.get() + 1;
 
             for (var read : readSet.entrySet()) {
                 var dep = dependenciesLocked.get(read.getKey());
@@ -182,7 +162,6 @@ public class JObjectManager {
                 Log.trace("Checking dependency " + read.getKey() + " - ok with read");
             }
 
-            Log.tracef("Committing transaction %d to storage", newId);
             var addFlushCallback = snapshotManager.commitTx(
                     writes.values().stream()
                             .filter(r -> {
@@ -194,11 +173,7 @@ public class JObjectManager {
                                     }
                                 }
                                 return true;
-                            }).toList(),
-                    newId);
-
-            var realNewId = _txCounter.getAndIncrement() + 1;
-            assert realNewId == newId;
+                            }).toList());
 
             for (var callback : tx.getOnCommit()) {
                 callback.run();

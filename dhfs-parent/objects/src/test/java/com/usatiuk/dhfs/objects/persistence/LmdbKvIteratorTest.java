@@ -10,18 +10,23 @@ import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.RepeatedTest;
 
 import java.util.List;
 
+class Profiles {
+    public static class LmdbKvIteratorTestProfile extends TempDataProfile {
+    }
+}
+
 @QuarkusTest
-@TestProfile(TempDataProfile.class)
+@TestProfile(Profiles.LmdbKvIteratorTestProfile.class)
 public class LmdbKvIteratorTest {
 
     @Inject
     LmdbObjectPersistentStore store;
 
-    @Test
+    @RepeatedTest(100)
     public void iteratorTest1() {
         store.commitTx(
                 new TxManifestRaw(
@@ -29,7 +34,7 @@ public class LmdbKvIteratorTest {
                                 Pair.of(JObjectKey.of(Long.toString(2)), ByteString.copyFrom(new byte[]{3})),
                                 Pair.of(JObjectKey.of(Long.toString(3)), ByteString.copyFrom(new byte[]{4}))),
                         List.of()
-                )
+                ), -1, Runnable::run
         );
 
         var iterator = store.getIterator(IteratorStart.LE, JObjectKey.of(Long.toString(3)));
@@ -99,8 +104,10 @@ public class LmdbKvIteratorTest {
         iterator.close();
 
         store.commitTx(new TxManifestRaw(
-                List.of(),
-                List.of(JObjectKey.of(Long.toString(1)), JObjectKey.of(Long.toString(2)), JObjectKey.of(Long.toString(3)))
-        ));
+                        List.of(),
+                        List.of(JObjectKey.of(Long.toString(1)), JObjectKey.of(Long.toString(2)), JObjectKey.of(Long.toString(3)))
+                ),
+                -1, Runnable::run
+        );
     }
 }

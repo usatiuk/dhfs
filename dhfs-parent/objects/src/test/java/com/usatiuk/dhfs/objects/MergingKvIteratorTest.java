@@ -45,6 +45,27 @@ public class MergingKvIteratorTest {
         }
 
         @Override
+        public K peekPrevKey() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Pair<K, V> prev() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean hasPrev() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void skipPrev() {
+            throw new UnsupportedOperationException();
+
+        }
+
+        @Override
         public void close() {
         }
 
@@ -148,7 +169,7 @@ public class MergingKvIteratorTest {
         Assertions.assertFalse(mergingIterator.hasNext());
         Just.checkIterator(mergingIterator.reversed(), Pair.of(5, 6), Pair.of(2, 4), Pair.of(1, 3));
         Assertions.assertFalse(mergingIterator.reversed().hasNext());
-        Just.checkIterator(mergingIterator, Pair.of(1,3), Pair.of(2, 4), Pair.of(5, 6));
+        Just.checkIterator(mergingIterator, Pair.of(1, 3), Pair.of(2, 4), Pair.of(5, 6));
         Assertions.assertFalse(mergingIterator.hasNext());
 
 
@@ -161,7 +182,7 @@ public class MergingKvIteratorTest {
         Assertions.assertFalse(mergingIterator2.hasNext());
         Just.checkIterator(mergingIterator2.reversed(), Pair.of(5, 6), Pair.of(2, 5), Pair.of(1, 3));
         Assertions.assertFalse(mergingIterator2.reversed().hasNext());
-        Just.checkIterator(mergingIterator2, Pair.of(1,3), Pair.of(2, 5), Pair.of(5, 6));
+        Just.checkIterator(mergingIterator2, Pair.of(1, 3), Pair.of(2, 5), Pair.of(5, 6));
         Assertions.assertFalse(mergingIterator2.hasNext());
 
         var mergingIterator3 = new MergingKvIterator<>("test", IteratorStart.LE, 5, (mS, mK) -> new NavigableMapKvIterator<>(source1, mS, mK), (mS, mK) -> new NavigableMapKvIterator<>(source2, mS, mK));
@@ -213,6 +234,9 @@ public class MergingKvIteratorTest {
         Assertions.assertEquals(2, mergingIterator3.peekPrevKey());
         Assertions.assertEquals(5, mergingIterator3.peekNextKey());
         Assertions.assertEquals(2, mergingIterator3.peekPrevKey());
+        Assertions.assertTrue(mergingIterator3.hasPrev());
+        Assertions.assertTrue(mergingIterator3.hasNext());
+        Assertions.assertEquals(5, mergingIterator3.peekNextKey());
     }
 
     @Test

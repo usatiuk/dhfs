@@ -5,6 +5,7 @@ import io.quarkus.logging.Log;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, V> {
     private final Map<CloseableKvIterator<K, V>, Integer> _iterators;
@@ -22,16 +23,22 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
             // Starting at a greatest key less than/less or equal than:
             // We have a bunch of iterators that have given us theirs "greatest LT/LE key"
             // now we need to pick the greatest of those to start with
+            // But if some of them don't have a lesser key, we need to pick the smallest of those
             var initialIterators = iterators.stream().map(p -> p.get(initialStartType, initialStartKey)).toList();
             try {
-                K initialMaxValue = initialIterators.stream()
+                IteratorStart finalStartType = startType;
+                var found = initialIterators.stream()
                         .filter(CloseableKvIterator::hasNext)
                         .map((i) -> {
                             var peeked = i.peekNextKey();
 //                            Log.warnv("peeked: {0}, from {1}", peeked, i.getClass());
                             return peeked;
-                        })
-                        .max(Comparator.naturalOrder()).orElse(null);
+                        }).distinct().collect(Collectors.partitioningBy(e -> finalStartType == IteratorStart.LE ? e.compareTo(initialStartKey) <= 0 : e.compareTo(initialStartKey) < 0));
+                K initialMaxValue;
+                if (!found.get(true).isEmpty())
+                    initialMaxValue = found.get(true).stream().max(Comparator.naturalOrder()).orElse(null);
+                else
+                    initialMaxValue = found.get(false).stream().min(Comparator.naturalOrder()).orElse(null);
                 if (initialMaxValue == null) {
                     fail = true;
                 }
@@ -61,12 +68,12 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
 
         Log.tracev("{0} Created: {1}", _name, _sortedIterators);
         switch (initialStartType) {
-            case LT -> {
-                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(initialStartKey) < 0;
-            }
-            case LE -> {
-                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(initialStartKey) <= 0;
-            }
+//            case LT -> {
+//                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(initialStartKey) < 0;
+//            }
+//            case LE -> {
+//                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(initialStartKey) <= 0;
+//            }
             case GT -> {
                 assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(initialStartKey) > 0;
             }
@@ -88,6 +95,7 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
         }
 
         K key = iterator.peekNextKey();
+        Log.tracev("{0} Advance peeked: {1}-{2}", _name, iterator, key);
         if (!_sortedIterators.containsKey(key)) {
             _sortedIterators.put(key, iterator);
             return;
@@ -110,6 +118,7 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
     @Override
     protected void reverse() {
         var cur = _goingForward ? _sortedIterators.pollFirstEntry() : _sortedIterators.pollLastEntry();
+        Log.tracev("{0} Reversing from {1}", _name, cur);
         _goingForward = !_goingForward;
         _sortedIterators.clear();
         for (CloseableKvIterator<K, V> iterator : _iterators.keySet()) {
@@ -126,6 +135,7 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
                 || (!_goingForward && peekImpl().compareTo(cur.getKey()) >= 0))) {
             skipImpl();
         }
+        Log.tracev("{0} Reversed to {1}", _name, _sortedIterators);
     }
 
     @Override

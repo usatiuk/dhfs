@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.objects;
 import com.usatiuk.dhfs.objects.data.Parent;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.junit.mockito.InjectSpy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -12,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 @QuarkusTest
+@TestProfile(TempDataProfile.class)
 public class PreCommitTxHookTest {
     @Inject
     TransactionManager txm;

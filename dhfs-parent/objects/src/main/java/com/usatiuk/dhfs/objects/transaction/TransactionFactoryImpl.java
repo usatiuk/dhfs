@@ -18,24 +18,22 @@ public class TransactionFactoryImpl implements TransactionFactory {
     ReadTrackingObjectSourceFactory readTrackingObjectSourceFactory;
 
     @Override
-    public TransactionPrivate createTransaction(long snapshotId) {
-        Log.tracev("Trying to create transaction with snapshotId={0}", snapshotId);
-        return new TransactionImpl(snapshotId);
+    public TransactionPrivate createTransaction() {
+        return new TransactionImpl();
     }
 
     private class TransactionImpl implements TransactionPrivate {
         private final ReadTrackingTransactionObjectSource _source;
 
         private final NavigableMap<JObjectKey, TxRecord.TxObjectRecord<?>> _writes = new TreeMap<>();
-        private long _writeVersion = 0;
 
         private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _newWrites = new HashMap<>();
         private final List<Runnable> _onCommit = new ArrayList<>();
         private final List<Runnable> _onFlush = new ArrayList<>();
         private final SnapshotManager.Snapshot _snapshot;
 
-        private TransactionImpl(long snapshotId) {
-            _snapshot = snapshotManager.createSnapshot(snapshotId);
+        private TransactionImpl() {
+            _snapshot = snapshotManager.createSnapshot();
             _source = readTrackingObjectSourceFactory.create(_snapshot);
         }
 
@@ -108,12 +106,11 @@ public class TransactionFactoryImpl implements TransactionFactory {
             Log.tracev("Getting tx iterator with start={0}, key={1}", start, key);
             return new TombstoneMergingKvIterator<>("tx", start, key,
                     (tS, tK) -> new MappingKvIterator<>(new NavigableMapKvIterator<>(_writes, tS, tK), t -> switch (t) {
-                        case TxRecord.TxObjectRecordWrite<?> write ->
-                                new TombstoneMergingKvIterator.Data<>(write.data());
-                        case TxRecord.TxObjectRecordDeleted deleted -> new TombstoneMergingKvIterator.Tombstone<>();
+                        case TxRecord.TxObjectRecordWrite<?> write -> new Data<>(write.data());
+                        case TxRecord.TxObjectRecordDeleted deleted -> new Tombstone<>();
                         case null, default -> null;
                     }),
-                    (tS, tK) -> new MappingKvIterator<>(_source.getIterator(tS, tK), TombstoneMergingKvIterator.Data::new));
+                    (tS, tK) -> new MappingKvIterator<>(_source.getIterator(tS, tK), Data::new));
         }
 
         @Override

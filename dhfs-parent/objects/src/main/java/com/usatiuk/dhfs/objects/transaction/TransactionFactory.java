@@ -1,5 +1,5 @@
 package com.usatiuk.dhfs.objects.transaction;
 
 public interface TransactionFactory {
-    TransactionPrivate createTransaction(long snapshotId);
+    TransactionPrivate createTransaction();
 }

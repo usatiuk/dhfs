@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.objects.jmap;
 import com.usatiuk.dhfs.objects.CloseableKvIterator;
 import com.usatiuk.dhfs.objects.JData;
 import com.usatiuk.dhfs.objects.JObjectKey;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.tuple.Pair;
 
 public class JMapIterator<K extends JMapKey & Comparable<K>> implements CloseableKvIterator<K, JMapEntry<K>> {
@@ -50,6 +51,26 @@ public class JMapIterator<K extends JMapKey & Comparable<K>> implements Closeabl
             throw new IllegalStateException("No next element");
         }
         advance();
+    }
+
+    @Override
+    public K peekPrevKey() {
+        throw new NotImplementedException();
+    }
+
+    @Override
+    public Pair<K, JMapEntry<K>> prev() {
+        throw new NotImplementedException();
+    }
+
+    @Override
+    public boolean hasPrev() {
+        throw new NotImplementedException();
+    }
+
+    @Override
+    public void skipPrev() {
+        throw new NotImplementedException();
     }
 
     @Override
