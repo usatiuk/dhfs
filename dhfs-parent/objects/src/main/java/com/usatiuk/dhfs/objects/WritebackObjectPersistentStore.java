@@ -432,7 +432,7 @@ public class WritebackObjectPersistentStore {
                 switch (action) {
                     case TxRecord.TxObjectRecordWrite<?> write -> {
                         Log.trace("Flushing object " + write.key());
-                        bundle.commit(new JDataVersionedWrapper(write.data(), bundleId));
+                        bundle.commit(new JDataVersionedWrapperImpl(write.data(), bundleId));
                     }
                     case TxRecord.TxObjectRecordDeleted deleted -> {
                         Log.trace("Deleting object " + deleted.key());

@@ -1,8 +1,7 @@
 package com.usatiuk.dhfs.objects;
 
-import jakarta.annotation.Nonnull;
+public interface JDataVersionedWrapper {
+    JData data();
 
-import java.io.Serializable;
-
-public record JDataVersionedWrapper(@Nonnull JData data, long version) implements Serializable {
+    long version();
 }
