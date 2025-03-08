@@ -60,7 +60,7 @@ public class CachingObjectPersistentStore {
 //        Log.tracev("Adding {0} to cache: {1}", key, obj);
         _lock.writeLock().lock();
         try {
-            int size = obj.map(o -> o.data().estimateSize()).orElse(16);
+            int size = obj.map(JDataVersionedWrapper::estimateSize).orElse(16);
 
             _curSize += size;
             var entry = new CacheEntry(obj.<MaybeTombstone<JDataVersionedWrapper>>map(Data::new).orElse(new Tombstone<>()), size);

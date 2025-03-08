@@ -34,4 +34,11 @@ public class JDataVersionedWrapperLazy implements JDataVersionedWrapper {
     public long version() {
         return _version;
     }
+
+    @Override
+    public int estimateSize() {
+        if (_data != null)
+            return _data.estimateSize();
+        return _rawData.size();
+    }
 }

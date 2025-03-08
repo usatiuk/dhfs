@@ -269,6 +269,13 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             if (!_hasNext) {
                 throw new NoSuchElementException("No more elements");
             }
+            // TODO: Right now with java serialization it doesn't matter, it's all copied to arrays anyway
+//            var val = _cursor.val();
+//            var bbDirect = UninitializedByteBuffer.allocateUninitialized(val.remaining());
+//            bbDirect.put(val);
+//            bbDirect.flip();
+//            var bs = UnsafeByteOperations.unsafeWrap(bbDirect);
+//            var ret = Pair.of(JObjectKey.fromByteBuffer(_cursor.key()), bs);
             var ret = Pair.of(JObjectKey.fromByteBuffer(_cursor.key()), ByteString.copyFrom(_cursor.val()));
             if (_goingForward)
                 _hasNext = _cursor.next();
