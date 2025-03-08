@@ -19,12 +19,12 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 @ApplicationScoped
 public class CachingObjectPersistentStore {
-    private final LinkedHashMap<JObjectKey, CacheEntry> _cache = new LinkedHashMap<>(8, 0.75f, true);
+    private final LinkedHashMap<JObjectKey, CacheEntry> _cache = new LinkedHashMap<>();
     private TreePMap<JObjectKey, CacheEntry> _sortedCache = TreePMap.empty();
     private long _cacheVersion = 0;
 
     private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
-    private final DataLocker _locker = new DataLocker();
+    private final DataLocker _readerLocker = new DataLocker();
 
     @Inject
     SerializingObjectPersistentStore delegate;
@@ -83,17 +83,16 @@ public class CachingObjectPersistentStore {
 
     @Nonnull
     public Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
-        try (var lock = _locker.lock(name)) {
-            _lock.readLock().lock();
-            try {
-                var got = _cache.get(name);
-                if (got != null) {
-                    return got.object().opt();
-                }
-            } finally {
-                _lock.readLock().unlock();
+        _lock.readLock().lock();
+        try {
+            var got = _cache.get(name);
+            if (got != null) {
+                return got.object().opt();
             }
-
+        } finally {
+            _lock.readLock().unlock();
+        }
+        try (var lock = _readerLocker.lock(name)) {
             // TODO: This is possibly racy
 //            var got = delegate.readObject(name);
 //            put(name, got);

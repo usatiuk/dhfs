@@ -156,7 +156,7 @@ public class JObjectManager {
 
                 if (dep.get().version() > snapshotId) {
                     Log.trace("Checking dependency " + read.getKey() + " - newer than");
-                    throw new TxCommitException("Serialization hazard: " + dep.get().version() + " vs " + snapshotId);
+                    throw new TxCommitException("Serialization hazard: " + dep.get().data().key() + " " + dep.get().version() + " vs " + snapshotId);
                 }
 
                 Log.trace("Checking dependency " + read.getKey() + " - ok with read");
