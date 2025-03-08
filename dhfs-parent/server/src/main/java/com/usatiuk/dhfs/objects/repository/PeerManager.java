@@ -1,10 +1,16 @@
 package com.usatiuk.dhfs.objects.repository;
 
-import com.usatiuk.dhfs.objects.repository.peersync.PeerSyncApiClientDynamic;
-import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
+import com.usatiuk.dhfs.objects.PeerId;
+import com.usatiuk.dhfs.objects.TransactionManager;
+import com.usatiuk.dhfs.objects.repository.peerdiscovery.PeerAddress;
+import com.usatiuk.dhfs.objects.repository.peerdiscovery.PeerDiscoveryDirectory;
+import com.usatiuk.dhfs.objects.repository.peersync.PeerInfo;
+import com.usatiuk.dhfs.objects.repository.peersync.PeerInfoService;
+import com.usatiuk.dhfs.objects.repository.peersync.api.PeerSyncApiClientDynamic;
+import com.usatiuk.dhfs.objects.repository.peertrust.PeerTrustManager;
 import com.usatiuk.dhfs.objects.repository.webapi.AvailablePeerInfo;
+import com.usatiuk.dhfs.objects.transaction.Transaction;
 import io.quarkus.logging.Log;
-import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 import io.smallrye.common.annotation.Blocking;
@@ -12,57 +18,52 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import lombok.Getter;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
-import java.security.cert.CertificateException;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class PeerManager {
-    private final TransientPeersState _transientPeersState = new TransientPeersState();
-    private final ConcurrentMap<UUID, TransientPeerState> _seenButNotAdded = new ConcurrentHashMap<>();
+    private final ConcurrentMap<PeerId, PeerAddress> _states = new ConcurrentHashMap<>();
     // FIXME: Ideally not call them on every ping
     private final ArrayList<ConnectionEventListener> _connectedListeners = new ArrayList<>();
     private final ArrayList<ConnectionEventListener> _disconnectedListeners = new ArrayList<>();
     @Inject
     PersistentPeerDataService persistentPeerDataService;
     @Inject
-    SyncHandler syncHandler;
+    PeerInfoService peerInfoService;
     @Inject
     RpcClientFactory rpcClientFactory;
     @Inject
     PeerSyncApiClientDynamic peerSyncApiClient;
+    @Inject
+    TransactionManager transactionManager;
+    @Inject
+    Transaction curTx;
+    @Inject
+    PeerTrustManager peerTrustManager;
     @ConfigProperty(name = "dhfs.objects.sync.ping.timeout")
     long pingTimeout;
+    @Inject
+    PeerDiscoveryDirectory peerDiscoveryDirectory;
+    @Inject
+    SyncHandler syncHandler;
     private ExecutorService _heartbeatExecutor;
-    @Getter
-    private boolean _ready = false;
 
     // Note: keep priority updated with below
     void init(@Observes @Priority(600) StartupEvent event) throws IOException {
         _heartbeatExecutor = Executors.newVirtualThreadPerTaskExecutor();
-
-        // Note: newly added hosts aren't in _transientPeersState
-        // but that's ok as they don't have initialSyncDone set
-        for (var h : persistentPeerDataService.getHostUuids())
-            _transientPeersState.runWriteLocked(d -> d.get(h));
-
-        _ready = true;
-    }
-
-    void shutdown(@Observes @Priority(50) ShutdownEvent event) throws IOException {
-        _ready = false;
     }
 
     @Scheduled(every = "${dhfs.objects.reconnect_interval}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     @Blocking
     public void tryConnectAll() {
-        if (!_ready) return;
+        if (_heartbeatExecutor == null) return;
         try {
-            _heartbeatExecutor.invokeAll(persistentPeerDataService.getHostUuids()
+            _heartbeatExecutor.invokeAll(peerInfoService.getPeersNoSelf()
                     .stream()
                     .<Callable<Void>>map(host -> () -> {
                         try {
@@ -70,8 +71,9 @@ public class PeerManager {
                                 Log.trace("Heartbeat: " + host);
                             else
                                 Log.debug("Trying to connect to " + host);
-                            if (pingCheck(host))
-                                handleConnectionSuccess(host);
+                            var bestAddr = selectBestAddress(host.id());
+                            if (pingCheck(host, bestAddr))
+                                handleConnectionSuccess(host, bestAddr);
                             else
                                 handleConnectionError(host);
                         } catch (Exception e) {
@@ -86,7 +88,6 @@ public class PeerManager {
 
     // Note: registrations should be completed with Priority < 600
     public void registerConnectEventListener(ConnectionEventListener listener) {
-        if (_ready) throw new IllegalStateException("Already initialized");
         synchronized (_connectedListeners) {
             _connectedListeners.add(listener);
         }
@@ -94,65 +95,48 @@ public class PeerManager {
 
     // Note: registrations should be completed with Priority < 600
     public void registerDisconnectEventListener(ConnectionEventListener listener) {
-        if (_ready) throw new IllegalStateException("Already initialized");
         synchronized (_disconnectedListeners) {
             _disconnectedListeners.add(listener);
         }
     }
 
-    public void handleConnectionSuccess(UUID host) {
-        if (!_ready) return;
-
+    private void handleConnectionSuccess(PeerInfo host, PeerAddress address) {
         boolean wasReachable = isReachable(host);
 
-        boolean shouldSyncObj = persistentPeerDataService.markInitialObjSyncDone(host);
-        boolean shouldSyncOp = persistentPeerDataService.markInitialOpSyncDone(host);
+        boolean shouldSync = persistentPeerDataService.markInitialSyncDone(host.id());
 
-        if (shouldSyncObj)
-            syncHandler.pushInitialResyncObj(host);
-        if (shouldSyncOp)
-            syncHandler.pushInitialResyncOp(host);
+        if (shouldSync)
+            syncHandler.doInitialSync(host.id());
 
-        _transientPeersState.runWriteLocked(d -> {
-            d.get(host).setReachable(true);
-            return null;
-        });
+        _states.put(host.id(), address);
 
         if (wasReachable) return;
 
         Log.info("Connected to " + host);
 
-        for (var l : _connectedListeners) {
-            l.apply(host);
-        }
+//        for (var l : _connectedListeners) {
+//            l.apply(host);
+//        }
     }
 
-    public void handleConnectionError(UUID host) {
+    public void handleConnectionError(PeerInfo host) {
         boolean wasReachable = isReachable(host);
 
         if (wasReachable)
             Log.info("Lost connection to " + host);
 
-        _transientPeersState.runWriteLocked(d -> {
-            d.get(host).setReachable(false);
-            return null;
-        });
+        _states.remove(host.id());
 
-        for (var l : _disconnectedListeners) {
-            l.apply(host);
-        }
+//        for (var l : _disconnectedListeners) {
+//            l.apply(host);
+//        }
     }
 
     // FIXME:
-    private boolean pingCheck(UUID host) {
-        TransientPeerState state = _transientPeersState.runReadLocked(s -> s.getCopy(host));
-
+    private boolean pingCheck(PeerInfo host, PeerAddress address) {
         try {
-            return rpcClientFactory.withObjSyncClient(host.toString(), state.getAddr(), state.getSecurePort(), pingTimeout, c -> {
-                var ret = c.ping(PingRequest.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString()).build());
-                if (!UUID.fromString(ret.getSelfUuid()).equals(host)) {
-                    throw new IllegalStateException("Ping selfUuid returned " + ret.getSelfUuid() + " but expected " + host);
-                }
+            return rpcClientFactory.withObjSyncClient(host.id(), address, pingTimeout, (peer, c) -> {
+                c.ping(PingRequest.getDefaultInstance());
                 return true;
             });
         } catch (Exception ignored) {
@@ -161,109 +145,69 @@ public class PeerManager {
         }
     }
 
-    public boolean isReachable(UUID host) {
-        return _transientPeersState.runReadLocked(d -> d.get(host).isReachable());
+    public boolean isReachable(PeerId host) {
+        return _states.containsKey(host);
     }
 
-    public TransientPeerState getTransientState(UUID host) {
-        return _transientPeersState.runReadLocked(d -> d.getCopy(host));
+    public boolean isReachable(PeerInfo host) {
+        return isReachable(host.id());
     }
 
-    public List<UUID> getAvailableHosts() {
-        return _transientPeersState.runReadLocked(d -> d.getStates().entrySet().stream()
-                .filter(e -> e.getValue().isReachable())
-                .map(Map.Entry::getKey).toList());
+    public PeerAddress getAddress(PeerId host) {
+        return _states.get(host);
     }
 
-    public List<UUID> getUnavailableHosts() {
-        return _transientPeersState.runReadLocked(d -> d.getStates().entrySet().stream()
-                .filter(e -> !e.getValue().isReachable())
-                .map(Map.Entry::getKey).toList());
+    public List<PeerId> getAvailableHosts() {
+        return _states.keySet().stream().toList();
     }
+
+//    public List<UUID> getUnavailableHosts() {
+//        return _transientPeersState.runReadLocked(d -> d.getStates().entrySet().stream()
+//                .filter(e -> !e.getValue().isReachable())
+//                .map(Map.Entry::getKey).toList());
+//    }
 
     public HostStateSnapshot getHostStateSnapshot() {
-        ArrayList<UUID> available = new ArrayList<>();
-        ArrayList<UUID> unavailable = new ArrayList<>();
-        _transientPeersState.runReadLocked(d -> {
-                    for (var v : d.getStates().entrySet()) {
-                        if (v.getValue().isReachable())
-                            available.add(v.getKey());
-                        else
-                            unavailable.add(v.getKey());
-                    }
-                    return null;
-                }
-        );
-        return new HostStateSnapshot(available, unavailable);
-    }
-
-    public void notifyAddr(UUID host, String addr, Integer port, Integer securePort) {
-        if (host.equals(persistentPeerDataService.getSelfUuid())) {
-            return;
-        }
-
-        var state = new TransientPeerState();
-        state.setAddr(addr);
-        state.setPort(port);
-        state.setSecurePort(securePort);
-
-        if (!persistentPeerDataService.existsHost(host)) {
-            var prev = _seenButNotAdded.put(host, state);
-            // Needed for tests
-            if (prev == null)
-                Log.debug("Ignoring new address from unknown host " + ": addr=" + addr + " port=" + port);
-            return;
-        } else {
-            _seenButNotAdded.remove(host);
-        }
-
-        _transientPeersState.runWriteLocked(d -> {
-//            Log.trace("Updating connection info for " + host + ": addr=" + addr + " port=" + port);
-            d.get(host).setAddr(addr);
-            d.get(host).setPort(port);
-            d.get(host).setSecurePort(securePort);
-            return null;
+        return transactionManager.run(() -> {
+            var partition = peerInfoService.getPeersNoSelf().stream().map(PeerInfo::id)
+                    .collect(Collectors.partitioningBy(this::isReachable));
+            return new HostStateSnapshot(partition.get(true), partition.get(false));
         });
     }
 
-    public void removeRemoteHost(UUID host) {
-        persistentPeerDataService.removeHost(host);
-        // Race?
-        _transientPeersState.runWriteLocked(d -> {
-            d.getStates().remove(host);
-            return null;
+    public void removeRemoteHost(PeerId peerId) {
+        transactionManager.run(() -> {
+            peerInfoService.removePeer(peerId);
         });
     }
 
-    public void addRemoteHost(UUID host) {
-        if (!_seenButNotAdded.containsKey(host)) {
-            throw new IllegalStateException("Host " + host + " is not seen");
-        }
-        if (persistentPeerDataService.existsHost(host)) {
+    private PeerAddress selectBestAddress(PeerId host) {
+        return peerDiscoveryDirectory.getForPeer(host).stream().findFirst().orElseThrow();
+    }
+
+    public void addRemoteHost(PeerId host) {
+        if (_states.containsKey(host)) {
             throw new IllegalStateException("Host " + host + " is already added");
         }
 
-        var state = _seenButNotAdded.get(host);
+        transactionManager.run(() -> {
+            if (peerInfoService.getPeerInfo(host).isPresent())
+                throw new IllegalStateException("Host " + host + " is already added");
 
-        // FIXME: race?
+            var info = peerSyncApiClient.getSelfInfo(selectBestAddress(host));
 
-        var info = peerSyncApiClient.getSelfInfo(state.getAddr(), state.getPort());
+            var cert = Base64.getDecoder().decode(info.cert());
+            peerInfoService.putPeer(host, cert);
+        });
 
-        try {
-            persistentPeerDataService.addHost(
-                    new PersistentPeerInfo(UUID.fromString(info.selfUuid()),
-                            CertificateTools.certFromBytes(Base64.getDecoder().decode(info.cert()))));
-            Log.info("Added host: " + host.toString());
-        } catch (CertificateException e) {
-            throw new RuntimeException(e);
-        }
+        peerTrustManager.reloadTrustManagerHosts(transactionManager.run(() -> peerInfoService.getPeers().stream().toList())); //FIXME:
     }
 
     public Collection<AvailablePeerInfo> getSeenButNotAddedHosts() {
-        return _seenButNotAdded.entrySet().stream()
-                .filter(e -> !persistentPeerDataService.existsHost(e.getKey()))
-                .map(e -> new AvailablePeerInfo(e.getKey().toString(), e.getValue().getAddr(), e.getValue().getPort()))
-                .toList();
+        return transactionManager.run(() -> {
+            return peerDiscoveryDirectory.getReachablePeers().stream().filter(p -> !peerInfoService.getPeerInfo(p).isPresent())
+                    .map(p -> new AvailablePeerInfo(p.toString())).toList();
+        });
     }
 
     @FunctionalInterface
@@ -271,7 +215,7 @@ public class PeerManager {
         void apply(UUID host);
     }
 
-    public record HostStateSnapshot(List<UUID> available, List<UUID> unavailable) {
+    public record HostStateSnapshot(Collection<PeerId> available, Collection<PeerId> unavailable) {
     }
 
 }

@@ -1,7 +1,8 @@
 package com.usatiuk.dhfs.objects.repository.invalidation;
 
-import com.usatiuk.dhfs.SerializationHelper;
+import com.usatiuk.dhfs.objects.PeerId;
 import com.usatiuk.dhfs.objects.repository.PeerManager;
+import com.usatiuk.dhfs.utils.SerializationHelper;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -17,9 +18,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.UUID;
-
-import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
 @ApplicationScoped
 public class DeferredInvalidationQueueService {
@@ -28,9 +26,8 @@ public class DeferredInvalidationQueueService {
     PeerManager remoteHostManager;
     @Inject
     InvalidationQueueService invalidationQueueService;
-    @ConfigProperty(name = "dhfs.objects.root")
+    @ConfigProperty(name = "dhfs.objects.persistence.files.root")
     String dataRoot;
-    // FIXME: DB when?
     private DeferredInvalidationQueueData _persistentData = new DeferredInvalidationQueueData();
 
     void init(@Observes @Priority(290) StartupEvent event) throws IOException {
@@ -39,11 +36,8 @@ public class DeferredInvalidationQueueService {
         if (Paths.get(dataRoot).resolve(dataFileName).toFile().exists()) {
             Log.info("Reading invalidation queue");
             _persistentData = SerializationHelper.deserialize(Files.readAllBytes(Paths.get(dataRoot).resolve(dataFileName)));
-        } else if (Paths.get(dataRoot).resolve(dataFileName + ".bak").toFile().exists()) {
-            Log.warn("Reading invalidation queue from backup");
-            _persistentData = SerializationHelper.deserialize(Files.readAllBytes(Paths.get(dataRoot).resolve(dataFileName)));
         }
-        remoteHostManager.registerConnectEventListener(this::returnForHost);
+//        remoteHostManager.registerConnectEventListener(this::returnForHost);
     }
 
     void shutdown(@Observes @Priority(300) ShutdownEvent event) throws IOException {
@@ -52,11 +46,8 @@ public class DeferredInvalidationQueueService {
         Log.info("Saved deferred invalidations");
     }
 
-
     private void writeData() {
         try {
-            if (Paths.get(dataRoot).resolve(dataFileName).toFile().exists())
-                Files.move(Paths.get(dataRoot).resolve(dataFileName), Paths.get(dataRoot).resolve(dataFileName + ".bak"), REPLACE_EXISTING);
             Files.write(Paths.get(dataRoot).resolve(dataFileName), SerializationUtils.serialize(_persistentData));
         } catch (IOException iex) {
             Log.error("Error writing deferred invalidations data", iex);
@@ -72,21 +63,21 @@ public class DeferredInvalidationQueueService {
             returnForHost(reachable);
     }
 
-    void returnForHost(UUID host) {
+    void returnForHost(PeerId host) {
         synchronized (this) {
-            var col = _persistentData.getDeferredInvalidations().get(host);
+            var col = _persistentData.deferredInvalidations.get(host);
             for (var s : col) {
-                Log.trace("Un-deferred invalidation to " + host + " of " + s);
-                invalidationQueueService.pushDeferredInvalidations(host, s);
+                Log.tracev("Returning deferred invalidation: {0}", s);
+                invalidationQueueService.pushDeferredInvalidations(s);
             }
             col.clear();
         }
     }
 
-    void defer(UUID host, String object) {
+    void defer(InvalidationQueueEntry entry) {
         synchronized (this) {
-            Log.trace("Deferred invalidation to " + host + " of " + object);
-            _persistentData.getDeferredInvalidations().put(host, object);
+            Log.tracev("Deferred invalidation: {0}", entry);
+            _persistentData.deferredInvalidations.put(entry.peer(), entry);
         }
     }
 }

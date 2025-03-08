@@ -6,7 +6,9 @@ import java.util.List;
 public class TestPeerInterface implements PeerInterface<Long> {
     private final long selfId;
 
-    public TestPeerInterface(long selfId) {this.selfId = selfId;}
+    public TestPeerInterface(long selfId) {
+        this.selfId = selfId;
+    }
 
     @Override
     public Long getSelfId() {

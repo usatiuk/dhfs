@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects.repository.invalidation;
 
-import lombok.Getter;
+import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.PeerId;
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.commons.collections4.multimap.HashSetValuedHashMap;
 
@@ -12,6 +13,5 @@ public class DeferredInvalidationQueueData implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    @Getter
-    private final MultiValuedMap<UUID, String> _deferredInvalidations = new HashSetValuedHashMap<>();
+    public final MultiValuedMap<PeerId, InvalidationQueueEntry> deferredInvalidations = new HashSetValuedHashMap<>();
 }

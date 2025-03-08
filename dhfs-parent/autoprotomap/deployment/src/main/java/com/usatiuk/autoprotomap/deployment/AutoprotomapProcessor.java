@@ -68,11 +68,11 @@ class AutoprotomapProcessor {
             }
         } catch (Throwable e) {
             StringBuilder sb = new StringBuilder();
-            sb.append(e.toString() + "\n");
+            sb.append(e + "\n");
             for (var el : e.getStackTrace()) {
                 sb.append(el.toString() + "\n");
             }
-            System.out.println(sb.toString());
+            System.out.println(sb);
         }
     }
 }

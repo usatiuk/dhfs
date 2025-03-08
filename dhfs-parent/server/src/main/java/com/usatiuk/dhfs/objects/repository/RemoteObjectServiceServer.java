@@ -1,172 +1,172 @@
 package com.usatiuk.dhfs.objects.repository;
 
 import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
-import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
-import com.usatiuk.dhfs.objects.jrepository.JObjectData;
-import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
-import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
-import com.usatiuk.dhfs.objects.persistence.JObjectDataP;
-import com.usatiuk.dhfs.objects.repository.autosync.AutoSyncProcessor;
+import com.usatiuk.dhfs.objects.*;
+import com.usatiuk.dhfs.objects.persistence.JObjectKeyP;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
-import com.usatiuk.dhfs.objects.repository.opsupport.Op;
-import com.usatiuk.dhfs.objects.repository.opsupport.OpObjectRegistry;
-import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
+import com.usatiuk.dhfs.objects.repository.invalidation.Op;
+import com.usatiuk.dhfs.objects.repository.invalidation.OpHandler;
+import com.usatiuk.dhfs.objects.transaction.Transaction;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.grpc.GrpcService;
 import io.quarkus.logging.Log;
+import io.quarkus.security.identity.SecurityIdentity;
 import io.smallrye.common.annotation.Blocking;
 import io.smallrye.mutiny.Uni;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
-
-import java.util.UUID;
+import org.apache.commons.lang3.tuple.Pair;
 
 // Note: RunOnVirtualThread hangs somehow
 @GrpcService
 @RolesAllowed("cluster-member")
 public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
-    @Inject
-    SyncHandler syncHandler;
+//    @Inject
+//    SyncHandler syncHandler;
 
     @Inject
-    JObjectManager jObjectManager;
-
+    TransactionManager txm;
     @Inject
-    PeerManager remoteHostManager;
-
+    PeerManager peerManager;
     @Inject
-    AutoSyncProcessor autoSyncProcessor;
-
+    Transaction curTx;
     @Inject
     PersistentPeerDataService persistentPeerDataService;
 
     @Inject
     InvalidationQueueService invalidationQueueService;
-
     @Inject
-    ProtoSerializer<JObjectDataP, JObjectData> dataProtoSerializer;
+    SecurityIdentity identity;
     @Inject
-    ProtoSerializer<OpPushPayload, Op> opProtoSerializer;
-
+    ProtoSerializer<OpP, Op> opProtoSerializer;
     @Inject
-    OpObjectRegistry opObjectRegistry;
-
+    ProtoSerializer<GetObjectReply, ReceivedObject> receivedObjectProtoSerializer;
     @Inject
-    JObjectTxManager jObjectTxManager;
+    RemoteTransaction remoteTx;
+    @Inject
+    OpHandler opHandler;
 
     @Override
     @Blocking
     public Uni<GetObjectReply> getObject(GetObjectRequest request) {
-        if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-        if (!persistentPeerDataService.existsHost(UUID.fromString(request.getSelfUuid())))
-            throw new StatusRuntimeException(Status.UNAUTHENTICATED);
+        Log.info("<-- getObject: " + request.getName() + " from " + identity.getPrincipal().getName().substring(3));
 
-        Log.info("<-- getObject: " + request.getName() + " from " + request.getSelfUuid());
-
-        var obj = jObjectManager.get(request.getName()).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
-
-        // Does @Blocking break this?
-        return Uni.createFrom().emitter(emitter -> {
-            var replyObj = jObjectTxManager.executeTx(() -> {
-                // Obj.markSeen before markSeen of its children
-                obj.markSeen();
-                return obj.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (meta, data) -> {
-                    if (meta.isOnlyLocal())
-                        throw new StatusRuntimeExceptionNoStacktrace(Status.INVALID_ARGUMENT.withDescription("Trying to get local-only object"));
-                    if (data == null) {
-                        Log.info("<-- getObject FAIL: " + request.getName() + " from " + request.getSelfUuid());
-                        throw new StatusRuntimeException(Status.ABORTED.withDescription("Not available locally"));
-                    }
-                    data.extractRefs().forEach(ref ->
-                            jObjectManager.get(ref)
-                                    .orElseThrow(() -> new IllegalStateException("Non-hydrated refs for local object?"))
-                                    .markSeen());
-
-                    return ApiObject.newBuilder()
-                            .setHeader(obj.getMeta().toRpcHeader())
-                            .setContent(dataProtoSerializer.serialize(obj.getData())).build();
-                });
-            });
-            var ret = GetObjectReply.newBuilder()
-                    .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
-                    .setObject(replyObj).build();
-            // TODO: Could this cause problems if we wait for too long?
-            obj.commitFenceAsync(() -> emitter.complete(ret));
+        Pair<RemoteObjectMeta, JDataRemote> got = txm.run(() -> {
+            var meta = remoteTx.getMeta(JObjectKey.of(request.getName().getName())).orElse(null);
+            var obj = remoteTx.getDataLocal(JDataRemote.class, JObjectKey.of(request.getName().getName())).orElse(null);
+            if (meta != null && !meta.seen())
+                curTx.put(meta.withSeen(true));
+            if (obj != null)
+                for (var ref : obj.collectRefsTo()) {
+                    var refMeta = remoteTx.getMeta(ref).orElse(null);
+                    if (refMeta != null && !refMeta.seen())
+                        curTx.put(refMeta.withSeen(true));
+                }
+            return Pair.of(meta, obj);
         });
+
+        if ((got.getValue() != null) && (got.getKey() == null)) {
+            Log.error("Inconsistent state for object meta: " + request.getName());
+            throw new StatusRuntimeException(Status.INTERNAL);
+        }
+
+        if (got.getValue() == null) {
+            Log.info("<-- getObject NOT FOUND: " + request.getName() + " from " + identity.getPrincipal().getName().substring(3));
+            throw new StatusRuntimeException(Status.NOT_FOUND);
+        }
+
+        var serialized = receivedObjectProtoSerializer.serialize(new ReceivedObject(got.getKey().changelog(), got.getValue()));
+        return Uni.createFrom().item(serialized);
+//        // Does @Blocking break this?
+//        return Uni.createFrom().emitter(emitter -> {
+//            try {
+//            } catch (Exception e) {
+//                emitter.fail(e);
+//            }
+//            var replyObj = txm.run(() -> {
+//                var cur = curTx.get(JDataRemote.class, JObjectKey.of(request.getName())).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
+//                // Obj.markSeen before markSeen of its children
+//                obj.markSeen();
+//                return obj.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (meta, data) -> {
+//                    if (meta.isOnlyLocal())
+//                        throw new StatusRuntimeExceptionNoStacktrace(Status.INVALID_ARGUMENT.withDescription("Trying to get local-only object"));
+//                    if (data == null) {
+//                        Log.info("<-- getObject FAIL: " + request.getName() + " from " + request.getSelfUuid());
+//                        throw new StatusRuntimeException(Status.ABORTED.withDescription("Not available locally"));
+//                    }
+//                    data.extractRefs().forEach(ref ->
+//                            jObjectManager.get(ref)
+//                                    .orElseThrow(() -> new IllegalStateException("Non-hydrated refs for local object?"))
+//                                    .markSeen());
+//
+//                    return ApiObject.newBuilder()
+//                            .setHeader(obj.getMeta().toRpcHeader())
+//                            .setContent(dataProtoSerializer.serialize(obj.getData())).build();
+//                });
+//            });
+//            var ret = GetObjectReply.newBuilder()
+//                    .setSelfUuid(persistentPeerDataService.getSelfUuid().toString())
+//                    .setObject(replyObj).build();
+//            emitter.complete(ret);
+//            // TODO: Could this cause problems if we wait for too long?
+////            obj.commitFenceAsync(() -> emitter.complete(ret));
+//        });
     }
 
     @Override
     @Blocking
     public Uni<CanDeleteReply> canDelete(CanDeleteRequest request) {
-        if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-        if (!persistentPeerDataService.existsHost(UUID.fromString(request.getSelfUuid())))
-            throw new StatusRuntimeException(Status.UNAUTHENTICATED);
+        var peerId = identity.getPrincipal().getName().substring(3);
 
-        Log.info("<-- canDelete: " + request.getName() + " from " + request.getSelfUuid());
+        Log.info("<-- canDelete: " + request.getName() + " from " + peerId);
 
         var builder = CanDeleteReply.newBuilder();
 
-        var obj = jObjectManager.get(request.getName());
+        txm.run(() -> {
+            var obj = curTx.get(RemoteObjectMeta.class, JObjectKey.of(request.getName().getName())).orElse(null);
 
-        builder.setSelfUuid(persistentPeerDataService.getSelfUuid().toString());
-        builder.setObjName(request.getName());
+            if (obj == null) {
+                builder.setDeletionCandidate(true);
+                return;
+            }
 
-        if (obj.isPresent()) try {
-            boolean tryUpdate = obj.get().runReadLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d) -> {
-                if (m.isDeleted() && !m.isDeletionCandidate())
-                    throw new IllegalStateException("Object " + m.getName() + " is deleted but not a deletion candidate");
-                builder.setDeletionCandidate(m.isDeletionCandidate());
-                builder.addAllReferrers(m.getReferrers());
-                return m.isDeletionCandidate() && !m.isDeleted();
-            });
-            // FIXME
-//            if (tryUpdate) {
-//                obj.get().runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
-//                    return null;
-//                });
-//            }
-        } catch (DeletedObjectAccessException dox) {
-            builder.setDeletionCandidate(true);
-        }
-        else {
-            builder.setDeletionCandidate(true);
-        }
+            builder.setDeletionCandidate(!obj.frozen() && obj.refsFrom().isEmpty());
 
-        var ret = builder.build();
+            if (!builder.getDeletionCandidate())
+                for (var r : obj.refsFrom())
+                    builder.addReferrers(JObjectKeyP.newBuilder().setName(r.toString()).build());
 
-        if (!ret.getDeletionCandidate())
-            for (var rr : request.getOurReferrersList())
-                autoSyncProcessor.add(rr);
-
-        return Uni.createFrom().item(ret);
-    }
-
-    @Override
-    @Blocking
-    public Uni<IndexUpdateReply> indexUpdate(IndexUpdatePush request) {
-        if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-        if (!persistentPeerDataService.existsHost(UUID.fromString(request.getSelfUuid())))
-            throw new StatusRuntimeException(Status.UNAUTHENTICATED);
-
-//        Log.info("<-- indexUpdate: " + request.getHeader().getName());
-        return jObjectTxManager.executeTxAndFlush(() -> {
-            return Uni.createFrom().item(syncHandler.handleRemoteUpdate(request));
+//            if (!ret.getDeletionCandidate())
+//                for (var rr : request.getOurReferrersList())
+//                    autoSyncProcessor.add(rr);
         });
+        return Uni.createFrom().item(builder.build());
     }
 
+    //    @Override
+//    @Blocking
+//    public Uni<IndexUpdateReply> indexUpdate(IndexUpdatePush request) {
+//        if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+//        if (!persistentPeerDataService.existsHost(UUID.fromString(request.getSelfUuid())))
+//            throw new StatusRuntimeException(Status.UNAUTHENTICATED);
+//
+//        Log.info("<-- indexUpdate: " + request.getHeader().getName());
+//        return jObjectTxManager.executeTxAndFlush(() -> {
+//            return Uni.createFrom().item(syncHandler.handleRemoteUpdate(request));
+//        });
+//    }
     @Override
     @Blocking
-    public Uni<OpPushReply> opPush(OpPushMsg request) {
-        if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-        if (!persistentPeerDataService.existsHost(UUID.fromString(request.getSelfUuid())))
-            throw new StatusRuntimeException(Status.UNAUTHENTICATED);
-
+    public Uni<OpPushReply> opPush(OpPushRequest request) {
         try {
-            var objs = request.getMsgList().stream().map(opProtoSerializer::deserialize).toList();
-            jObjectTxManager.executeTxAndFlush(() -> {
-                opObjectRegistry.acceptExternalOps(request.getQueueId(), UUID.fromString(request.getSelfUuid()), objs);
-            });
+            var ops = request.getMsgList().stream().map(opProtoSerializer::deserialize).toList();
+            for (var op : ops) {
+                Log.info("<-- op: " + op + " from " + identity.getPrincipal().getName().substring(3));
+                txm.run(() -> {
+                    opHandler.handleOp(PeerId.of(identity.getPrincipal().getName().substring(3)), op);
+                });
+            }
         } catch (Exception e) {
             Log.error(e, e);
             throw e;
@@ -174,11 +174,10 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
         return Uni.createFrom().item(OpPushReply.getDefaultInstance());
     }
 
+
     @Override
     @Blocking
     public Uni<PingReply> ping(PingRequest request) {
-        if (request.getSelfUuid().isBlank()) throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-
-        return Uni.createFrom().item(PingReply.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString()).build());
+        return Uni.createFrom().item(PingReply.getDefaultInstance());
     }
 }

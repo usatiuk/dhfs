@@ -9,7 +9,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 abstract public class TempDataProfile implements QuarkusTestProfile {
-    protected void getConfigOverrides(Map<String, String> toPut) {}
+    protected void getConfigOverrides(Map<String, String> toPut) {
+    }
 
     @Override
     final public Map<String, String> getConfigOverrides() {
@@ -21,7 +22,6 @@ abstract public class TempDataProfile implements QuarkusTestProfile {
         }
         var ret = new HashMap<String, String>();
         ret.put("dhfs.objects.persistence.files.root", tempDirWithPrefix.resolve("dhfs_root_test").toString());
-        ret.put("dhfs.objects.root", tempDirWithPrefix.resolve("dhfs_root_d_test").toString());
         ret.put("dhfs.fuse.root", tempDirWithPrefix.resolve("dhfs_fuse_root_test").toString());
         getConfigOverrides(ret);
         return ret;

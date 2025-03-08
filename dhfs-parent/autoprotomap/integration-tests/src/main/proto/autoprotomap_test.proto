@@ -29,3 +29,19 @@ message AbstractProto {
     CustomObjectProto customObject = 3;
   }
 }
+
+message RecordObjectProto {
+  string key = 1;
+}
+
+message RecordObject2Proto {
+  string key = 1;
+  int32 value = 2;
+}
+
+message InterfaceObjectProto {
+  oneof obj {
+    RecordObjectProto recordObject = 1;
+    RecordObject2Proto recordObject2 = 2;
+  }
+}

@@ -1,35 +1,25 @@
 package com.usatiuk.dhfs.objects.repository;
 
+import com.usatiuk.dhfs.objects.PeerId;
 import com.usatiuk.dhfs.objects.repository.peertrust.PeerTrustManager;
 import io.grpc.ChannelCredentials;
 import io.grpc.ManagedChannel;
 import io.grpc.TlsChannelCredentials;
 import io.grpc.netty.NettyChannelBuilder;
-import io.quarkus.runtime.ShutdownEvent;
-import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 import javax.net.ssl.KeyManagerFactory;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
-//FIXME: Leaks!
 @ApplicationScoped
 public class RpcChannelFactory {
     @Inject
     PersistentPeerDataService persistentPeerDataService;
     @Inject
     PeerTrustManager peerTrustManager;
-    private ConcurrentMap<SecureChannelKey, ManagedChannel> _secureChannelCache = new ConcurrentHashMap<>();
-
-    void shutdown(@Observes @Priority(100000) ShutdownEvent event) {
-        for (var c : _secureChannelCache.values()) c.shutdownNow();
-    }
 
     private ChannelCredentials getChannelCredentials() {
         try {
@@ -48,22 +38,7 @@ public class RpcChannelFactory {
         }
     }
 
-    ManagedChannel getSecureChannel(String host, String address, int port) {
-        var key = new SecureChannelKey(host, address, port);
-        return _secureChannelCache.computeIfAbsent(key, (k) -> {
-            return NettyChannelBuilder.forAddress(address, port, getChannelCredentials()).overrideAuthority(host).idleTimeout(10, TimeUnit.SECONDS).build();
-        });
-    }
-
-    public void dropCache() {
-        var oldS = _secureChannelCache;
-        _secureChannelCache = new ConcurrentHashMap<>();
-        oldS.values().forEach(ManagedChannel::shutdown);
-    }
-
-    private record SecureChannelKey(String host, String address, int port) {
-    }
-
-    private record InsecureChannelKey(String address, int port) {
+    ManagedChannel getSecureChannel(PeerId host, String address, int port) {
+        return NettyChannelBuilder.forAddress(address, port, getChannelCredentials()).overrideAuthority(host.toString()).idleTimeout(10, TimeUnit.SECONDS).build();
     }
 }

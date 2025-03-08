@@ -1,51 +1,45 @@
 package com.usatiuk.dhfs.files.objects;
 
-import com.usatiuk.dhfs.files.conflicts.FileConflictResolver;
-import com.usatiuk.dhfs.objects.jrepository.JObjectData;
-import com.usatiuk.dhfs.objects.repository.ConflictResolver;
-import lombok.Getter;
-import lombok.Setter;
+import com.usatiuk.dhfs.objects.JDataRemote;
+import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.jmap.JMapHolder;
+import com.usatiuk.dhfs.objects.jmap.JMapLongKey;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Set;
 
-public class File extends FsNode {
-    @Getter
-    private final NavigableMap<Long, String> _chunks;
-    @Getter
-    private final boolean _symlink;
-    @Getter
-    @Setter
-    private long _size = 0;
-
-    public File(UUID uuid, long mode, boolean symlink) {
-        super(uuid, mode);
-        _symlink = symlink;
-        _chunks = new TreeMap<>();
+public record File(JObjectKey key, long mode, long cTime, long mTime,
+                   boolean symlink, long size
+) implements JDataRemote, JMapHolder<JMapLongKey> {
+    public File withSymlink(boolean symlink) {
+        return new File(key, mode, cTime, mTime, symlink, size);
     }
 
-    public File(UUID uuid, long mode, boolean symlink, NavigableMap<Long, String> chunks) {
-        super(uuid, mode);
-        _symlink = symlink;
-        _chunks = chunks;
+    public File withSize(long size) {
+        return new File(key, mode, cTime, mTime, symlink, size);
     }
 
-    @Override
-    public Class<? extends ConflictResolver> getConflictResolver() {
-        return FileConflictResolver.class;
+    public File withMode(long mode) {
+        return new File(key, mode, cTime, mTime, symlink, size);
+    }
+
+    public File withCTime(long cTime) {
+        return new File(key, mode, cTime, mTime, symlink, size);
+    }
+
+    public File withMTime(long mTime) {
+        return new File(key, mode, cTime, mTime, symlink, size);
     }
 
     @Override
-    public Class<? extends JObjectData> getRefType() {
-        return ChunkData.class;
-    }
-
-    @Override
-    public Collection<String> extractRefs() {
-        return Collections.unmodifiableCollection(_chunks.values());
+    public Collection<JObjectKey> collectRefsTo() {
+        return Set.of();
+//        return Set.copyOf(chunks().values());
     }
 
     @Override
     public int estimateSize() {
-        return _chunks.size() * 192;
+        return 64;
+//        return chunks.size() * 64;
     }
 }

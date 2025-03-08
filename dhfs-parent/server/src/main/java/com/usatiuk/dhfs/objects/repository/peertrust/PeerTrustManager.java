@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.objects.repository.peertrust;
 
-import com.usatiuk.dhfs.objects.repository.peersync.PersistentPeerInfo;
+import com.usatiuk.dhfs.objects.repository.peersync.PeerInfo;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.apache.commons.lang3.tuple.Pair;
@@ -8,9 +8,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
-import java.io.IOException;
 import java.security.KeyStore;
-import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -36,17 +34,17 @@ public class PeerTrustManager implements X509TrustManager {
         return trustManager.get().getAcceptedIssuers();
     }
 
-    public synchronized void reloadTrustManagerHosts(Collection<PersistentPeerInfo> hosts) {
+    public synchronized void reloadTrustManagerHosts(Collection<PeerInfo> hosts) {
         try {
             Log.info("Trying to reload trust manager: " + hosts.size() + " known hosts");
             reloadTrustManager(hosts.stream().map(hostInfo ->
-                    Pair.of(hostInfo.getUuid().toString(), hostInfo.getCertificate())).toList());
+                    Pair.of(hostInfo.id().toString(), hostInfo.parsedCert())).toList());
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
-    private synchronized void reloadTrustManager(Collection<Pair<String, X509Certificate>> certs) throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException {
+    private synchronized void reloadTrustManager(Collection<Pair<String, X509Certificate>> certs) throws Exception {
         KeyStore ts = KeyStore.getInstance(KeyStore.getDefaultType());
         ts.load(null, null);
 

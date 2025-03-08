@@ -9,94 +9,45 @@ option java_outer_classname = "DhfsObjectSyncApi";
 package dhfs.objects.sync;
 
 service DhfsObjectSyncGrpc {
+  rpc OpPush (OpPushRequest) returns (OpPushReply) {}
+
   rpc GetObject (GetObjectRequest) returns (GetObjectReply) {}
   rpc CanDelete (CanDeleteRequest) returns (CanDeleteReply) {}
-  rpc IndexUpdate (IndexUpdatePush) returns (IndexUpdateReply) {}
-  rpc OpPush (OpPushMsg) returns (OpPushReply) {}
 
   rpc Ping (PingRequest) returns (PingReply) {}
 }
 
-message PingRequest {
-  string selfUuid = 1;
-}
+message PingRequest {}
 
-message PingReply {
-  string selfUuid = 1;
-}
-
-message ObjectChangelogEntry {
-  string host = 1;
-  uint64 version = 2;
-}
-
-message ObjectChangelog {
-  repeated ObjectChangelogEntry entries = 1;
-}
-
-message ObjectHeader {
-  string name = 2;
-  ObjectChangelog changelog = 5;
-  optional dhfs.objects.persistence.JObjectDataP pushedData = 6;
-}
-
-message ApiObject {
-  ObjectHeader header = 1;
-  dhfs.objects.persistence.JObjectDataP content = 2;
-}
+message PingReply {}
 
 message GetObjectRequest {
-  string selfUuid = 10;
-
-  string name = 2;
+  dhfs.objects.persistence.JObjectKeyP name = 2;
 }
 
 message GetObjectReply {
-  string selfUuid = 10;
-
-  ApiObject object = 1;
+  dhfs.objects.persistence.ObjectChangelog changelog = 5;
+  dhfs.objects.persistence.JDataRemoteP pushedData = 6;
 }
 
 message CanDeleteRequest {
-  string selfUuid = 10;
-
-  string name = 2;
-  repeated string ourReferrers = 3;
+  dhfs.objects.persistence.JObjectKeyP name = 2;
+  repeated dhfs.objects.persistence.JObjectKeyP ourReferrers = 3;
 }
 
 message CanDeleteReply {
-  string selfUuid = 10;
-  string objName = 1;
   bool deletionCandidate = 2;
-  repeated string referrers = 3;
+  repeated dhfs.objects.persistence.JObjectKeyP referrers = 3;
 }
 
-message IndexUpdatePush {
-  string selfUuid = 10;
-
-  ObjectHeader header = 1;
-}
-
-message IndexUpdateReply {}
-
-message JKleppmannTreePeriodicPushOpP {
-  string fromUuid = 1;
-  int64 timestamp = 2;
-}
-
-message OpPushPayload {
-  oneof payload {
-    dhfs.objects.persistence.JKleppmannTreeOpP jKleppmannTreeOpWrapper = 1;
-    JKleppmannTreePeriodicPushOpP jKleppmannTreePeriodicPushOp = 2;
-  }
-}
-
-message OpPushMsg {
-  string selfUuid = 10;
-  string queueId = 1;
-  repeated OpPushPayload msg = 2;
+message OpPushRequest {
+  repeated OpP msg = 2;
 }
 
 message OpPushReply {
 
+}
+
+message OpP {
+  bytes serializedData = 1;
 }

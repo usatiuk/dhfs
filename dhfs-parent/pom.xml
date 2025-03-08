@@ -15,6 +15,8 @@
         <module>kleppmanntree</module>
         <module>supportlib</module>
         <module>autoprotomap</module>
+        <module>objects</module>
+        <module>utils</module>
     </modules>
 
     <properties>
@@ -55,6 +57,11 @@
                 <scope>provided</scope>
             </dependency>
             <dependency>
+                <groupId>net.openhft</groupId>
+                <artifactId>zero-allocation-hashing</artifactId>
+                <version>0.16</version>
+            </dependency>
+            <dependency>
                 <groupId>org.awaitility</groupId>
                 <artifactId>awaitility</artifactId>
                 <version>4.2.2</version>
@@ -70,6 +77,11 @@
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-collections4</artifactId>
                 <version>4.5.0-M2</version>
+            </dependency>
+            <dependency>
+                <groupId>org.pcollections</groupId>
+                <artifactId>pcollections</artifactId>
+                <version>4.0.2</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -109,6 +121,7 @@
                     <argLine>
                         --add-exports java.base/sun.nio.ch=ALL-UNNAMED
                         --add-exports java.base/jdk.internal.access=ALL-UNNAMED
+                        --add-opens=java.base/java.nio=ALL-UNNAMED
                     </argLine>
                     <skipTests>${skip.unit}</skipTests>
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>

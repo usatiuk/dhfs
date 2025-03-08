@@ -12,10 +12,11 @@ import java.util.concurrent.TimeoutException;
 
 public class DhfsImage implements Future<String> {
 
+    private static final DhfsImage INSTANCE = new DhfsImage();
     private static String _builtImage = null;
-    private static DhfsImage INSTANCE = new DhfsImage();
 
-    private DhfsImage() {}
+    private DhfsImage() {
+    }
 
     public static DhfsImage getInstance() {
         return INSTANCE;
@@ -68,7 +69,8 @@ public class DhfsImage implements Future<String> {
                                 .cmd("java", "-ea", "-Xmx128M",
                                         "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
                                         "--add-exports", "java.base/jdk.internal.access=ALL-UNNAMED",
-                                        "-Ddhfs.objects.peerdiscovery.interval=100",
+                                        "--add-opens=java.base/java.nio=ALL-UNNAMED",
+                                        "-Ddhfs.objects.peerdiscovery.interval=1s",
                                         "-Ddhfs.objects.invalidation.delay=100",
                                         "-Ddhfs.objects.deletion.delay=0",
                                         "-Ddhfs.objects.deletion.can-delete-retry-delay=1000",

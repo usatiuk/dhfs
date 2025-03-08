@@ -4,18 +4,19 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.files.objects.ChunkData;
 import com.usatiuk.dhfs.files.objects.File;
-import com.usatiuk.dhfs.files.objects.FsNode;
+import com.usatiuk.dhfs.objects.*;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaDirectory;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaFile;
-import com.usatiuk.dhfs.objects.jrepository.JMutator;
-import com.usatiuk.dhfs.objects.jrepository.JObject;
-import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
-import com.usatiuk.dhfs.objects.jrepository.JObjectTxManager;
-import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
-import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
+import com.usatiuk.dhfs.objects.jmap.JMapEntry;
+import com.usatiuk.dhfs.objects.jmap.JMapHelper;
+import com.usatiuk.dhfs.objects.jmap.JMapLongKey;
+import com.usatiuk.dhfs.objects.persistence.IteratorStart;
+import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
+import com.usatiuk.dhfs.objects.transaction.Transaction;
+import com.usatiuk.dhfs.utils.StatusRuntimeExceptionNoStacktrace;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -35,9 +36,11 @@ import java.util.stream.StreamSupport;
 @ApplicationScoped
 public class DhfsFileServiceImpl implements DhfsFileService {
     @Inject
-    JObjectManager jObjectManager;
+    Transaction curTx;
     @Inject
-    JObjectTxManager jObjectTxManager;
+    RemoteTransaction remoteTx;
+    @Inject
+    TransactionManager jObjectTxManager;
 
     @ConfigProperty(name = "dhfs.files.target_chunk_size")
     int targetChunkSize;
@@ -67,72 +70,72 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     boolean writeLogging;
 
     @Inject
-    PersistentPeerDataService persistentPeerDataService;
-    @Inject
     JKleppmannTreeManager jKleppmannTreeManager;
 
-    private JKleppmannTreeManager.JKleppmannTree _tree;
+    @Inject
+    JMapHelper jMapHelper;
+
+    private JKleppmannTreeManager.JKleppmannTree getTree() {
+        return jKleppmannTreeManager.getTree(new JObjectKey("fs"));
+    }
 
     private ChunkData createChunk(ByteString bytes) {
-        if (useHashForChunks) {
-            return new ChunkData(bytes);
-        } else {
-            return new ChunkData(bytes, persistentPeerDataService.getUniqueId());
-        }
+        var newChunk = new ChunkData(JObjectKey.of(UUID.randomUUID().toString()), bytes);
+        remoteTx.putData(newChunk);
+        return newChunk;
     }
 
     void init(@Observes @Priority(500) StartupEvent event) {
         Log.info("Initializing file service");
-        _tree = jKleppmannTreeManager.getTree("fs");
+        getTree();
     }
 
-    private JObject<JKleppmannTreeNode> getDirEntry(String name) {
-        var res = _tree.traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
+    private JKleppmannTreeNode getDirEntry(String name) {
+        var res = getTree().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
         if (res == null) throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
-        var ret = jObjectManager.get(res).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
-        if (!ret.getMeta().getKnownClass().equals(JKleppmannTreeNode.class))
-            throw new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not jObject: " + name));
-        return (JObject<JKleppmannTreeNode>) ret;
+        var ret = curTx.get(JKleppmannTreeNode.class, res).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
+        return ret;
     }
 
-    private Optional<JObject<JKleppmannTreeNode>> getDirEntryOpt(String name) {
-        var res = _tree.traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
+    private Optional<JKleppmannTreeNode> getDirEntryOpt(String name) {
+        var res = getTree().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
         if (res == null) return Optional.empty();
-        var ret = jObjectManager.get(res).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
-        if (!ret.getMeta().getKnownClass().equals(JKleppmannTreeNode.class))
-            throw new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not jObject: " + name));
-        return Optional.of((JObject<JKleppmannTreeNode>) ret);
+        var ret = curTx.get(JKleppmannTreeNode.class, res);
+        return ret;
     }
 
     @Override
-    public Optional<GetattrRes> getattr(String uuid) {
+    public Optional<GetattrRes> getattr(JObjectKey uuid) {
         return jObjectTxManager.executeTx(() -> {
-            var ref = jObjectManager.get(uuid);
-            if (ref.isEmpty()) return Optional.empty();
-            return ref.get().runReadLocked(JObjectManager.ResolutionStrategy.REMOTE, (m, d) -> {
-                GetattrRes ret;
-                if (d instanceof File f) {
-                    ret = new GetattrRes(f.getMtime(), f.getCtime(), f.getMode(), f.isSymlink() ? GetattrType.SYMLINK : GetattrType.FILE);
-                } else if (d instanceof JKleppmannTreeNode) {
-                    ret = new GetattrRes(100, 100, 0700, GetattrType.DIRECTORY);
+            var ref = curTx.get(JData.class, uuid).orElse(null);
+            if (ref == null) return Optional.empty();
+            GetattrRes ret;
+            if (ref instanceof RemoteObjectMeta r) {
+                var remote = remoteTx.getData(JDataRemote.class, uuid).orElse(null);
+                if (remote instanceof File f) {
+                    ret = new GetattrRes(f.mTime(), f.cTime(), f.mode(), f.symlink() ? GetattrType.SYMLINK : GetattrType.FILE);
                 } else {
-                    throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + m.getName()));
+                    throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + ref.key()));
                 }
-                return Optional.of(ret);
-            });
+            } else if (ref instanceof JKleppmannTreeNode) {
+                ret = new GetattrRes(100, 100, 0700, GetattrType.DIRECTORY);
+            } else {
+                throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + ref.key()));
+            }
+            return Optional.of(ret);
         });
     }
 
     @Override
-    public Optional<String> open(String name) {
+    public Optional<JObjectKey> open(String name) {
         return jObjectTxManager.executeTx(() -> {
             try {
                 var ret = getDirEntry(name);
-                return Optional.of(ret.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
-                    if (d.getNode().getMeta() instanceof JKleppmannTreeNodeMetaFile f) return f.getFileIno();
-                    else if (d.getNode().getMeta() instanceof JKleppmannTreeNodeMetaDirectory f) return m.getName();
-                    throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + m.getName()));
-                }));
+                return switch (ret.meta()) {
+                    case JKleppmannTreeNodeMetaFile f -> Optional.of(f.getFileIno());
+                    case JKleppmannTreeNodeMetaDirectory f -> Optional.of(ret.key());
+                    default -> Optional.empty();
+                };
             } catch (StatusRuntimeException e) {
                 if (e.getStatus().getCode() == Status.Code.NOT_FOUND) {
                     return Optional.empty();
@@ -142,17 +145,13 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         });
     }
 
-    private void ensureDir(JObject<JKleppmannTreeNode> entry) {
-        entry.runReadLocked(JObjectManager.ResolutionStrategy.REMOTE, (m, d) -> {
-            if (d.getNode().getMeta() instanceof JKleppmannTreeNodeMetaFile f)
-                throw new StatusRuntimeExceptionNoStacktrace(Status.INVALID_ARGUMENT.withDescription(m.getName() + " is a file, not directory"));
-            else if (d.getNode().getMeta() instanceof JKleppmannTreeNodeMetaDirectory f) return null;
-            throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + m.getName()));
-        });
+    private void ensureDir(JKleppmannTreeNode entry) {
+        if (!(entry.meta() instanceof JKleppmannTreeNodeMetaDirectory))
+            throw new StatusRuntimeExceptionNoStacktrace(Status.INVALID_ARGUMENT.withDescription("Not a directory: " + entry.key()));
     }
 
     @Override
-    public Optional<String> create(String name, long mode) {
+    public Optional<JObjectKey> create(String name, long mode) {
         return jObjectTxManager.executeTx(() -> {
             Path path = Path.of(name);
             var parent = getDirEntry(path.getParent().toString());
@@ -163,30 +162,26 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             var fuuid = UUID.randomUUID();
             Log.debug("Creating file " + fuuid);
-            File f = new File(fuuid, mode, false);
+            File f = new File(JObjectKey.of(fuuid.toString()), mode, System.currentTimeMillis(), System.currentTimeMillis(), false, 0);
+            remoteTx.putData(f);
 
-            var newNodeId = _tree.getNewNodeId();
-            var fobj = jObjectManager.putLocked(f, Optional.of(newNodeId));
             try {
-                _tree.move(parent.getMeta().getName(), new JKleppmannTreeNodeMetaFile(fname, f.getName()), newNodeId);
+                getTree().move(parent.key(), new JKleppmannTreeNodeMetaFile(fname, f.key()), getTree().getNewNodeId());
             } catch (Exception e) {
-                fobj.getMeta().removeRef(newNodeId);
+//                fobj.getMeta().removeRef(newNodeId);
                 throw e;
-            } finally {
-                fobj.rwUnlock();
             }
-            return Optional.of(f.getName());
+            return Optional.of(f.key());
         });
     }
 
     //FIXME: Slow..
     @Override
-    public Pair<String, String> inoToParent(String ino) {
+    public Pair<String, JObjectKey> inoToParent(JObjectKey ino) {
         return jObjectTxManager.executeTx(() -> {
-            return _tree.findParent(w -> {
-                if (w.getNode().getMeta() instanceof JKleppmannTreeNodeMetaFile f)
-                    if (f.getFileIno().equals(ino))
-                        return true;
+            return getTree().findParent(w -> {
+                if (w.meta() instanceof JKleppmannTreeNodeMetaFile f)
+                    return f.getFileIno().equals(ino);
                 return false;
             });
         });
@@ -203,7 +198,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             Log.debug("Creating directory " + name);
 
-            _tree.move(parent.getMeta().getName(), new JKleppmannTreeNodeMetaDirectory(dname), _tree.getNewNodeId());
+            getTree().move(parent.key(), new JKleppmannTreeNodeMetaDirectory(dname), getTree().getNewNodeId());
         });
     }
 
@@ -211,13 +206,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     public void unlink(String name) {
         jObjectTxManager.executeTx(() -> {
             var node = getDirEntryOpt(name).orElse(null);
-            JKleppmannTreeNodeMeta meta = node.runReadLocked(JObjectManager.ResolutionStrategy.REMOTE, (m, d) -> {
-                if (d.getNode().getMeta() instanceof JKleppmannTreeNodeMetaDirectory f)
-                    if (!d.getNode().getChildren().isEmpty()) throw new DirectoryNotEmptyException();
-                return d.getNode().getMeta();
-            });
-
-            _tree.trash(meta, node.getMeta().getName());
+            if (node.meta() instanceof JKleppmannTreeNodeMetaDirectory f) {
+                if (!allowRecursiveDelete && !node.children().isEmpty())
+                    throw new DirectoryNotEmptyException();
+            }
+            getTree().trash(node.meta(), node.key());
         });
     }
 
@@ -225,37 +218,35 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     public Boolean rename(String from, String to) {
         return jObjectTxManager.executeTx(() -> {
             var node = getDirEntry(from);
-            JKleppmannTreeNodeMeta meta = node.runReadLocked(JObjectManager.ResolutionStrategy.REMOTE, (m, d) -> d.getNode().getMeta());
+            JKleppmannTreeNodeMeta meta = node.meta();
 
             var toPath = Path.of(to);
             var toDentry = getDirEntry(toPath.getParent().toString());
             ensureDir(toDentry);
 
-            _tree.move(toDentry.getMeta().getName(), meta.withName(toPath.getFileName().toString()), node.getMeta().getName());
-
+            getTree().move(toDentry.key(), meta.withName(toPath.getFileName().toString()), node.key());
             return true;
         });
     }
 
     @Override
-    public Boolean chmod(String uuid, long mode) {
+    public Boolean chmod(JObjectKey uuid, long mode) {
         return jObjectTxManager.executeTx(() -> {
-            var dent = jObjectManager.get(uuid).orElseThrow(() -> new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND));
+            var dent = curTx.get(JData.class, uuid).orElseThrow(() -> new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND));
 
-            dent.runWriteLocked(JObjectManager.ResolutionStrategy.REMOTE, (m, d, bump, i) -> {
-                if (d instanceof JKleppmannTreeNode) {
-                    return null;//FIXME:?
-                } else if (d instanceof File f) {
-                    bump.apply();
-                    f.setMtime(System.currentTimeMillis());
-                    f.setMode(mode);
+            if (dent instanceof JKleppmannTreeNode) {
+                return true;
+            } else if (dent instanceof RemoteObjectMeta) {
+                var remote = remoteTx.getData(JDataRemote.class, uuid).orElse(null);
+                if (remote instanceof File f) {
+                    remoteTx.putData(f.withMode(mode).withMTime(System.currentTimeMillis()));
+                    return true;
                 } else {
                     throw new IllegalArgumentException(uuid + " is not a file");
                 }
-                return null;
-            });
-
-            return true;
+            } else {
+                throw new IllegalArgumentException(uuid + " is not a file");
+            }
         });
     }
 
@@ -264,81 +255,68 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         return jObjectTxManager.executeTx(() -> {
             var found = getDirEntry(name);
 
-            return found.runReadLocked(JObjectManager.ResolutionStrategy.REMOTE, (m, d) -> {
-                if (!(d instanceof JKleppmannTreeNode) || !(d.getNode().getMeta() instanceof JKleppmannTreeNodeMetaDirectory)) {
-                    throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-                }
-                return new ArrayList<>(d.getNode().getChildren().keySet());
-            });
+            if (!(found.meta() instanceof JKleppmannTreeNodeMetaDirectory md))
+                throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+
+            return found.children().keySet();
         });
     }
 
     @Override
-    public Optional<ByteString> read(String fileUuid, long offset, int length) {
+    public Optional<ByteString> read(JObjectKey fileUuid, long offset, int length) {
         return jObjectTxManager.executeTx(() -> {
             if (length < 0)
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Length should be more than zero: " + length));
             if (offset < 0)
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Offset should be more than zero: " + offset));
 
-            var fileOpt = jObjectManager.get(fileUuid);
-            if (fileOpt.isEmpty()) {
+            var file = remoteTx.getData(File.class, fileUuid).orElse(null);
+            if (file == null) {
                 Log.error("File not found when trying to read: " + fileUuid);
                 return Optional.empty();
             }
-            var file = fileOpt.get();
 
-            try {
-                return file.runReadLocked(JObjectManager.ResolutionStrategy.REMOTE, (md, fileData) -> {
-                    if (!(fileData instanceof File)) {
-                        throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-                    }
-                    var chunksAll = ((File) fileData).getChunks();
-                    if (chunksAll.isEmpty()) {
-                        return Optional.of(ByteString.empty());
-                    }
-                    var chunksList = chunksAll.tailMap(chunksAll.floorKey(offset)).entrySet();
+            try (var it = jMapHelper.getIterator(file, IteratorStart.LE, JMapLongKey.of(offset))) {
+                if (!it.hasNext())
+                    return Optional.of(ByteString.empty());
 
-                    if (chunksList.isEmpty()) {
-                        return Optional.of(ByteString.empty());
-                    }
+//                if (it.peekNextKey().key() != offset) {
+//                    Log.warnv("Read over the end of file: {0} {1} {2}, next chunk: {3}", fileUuid, offset, length, it.peekNextKey());
+//                    return Optional.of(ByteString.empty());
+//                }
+                long curPos = offset;
+                ByteString buf = ByteString.empty();
 
-                    var chunks = chunksList.iterator();
-                    ByteString buf = ByteString.empty();
+                var chunk = it.next();
 
-                    long curPos = offset;
-                    var chunk = chunks.next();
+                while (curPos < offset + length) {
+                    var chunkPos = chunk.getKey().key();
 
-                    while (curPos < offset + length) {
-                        var chunkPos = chunk.getKey();
+                    long offInChunk = curPos - chunkPos;
 
-                        long offInChunk = curPos - chunkPos;
+                    long toReadInChunk = (offset + length) - curPos;
 
-                        long toReadInChunk = (offset + length) - curPos;
+                    var chunkBytes = readChunk(chunk.getValue().ref());
 
-                        var chunkBytes = readChunk(chunk.getValue());
+                    long readableLen = chunkBytes.size() - offInChunk;
 
-                        long readableLen = chunkBytes.size() - offInChunk;
+                    var toReadReally = Math.min(readableLen, toReadInChunk);
 
-                        var toReadReally = Math.min(readableLen, toReadInChunk);
+                    if (toReadReally < 0) break;
 
-                        if (toReadReally < 0) break;
+                    buf = buf.concat(chunkBytes.substring((int) offInChunk, (int) (offInChunk + toReadReally)));
 
-                        buf = buf.concat(chunkBytes.substring((int) offInChunk, (int) (offInChunk + toReadReally)));
+                    curPos += toReadReally;
 
-                        curPos += toReadReally;
+                    if (readableLen > toReadInChunk)
+                        break;
 
-                        if (readableLen > toReadInChunk)
-                            break;
+                    if (!it.hasNext()) break;
 
-                        if (!chunks.hasNext()) break;
+                    chunk = it.next();
+                }
 
-                        chunk = chunks.next();
-                    }
-
-                    // FIXME:
-                    return Optional.of(buf);
-                });
+                return Optional.of(buf);
             } catch (Exception e) {
                 Log.error("Error reading file: " + fileUuid, e);
                 return Optional.empty();
@@ -346,357 +324,379 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         });
     }
 
-    private ByteString readChunk(String uuid) {
-        var chunkRead = jObjectManager.get(uuid).orElse(null);
+    private ByteString readChunk(JObjectKey uuid) {
+        var chunkRead = remoteTx.getData(ChunkData.class, uuid).orElse(null);
 
         if (chunkRead == null) {
             Log.error("Chunk requested not found: " + uuid);
             throw new StatusRuntimeException(Status.NOT_FOUND);
         }
 
-        return chunkRead.runReadLocked(JObjectManager.ResolutionStrategy.REMOTE, (m, d) -> {
-            if (!(d instanceof ChunkData cd))
-                throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-            return cd.getBytes();
-        });
+        return chunkRead.data();
     }
 
-    private int getChunkSize(String uuid) {
+    private int getChunkSize(JObjectKey uuid) {
         return readChunk(uuid).size();
     }
 
-    private void cleanupChunks(File f, Collection<String> uuids) {
+    private void cleanupChunks(File f, Collection<JObjectKey> uuids) {
         // FIXME:
-        var inFile = useHashForChunks ? new HashSet<>(f.getChunks().values()) : Collections.emptySet();
-        for (var cuuid : uuids) {
-            try {
-                if (inFile.contains(cuuid)) continue;
-                jObjectManager.get(cuuid)
-                        .ifPresent(jObject -> jObject.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION,
-                                (m, d, b, v) -> {
-                                    m.removeRef(f.getName());
-                                    return null;
-                                }));
-            } catch (Exception e) {
-                Log.error("Error when cleaning chunk " + cuuid, e);
-            }
-        }
+//        var inFile = useHashForChunks ? new HashSet<>(f.getChunks().values()) : Collections.emptySet();
+//        for (var cuuid : uuids) {
+//            try {
+//                if (inFile.contains(cuuid)) continue;
+//                jObjectManager.get(cuuid)
+//                        .ifPresent(jObject -> jObject.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION,
+//                                (m, d, b, v) -> {
+//                                    m.removeRef(f.getName());
+//                                    return null;
+//                                }));
+//            } catch (Exception e) {
+//                Log.error("Error when cleaning chunk " + cuuid, e);
+//            }
+//        }
     }
 
     @Override
-    public Long write(String fileUuid, long offset, ByteString data) {
+    public Long write(JObjectKey fileUuid, long offset, ByteString data) {
         return jObjectTxManager.executeTx(() -> {
             if (offset < 0)
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Offset should be more than zero: " + offset));
 
             // FIXME:
-            var file = (JObject<File>) jObjectManager.get(fileUuid).orElse(null);
+            var file = remoteTx.getData(File.class, fileUuid, LockingStrategy.WRITE).orElse(null);
             if (file == null) {
-                Log.error("File not found when trying to read: " + fileUuid);
+                Log.error("File not found when trying to write: " + fileUuid);
                 return -1L;
             }
 
-            file.rwLockNoCopy();
-            try {
-                file.tryResolve(JObjectManager.ResolutionStrategy.REMOTE);
-                // FIXME:
-                if (!(file.getData() instanceof File))
-                    throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+            if (writeLogging) {
+                Log.info("Writing to file: " + file.key() + " size=" + size(fileUuid) + " "
+                        + offset + " " + data.size());
+            }
 
-                if (writeLogging) {
-                    Log.info("Writing to file: " + file.getMeta().getName() + " size=" + size(fileUuid) + " "
-                            + offset + " " + data.size());
-                }
+            if (size(fileUuid) < offset) {
+                truncate(fileUuid, offset);
+                file = remoteTx.getData(File.class, fileUuid).orElse(null);
+            }
 
-                if (size(fileUuid) < offset)
-                    truncate(fileUuid, offset);
+            Pair<JMapLongKey, JMapEntry<JMapLongKey>> first;
+            Pair<JMapLongKey, JMapEntry<JMapLongKey>> last;
+            Log.tracev("Getting last");
+            try (var it = jMapHelper.getIterator(file, IteratorStart.LT, JMapLongKey.of(offset + data.size()))) {
+                last = it.hasNext() ? it.next() : null;
+                Log.tracev("Last: {0}", last);
+            }
 
-                // FIXME: Some kind of immutable interface?
-                var chunksAll = Collections.unmodifiableNavigableMap(file.getData().getChunks());
-                var first = chunksAll.floorEntry(offset);
-                var last = chunksAll.lowerEntry(offset + data.size());
-                NavigableMap<Long, String> removedChunks = new TreeMap<>();
+            NavigableMap<Long, JObjectKey> removedChunks = new TreeMap<>();
 
-                long start = 0;
+            long start = 0;
 
-                NavigableMap<Long, String> beforeFirst = first != null ? chunksAll.headMap(first.getKey(), false) : Collections.emptyNavigableMap();
-                NavigableMap<Long, String> afterLast = last != null ? chunksAll.tailMap(last.getKey(), false) : Collections.emptyNavigableMap();
-
-                if (first != null && (getChunkSize(first.getValue()) + first.getKey() <= offset)) {
-                    beforeFirst = chunksAll;
-                    afterLast = Collections.emptyNavigableMap();
+            try (var it = jMapHelper.getIterator(file, IteratorStart.LE, JMapLongKey.of(offset))) {
+                first = it.hasNext() ? it.next() : null;
+                Log.tracev("First: {0}", first);
+                boolean empty = last == null;
+                if (first != null && getChunkSize(first.getValue().ref()) + first.getKey().key() <= offset) {
                     first = null;
                     last = null;
                     start = offset;
-                } else if (!chunksAll.isEmpty()) {
-                    var between = chunksAll.subMap(first.getKey(), true, last.getKey(), true);
-                    removedChunks.putAll(between);
-                    start = first.getKey();
-                }
-
-                ByteString pendingWrites = ByteString.empty();
-
-                if (first != null && first.getKey() < offset) {
-                    var chunkBytes = readChunk(first.getValue());
-                    pendingWrites = pendingWrites.concat(chunkBytes.substring(0, (int) (offset - first.getKey())));
-                }
-                pendingWrites = pendingWrites.concat(data);
-
-                if (last != null) {
-                    var lchunkBytes = readChunk(last.getValue());
-                    if (last.getKey() + lchunkBytes.size() > offset + data.size()) {
-                        var startInFile = offset + data.size();
-                        var startInChunk = startInFile - last.getKey();
-                        pendingWrites = pendingWrites.concat(lchunkBytes.substring((int) startInChunk, lchunkBytes.size()));
+                } else if (!empty) {
+                    assert first != null;
+                    removedChunks.put(first.getKey().key(), first.getValue().ref());
+                    while (it.hasNext() && it.peekNextKey().compareTo(last.getKey()) <= 0) {
+                        var next = it.next();
+                        Log.tracev("Next: {0}", next);
+                        removedChunks.put(next.getKey().key(), next.getValue().ref());
                     }
+                    removedChunks.put(last.getKey().key(), last.getValue().ref());
+                    start = first.getKey().key();
                 }
-
-                int combinedSize = pendingWrites.size();
-
-                if (targetChunkSize > 0) {
-                    if (combinedSize < (targetChunkSize * writeMergeThreshold)) {
-                        boolean leftDone = false;
-                        boolean rightDone = false;
-                        while (!leftDone && !rightDone) {
-                            if (beforeFirst.isEmpty()) leftDone = true;
-                            if (!beforeFirst.isEmpty() || !leftDone) {
-                                var takeLeft = beforeFirst.lastEntry();
-
-                                var cuuid = takeLeft.getValue();
-
-                                if (getChunkSize(cuuid) >= (targetChunkSize * writeMergeMaxChunkToTake)) {
-                                    leftDone = true;
-                                    continue;
-                                }
-
-                                if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * writeMergeLimit)) {
-                                    leftDone = true;
-                                    continue;
-                                }
-
-                                // FIXME: (and test this)
-                                beforeFirst = beforeFirst.headMap(takeLeft.getKey(), false);
-                                start = takeLeft.getKey();
-                                pendingWrites = readChunk(cuuid).concat(pendingWrites);
-                                combinedSize += getChunkSize(cuuid);
-                                removedChunks.put(takeLeft.getKey(), takeLeft.getValue());
-                            }
-                            if (afterLast.isEmpty()) rightDone = true;
-                            if (!afterLast.isEmpty() && !rightDone) {
-                                var takeRight = afterLast.firstEntry();
-
-                                var cuuid = takeRight.getValue();
-
-                                if (getChunkSize(cuuid) >= (targetChunkSize * writeMergeMaxChunkToTake)) {
-                                    rightDone = true;
-                                    continue;
-                                }
-
-                                if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * writeMergeLimit)) {
-                                    rightDone = true;
-                                    continue;
-                                }
-
-                                // FIXME: (and test this)
-                                afterLast = afterLast.tailMap(takeRight.getKey(), false);
-                                pendingWrites = pendingWrites.concat(readChunk(cuuid));
-                                combinedSize += getChunkSize(cuuid);
-                                removedChunks.put(takeRight.getKey(), takeRight.getValue());
-                            }
-                        }
-                    }
-                }
-
-                NavigableMap<Long, String> newChunks = new TreeMap<>();
-
-                {
-                    int cur = 0;
-                    while (cur < combinedSize) {
-                        int end;
-
-                        if (targetChunkSize <= 0)
-                            end = combinedSize;
-                        else {
-                            if ((combinedSize - cur) > (targetChunkSize * writeLastChunkLimit)) {
-                                end = Math.min(cur + targetChunkSize, combinedSize);
-                            } else {
-                                end = combinedSize;
-                            }
-                        }
-
-                        var thisChunk = pendingWrites.substring(cur, end);
-
-                        ChunkData newChunkData = createChunk(thisChunk);
-                        //FIXME:
-                        jObjectManager.put(newChunkData, Optional.of(file.getMeta().getName()));
-                        newChunks.put(start, newChunkData.getName());
-
-                        start += thisChunk.size();
-                        cur = end;
-                    }
-                }
-
-                file.mutate(new FileChunkMutator(file.getData().getMtime(), System.currentTimeMillis(), removedChunks, newChunks));
-
-                cleanupChunks(file.getData(), removedChunks.values());
-                updateFileSize((JObject<File>) file);
-            } finally {
-                file.rwUnlock();
             }
+
+
+//            NavigableMap<Long, JObjectKey> beforeFirst = first != null ? chunksAll.headMap(first.getKey(), false) : Collections.emptyNavigableMap();
+//            NavigableMap<Long, JObjectKey> afterLast = last != null ? chunksAll.tailMap(last.getKey(), false) : Collections.emptyNavigableMap();
+
+//            if (first != null && (getChunkSize(first.getValue()) + first.getKey() <= offset)) {
+//                beforeFirst = chunksAll;
+//                afterLast = Collections.emptyNavigableMap();
+//                first = null;
+//                last = null;
+//                start = offset;
+//            } else if (!chunksAll.isEmpty()) {
+//                var between = chunksAll.subMap(first.getKey(), true, last.getKey(), true);
+//                removedChunks.putAll(between);
+//                start = first.getKey();
+//            }
+
+            ByteString pendingWrites = ByteString.empty();
+
+            if (first != null && first.getKey().key() < offset) {
+                var chunkBytes = readChunk(first.getValue().ref());
+                pendingWrites = pendingWrites.concat(chunkBytes.substring(0, (int) (offset - first.getKey().key())));
+            }
+            pendingWrites = pendingWrites.concat(data);
+
+            if (last != null) {
+                var lchunkBytes = readChunk(last.getValue().ref());
+                if (last.getKey().key() + lchunkBytes.size() > offset + data.size()) {
+                    var startInFile = offset + data.size();
+                    var startInChunk = startInFile - last.getKey().key();
+                    pendingWrites = pendingWrites.concat(lchunkBytes.substring((int) startInChunk, lchunkBytes.size()));
+                }
+            }
+
+            int combinedSize = pendingWrites.size();
+
+            if (targetChunkSize > 0) {
+//                if (combinedSize < (targetChunkSize * writeMergeThreshold)) {
+//                    boolean leftDone = false;
+//                    boolean rightDone = false;
+//                    while (!leftDone && !rightDone) {
+//                        if (beforeFirst.isEmpty()) leftDone = true;
+//                        if (!beforeFirst.isEmpty() || !leftDone) {
+//                            var takeLeft = beforeFirst.lastEntry();
+//
+//                            var cuuid = takeLeft.getValue();
+//
+//                            if (getChunkSize(cuuid) >= (targetChunkSize * writeMergeMaxChunkToTake)) {
+//                                leftDone = true;
+//                                continue;
+//                            }
+//
+//                            if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * writeMergeLimit)) {
+//                                leftDone = true;
+//                                continue;
+//                            }
+//
+//                            // FIXME: (and test this)
+//                            beforeFirst = beforeFirst.headMap(takeLeft.getKey(), false);
+//                            start = takeLeft.getKey();
+//                            pendingWrites = readChunk(cuuid).concat(pendingWrites);
+//                            combinedSize += getChunkSize(cuuid);
+//                            removedChunks.put(takeLeft.getKey(), takeLeft.getValue());
+//                        }
+//                        if (afterLast.isEmpty()) rightDone = true;
+//                        if (!afterLast.isEmpty() && !rightDone) {
+//                            var takeRight = afterLast.firstEntry();
+//
+//                            var cuuid = takeRight.getValue();
+//
+//                            if (getChunkSize(cuuid) >= (targetChunkSize * writeMergeMaxChunkToTake)) {
+//                                rightDone = true;
+//                                continue;
+//                            }
+//
+//                            if ((combinedSize + getChunkSize(cuuid)) > (targetChunkSize * writeMergeLimit)) {
+//                                rightDone = true;
+//                                continue;
+//                            }
+//
+//                            // FIXME: (and test this)
+//                            afterLast = afterLast.tailMap(takeRight.getKey(), false);
+//                            pendingWrites = pendingWrites.concat(readChunk(cuuid));
+//                            combinedSize += getChunkSize(cuuid);
+//                            removedChunks.put(takeRight.getKey(), takeRight.getValue());
+//                        }
+//                    }
+//                }
+            }
+
+            NavigableMap<Long, JObjectKey> newChunks = new TreeMap<>();
+
+            {
+                int cur = 0;
+                while (cur < combinedSize) {
+                    int end;
+
+                    if (targetChunkSize <= 0)
+                        end = combinedSize;
+                    else {
+                        if ((combinedSize - cur) > (targetChunkSize * writeLastChunkLimit)) {
+                            end = Math.min(cur + targetChunkSize, combinedSize);
+                        } else {
+                            end = combinedSize;
+                        }
+                    }
+
+                    var thisChunk = pendingWrites.substring(cur, end);
+
+                    ChunkData newChunkData = createChunk(thisChunk);
+                    newChunks.put(start, newChunkData.key());
+
+                    start += thisChunk.size();
+                    cur = end;
+                }
+            }
+
+            for (var e : removedChunks.entrySet()) {
+                Log.tracev("Removing chunk {0}-{1}", e.getKey(), e.getValue());
+                jMapHelper.delete(file, JMapLongKey.of(e.getKey()));
+            }
+
+            for (var e : newChunks.entrySet()) {
+                Log.tracev("Adding chunk {0}-{1}", e.getKey(), e.getValue());
+                jMapHelper.put(file, JMapLongKey.of(e.getKey()), e.getValue());
+            }
+
+            remoteTx.putData(file);
+            cleanupChunks(file, removedChunks.values());
+            updateFileSize(file);
 
             return (long) data.size();
         });
     }
 
     @Override
-    public Boolean truncate(String fileUuid, long length) {
+    public Boolean truncate(JObjectKey fileUuid, long length) {
         return jObjectTxManager.executeTx(() -> {
             if (length < 0)
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Length should be more than zero: " + length));
 
-            var file = (JObject<File>) jObjectManager.get(fileUuid).orElse(null);
+            var file = remoteTx.getData(File.class, fileUuid).orElse(null);
             if (file == null) {
-                Log.error("File not found when trying to read: " + fileUuid);
+                Log.error("File not found when trying to write: " + fileUuid);
                 return false;
             }
 
             if (length == 0) {
-                file.rwLockNoCopy();
-                try {
-                    file.tryResolve(JObjectManager.ResolutionStrategy.REMOTE);
-
-                    var oldChunks = Collections.unmodifiableNavigableMap(new TreeMap<>(file.getData().getChunks()));
-
-                    file.mutate(new JMutator<>() {
-                        long oldMtime;
-
-                        @Override
-                        public boolean mutate(File object) {
-                            oldMtime = object.getMtime();
-                            object.getChunks().clear();
-                            return true;
-                        }
-
-                        @Override
-                        public void revert(File object) {
-                            object.setMtime(oldMtime);
-                            object.getChunks().putAll(oldChunks);
-                        }
-                    });
-                    cleanupChunks(file.getData(), oldChunks.values());
-                    updateFileSize((JObject<File>) file);
-                } catch (Exception e) {
-                    Log.error("Error writing file chunks: " + fileUuid, e);
-                    return false;
-                } finally {
-                    file.rwUnlock();
-                }
-                return true;
-            }
-
-            file.rwLockNoCopy();
-            try {
-                file.tryResolve(JObjectManager.ResolutionStrategy.REMOTE);
-
-                var curSize = size(fileUuid);
-                if (curSize == length) return true;
-
-                var chunksAll = Collections.unmodifiableNavigableMap(file.getData().getChunks());
-                NavigableMap<Long, String> removedChunks = new TreeMap<>();
-                NavigableMap<Long, String> newChunks = new TreeMap<>();
-
-                if (curSize < length) {
-                    long combinedSize = (length - curSize);
-
-                    long start = curSize;
-
-                    // Hack
-                    HashMap<Long, ByteString> zeroCache = new HashMap<>();
-
-                    {
-                        long cur = 0;
-                        while (cur < combinedSize) {
-                            long end;
-
-                            if (targetChunkSize <= 0)
-                                end = combinedSize;
-                            else {
-                                if ((combinedSize - cur) > (targetChunkSize * 1.5)) {
-                                    end = cur + targetChunkSize;
-                                } else {
-                                    end = combinedSize;
-                                }
-                            }
-
-                            if (!zeroCache.containsKey(end - cur))
-                                zeroCache.put(end - cur, UnsafeByteOperations.unsafeWrap(new byte[Math.toIntExact(end - cur)]));
-
-                            ChunkData newChunkData = createChunk(zeroCache.get(end - cur));
-                            //FIXME:
-                            jObjectManager.put(newChunkData, Optional.of(file.getMeta().getName()));
-                            newChunks.put(start, newChunkData.getName());
-
-                            start += newChunkData.getSize();
-                            cur = end;
-                        }
+                try (var it = jMapHelper.getIterator(file, IteratorStart.GE, JMapLongKey.of(0))) {
+                    while (it.hasNext()) {
+                        var next = it.next();
+                        jMapHelper.delete(file, next.getKey());
                     }
-                } else {
-                    var tail = chunksAll.lowerEntry(length);
-                    var afterTail = chunksAll.tailMap(tail.getKey(), false);
-
-                    removedChunks.put(tail.getKey(), tail.getValue());
-                    removedChunks.putAll(afterTail);
-
-                    var tailBytes = readChunk(tail.getValue());
-                    var newChunk = tailBytes.substring(0, (int) (length - tail.getKey()));
-
-                    ChunkData newChunkData = createChunk(newChunk);
-                    //FIXME:
-                    jObjectManager.put(newChunkData, Optional.of(file.getMeta().getName()));
-                    newChunks.put(tail.getKey(), newChunkData.getName());
                 }
-
-                file.mutate(new FileChunkMutator(file.getData().getMtime(), System.currentTimeMillis(), removedChunks, newChunks));
-
-                cleanupChunks(file.getData(), removedChunks.values());
-                updateFileSize((JObject<File>) file);
+//                var oldChunks = file.chunks();
+//
+//                file = file.withChunks(TreePMap.empty()).withMTime(System.currentTimeMillis());
+                remoteTx.putData(file);
+//                cleanupChunks(file, oldChunks.values());
+                updateFileSize(file);
                 return true;
-            } catch (Exception e) {
-                Log.error("Error reading file: " + fileUuid, e);
-                return false;
-            } finally {
-                file.rwUnlock();
             }
+
+            var curSize = size(fileUuid);
+            if (curSize == length) return true;
+
+            NavigableMap<Long, JObjectKey> removedChunks = new TreeMap<>();
+            NavigableMap<Long, JObjectKey> newChunks = new TreeMap<>();
+
+            if (curSize < length) {
+                long combinedSize = (length - curSize);
+
+                long start = curSize;
+
+                // Hack
+                HashMap<Long, ByteString> zeroCache = new HashMap<>();
+
+                {
+                    long cur = 0;
+                    while (cur < combinedSize) {
+                        long end;
+
+                        if (targetChunkSize <= 0)
+                            end = combinedSize;
+                        else {
+                            if ((combinedSize - cur) > (targetChunkSize * 1.5)) {
+                                end = cur + targetChunkSize;
+                            } else {
+                                end = combinedSize;
+                            }
+                        }
+
+                        if (!zeroCache.containsKey(end - cur))
+                            zeroCache.put(end - cur, UnsafeByteOperations.unsafeWrap(new byte[Math.toIntExact(end - cur)]));
+
+                        ChunkData newChunkData = createChunk(zeroCache.get(end - cur));
+                        newChunks.put(start, newChunkData.key());
+
+                        start += newChunkData.data().size();
+                        cur = end;
+                    }
+                }
+            } else {
+//                Pair<JMapLongKey, JMapEntry<JMapLongKey>> first;
+                Pair<JMapLongKey, JMapEntry<JMapLongKey>> last;
+                try (var it = jMapHelper.getIterator(file, IteratorStart.LT, JMapLongKey.of(length))) {
+                    last = it.hasNext() ? it.next() : null;
+                    while (it.hasNext()) {
+                        var next = it.next();
+                        removedChunks.put(next.getKey().key(), next.getValue().ref());
+                    }
+                }
+                removedChunks.put(last.getKey().key(), last.getValue().ref());
+//
+//                NavigableMap<Long, JObjectKey> removedChunks = new TreeMap<>();
+//
+//                long start = 0;
+//
+//                try (var it = jMapHelper.getIterator(file, IteratorStart.LE, JMapLongKey.of(offset))) {
+//                    first = it.hasNext() ? it.next() : null;
+//                    boolean empty = last == null;
+//                    if (first != null && getChunkSize(first.getValue().ref()) + first.getKey().key() <= offset) {
+//                        first = null;
+//                        last = null;
+//                        start = offset;
+//                    } else if (!empty) {
+//                        assert first != null;
+//                        removedChunks.put(first.getKey().key(), first.getValue().ref());
+//                        while (it.hasNext() && it.peekNextKey() != last.getKey()) {
+//                            var next = it.next();
+//                            removedChunks.put(next.getKey().key(), next.getValue().ref());
+//                        }
+//                        removedChunks.put(last.getKey().key(), last.getValue().ref());
+//                    }
+//                }
+//
+//                var tail = chunksAll.lowerEntry(length);
+//                var afterTail = chunksAll.tailMap(tail.getKey(), false);
+//
+//                removedChunks.put(tail.getKey(), tail.getValue());
+//                removedChunks.putAll(afterTail);
+
+                var tailBytes = readChunk(last.getValue().ref());
+                var newChunk = tailBytes.substring(0, (int) (length - last.getKey().key()));
+
+                ChunkData newChunkData = createChunk(newChunk);
+                newChunks.put(last.getKey().key(), newChunkData.key());
+            }
+
+//            file = file.withChunks(file.chunks().minusAll(removedChunks.keySet()).plusAll(newChunks)).withMTime(System.currentTimeMillis());
+
+            for (var e : removedChunks.entrySet()) {
+                Log.tracev("Removing chunk {0}-{1}", e.getKey(), e.getValue());
+                jMapHelper.delete(file, JMapLongKey.of(e.getKey()));
+            }
+
+            for (var e : newChunks.entrySet()) {
+                Log.tracev("Adding chunk {0}-{1}", e.getKey(), e.getValue());
+                jMapHelper.put(file, JMapLongKey.of(e.getKey()), e.getValue());
+            }
+
+            remoteTx.putData(file);
+            cleanupChunks(file, removedChunks.values());
+            updateFileSize(file);
+            return true;
         });
     }
 
     @Override
-    public String readlink(String uuid) {
+    public String readlink(JObjectKey uuid) {
         return jObjectTxManager.executeTx(() -> {
             return readlinkBS(uuid).toStringUtf8();
         });
     }
 
     @Override
-    public ByteString readlinkBS(String uuid) {
+    public ByteString readlinkBS(JObjectKey uuid) {
         return jObjectTxManager.executeTx(() -> {
-            var fileOpt = jObjectManager.get(uuid).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("File not found when trying to readlink: " + uuid)));
-
-            return fileOpt.runReadLocked(JObjectManager.ResolutionStrategy.REMOTE, (md, fileData) -> {
-                if (!(fileData instanceof File)) {
-                    throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-                }
-
-                if (!((File) fileData).isSymlink())
-                    throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Not a symlink: " + uuid));
-
-                return read(uuid, 0, Math.toIntExact(size(uuid))).get();
-            });
+            var fileOpt = remoteTx.getData(File.class, uuid).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("File not found when trying to readlink: " + uuid)));
+            return read(uuid, 0, Math.toIntExact(size(uuid))).get();
         });
     }
 
     @Override
-    public String symlink(String oldpath, String newpath) {
+    public JObjectKey symlink(String oldpath, String newpath) {
         return jObjectTxManager.executeTx(() -> {
             Path path = Path.of(newpath);
             var parent = getDirEntry(path.getParent().toString());
@@ -708,107 +708,58 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             var fuuid = UUID.randomUUID();
             Log.debug("Creating file " + fuuid);
 
-            File f = new File(fuuid, 0, true);
-            var newNodeId = _tree.getNewNodeId();
             ChunkData newChunkData = createChunk(UnsafeByteOperations.unsafeWrap(oldpath.getBytes(StandardCharsets.UTF_8)));
+            File f = new File(JObjectKey.of(fuuid.toString()), 0, System.currentTimeMillis(), System.currentTimeMillis(), true, 0);
+            jMapHelper.put(f, JMapLongKey.of(0), newChunkData.key());
 
-            f.getChunks().put(0L, newChunkData.getName());
+            updateFileSize(f);
 
-            jObjectManager.put(newChunkData, Optional.of(f.getName()));
-            var newFile = jObjectManager.putLocked(f, Optional.of(newNodeId));
-            try {
-                updateFileSize(newFile);
-            } finally {
-                newFile.rwUnlock();
-            }
-
-            _tree.move(parent.getMeta().getName(), new JKleppmannTreeNodeMetaFile(fname, f.getName()), newNodeId);
-            return f.getName();
+            getTree().move(parent.key(), new JKleppmannTreeNodeMetaFile(fname, f.key()), getTree().getNewNodeId());
+            return f.key();
         });
     }
 
     @Override
-    public Boolean setTimes(String fileUuid, long atimeMs, long mtimeMs) {
+    public Boolean setTimes(JObjectKey fileUuid, long atimeMs, long mtimeMs) {
         return jObjectTxManager.executeTx(() -> {
-            var file = jObjectManager.get(fileUuid).orElseThrow(
+            var file = remoteTx.getData(File.class, fileUuid).orElseThrow(
                     () -> new StatusRuntimeException(Status.NOT_FOUND.withDescription(
                             "File not found for setTimes: " + fileUuid))
             );
 
-            file.runWriteLocked(JObjectManager.ResolutionStrategy.REMOTE, (m, fileData, bump, i) -> {
-                if (fileData instanceof JKleppmannTreeNode) return null; // FIXME:
-                if (!(fileData instanceof FsNode fd))
-                    throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-
-                bump.apply();
-                fd.setMtime(mtimeMs);
-                return null;
-            });
-
+            remoteTx.putData(file.withCTime(atimeMs).withMTime(mtimeMs));
             return true;
         });
     }
 
     @Override
-    public void updateFileSize(JObject<File> file) {
+    public void updateFileSize(File file) {
         jObjectTxManager.executeTx(() -> {
-            file.rwLockNoCopy();
-            try {
-                file.tryResolve(JObjectManager.ResolutionStrategy.REMOTE);
-                if (!(file.getData() instanceof File fd))
-                    throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+            long realSize = 0;
 
-                long realSize = 0;
+            Pair<JMapLongKey, JMapEntry<JMapLongKey>> last;
+            Log.tracev("Getting last");
+            try (var it = jMapHelper.getIterator(file, IteratorStart.LT, JMapLongKey.max())) {
+                last = it.hasNext() ? it.next() : null;
+            }
 
-                var last = fd.getChunks().lastEntry();
-                if (last != null) {
-                    var lastSize = getChunkSize(last.getValue());
-                    realSize = last.getKey() + lastSize;
-                }
+            if (last != null) {
+                realSize = last.getKey().key() + getChunkSize(last.getValue().ref());
+            }
 
-                if (realSize != fd.getSize()) {
-                    long finalRealSize = realSize;
-                    file.mutate(new JMutator<File>() {
-                        long oldSize;
-
-                        @Override
-                        public boolean mutate(File object) {
-                            oldSize = object.getSize();
-                            object.setSize(finalRealSize);
-                            return true;
-                        }
-
-                        @Override
-                        public void revert(File object) {
-                            object.setSize(oldSize);
-                        }
-                    });
-                }
-            } catch (Exception e) {
-                Log.error("Error updating file size: " + file.getMeta().getName(), e);
-            } finally {
-                file.rwUnlock();
+            if (realSize != file.size()) {
+                remoteTx.putData(file.withSize(realSize));
             }
         });
     }
 
     @Override
-    public Long size(String uuid) {
+    public Long size(JObjectKey uuid) {
         return jObjectTxManager.executeTx(() -> {
-            var read = jObjectManager.get(uuid)
+            var read = remoteTx.getData(File.class, uuid)
                     .orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
-            try {
-                return read.runReadLocked(JObjectManager.ResolutionStrategy.REMOTE, (fsNodeData, fileData) -> {
-                    if (!(fileData instanceof File fd))
-                        throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-
-                    return fd.getSize();
-                });
-            } catch (Exception e) {
-                Log.error("Error reading file: " + uuid, e);
-                return -1L;
-            }
+            return read.size();
         });
     }
 }

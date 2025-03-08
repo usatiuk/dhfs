@@ -16,6 +16,8 @@ public class AutoprotomapResourceTest {
     ProtoSerializer<NestedObjectProto, NestedObject> nestedProtoSerializer;
     @Inject
     ProtoSerializer<AbstractProto, AbstractObject> abstractProtoSerializer;
+    @Inject
+    ProtoSerializer<InterfaceObjectProto, InterfaceObject> interfaceProtoSerializer;
 
     @Test
     public void testSimple() {
@@ -74,7 +76,7 @@ public class AutoprotomapResourceTest {
     }
 
     @Test
-    public void tesAbstractNested() {
+    public void testAbstractNested() {
         var ret = abstractProtoSerializer.serialize(
                 new NestedObject(
                         new SimpleObject(333, "nested so", ByteString.copyFrom(new byte[]{1, 2, 3})),
@@ -92,5 +94,20 @@ public class AutoprotomapResourceTest {
         Assertions.assertEquals(ByteString.copyFrom(new byte[]{1, 2, 3}), des.getObject().getSomeBytes());
         Assertions.assertEquals("nested obj", des.get_nestedName());
         Assertions.assertEquals(ByteString.copyFrom(new byte[]{4, 5, 6}), des.get_nestedSomeBytes());
+    }
+
+    @Test
+    public void testInterface() {
+        var ret = interfaceProtoSerializer.serialize(new RecordObject("record test"));
+        Assertions.assertEquals("record test", ret.getRecordObject().getKey());
+        var des = (RecordObject) interfaceProtoSerializer.deserialize(ret);
+        Assertions.assertEquals("record test", des.key());
+
+        var ret2 = interfaceProtoSerializer.serialize(new RecordObject2("record test 2", 1234));
+        Assertions.assertEquals("record test 2", ret2.getRecordObject2().getKey());
+        Assertions.assertEquals(1234, ret2.getRecordObject2().getValue());
+        var des2 = (RecordObject2) interfaceProtoSerializer.deserialize(ret2);
+        Assertions.assertEquals("record test 2", des2.key());
+        Assertions.assertEquals(1234, des2.value());
     }
 }

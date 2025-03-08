@@ -1,45 +1,72 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
-import com.usatiuk.dhfs.objects.jrepository.JObjectData;
-import com.usatiuk.dhfs.objects.jrepository.OnlyLocal;
-import com.usatiuk.dhfs.objects.repository.ConflictResolver;
+import com.usatiuk.dhfs.objects.JDataRefcounted;
+import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.PeerId;
+import com.usatiuk.dhfs.objects.repository.peersync.structs.JKleppmannTreeNodeMetaPeer;
+import com.usatiuk.kleppmanntree.OpMove;
 import com.usatiuk.kleppmanntree.TreeNode;
-import lombok.Getter;
+import org.pcollections.HashTreePMap;
+import org.pcollections.PCollection;
+import org.pcollections.PMap;
+import org.pcollections.TreePSet;
 
+import java.io.Serializable;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 // FIXME: Ideally this is two classes?
-@OnlyLocal
-public class JKleppmannTreeNode extends JObjectData {
-    @Getter
-    final TreeNode<Long, UUID, JKleppmannTreeNodeMeta, String> _node;
+public record JKleppmannTreeNode(JObjectKey key, PCollection<JObjectKey> refsFrom, boolean frozen, JObjectKey parent,
+                                 OpMove<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> lastEffectiveOp,
+                                 JKleppmannTreeNodeMeta meta,
+                                 PMap<String, JObjectKey> children) implements TreeNode<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>, JDataRefcounted, Serializable {
 
-    public JKleppmannTreeNode(TreeNode<Long, UUID, JKleppmannTreeNodeMeta, String> node) {
-        _node = node;
+    public JKleppmannTreeNode(JObjectKey id, JObjectKey parent, JKleppmannTreeNodeMeta meta) {
+        this(id, TreePSet.empty(), false, parent, null, meta, HashTreePMap.empty());
     }
 
     @Override
-    public String getName() {
-        return _node.getId();
+    public JKleppmannTreeNode withParent(JObjectKey parent) {
+        return new JKleppmannTreeNode(key, refsFrom, frozen, parent, lastEffectiveOp, meta, children);
     }
 
     @Override
-    public Class<? extends ConflictResolver> getConflictResolver() {
-        return null;
+    public JKleppmannTreeNode withLastEffectiveOp(OpMove<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> lastEffectiveOp) {
+        return new JKleppmannTreeNode(key, refsFrom, frozen, parent, lastEffectiveOp, meta, children);
     }
 
     @Override
-    public Collection<String> extractRefs() {
-        if (_node.getMeta() instanceof JKleppmannTreeNodeMetaFile)
-            return List.of(((JKleppmannTreeNodeMetaFile) _node.getMeta()).getFileIno());
-        return Collections.unmodifiableCollection(_node.getChildren().values());
+    public JKleppmannTreeNode withMeta(JKleppmannTreeNodeMeta meta) {
+        return new JKleppmannTreeNode(key, refsFrom, frozen, parent, lastEffectiveOp, meta, children);
     }
 
     @Override
-    public Class<? extends JObjectData> getRefType() {
-        return JObjectData.class;
+    public JKleppmannTreeNode withChildren(PMap<String, JObjectKey> children) {
+        return new JKleppmannTreeNode(key, refsFrom, frozen, parent, lastEffectiveOp, meta, children);
+    }
+
+    @Override
+    public JKleppmannTreeNode withRefsFrom(PCollection<JObjectKey> refs) {
+        return new JKleppmannTreeNode(key, refs, frozen, parent, lastEffectiveOp, meta, children);
+    }
+
+    @Override
+    public JKleppmannTreeNode withFrozen(boolean frozen) {
+        return new JKleppmannTreeNode(key, refsFrom, frozen, parent, lastEffectiveOp, meta, children);
+    }
+
+    @Override
+    public Collection<JObjectKey> collectRefsTo() {
+        return Stream.concat(children().values().stream(),
+                switch (meta()) {
+                    case JKleppmannTreeNodeMetaDirectory dir -> Stream.<JObjectKey>of();
+                    case JKleppmannTreeNodeMetaFile file -> Stream.of(file.getFileIno());
+                    case JKleppmannTreeNodeMetaPeer peer -> Stream.of(peer.getPeerId());
+                    default -> throw new IllegalStateException("Unexpected value: " + meta());
+                }
+        ).collect(Collectors.toUnmodifiableSet());
     }
 }

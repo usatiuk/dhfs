@@ -54,12 +54,12 @@ jobs:
       # - name: Build with Maven
       #   run: cd dhfs-parent && mvn --batch-mode --update-snapshots package # -Dquarkus.log.category.\"com.usatiuk.dhfs\".min-level=DEBUG
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: DHFS Server Package
           path: dhfs-parent/server/target/quarkus-app
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: ${{ always() }}
         with:
           name: Test logs
@@ -84,7 +84,7 @@ jobs:
       - name: NPM Build
         run: cd webui && npm run build
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: Webui
           path: webui/dist
@@ -155,7 +155,7 @@ jobs:
           CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release" libdhfs_support/builder/cross-build.sh both build "$(pwd)/result"
 
       - name: Upload build
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: NativeLib-${{ matrix.os }}-${{ env.SANITIZED_DOCKER_PLATFORM }}
           path: result
@@ -168,7 +168,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: downloaded-libs
 
@@ -180,7 +180,7 @@ jobs:
           test -f "result/Linux-x86_64/libdhfs_support.so" || exit 1
 
       - name: Upload
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: NativeLibs
           path: result
@@ -201,19 +201,19 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download server package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: DHFS Server Package
           path: dhfs-package-downloaded
 
       - name: Download webui
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: Webui
           path: webui-dist-downloaded
 
       - name: Download native libs
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: NativeLibs
           path: dhfs-native-downloaded
@@ -299,17 +299,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: DHFS Server Package
           path: dhfs-package-downloaded
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: Webui
           path: webui-dist-downloaded
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: NativeLibs
           path: dhfs-native-downloaded
@@ -339,7 +339,7 @@ jobs:
         run: tar -cvf ~/run-wrapper.tar.gz ./run-wrapper-out
 
       - name: Upload
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Run wrapper
           path: ~/run-wrapper.tar.gz

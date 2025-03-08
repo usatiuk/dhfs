@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.benchmarks;
 import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.TempDataProfile;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
+import com.usatiuk.dhfs.objects.JObjectKey;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
@@ -41,7 +42,7 @@ public class DhfsFileBenchmarkTest {
     @Test
     @Disabled
     void writeMbTest() {
-        String file = dhfsFileService.create("/writeMbTest", 0777).get();
+        JObjectKey file = dhfsFileService.create("/writeMbTest", 0777).get();
         var bb = ByteBuffer.allocateDirect(1024 * 1024);
         Benchmarker.runAndPrintMixSimple("dhfsFileService.write(\"\")",
                 () -> {

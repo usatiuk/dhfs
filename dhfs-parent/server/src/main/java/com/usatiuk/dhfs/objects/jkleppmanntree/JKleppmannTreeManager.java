@@ -1,75 +1,74 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree;
 
-import com.usatiuk.dhfs.files.objects.File;
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.*;
-import com.usatiuk.dhfs.objects.jrepository.*;
-import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
-import com.usatiuk.dhfs.objects.repository.opsupport.Op;
-import com.usatiuk.dhfs.objects.repository.opsupport.OpObject;
-import com.usatiuk.dhfs.objects.repository.opsupport.OpObjectRegistry;
-import com.usatiuk.dhfs.objects.repository.opsupport.OpSender;
+import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.PeerId;
+import com.usatiuk.dhfs.objects.TransactionManager;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaDirectory;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreePersistentData;
+import com.usatiuk.dhfs.objects.repository.invalidation.Op;
+import com.usatiuk.dhfs.objects.repository.peersync.PeerInfoService;
+import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
+import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.kleppmanntree.*;
-import com.usatiuk.utils.VoidFn;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
+import org.pcollections.HashTreePMap;
+import org.pcollections.TreePMap;
+import org.pcollections.TreePSet;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 @ApplicationScoped
 public class JKleppmannTreeManager {
     private static final String dataFileName = "trees";
-    private final ConcurrentHashMap<String, JKleppmannTree> _trees = new ConcurrentHashMap<>();
     @Inject
-    JKleppmannTreePeerInterface jKleppmannTreePeerInterface;
+    Transaction curTx;
     @Inject
-    OpSender opSender;
-    @Inject
-    OpObjectRegistry opObjectRegistry;
-    @Inject
-    JObjectManager jObjectManager;
-    @Inject
-    PersistentPeerDataService persistentPeerDataService;
-    @Inject
-    JObjectTxManager jObjectTxManager;
-    @Inject
-    SoftJObjectFactory softJObjectFactory;
+    TransactionManager txManager;
     @Inject
     JKleppmannTreePeerInterface peerInterface;
+    @Inject
+    PeerInfoService peerInfoService;
 
-    public JKleppmannTree getTree(String name) {
-        return _trees.computeIfAbsent(name, this::createTree);
-    }
-
-    private JKleppmannTree createTree(String name) {
-        return jObjectTxManager.executeTx(() -> {
-            var data = jObjectManager.get(JKleppmannTreePersistentData.nameFromTreeName(name)).orElse(null);
+    public JKleppmannTree getTree(JObjectKey name) {
+        return txManager.executeTx(() -> {
+            var data = curTx.get(JKleppmannTreePersistentData.class, name, LockingStrategy.WRITE).orElse(null);
             if (data == null) {
-                data = jObjectManager.put(new JKleppmannTreePersistentData(name), Optional.empty());
+                data = new JKleppmannTreePersistentData(
+                        name,
+                        TreePSet.empty(),
+                        true,
+                        1L,
+                        HashTreePMap.empty(),
+                        HashTreePMap.empty(),
+                        TreePMap.empty()
+                );
+                curTx.put(data);
+                var rootNode = new JKleppmannTreeNode(JObjectKey.of(name.name() + "_jt_root"), null, new JKleppmannTreeNodeMetaDirectory(""));
+                curTx.put(rootNode);
+                var trashNode = new JKleppmannTreeNode(JObjectKey.of(name.name() + "_jt_trash"), null, new JKleppmannTreeNodeMetaDirectory(""));
+                curTx.put(trashNode);
             }
-            var tree = new JKleppmannTree(name);
-            opObjectRegistry.registerObject(tree);
-            return tree;
+            return new JKleppmannTree(data);
+//            opObjectRegistry.registerObject(tree);
         });
     }
 
-    public class JKleppmannTree implements OpObject {
-        private final KleppmannTree<Long, UUID, JKleppmannTreeNodeMeta, String, JKleppmannTreeNodeWrapper> _tree;
-
-        private final SoftJObject<JKleppmannTreePersistentData> _persistentData;
-
+    public class JKleppmannTree {
+        private final KleppmannTree<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> _tree;
         private final JKleppmannTreeStorageInterface _storageInterface;
         private final JKleppmannTreeClock _clock;
+        private final JObjectKey _treeName;
+        private JKleppmannTreePersistentData _data;
 
-        private final String _treeName;
-
-        JKleppmannTree(String treeName) {
-            _treeName = treeName;
-
-            _persistentData = softJObjectFactory.create(JKleppmannTreePersistentData.class, JKleppmannTreePersistentData.nameFromTreeName(treeName));
+        JKleppmannTree(JKleppmannTreePersistentData data) {
+            _treeName = data.key();
+            _data = data;
 
             _storageInterface = new JKleppmannTreeStorageInterface();
             _clock = new JKleppmannTreeClock();
@@ -77,111 +76,77 @@ public class JKleppmannTreeManager {
             _tree = new KleppmannTree<>(_storageInterface, peerInterface, _clock, new JOpRecorder());
         }
 
-        public String traverse(List<String> names) {
+        public JObjectKey traverse(List<String> names) {
             return _tree.traverse(names);
         }
 
-        public String getNewNodeId() {
+        public JObjectKey getNewNodeId() {
             return _storageInterface.getNewNodeId();
         }
 
-        public void move(String newParent, JKleppmannTreeNodeMeta newMeta, String node) {
+        public void move(JObjectKey newParent, JKleppmannTreeNodeMeta newMeta, JObjectKey node) {
             _tree.move(newParent, newMeta, node);
         }
 
-        public void trash(JKleppmannTreeNodeMeta newMeta, String node) {
-            _tree.move(_storageInterface.getTrashId(), newMeta.withName(node), node);
+        public void trash(JKleppmannTreeNodeMeta newMeta, JObjectKey nodeKey) {
+            _tree.move(_storageInterface.getTrashId(), newMeta.withName(nodeKey.toString()), nodeKey);
         }
 
-        @Override
-        public boolean hasPendingOpsForHost(UUID host) {
-            return _persistentData.get()
-                    .runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY,
-                            (m, d) -> d.getQueues().containsKey(host) &&
-                                    !d.getQueues().get(host).isEmpty()
-                    );
+        public boolean hasPendingOpsForHost(PeerId host) {
+            return !_data.queues().getOrDefault(host, TreePMap.empty()).isEmpty();
         }
 
-        @Override
-        public List<Op> getPendingOpsForHost(UUID host, int limit) {
-            return _persistentData.get().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
-                if (d.getQueues().containsKey(host)) {
-                    var queue = d.getQueues().get(host);
-                    ArrayList<Op> collected = new ArrayList<>();
-
-                    for (var node : queue.entrySet()) {
-                        collected.add(new JKleppmannTreeOpWrapper(node.getValue()));
-                        if (collected.size() >= limit) break;
-                    }
-
-                    return collected;
-                }
-                return List.of();
-            });
+        public List<Op> getPendingOpsForHost(PeerId host, int limit) {
+            ArrayList<Op> collected = new ArrayList<>();
+            for (var node : _data.queues().getOrDefault(host, TreePMap.empty()).entrySet()) {
+                collected.add(new JKleppmannTreeOpWrapper(_data.key(), node.getValue()));
+                if (collected.size() >= limit) break;
+            }
+            return Collections.unmodifiableList(collected);
         }
 
-        @Override
-        public String getId() {
-            return _treeName;
-        }
-
-        @Override
-        public void commitOpForHost(UUID host, Op op) {
+        //        @Override
+        public void commitOpForHost(PeerId host, Op op) {
             if (!(op instanceof JKleppmannTreeOpWrapper jop))
-                throw new IllegalArgumentException("Invalid incoming op type for JKleppmannTree: " + op.getClass() + " " + getId());
-            _persistentData.get().assertRwLock();
-            _persistentData.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
+                throw new IllegalArgumentException("Invalid incoming op type for JKleppmannTree: " + op.getClass());
 
-            var got = _persistentData.get().getData().getQueues().get(host).firstEntry().getValue();
-            if (!Objects.equals(jop.getOp(), got))
+            var firstOp = _data.queues().get(host).firstEntry().getValue();
+            if (!Objects.equals(firstOp, jop.op()))
                 throw new IllegalArgumentException("Committed op push was not the oldest");
 
-            _persistentData.get().mutate(new JMutator<JKleppmannTreePersistentData>() {
-                @Override
-                public boolean mutate(JKleppmannTreePersistentData object) {
-                    object.getQueues().get(host).pollFirstEntry();
-                    return true;
-                }
-
-                @Override
-                public void revert(JKleppmannTreePersistentData object) {
-                    object.getQueues().get(host).put(jop.getOp().timestamp(), jop.getOp());
-                }
-            });
-
+            _data = _data.withQueues(_data.queues().plus(host, _data.queues().get(host).minus(_data.queues().get(host).firstKey())));
+            curTx.put(_data);
         }
 
-        @Override
-        public void pushBootstrap(UUID host) {
+        public void recordBootstrap(PeerId host) {
             _tree.recordBoostrapFor(host);
         }
 
-        public Pair<String, String> findParent(Function<JKleppmannTreeNodeWrapper, Boolean> predicate) {
+        public Pair<String, JObjectKey> findParent(Function<TreeNode<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>, Boolean> predicate) {
             return _tree.findParent(predicate);
         }
 
-        @Override
-        public boolean acceptExternalOp(UUID from, Op op) {
+        //        @Override
+        public boolean acceptExternalOp(PeerId from, Op op) {
             if (op instanceof JKleppmannTreePeriodicPushOp pushOp) {
                 return _tree.updateExternalTimestamp(pushOp.getFrom(), pushOp.getTimestamp());
             }
 
             if (!(op instanceof JKleppmannTreeOpWrapper jop))
-                throw new IllegalArgumentException("Invalid incoming op type for JKleppmannTree: " + op.getClass() + " " + getId());
+                throw new IllegalArgumentException("Invalid incoming op type for JKleppmannTree: " + op.getClass());
 
-            JObject<?> fileRef;
-            if (jop.getOp().newMeta() instanceof JKleppmannTreeNodeMetaFile f) {
-                var fino = f.getFileIno();
-                fileRef = jObjectManager.getOrPut(fino, File.class, Optional.of(jop.getOp().childId()));
-            } else {
-                fileRef = null;
-            }
+//            if (jop.op().newMeta() instanceof JKleppmannTreeNodeMetaFile f) {
+//                var fino = f.getFileIno();
+//                fileRef = jObjectManager.getOrPut(fino, File.class, Optional.of(jop.getOp().childId()));
+//            } else {
+//                fileRef = null;
+//            }
 
             if (Log.isTraceEnabled())
-                Log.trace("Received op from " + from + ": " + jop.getOp().timestamp().timestamp() + " " + jop.getOp().childId() + "->" + jop.getOp().newParentId() + " as " + jop.getOp().newMeta().getName());
+                Log.trace("Received op from " + from + ": " + jop.op().timestamp().timestamp() + " " + jop.op().childId() + "->" + jop.op().newParentId() + " as " + jop.op().newMeta().getName());
 
             try {
-                _tree.applyExternalOp(from, jop.getOp());
+                _tree.applyExternalOp(from, jop.op());
             } catch (Exception e) {
                 Log.error("Error applying external op", e);
                 throw e;
@@ -189,376 +154,216 @@ public class JKleppmannTreeManager {
                 // FIXME:
                 // Fixup the ref if it didn't really get applied
 
-                if ((fileRef == null) && (jop.getOp().newMeta() instanceof JKleppmannTreeNodeMetaFile))
-                    Log.error("Could not create child of pushed op: " + jop.getOp());
+//                if ((fileRef == null) && (jop.getOp().newMeta() instanceof JKleppmannTreeNodeMetaFile))
+//                    Log.error("Could not create child of pushed op: " + jop.getOp());
 
-                if (jop.getOp().newMeta() instanceof JKleppmannTreeNodeMetaFile f) {
-                    if (fileRef != null) {
-                        var got = jObjectManager.get(jop.getOp().childId()).orElse(null);
-
-                        VoidFn remove = () -> {
-                            fileRef.runWriteLockedVoid(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
-                                m.removeRef(jop.getOp().childId());
-                            });
-                        };
-
-                        if (got == null) {
-                            remove.apply();
-                        } else {
-                            try {
-                                got.rLock();
-                                try {
-                                    got.tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
-                                    if (got.getData() == null || !got.getData().extractRefs().contains(f.getFileIno()))
-                                        remove.apply();
-                                } finally {
-                                    got.rUnlock();
-                                }
-                            } catch (DeletedObjectAccessException dex) {
-                                remove.apply();
-                            }
-                        }
-                    }
-                }
+//                if (jop.getOp().newMeta() instanceof JKleppmannTreeNodeMetaFile f) {
+//                    if (fileRef != null) {
+//                        var got = jObjectManager.get(jop.getOp().childId()).orElse(null);
+//
+//                        VoidFn remove = () -> {
+//                            fileRef.runWriteLockedVoid(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
+//                                m.removeRef(jop.getOp().childId());
+//                            });
+//                        };
+//
+//                        if (got == null) {
+//                            remove.apply();
+//                        } else {
+//                            try {
+//                                got.rLock();
+//                                try {
+//                                    got.tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
+//                                    if (got.getData() == null || !got.getData().extractRefs().contains(f.getFileIno()))
+//                                        remove.apply();
+//                                } finally {
+//                                    got.rUnlock();
+//                                }
+//                            } catch (DeletedObjectAccessException dex) {
+//                                remove.apply();
+//                            }
+//                        }
+//                    }
+//                }
             }
             return true;
         }
 
-        @Override
-        public Op getPeriodicPushOp() {
-            return new JKleppmannTreePeriodicPushOp(persistentPeerDataService.getSelfUuid(), _clock.peekTimestamp());
-        }
+//        @Override
+//        public Op getPeriodicPushOp() {
+//            return new JKleppmannTreePeriodicPushOp(persistentPeerDataService.getSelfUuid(), _clock.peekTimestamp());
+//        }
 
-        @Override
-        public void addToTx() {
-            // FIXME: a hack
-            _persistentData.get().rwLockNoCopy();
-            _persistentData.get().rwUnlock();
-        }
+//        @Override
+//        public void addToTx() {
+//            // FIXME: a hack
+//            _persistentData.get().rwLockNoCopy();
+//            _persistentData.get().rwUnlock();
+//        }
 
-        private class JOpRecorder implements OpRecorder<Long, UUID, JKleppmannTreeNodeMeta, String> {
+        private class JOpRecorder implements OpRecorder<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> {
             @Override
-            public void recordOp(OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> op) {
-                _persistentData.get().assertRwLock();
-                _persistentData.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
-                var hostUuds = persistentPeerDataService.getHostUuids().stream().toList();
-                _persistentData.get().mutate(new JMutator<JKleppmannTreePersistentData>() {
-                    @Override
-                    public boolean mutate(JKleppmannTreePersistentData object) {
-                        object.recordOp(hostUuds, op);
-                        return true;
-                    }
-
-                    @Override
-                    public void revert(JKleppmannTreePersistentData object) {
-                        object.removeOp(hostUuds, op);
-                    }
-                });
-                opSender.push(JKleppmannTree.this);
+            public void recordOp(OpMove<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> op) {
+                for (var p : peerInfoService.getPeersNoSelf()) {
+                    recordOpForPeer(p.id(), op);
+                }
             }
 
             @Override
-            public void recordOpForPeer(UUID peer, OpMove<Long, UUID, JKleppmannTreeNodeMeta, String> op) {
-                _persistentData.get().assertRwLock();
-                _persistentData.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
-                _persistentData.get().mutate(new JMutator<JKleppmannTreePersistentData>() {
-                    @Override
-                    public boolean mutate(JKleppmannTreePersistentData object) {
-                        object.recordOp(peer, op);
-                        return true;
-                    }
-
-                    @Override
-                    public void revert(JKleppmannTreePersistentData object) {
-                        object.removeOp(peer, op);
-                    }
-                });
-                opSender.push(JKleppmannTree.this);
+            public void recordOpForPeer(PeerId peer, OpMove<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> op) {
+                _data = _data.withQueues(_data.queues().plus(peer, _data.queues().getOrDefault(peer, TreePMap.empty()).plus(op.timestamp(), op)));
+                curTx.put(_data);
             }
         }
 
         private class JKleppmannTreeClock implements Clock<Long> {
             @Override
             public Long getTimestamp() {
-                _persistentData.get().assertRwLock();
-                _persistentData.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
-                var ret = _persistentData.get().getData().getClock().peekTimestamp() + 1;
-                _persistentData.get().mutate(new JMutator<JKleppmannTreePersistentData>() {
-                    @Override
-                    public boolean mutate(JKleppmannTreePersistentData object) {
-                        object.getClock().getTimestamp();
-                        return true;
-                    }
-
-                    @Override
-                    public void revert(JKleppmannTreePersistentData object) {
-                        object.getClock().ungetTimestamp();
-                    }
-                });
-                return ret;
+                var res = _data.clock() + 1;
+                _data = _data.withClock(res);
+                curTx.put(_data);
+                return res;
             }
 
             @Override
             public Long peekTimestamp() {
-                return _persistentData.get().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.getClock().peekTimestamp());
+                return _data.clock();
             }
 
             @Override
             public Long updateTimestamp(Long receivedTimestamp) {
-                _persistentData.get().assertRwLock();
-                _persistentData.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
-                _persistentData.get().mutate(new JMutator<JKleppmannTreePersistentData>() {
-                    Long _old;
-
-                    @Override
-                    public boolean mutate(JKleppmannTreePersistentData object) {
-                        _old = object.getClock().updateTimestamp(receivedTimestamp);
-                        return true;
-                    }
-
-                    @Override
-                    public void revert(JKleppmannTreePersistentData object) {
-                        object.getClock().setTimestamp(_old);
-                    }
-                });
-                return _persistentData.get().getData().getClock().peekTimestamp();
+                var old = _data.clock();
+                _data = _data.withClock(Math.max(old, receivedTimestamp) + 1);
+                curTx.put(_data);
+                return old;
             }
         }
 
-        public class JKleppmannTreeStorageInterface implements StorageInterface<Long, UUID, JKleppmannTreeNodeMeta, String, JKleppmannTreeNodeWrapper> {
+        public class JKleppmannTreeStorageInterface implements StorageInterface<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> {
             private final LogWrapper _logWrapper = new LogWrapper();
             private final PeerLogWrapper _peerLogWrapper = new PeerLogWrapper();
 
             public JKleppmannTreeStorageInterface() {
-                if (jObjectManager.get(getRootId()).isEmpty()) {
-                    putNode(new JKleppmannTreeNode(new TreeNode<>(getRootId(), null, new JKleppmannTreeNodeMetaDirectory(""))));
-                    putNode(new JKleppmannTreeNode(new TreeNode<>(getTrashId(), null, null)));
-                }
-            }
-
-            public JObject<JKleppmannTreeNode> putNode(JKleppmannTreeNode node) {
-                return jObjectManager.put(node, Optional.ofNullable(node.getNode().getParent()));
-            }
-
-            public JObject<JKleppmannTreeNode> putNodeLocked(JKleppmannTreeNode node) {
-                return jObjectManager.putLocked(node, Optional.ofNullable(node.getNode().getParent()));
             }
 
             @Override
-            public String getRootId() {
-                return _treeName + "_jt_root";
+            public JObjectKey getRootId() {
+                return new JObjectKey(_treeName.name() + "_jt_root");
             }
 
             @Override
-            public String getTrashId() {
-                return _treeName + "_jt_trash";
+            public JObjectKey getTrashId() {
+                return new JObjectKey(_treeName.name() + "_jt_trash");
             }
 
             @Override
-            public String getNewNodeId() {
-                return persistentPeerDataService.getUniqueId();
+            public JObjectKey getNewNodeId() {
+                return new JObjectKey(UUID.randomUUID().toString());
             }
 
             @Override
-            public JKleppmannTreeNodeWrapper getById(String id) {
-                var got = jObjectManager.get(id);
-                if (got.isEmpty()) return null;
-                return new JKleppmannTreeNodeWrapper((JObject<JKleppmannTreeNode>) got.get());
+            public JKleppmannTreeNode getById(JObjectKey id) {
+                var got = curTx.get(JKleppmannTreeNode.class, id);
+                return got.orElse(null);
             }
 
             @Override
-            public JKleppmannTreeNodeWrapper createNewNode(TreeNode<Long, UUID, JKleppmannTreeNodeMeta, String> node) {
-                return new JKleppmannTreeNodeWrapper(putNodeLocked(new JKleppmannTreeNode(node)));
+            public JKleppmannTreeNode createNewNode(JObjectKey key, JObjectKey parent, JKleppmannTreeNodeMeta meta) {
+                return new JKleppmannTreeNode(key, parent, meta);
             }
 
             @Override
-            public void removeNode(String id) {}
+            public void putNode(TreeNode<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> node) {
+                curTx.put(((JKleppmannTreeNode) node));
+            }
 
             @Override
-            public LogInterface<Long, UUID, JKleppmannTreeNodeMeta, String> getLog() {
+            public void removeNode(JObjectKey id) {
+                // TODO
+            }
+
+            @Override
+            public LogInterface<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> getLog() {
                 return _logWrapper;
             }
 
             @Override
-            public PeerTimestampLogInterface<Long, UUID> getPeerTimestampLog() {
+            public PeerTimestampLogInterface<Long, PeerId> getPeerTimestampLog() {
                 return _peerLogWrapper;
             }
 
-            @Override
-            public void rLock() {
-                _persistentData.get().rLock();
-            }
-
-            @Override
-            public void rUnlock() {
-                _persistentData.get().rUnlock();
-            }
-
-            @Override
-            public void rwLock() {
-                _persistentData.get().rwLockNoCopy();
-            }
-
-            @Override
-            public void rwUnlock() {
-                _persistentData.get().rwUnlock();
-            }
-
-            @Override
-            public void assertRwLock() {
-                _persistentData.get().assertRwLock();
-            }
-
-            private class PeerLogWrapper implements PeerTimestampLogInterface<Long, UUID> {
-
+            private class PeerLogWrapper implements PeerTimestampLogInterface<Long, PeerId> {
                 @Override
-                public Long getForPeer(UUID peerId) {
-                    return _persistentData.get().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY,
-                            (m, d) -> d.getPeerTimestampLog().get(peerId));
+                public Long getForPeer(PeerId peerId) {
+                    return _data.peerTimestampLog().get(peerId);
                 }
 
                 @Override
-                public void putForPeer(UUID peerId, Long timestamp) {
-                    _persistentData.get().assertRwLock();
-                    _persistentData.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
-                    _persistentData.get().mutate(new JMutator<JKleppmannTreePersistentData>() {
-                        Long old;
-
-                        @Override
-                        public boolean mutate(JKleppmannTreePersistentData object) {
-                            old = object.getPeerTimestampLog().put(peerId, timestamp);
-                            return !Objects.equals(old, timestamp);
-                        }
-
-                        @Override
-                        public void revert(JKleppmannTreePersistentData object) {
-                            if (old != null)
-                                object.getPeerTimestampLog().put(peerId, old);
-                            else
-                                object.getPeerTimestampLog().remove(peerId, timestamp);
-                        }
-                    });
+                public void putForPeer(PeerId peerId, Long timestamp) {
+                    _data = _data.withPeerTimestampLog(_data.peerTimestampLog().plus(peerId, timestamp));
+                    curTx.put(_data);
                 }
             }
 
-            private class LogWrapper implements LogInterface<Long, UUID, JKleppmannTreeNodeMeta, String> {
+            private class LogWrapper implements LogInterface<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> {
                 @Override
-                public Pair<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, String>> peekOldest() {
-                    return _persistentData.get().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
-                        var ret = d.getLog().firstEntry();
-                        if (ret == null) return null;
-                        return Pair.of(ret);
-                    });
+                public Pair<CombinedTimestamp<Long, PeerId>, LogRecord<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>> peekOldest() {
+                    if (_data.log().isEmpty()) return null;
+                    return Pair.of(_data.log().firstEntry());
                 }
 
                 @Override
-                public Pair<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, String>> takeOldest() {
-                    _persistentData.get().assertRwLock();
-                    _persistentData.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
-
-                    var ret = _persistentData.get().getData().getLog().firstEntry();
-                    if (ret != null)
-                        _persistentData.get().mutate(new JMutator<JKleppmannTreePersistentData>() {
-                            @Override
-                            public boolean mutate(JKleppmannTreePersistentData object) {
-                                object.getLog().pollFirstEntry();
-                                return true;
-                            }
-
-                            @Override
-                            public void revert(JKleppmannTreePersistentData object) {
-                                object.getLog().put(ret.getKey(), ret.getValue());
-                            }
-                        });
+                public Pair<CombinedTimestamp<Long, PeerId>, LogRecord<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>> takeOldest() {
+                    if (_data.log().isEmpty()) return null;
+                    var ret = _data.log().firstEntry();
+                    _data = _data.withLog(_data.log().minusFirstEntry());
+                    curTx.put(_data);
                     return Pair.of(ret);
                 }
 
                 @Override
-                public Pair<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, String>> peekNewest() {
-                    return _persistentData.get().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
-                        var ret = d.getLog().lastEntry();
-                        if (ret == null) return null;
-                        return Pair.of(ret);
-                    });
+                public Pair<CombinedTimestamp<Long, PeerId>, LogRecord<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>> peekNewest() {
+                    if (_data.log().isEmpty()) return null;
+                    return Pair.of(_data.log().lastEntry());
                 }
 
                 @Override
-                public List<Pair<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, String>>> newestSlice(CombinedTimestamp<Long, UUID> since, boolean inclusive) {
-                    return _persistentData.get().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
-                        var tail = d.getLog().tailMap(since, inclusive);
-                        return tail.entrySet().stream().map(e -> Pair.of(e.getKey(), e.getValue())).toList();
-                    });
+                public List<Pair<CombinedTimestamp<Long, PeerId>, LogRecord<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>>> newestSlice(CombinedTimestamp<Long, PeerId> since, boolean inclusive) {
+                    return _data.log().tailMap(since, inclusive).entrySet().stream().map(e -> Pair.of(e.getKey(), e.getValue())).toList();
                 }
 
                 @Override
-                public List<Pair<CombinedTimestamp<Long, UUID>, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, String>>> getAll() {
-                    return _persistentData.get().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
-                        return d.getLog().entrySet().stream().map(e -> Pair.of(e.getKey(), e.getValue())).toList();
-                    });
+                public List<Pair<CombinedTimestamp<Long, PeerId>, LogRecord<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>>> getAll() {
+                    return _data.log().entrySet().stream().map(e -> Pair.of(e.getKey(), e.getValue())).toList();
                 }
 
                 @Override
                 public boolean isEmpty() {
-                    return _persistentData.get().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
-                        return d.getLog().isEmpty();
-                    });
+                    return _data.log().isEmpty();
                 }
 
                 @Override
-                public boolean containsKey(CombinedTimestamp<Long, UUID> timestamp) {
-                    return _persistentData.get().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
-                        return d.getLog().containsKey(timestamp);
-                    });
+                public boolean containsKey(CombinedTimestamp<Long, PeerId> timestamp) {
+                    return _data.log().containsKey(timestamp);
                 }
 
                 @Override
                 public long size() {
-                    return _persistentData.get().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
-                        return (long) d.getLog().size();
-                    });
+                    return _data.log().size();
                 }
 
                 @Override
-                public void put(CombinedTimestamp<Long, UUID> timestamp, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, String> record) {
-                    _persistentData.get().assertRwLock();
-                    _persistentData.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
-                    if (_persistentData.get().getData().getLog().containsKey(timestamp))
+                public void put(CombinedTimestamp<Long, PeerId> timestamp, LogRecord<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> record) {
+                    if (_data.log().containsKey(timestamp))
                         throw new IllegalStateException("Overwriting log entry?");
-                    _persistentData.get().mutate(new JMutator<JKleppmannTreePersistentData>() {
-                        @Override
-                        public boolean mutate(JKleppmannTreePersistentData object) {
-                            object.getLog().put(timestamp, record);
-                            return true;
-                        }
-
-                        @Override
-                        public void revert(JKleppmannTreePersistentData object) {
-                            object.getLog().remove(timestamp, record);
-                        }
-                    });
+                    _data = _data.withLog(_data.log().plus(timestamp, record));
+                    curTx.put(_data);
                 }
 
                 @Override
-                public void replace(CombinedTimestamp<Long, UUID> timestamp, LogRecord<Long, UUID, JKleppmannTreeNodeMeta, String> record) {
-                    _persistentData.get().assertRwLock();
-                    _persistentData.get().tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
-                    _persistentData.get().mutate(new JMutator<JKleppmannTreePersistentData>() {
-                        LogRecord<Long, UUID, JKleppmannTreeNodeMeta, String> old;
-
-                        @Override
-                        public boolean mutate(JKleppmannTreePersistentData object) {
-                            old = object.getLog().put(timestamp, record);
-                            return !Objects.equals(old, record);
-                        }
-
-                        @Override
-                        public void revert(JKleppmannTreePersistentData object) {
-                            if (old != null)
-                                object.getLog().put(timestamp, old);
-                            else
-                                object.getLog().remove(timestamp, record);
-                        }
-                    });
+                public void replace(CombinedTimestamp<Long, PeerId> timestamp, LogRecord<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> record) {
+                    _data = _data.withLog(_data.log().plus(timestamp, record));
+                    curTx.put(_data);
                 }
             }
         }

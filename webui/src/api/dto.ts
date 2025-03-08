@@ -39,8 +39,8 @@ export type TTokenToResp = z.infer<typeof TokenToResp>;
 //  AvailablePeerInfo
 export const AvailablePeerInfoTo = z.object({
     uuid: z.string(),
-    addr: z.string(),
-    port: z.number(),
+    // addr: z.string(),
+    // port: z.number(),
 });
 export type TAvailablePeerInfoTo = z.infer<typeof AvailablePeerInfoTo>;
 

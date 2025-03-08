@@ -1,12 +1,10 @@
 package com.usatiuk.dhfs.objects.repository.invalidation;
 
-import com.usatiuk.dhfs.objects.jrepository.DeletedObjectAccessException;
-import com.usatiuk.dhfs.objects.jrepository.JObject;
-import com.usatiuk.dhfs.objects.jrepository.JObjectManager;
+import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.PeerId;
 import com.usatiuk.dhfs.objects.repository.PeerManager;
-import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
-import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
-import com.usatiuk.utils.HashSetDelayedBlockingQueue;
+import com.usatiuk.dhfs.objects.repository.peersync.PeerInfoService;
+import com.usatiuk.dhfs.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -16,10 +14,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
-import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -27,18 +23,16 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @ApplicationScoped
 public class InvalidationQueueService {
-    private final HashSetDelayedBlockingQueue<Pair<UUID, String>> _queue;
-    private final AtomicReference<ConcurrentHashSet<String>> _toAllQueue = new AtomicReference<>(new ConcurrentHashSet<>());
+    private final HashSetDelayedBlockingQueue<InvalidationQueueEntry> _queue;
+    private final AtomicReference<ConcurrentHashSet<JObjectKey>> _toAllQueue = new AtomicReference<>(new ConcurrentHashSet<>());
     @Inject
     PeerManager remoteHostManager;
     @Inject
-    RemoteObjectServiceClient remoteObjectServiceClient;
-    @Inject
-    JObjectManager jObjectManager;
-    @Inject
-    PersistentPeerDataService persistentPeerDataService;
-    @Inject
     DeferredInvalidationQueueService deferredInvalidationQueueService;
+    @Inject
+    PeerInfoService peerInfoService;
+    @Inject
+    OpPusher opPusher;
     @ConfigProperty(name = "dhfs.objects.invalidation.threads")
     int threads;
     private ExecutorService _executor;
@@ -69,7 +63,7 @@ public class InvalidationQueueService {
         var data = _queue.close();
         Log.info("Will defer " + data.size() + " invalidations on shutdown");
         for (var e : data)
-            deferredInvalidationQueueService.defer(e.getLeft(), e.getRight());
+            deferredInvalidationQueueService.defer(e);
     }
 
     private void sender() {
@@ -77,7 +71,7 @@ public class InvalidationQueueService {
             try {
                 try {
                     if (!_queue.hasImmediate()) {
-                        ConcurrentHashSet<String> toAllQueue;
+                        ConcurrentHashSet<JObjectKey> toAllQueue;
 
                         while (true) {
                             toAllQueue = _toAllQueue.get();
@@ -93,9 +87,9 @@ public class InvalidationQueueService {
                             var hostInfo = remoteHostManager.getHostStateSnapshot();
                             for (var o : toAllQueue) {
                                 for (var h : hostInfo.available())
-                                    _queue.add(Pair.of(h, o));
+                                    _queue.add(new InvalidationQueueEntry(h, o, false));
                                 for (var u : hostInfo.unavailable())
-                                    deferredInvalidationQueueService.defer(u, o);
+                                    deferredInvalidationQueueService.defer(new InvalidationQueueEntry(u, o, false));
                             }
                         }
                     }
@@ -106,22 +100,19 @@ public class InvalidationQueueService {
                     long success = 0;
 
                     for (var e : data) {
-                        if (!persistentPeerDataService.existsHost(e.getLeft())) continue;
+                        if (peerInfoService.getPeerInfo(e.peer()).isEmpty()) continue;
 
-                        if (!remoteHostManager.isReachable(e.getLeft())) {
-                            deferredInvalidationQueueService.defer(e.getLeft(), e.getRight());
+                        if (!remoteHostManager.isReachable(e.peer())) {
+                            deferredInvalidationQueueService.defer(e);
                             continue;
                         }
 
                         try {
-                            jObjectManager.get(e.getRight()).ifPresent(obj -> {
-                                remoteObjectServiceClient.notifyUpdate(obj, e.getLeft());
-                            });
+                            opPusher.doPush(e);
                             success++;
-                        } catch (DeletedObjectAccessException ignored) {
                         } catch (Exception ex) {
-                            Log.info("Failed to send invalidation to " + e.getLeft() + ", will retry", ex);
-                            pushInvalidationToOne(e.getLeft(), e.getRight());
+                            Log.warnv("Failed to send invalidation to {0}, will retry: {1}", e, ex);
+                            pushInvalidationToOne(e);
                         }
                         if (_shutdown) {
                             Log.info("Invalidation sender exiting");
@@ -142,39 +133,38 @@ public class InvalidationQueueService {
         Log.info("Invalidation sender exiting");
     }
 
-    public void pushInvalidationToAll(JObject<?> obj) {
-        if (obj.getMeta().isOnlyLocal()) return;
+    public void pushInvalidationToAll(JObjectKey key) {
         while (true) {
             var queue = _toAllQueue.get();
             if (queue == null) {
-                var nq = new ConcurrentHashSet<String>();
+                var nq = new ConcurrentHashSet<JObjectKey>();
                 if (!_toAllQueue.compareAndSet(null, nq)) continue;
                 queue = nq;
             }
 
-            queue.add(obj.getMeta().getName());
+            queue.add(key);
 
             if (_toAllQueue.get() == queue) break;
         }
     }
 
-    public void pushInvalidationToOne(UUID host, JObject<?> obj) {
-        if (obj.getMeta().isOnlyLocal()) return;
-        if (remoteHostManager.isReachable(host))
-            _queue.add(Pair.of(host, obj.getMeta().getName()));
+    void pushInvalidationToOne(InvalidationQueueEntry entry) {
+        if (remoteHostManager.isReachable(entry.peer()))
+            _queue.add(entry);
         else
-            deferredInvalidationQueueService.defer(host, obj.getMeta().getName());
+            deferredInvalidationQueueService.defer(entry);
     }
 
-    public void pushInvalidationToAll(String name) {
-        pushInvalidationToAll(jObjectManager.get(name).orElseThrow(() -> new IllegalArgumentException("Object " + name + " not found")));
+    public void pushInvalidationToOne(PeerId host, JObjectKey obj, boolean forced) {
+        var entry = new InvalidationQueueEntry(host, obj, forced);
+        pushInvalidationToOne(entry);
     }
 
-    public void pushInvalidationToOne(UUID host, String name) {
-        pushInvalidationToOne(host, jObjectManager.get(name).orElseThrow(() -> new IllegalArgumentException("Object " + name + " not found")));
+    public void pushInvalidationToOne(PeerId host, JObjectKey obj) {
+        pushInvalidationToOne(host, obj, false);
     }
 
-    protected void pushDeferredInvalidations(UUID host, String name) {
-        _queue.add(Pair.of(host, name));
+    void pushDeferredInvalidations(InvalidationQueueEntry entry) {
+        _queue.add(entry);
     }
 }
