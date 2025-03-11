@@ -123,7 +123,8 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
 
         private static final Cleaner CLEANER = Cleaner.create();
         private final MutableObject<Boolean> _closed = new MutableObject<>(false);
-        private final Exception _allocationStacktrace = new Exception();
+        //        private final Exception _allocationStacktrace = new Exception();
+        private final Exception _allocationStacktrace = null;
 
         LmdbKvIterator(IteratorStart start, JObjectKey key) {
             _goingForward = true;

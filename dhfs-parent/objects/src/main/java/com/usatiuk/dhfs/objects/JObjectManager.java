@@ -71,11 +71,11 @@ public class JObjectManager {
         // TODO: check deletions, inserts
         try {
             try {
-                Function<JObjectKey, JData> getCurrent =
+                Function<JObjectKey, JData> getPrev =
                         key -> switch (writes.get(key)) {
                             case TxRecord.TxObjectRecordWrite<?> write -> write.data();
                             case TxRecord.TxObjectRecordDeleted deleted -> null;
-                            case null -> tx.readSource().get(JData.class, key).orElse(null);
+                            case null -> tx.getFromSource(JData.class, key).orElse(null);
                             default -> {
                                 throw new TxCommitException("Unexpected value: " + writes.get(key));
                             }
@@ -93,7 +93,7 @@ public class JObjectManager {
                         for (var entry : currentIteration.entrySet()) {
                             somethingChanged = true;
                             Log.trace("Running pre-commit hook " + hook.getClass() + " for" + entry.getKey());
-                            var oldObj = getCurrent.apply(entry.getKey());
+                            var oldObj = getPrev.apply(entry.getKey());
                             switch (entry.getValue()) {
                                 case TxRecord.TxObjectRecordWrite<?> write -> {
                                     if (oldObj == null) {

@@ -6,6 +6,7 @@ import com.usatiuk.dhfs.objects.snapshot.SnapshotManager;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nonnull;
 import java.util.*;
@@ -15,16 +16,41 @@ public class TransactionFactoryImpl implements TransactionFactory {
     @Inject
     SnapshotManager snapshotManager;
     @Inject
-    ReadTrackingObjectSourceFactory readTrackingObjectSourceFactory;
+    LockManager lockManager;
 
     @Override
     public TransactionPrivate createTransaction() {
         return new TransactionImpl();
     }
 
-    private class TransactionImpl implements TransactionPrivate {
-        private final ReadTrackingTransactionObjectSource _source;
+    private interface ReadTrackingInternalCrap {
+        boolean fromSource();
 
+        JData obj();
+    }
+
+    // FIXME:
+    private record ReadTrackingInternalCrapSource(JDataVersionedWrapper wrapped) implements ReadTrackingInternalCrap {
+        @Override
+        public boolean fromSource() {
+            return true;
+        }
+
+        @Override
+        public JData obj() {
+            return wrapped.data();
+        }
+    }
+
+    private record ReadTrackingInternalCrapTx(JData obj) implements ReadTrackingInternalCrap {
+        @Override
+        public boolean fromSource() {
+            return false;
+        }
+    }
+
+    private class TransactionImpl implements TransactionPrivate {
+        private final Map<JObjectKey, TransactionObject<?>> _readSet = new HashMap<>();
         private final NavigableMap<JObjectKey, TxRecord.TxObjectRecord<?>> _writes = new TreeMap<>();
 
         private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _newWrites = new HashMap<>();
@@ -34,7 +60,67 @@ public class TransactionFactoryImpl implements TransactionFactory {
 
         private TransactionImpl() {
             _snapshot = snapshotManager.createSnapshot();
-            _source = readTrackingObjectSourceFactory.create(_snapshot);
+        }
+
+        private class ReadTrackingIterator implements CloseableKvIterator<JObjectKey, JData> {
+            private final CloseableKvIterator<JObjectKey, ReadTrackingInternalCrap> _backing;
+
+            public ReadTrackingIterator(CloseableKvIterator<JObjectKey, ReadTrackingInternalCrap> backing) {
+                _backing = backing;
+            }
+
+            @Override
+            public JObjectKey peekNextKey() {
+                return _backing.peekNextKey();
+            }
+
+            @Override
+            public void skip() {
+                _backing.skip();
+            }
+
+            @Override
+            public JObjectKey peekPrevKey() {
+                return _backing.peekPrevKey();
+            }
+
+            @Override
+            public Pair<JObjectKey, JData> prev() {
+                var got = _backing.prev();
+                if (got.getValue() instanceof ReadTrackingInternalCrapSource(JDataVersionedWrapper wrapped)) {
+                    _readSet.putIfAbsent(got.getKey(), new TransactionObjectNoLock<>(Optional.of(wrapped)));
+                }
+                return Pair.of(got.getKey(), got.getValue().obj());
+            }
+
+            @Override
+            public boolean hasPrev() {
+                return _backing.hasPrev();
+            }
+
+            @Override
+            public void skipPrev() {
+                _backing.skipPrev();
+            }
+
+            @Override
+            public void close() {
+                _backing.close();
+            }
+
+            @Override
+            public boolean hasNext() {
+                return _backing.hasNext();
+            }
+
+            @Override
+            public Pair<JObjectKey, JData> next() {
+                var got = _backing.next();
+                if (got.getValue() instanceof ReadTrackingInternalCrapSource(JDataVersionedWrapper wrapped)) {
+                    _readSet.putIfAbsent(got.getKey(), new TransactionObjectNoLock<>(Optional.of(wrapped)));
+                }
+                return Pair.of(got.getKey(), got.getValue().obj());
+            }
         }
 
         @Override
@@ -63,6 +149,37 @@ public class TransactionFactoryImpl implements TransactionFactory {
         }
 
         @Override
+        public <T extends JData> Optional<T> getFromSource(Class<T> type, JObjectKey key) {
+            var got = _readSet.get(key);
+
+            if (got == null) {
+                var read = _snapshot.readObject(key);
+                _readSet.put(key, new TransactionObjectNoLock<>(read));
+                return read.map(JDataVersionedWrapper::data).map(type::cast);
+            }
+
+            return got.data().map(JDataVersionedWrapper::data).map(type::cast);
+        }
+
+        public <T extends JData> Optional<T> getWriteLockedFromSource(Class<T> type, JObjectKey key) {
+            var got = _readSet.get(key);
+
+            if (got == null) {
+                var lock = lockManager.lockObject(key);
+                try {
+                    var read = _snapshot.readObject(key);
+                    _readSet.put(key, new TransactionObjectLocked<>(read, lock));
+                    return read.map(JDataVersionedWrapper::data).map(type::cast);
+                } catch (Exception e) {
+                    lock.close();
+                    throw e;
+                }
+            }
+
+            return got.data().map(JDataVersionedWrapper::data).map(type::cast);
+        }
+
+        @Override
         public <T extends JData> Optional<T> get(Class<T> type, JObjectKey key, LockingStrategy strategy) {
             switch (_writes.get(key)) {
                 case TxRecord.TxObjectRecordWrite<?> write -> {
@@ -76,8 +193,8 @@ public class TransactionFactoryImpl implements TransactionFactory {
             }
 
             return switch (strategy) {
-                case OPTIMISTIC -> _source.get(type, key);
-                case WRITE -> _source.getWriteLocked(type, key);
+                case OPTIMISTIC -> getFromSource(type, key);
+                case WRITE -> getWriteLockedFromSource(type, key);
             };
         }
 
@@ -104,13 +221,16 @@ public class TransactionFactoryImpl implements TransactionFactory {
         @Override
         public CloseableKvIterator<JObjectKey, JData> getIterator(IteratorStart start, JObjectKey key) {
             Log.tracev("Getting tx iterator with start={0}, key={1}", start, key);
-            return new TombstoneMergingKvIterator<>("tx", start, key,
-                    (tS, tK) -> new MappingKvIterator<>(new NavigableMapKvIterator<>(_writes, tS, tK), t -> switch (t) {
-                        case TxRecord.TxObjectRecordWrite<?> write -> new Data<>(write.data());
-                        case TxRecord.TxObjectRecordDeleted deleted -> new Tombstone<>();
-                        case null, default -> null;
-                    }),
-                    (tS, tK) -> new MappingKvIterator<>(_source.getIterator(tS, tK), Data::new));
+            return new ReadTrackingIterator(new TombstoneMergingKvIterator<>("tx", start, key,
+                    (tS, tK) -> new MappingKvIterator<>(new NavigableMapKvIterator<>(_writes, tS, tK),
+                            t -> switch (t) {
+                                case TxRecord.TxObjectRecordWrite<?> write ->
+                                        new Data<>(new ReadTrackingInternalCrapTx(write.data()));
+                                case TxRecord.TxObjectRecordDeleted deleted -> new Tombstone<>();
+                                case null, default -> null;
+                            }),
+                    (tS, tK) -> new MappingKvIterator<>(_snapshot.getIterator(tS, tK),
+                            d -> new Data<ReadTrackingInternalCrap>(new ReadTrackingInternalCrapSource(d)))));
         }
 
         @Override
@@ -128,17 +248,11 @@ public class TransactionFactoryImpl implements TransactionFactory {
 
         @Override
         public Map<JObjectKey, TransactionObject<?>> reads() {
-            return _source.getRead();
-        }
-
-        @Override
-        public ReadTrackingTransactionObjectSource readSource() {
-            return _source;
+            return Collections.unmodifiableMap(_readSet);
         }
 
         @Override
         public void close() {
-            _source.close();
             _snapshot.close();
         }
     }
