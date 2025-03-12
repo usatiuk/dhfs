@@ -16,58 +16,47 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
         _goingForward = true;
         _name = name;
 
-        IteratorStart initialStartType = startType;
-        K initialStartKey = startKey;
-        boolean fail = false;
+        {
+            int counter = 0;
+            var iteratorsTmp = new HashMap<CloseableKvIterator<K, V>, Integer>();
+            for (var iteratorFn : iterators) {
+                var iterator = iteratorFn.get(startType, startKey);
+                iteratorsTmp.put(iterator, counter++);
+            }
+            _iterators = Map.copyOf(iteratorsTmp);
+        }
+
         if (startType == IteratorStart.LT || startType == IteratorStart.LE) {
             // Starting at a greatest key less than/less or equal than:
             // We have a bunch of iterators that have given us theirs "greatest LT/LE key"
             // now we need to pick the greatest of those to start with
             // But if some of them don't have a lesser key, we need to pick the smallest of those
-            var initialIterators = iterators.stream().map(p -> p.get(initialStartType, initialStartKey)).toList();
-            try {
-                IteratorStart finalStartType = startType;
-                var found = initialIterators.stream()
-                        .filter(CloseableKvIterator::hasNext)
-                        .map((i) -> {
-                            var peeked = i.peekNextKey();
+            var found = _iterators.keySet().stream()
+                    .filter(CloseableKvIterator::hasNext)
+                    .map((i) -> {
+                        var peeked = i.peekNextKey();
 //                            Log.warnv("peeked: {0}, from {1}", peeked, i.getClass());
-                            return peeked;
-                        }).distinct().collect(Collectors.partitioningBy(e -> finalStartType == IteratorStart.LE ? e.compareTo(initialStartKey) <= 0 : e.compareTo(initialStartKey) < 0));
-                K initialMaxValue;
-                if (!found.get(true).isEmpty())
-                    initialMaxValue = found.get(true).stream().max(Comparator.naturalOrder()).orElse(null);
-                else
-                    initialMaxValue = found.get(false).stream().min(Comparator.naturalOrder()).orElse(null);
-                if (initialMaxValue == null) {
-                    fail = true;
+                        return peeked;
+                    }).distinct().collect(Collectors.partitioningBy(e -> startType == IteratorStart.LE ? e.compareTo(startKey) <= 0 : e.compareTo(startKey) < 0));
+            K initialMaxValue;
+            if (!found.get(true).isEmpty())
+                initialMaxValue = found.get(true).stream().max(Comparator.naturalOrder()).orElse(null);
+            else
+                initialMaxValue = found.get(false).stream().min(Comparator.naturalOrder()).orElse(null);
+
+            for (var iterator : _iterators.keySet()) {
+                while (iterator.hasNext() && iterator.peekNextKey().compareTo(initialMaxValue) < 0) {
+                    iterator.skip();
                 }
-                startKey = initialMaxValue;
-                startType = IteratorStart.GE;
-            } finally {
-                initialIterators.forEach(CloseableKvIterator::close);
             }
         }
-
-        if (fail) {
-            _iterators = Map.of();
-            return;
-        }
-
-        int counter = 0;
-        var iteratorsTmp = new HashMap<CloseableKvIterator<K, V>, Integer>();
-        for (var iteratorFn : iterators) {
-            var iterator = iteratorFn.get(startType, startKey);
-            iteratorsTmp.put(iterator, counter++);
-        }
-        _iterators = Map.copyOf(iteratorsTmp);
 
         for (CloseableKvIterator<K, V> iterator : _iterators.keySet()) {
             advanceIterator(iterator);
         }
 
         Log.tracev("{0} Created: {1}", _name, _sortedIterators);
-        switch (initialStartType) {
+        switch (startType) {
 //            case LT -> {
 //                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(initialStartKey) < 0;
 //            }
@@ -75,10 +64,10 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
 //                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(initialStartKey) <= 0;
 //            }
             case GT -> {
-                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(initialStartKey) > 0;
+                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(startKey) > 0;
             }
             case GE -> {
-                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(initialStartKey) >= 0;
+                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(startKey) >= 0;
             }
         }
     }
