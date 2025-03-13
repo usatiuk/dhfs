@@ -162,7 +162,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             var fuuid = UUID.randomUUID();
             Log.debug("Creating file " + fuuid);
-            File f = new File(JObjectKey.of(fuuid.toString()), mode, System.currentTimeMillis(), System.currentTimeMillis(), false, 0);
+            File f = new File(JObjectKey.of(fuuid.toString()), mode, System.currentTimeMillis(), System.currentTimeMillis(), false);
             remoteTx.putData(f);
 
             try {
@@ -541,7 +541,6 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             remoteTx.putData(file);
             cleanupChunks(file, removedChunks.values());
-            updateFileSize(file);
 
             return (long) data.size();
         });
@@ -571,7 +570,6 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 //                file = file.withChunks(TreePMap.empty()).withMTime(System.currentTimeMillis());
                 remoteTx.putData(file);
 //                cleanupChunks(file, oldChunks.values());
-                updateFileSize(file);
                 return true;
             }
 
@@ -675,7 +673,6 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             remoteTx.putData(file);
             cleanupChunks(file, removedChunks.values());
-            updateFileSize(file);
             return true;
         });
     }
@@ -709,11 +706,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             Log.debug("Creating file " + fuuid);
 
             ChunkData newChunkData = createChunk(UnsafeByteOperations.unsafeWrap(oldpath.getBytes(StandardCharsets.UTF_8)));
-            File f = new File(JObjectKey.of(fuuid.toString()), 0, System.currentTimeMillis(), System.currentTimeMillis(), true, 0);
+            File f = new File(JObjectKey.of(fuuid.toString()), 0, System.currentTimeMillis(), System.currentTimeMillis(), true);
             jMapHelper.put(f, JMapLongKey.of(0), newChunkData.key());
 
-            updateFileSize(f);
-
+            remoteTx.putData(f);
             getTree().move(parent.key(), new JKleppmannTreeNodeMetaFile(fname, f.key()), getTree().getNewNodeId());
             return f.key();
         });
@@ -733,12 +729,13 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     }
 
     @Override
-    public void updateFileSize(File file) {
-        jObjectTxManager.executeTx(() -> {
+    public long size(JObjectKey fileUuid) {
+        return jObjectTxManager.executeTx(() -> {
             long realSize = 0;
+            var file = remoteTx.getData(File.class, fileUuid)
+                    .orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
 
             Pair<JMapLongKey, JMapEntry<JMapLongKey>> last;
-            Log.tracev("Getting last");
             try (var it = jMapHelper.getIterator(file, IteratorStart.LT, JMapLongKey.max())) {
                 last = it.hasNext() ? it.next() : null;
             }
@@ -747,19 +744,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 realSize = last.getKey().key() + getChunkSize(last.getValue().ref());
             }
 
-            if (realSize != file.size()) {
-                remoteTx.putData(file.withSize(realSize));
-            }
-        });
-    }
-
-    @Override
-    public Long size(JObjectKey uuid) {
-        return jObjectTxManager.executeTx(() -> {
-            var read = remoteTx.getData(File.class, uuid)
-                    .orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND));
-
-            return read.size();
+            return realSize;
         });
     }
 }

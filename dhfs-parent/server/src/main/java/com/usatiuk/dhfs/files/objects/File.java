@@ -9,26 +9,22 @@ import java.util.Collection;
 import java.util.Set;
 
 public record File(JObjectKey key, long mode, long cTime, long mTime,
-                   boolean symlink, long size
+                   boolean symlink
 ) implements JDataRemote, JMapHolder<JMapLongKey> {
     public File withSymlink(boolean symlink) {
-        return new File(key, mode, cTime, mTime, symlink, size);
-    }
-
-    public File withSize(long size) {
-        return new File(key, mode, cTime, mTime, symlink, size);
+        return new File(key, mode, cTime, mTime, symlink);
     }
 
     public File withMode(long mode) {
-        return new File(key, mode, cTime, mTime, symlink, size);
+        return new File(key, mode, cTime, mTime, symlink);
     }
 
     public File withCTime(long cTime) {
-        return new File(key, mode, cTime, mTime, symlink, size);
+        return new File(key, mode, cTime, mTime, symlink);
     }
 
     public File withMTime(long mTime) {
-        return new File(key, mode, cTime, mTime, symlink, size);
+        return new File(key, mode, cTime, mTime, symlink);
     }
 
     @Override
