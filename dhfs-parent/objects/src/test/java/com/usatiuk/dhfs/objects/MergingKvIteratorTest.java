@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects;
 
 import com.usatiuk.dhfs.objects.persistence.IteratorStart;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,11 @@ public class MergingKvIteratorTest {
         }
 
         @Override
+        public Class<? extends V> peekNextType() {
+            throw new NotImplementedException();
+        }
+
+        @Override
         public void skip() {
             if (_next == null) {
                 throw new NoSuchElementException();
@@ -47,6 +53,11 @@ public class MergingKvIteratorTest {
         @Override
         public K peekPrevKey() {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Class<? extends V> peekPrevType() {
+            throw new NotImplementedException();
         }
 
         @Override

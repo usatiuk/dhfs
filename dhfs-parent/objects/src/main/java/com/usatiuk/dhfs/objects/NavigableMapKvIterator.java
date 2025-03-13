@@ -92,6 +92,13 @@ public class NavigableMapKvIterator<K extends Comparable<K>, V> extends Reversib
     }
 
     @Override
+    protected Class<? extends V> peekTypeImpl() {
+        if (_next == null)
+            throw new NoSuchElementException("No more elements");
+        return (Class<? extends V>) _next.getValue().getClass();
+    }
+
+    @Override
     public void close() {
     }
 

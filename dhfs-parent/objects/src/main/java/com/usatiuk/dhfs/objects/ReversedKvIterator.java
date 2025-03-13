@@ -30,6 +30,11 @@ public class ReversedKvIterator<K extends Comparable<K>, V> implements Closeable
     }
 
     @Override
+    public Class<?> peekNextType() {
+        return _backing.peekPrevType();
+    }
+
+    @Override
     public void skip() {
         _backing.skipPrev();
     }
@@ -37,6 +42,11 @@ public class ReversedKvIterator<K extends Comparable<K>, V> implements Closeable
     @Override
     public K peekPrevKey() {
         return _backing.peekNextKey();
+    }
+
+    @Override
+    public Class<?> peekPrevType() {
+        return _backing.peekNextType();
     }
 
     @Override

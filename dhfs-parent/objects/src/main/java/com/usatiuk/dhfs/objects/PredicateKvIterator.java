@@ -132,6 +132,17 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends Revers
     }
 
     @Override
+    protected Class<?> peekTypeImpl() {
+        if (!_checkedNext)
+            fillNext();
+
+        if (_next == null)
+            throw new NoSuchElementException("No more elements");
+
+        return _next.getValue().getClass();
+    }
+
+    @Override
     public void close() {
         _backing.close();
     }

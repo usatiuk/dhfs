@@ -63,7 +63,7 @@ public class CachingObjectPersistentStore {
             int size = obj.map(JDataVersionedWrapper::estimateSize).orElse(16);
 
             _curSize += size;
-            var entry = new CacheEntry(obj.<MaybeTombstone<JDataVersionedWrapper>>map(Data::new).orElse(new Tombstone<>()), size);
+            CacheEntry entry = obj.<CacheEntry>map(v -> new CacheEntryYes(v, size)).orElse(new CacheEntryDeleted());
             var old = _cache.putLast(key, entry);
 
             _sortedCache = _sortedCache.plus(key, entry);
@@ -87,7 +87,11 @@ public class CachingObjectPersistentStore {
         try {
             var got = _cache.get(name);
             if (got != null) {
-                return got.object().opt();
+                return switch (got) {
+                    case CacheEntryYes yes -> Optional.of(yes.object());
+                    case CacheEntryDeleted del -> Optional.empty();
+                    default -> throw new IllegalStateException("Unexpected value: " + got);
+                };
             }
         } finally {
             _lock.readLock().unlock();
@@ -138,6 +142,11 @@ public class CachingObjectPersistentStore {
         }
 
         @Override
+        public Class<?> peekNextType() {
+            return _delegate.peekNextType();
+        }
+
+        @Override
         public void skip() {
             _delegate.skip();
         }
@@ -155,6 +164,11 @@ public class CachingObjectPersistentStore {
         @Override
         public JObjectKey peekPrevKey() {
             return _delegate.peekPrevKey();
+        }
+
+        @Override
+        public Class<?> peekPrevType() {
+            return _delegate.peekPrevType();
         }
 
         private void maybeCache(Pair<JObjectKey, JDataVersionedWrapper> prev) {
@@ -209,19 +223,39 @@ public class CachingObjectPersistentStore {
                     (mS, mK)
                             -> new MappingKvIterator<>(
                             new NavigableMapKvIterator<>(curSortedCache, mS, mK),
+                            e -> switch (e) {
+                                case CacheEntryYes pw -> new Data<>(pw.object());
+                                case CacheEntryDeleted d -> new Tombstone<>();
+                                default -> throw new IllegalStateException("Unexpected value: " + e);
+                            },
                             e -> {
-                                Log.tracev("Taken from cache: {0}", e);
-                                return e.object();
-                            }
-                    ),
+                                if (CacheEntryYes.class.isAssignableFrom(e)) {
+                                    return Data.class;
+                                } else if (CacheEntryDeleted.class.isAssignableFrom(e)) {
+                                    return Tombstone.class;
+                                } else {
+                                    throw new IllegalStateException("Unexpected type: " + e);
+                                }
+                            }),
                     (mS, mK)
-                            -> new MappingKvIterator<>(new CachingKvIterator(delegate.getIterator(mS, mK)), Data::new));
+                            -> new MappingKvIterator<>(new CachingKvIterator(delegate.getIterator(mS, mK)), Data::new, (d) -> Data.class));
         } finally {
             _lock.readLock().unlock();
         }
     }
 
-    private record CacheEntry(MaybeTombstone<JDataVersionedWrapper> object, long size) {
+    private interface CacheEntry {
+        long size();
+    }
+
+    private record CacheEntryYes(JDataVersionedWrapper object, long size) implements CacheEntry {
+    }
+
+    private record CacheEntryDeleted() implements CacheEntry {
+        @Override
+        public long size() {
+            return 16;
+        }
     }
 
     public long getLastTxId() {

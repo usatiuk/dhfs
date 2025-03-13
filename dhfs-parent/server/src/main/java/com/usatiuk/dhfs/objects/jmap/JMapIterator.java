@@ -46,6 +46,11 @@ public class JMapIterator<K extends JMapKey & Comparable<K>> implements Closeabl
     }
 
     @Override
+    public Class<? extends JMapEntry<K>> peekNextType() {
+        throw new NotImplementedException();
+    }
+
+    @Override
     public void skip() {
         if (!_hasNext) {
             throw new IllegalStateException("No next element");
@@ -55,6 +60,11 @@ public class JMapIterator<K extends JMapKey & Comparable<K>> implements Closeabl
 
     @Override
     public K peekPrevKey() {
+        throw new NotImplementedException();
+    }
+
+    @Override
+    public Class<? extends JMapEntry<K>> peekPrevType() {
         throw new NotImplementedException();
     }
 

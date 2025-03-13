@@ -27,6 +27,8 @@ public abstract class ReversibleKvIterator<K extends Comparable<K>, V> implement
 
     abstract protected Pair<K, V> nextImpl();
 
+    abstract protected Class<?> peekTypeImpl();
+
     @Override
     public K peekNextKey() {
         ensureForward();
@@ -76,4 +78,15 @@ public abstract class ReversibleKvIterator<K extends Comparable<K>, V> implement
         skipImpl();
     }
 
+    @Override
+    public Class<?> peekNextType() {
+        ensureForward();
+        return peekTypeImpl();
+    }
+
+    @Override
+    public Class<?> peekPrevType() {
+        ensureBackward();
+        return peekTypeImpl();
+    }
 }

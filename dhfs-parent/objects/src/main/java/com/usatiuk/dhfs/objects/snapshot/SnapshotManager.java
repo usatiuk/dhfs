@@ -244,6 +244,11 @@ public class SnapshotManager {
             }
 
             @Override
+            public Class<?> peekNextType() {
+                return _backing.peekNextType();
+            }
+
+            @Override
             public void skip() {
                 _backing.skip();
             }
@@ -251,6 +256,11 @@ public class SnapshotManager {
             @Override
             public JObjectKey peekPrevKey() {
                 return _backing.peekPrevKey();
+            }
+
+            @Override
+            public Class<?> peekPrevType() {
+                return _backing.peekPrevType();
             }
 
             @Override
@@ -293,10 +303,10 @@ public class SnapshotManager {
             try {
                 Log.tracev("Getting snapshot {0} iterator for {1} {2}\n" +
                         "objects in snapshots: {3}", _id, start, key, _objects);
-                return new CheckingSnapshotKvIterator(new TombstoneMergingKvIterator<>("snapshot", start, key,
+                return new CheckingSnapshotKvIterator(new TombstoneMergingKvIterator<>("snapshot", start, key, JDataVersionedWrapper.class,
                         (tS, tK) -> new SnapshotKvIterator(_objects, _id, tS, tK),
-                        (tS, tK) -> new MappingKvIterator<>(
-                                writebackStore.getIterator(tS, tK), d -> d.version() <= _id ? new Data<>(d) : new Tombstone<>())
+                        (tS, tK) -> new PredicateKvIterator<>(
+                                writebackStore.getIterator(tS, tK), tS, tK, d -> d.version() <= _id ? new Data<>(d) : null)
                 ));
             } finally {
                 _lock.readLock().unlock();

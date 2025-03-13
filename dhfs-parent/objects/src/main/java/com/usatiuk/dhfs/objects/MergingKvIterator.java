@@ -289,6 +289,28 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
         return curVal;
     }
 
+    @Override
+    protected Class<? > peekTypeImpl() {
+        switch (_firstMatchState) {
+            case FirstMatchFound<K, V> firstMatchFound -> {
+                return firstMatchFound.iterator().peekNextType();
+            }
+            case FirstMatchConsumed<K, V> firstMatchConsumed -> {
+                doHydrate();
+                break;
+            }
+            default -> {
+            }
+        }
+
+        if (_sortedIterators.isEmpty())
+            throw new NoSuchElementException();
+
+        return _goingForward
+                ? _sortedIterators.firstEntry().getValue().peekNextType()
+                : _sortedIterators.lastEntry().getValue().peekNextType();
+    }
+
 
     @Override
     public void close() {

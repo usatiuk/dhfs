@@ -465,13 +465,22 @@ public class WritebackObjectPersistentStore {
         _pendingWritesVersionLock.readLock().lock();
         try {
             var curPending = _pendingWrites.get();
-            return new TombstoneMergingKvIterator<>("writeback-ps", start, key,
+            return new TombstoneMergingKvIterator<>("writeback-ps", start, key, JDataVersionedWrapper.class,
                     (tS, tK) -> new MappingKvIterator<>(
                             new NavigableMapKvIterator<>(curPending, tS, tK),
                             e -> switch (e) {
                                 case PendingWrite pw -> new Data<>(pw.data());
                                 case PendingDelete d -> new Tombstone<>();
                                 default -> throw new IllegalStateException("Unexpected value: " + e);
+                            },
+                            e -> {
+                                if (PendingWrite.class.isAssignableFrom(e)) {
+                                    return Data.class;
+                                } else if (PendingDelete.class.isAssignableFrom(e)) {
+                                    return Tombstone.class;
+                                } else {
+                                    throw new IllegalStateException("Unexpected type: " + e);
+                                }
                             }),
                     (tS, tK) -> cachedStore.getIterator(tS, tK));
         } finally {

@@ -6,6 +6,7 @@ import com.usatiuk.dhfs.objects.snapshot.SnapshotManager;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nonnull;
@@ -75,6 +76,11 @@ public class TransactionFactoryImpl implements TransactionFactory {
             }
 
             @Override
+            public Class<? extends JData> peekNextType() {
+                throw new NotImplementedException();
+            }
+
+            @Override
             public void skip() {
                 _backing.skip();
             }
@@ -82,6 +88,11 @@ public class TransactionFactoryImpl implements TransactionFactory {
             @Override
             public JObjectKey peekPrevKey() {
                 return _backing.peekPrevKey();
+            }
+
+            @Override
+            public Class<? extends JData> peekPrevType() {
+                throw new NotImplementedException();
             }
 
             @Override
@@ -221,16 +232,26 @@ public class TransactionFactoryImpl implements TransactionFactory {
         @Override
         public CloseableKvIterator<JObjectKey, JData> getIterator(IteratorStart start, JObjectKey key) {
             Log.tracev("Getting tx iterator with start={0}, key={1}", start, key);
-            return new ReadTrackingIterator(new TombstoneMergingKvIterator<>("tx", start, key,
-                    (tS, tK) -> new MappingKvIterator<>(new NavigableMapKvIterator<>(_writes, tS, tK),
+            return new ReadTrackingIterator(new TombstoneMergingKvIterator<>("tx", start, key, ReadTrackingInternalCrap.class,
+                    (tS, tK) -> new MappingKvIterator<>(
+                            new NavigableMapKvIterator<>(_writes, tS, tK),
                             t -> switch (t) {
                                 case TxRecord.TxObjectRecordWrite<?> write ->
                                         new Data<>(new ReadTrackingInternalCrapTx(write.data()));
                                 case TxRecord.TxObjectRecordDeleted deleted -> new Tombstone<>();
                                 case null, default -> null;
+                            },
+                            e -> {
+                                if (TxRecord.TxObjectRecordWrite.class.isAssignableFrom(e)) {
+                                    return Data.class;
+                                } else if (TxRecord.TxObjectRecordDeleted.class.isAssignableFrom(e)) {
+                                    return Tombstone.class;
+                                } else {
+                                    throw new IllegalStateException("Unexpected type: " + e);
+                                }
                             }),
                     (tS, tK) -> new MappingKvIterator<>(_snapshot.getIterator(tS, tK),
-                            d -> new Data<ReadTrackingInternalCrap>(new ReadTrackingInternalCrapSource(d)))));
+                            d -> new Data<>(new ReadTrackingInternalCrapSource(d)), (t) -> Data.class)));
         }
 
         @Override

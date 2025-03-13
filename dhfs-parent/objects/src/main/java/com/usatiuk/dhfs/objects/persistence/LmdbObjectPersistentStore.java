@@ -285,6 +285,14 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             Log.tracev("Read: {0}, hasNext: {1}", ret, _hasNext);
             return ret;
         }
+
+        @Override
+        protected Class<? extends ByteString> peekTypeImpl() {
+            if (!_hasNext)
+                throw new NoSuchElementException();
+
+            return ByteString.class;
+        }
     }
 
     @Override

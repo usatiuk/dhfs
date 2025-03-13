@@ -2,20 +2,30 @@ package com.usatiuk.dhfs.objects;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.util.NoSuchElementException;
 import java.util.function.Function;
 
 public class MappingKvIterator<K extends Comparable<K>, V, V_T> implements CloseableKvIterator<K, V_T> {
     private final CloseableKvIterator<K, V> _backing;
     private final Function<V, V_T> _transformer;
+    private final Function<Class<?>, Class<?>> _classMapper;
 
-    public MappingKvIterator(CloseableKvIterator<K, V> backing, Function<V, V_T> transformer) {
+    public MappingKvIterator(CloseableKvIterator<K, V> backing, Function<V, V_T> transformer, Function<Class<?>, Class<?>> classMapper) {
         _backing = backing;
         _transformer = transformer;
+        _classMapper = classMapper;
     }
 
     @Override
     public K peekNextKey() {
         return _backing.peekNextKey();
+    }
+
+    @Override
+    public Class<?> peekNextType() {
+        if (!hasNext())
+            throw new NoSuchElementException();
+        return _classMapper.apply(_backing.peekNextType());
     }
 
     @Override
@@ -36,6 +46,13 @@ public class MappingKvIterator<K extends Comparable<K>, V, V_T> implements Close
     @Override
     public K peekPrevKey() {
         return _backing.peekPrevKey();
+    }
+
+    @Override
+    public Class<?> peekPrevType() {
+        if (!hasPrev())
+            throw new NoSuchElementException();
+        return _classMapper.apply(_backing.peekPrevType());
     }
 
     @Override

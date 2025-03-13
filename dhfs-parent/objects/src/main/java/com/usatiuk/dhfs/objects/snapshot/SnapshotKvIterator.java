@@ -187,4 +187,12 @@ public class SnapshotKvIterator extends ReversibleKvIterator<JObjectKey, MaybeTo
         return ret;
     }
 
+    @Override
+    protected Class<? extends MaybeTombstone<JDataVersionedWrapper>> peekTypeImpl() {
+        if (_next == null)
+            throw new NoSuchElementException("No more elements");
+
+        return (Class<? extends MaybeTombstone<JDataVersionedWrapper>>) _next.getValue().getClass();
+    }
+
 }

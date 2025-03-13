@@ -31,7 +31,7 @@ public class SerializingObjectPersistentStore {
     // Returns an iterator with a view of all commited objects
     // Does not have to guarantee consistent view, snapshots are handled by upper layers
     public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-        return new MappingKvIterator<>(delegateStore.getIterator(start, key), d -> serializer.deserialize(d));
+        return new MappingKvIterator<>(delegateStore.getIterator(start, key), d -> serializer.deserialize(d), (d) -> JDataVersionedWrapper.class);
     }
 
     public TxManifestRaw prepareManifest(TxManifestObj<? extends JDataVersionedWrapper> names) {

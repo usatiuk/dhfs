@@ -9,29 +9,35 @@ import java.util.List;
 public class TombstoneMergingKvIterator<K extends Comparable<K>, V> implements CloseableKvIterator<K, V> {
     private final CloseableKvIterator<K, V> _backing;
     private final String _name;
+    private final Class<?> _returnType;
 
-    public TombstoneMergingKvIterator(String name, IteratorStart startType, K startKey, List<IterProdFn<K, MaybeTombstone<V>>> iterators) {
+    public TombstoneMergingKvIterator(String name, IteratorStart startType, K startKey, List<IterProdFn<K, MaybeTombstone<V>>> iterators,
+                                      Class<?> returnType) {
         _name = name;
-        _backing = new PredicateKvIterator<>(
+        _returnType = returnType;
+        _backing = new MappingKvIterator<>(new TypePredicateKvIterator<>(
                 new MergingKvIterator<>(name + "-merging", startType, startKey, iterators),
                 startType, startKey,
-                pair -> {
-                    Log.tracev("{0} - Processing pair {1}", _name, pair);
-                    if (pair instanceof Tombstone) {
-                        return null;
-                    }
-                    return ((Data<V>) pair).value();
-                });
+                k -> {
+                    assert !k.equals(MaybeTombstone.class);
+                    assert Tombstone.class.isAssignableFrom(k) || Data.class.isAssignableFrom(k);
+                    return Data.class.isAssignableFrom(k);
+                }), t -> (V) returnType.cast(Data.class.cast(t).value()), (t) -> returnType);
     }
 
     @SafeVarargs
-    public TombstoneMergingKvIterator(String name, IteratorStart startType, K startKey, IterProdFn<K, MaybeTombstone<V>>... iterators) {
-        this(name, startType, startKey, List.of(iterators));
+    public TombstoneMergingKvIterator(String name, IteratorStart startType, K startKey, Class<?> returnType, IterProdFn<K, MaybeTombstone<V>>... iterators) {
+        this(name, startType, startKey, List.of(iterators), returnType);
     }
 
     @Override
     public K peekNextKey() {
         return _backing.peekNextKey();
+    }
+
+    @Override
+    public Class<?> peekNextType() {
+        return _returnType;
     }
 
     @Override
@@ -42,6 +48,11 @@ public class TombstoneMergingKvIterator<K extends Comparable<K>, V> implements C
     @Override
     public K peekPrevKey() {
         return _backing.peekPrevKey();
+    }
+
+    @Override
+    public Class<?> peekPrevType() {
+        return _returnType;
     }
 
     @Override

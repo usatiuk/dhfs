@@ -6,12 +6,12 @@ import org.apache.commons.lang3.tuple.Pair;
 import java.util.NoSuchElementException;
 import java.util.function.Function;
 
-public class KeyPredicateKvIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, V> {
+public class TypePredicateKvIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, V> {
     private final CloseableKvIterator<K, V> _backing;
-    private final Function<K, Boolean> _filter;
+    private final Function<Class<?>, Boolean> _filter;
     private K _next;
 
-    public KeyPredicateKvIterator(CloseableKvIterator<K, V> backing, IteratorStart start, K startKey, Function<K, Boolean> filter) {
+    public TypePredicateKvIterator(CloseableKvIterator<K, V> backing, IteratorStart start, K startKey, Function<Class<?>, Boolean> filter) {
         _goingForward = true;
         _backing = backing;
         _filter = filter;
@@ -58,15 +58,16 @@ public class KeyPredicateKvIterator<K extends Comparable<K>, V> extends Reversib
 
     private void fillNext() {
         while ((_goingForward ? _backing.hasNext() : _backing.hasPrev()) && _next == null) {
-            var next = _goingForward ? _backing.peekNextKey() : _backing.peekPrevKey();
+            var next = _goingForward ? _backing.peekNextType() : _backing.peekPrevType();
             if (!_filter.apply(next)) {
                 if (_goingForward)
                     _backing.skip();
                 else
                     _backing.skipPrev();
                 continue;
+            } else {
+                _next = _goingForward ? _backing.peekNextKey() : _backing.peekPrevKey();
             }
-            _next = next;
         }
     }
 
@@ -108,14 +109,20 @@ public class KeyPredicateKvIterator<K extends Comparable<K>, V> extends Reversib
             throw new NoSuchElementException("No more elements");
         var retKey = _next;
         _next = null;
+        var nextType = _goingForward ? _backing.peekNextType() : _backing.peekPrevType();
         var got = _goingForward ? _backing.next() : _backing.prev();
         assert got.getKey().equals(retKey);
+        assert nextType.equals(got.getValue().getClass());
+        assert _filter.apply(got.getValue().getClass());
         fillNext();
         return got;
     }
 
     @Override
-    protected Class<? > peekTypeImpl() {
+    protected Class<?> peekTypeImpl() {
+        if (_next == null)
+            throw new NoSuchElementException("No more elements");
+
         return _goingForward ? _backing.peekNextType() : _backing.peekPrevType();
     }
 
