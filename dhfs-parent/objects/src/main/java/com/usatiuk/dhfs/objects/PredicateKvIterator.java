@@ -10,12 +10,17 @@ import java.util.function.Function;
 public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends ReversibleKvIterator<K, V_T> {
     private final CloseableKvIterator<K, V> _backing;
     private final Function<V, V_T> _transformer;
-    private Pair<K, V_T> _next;
+    private Pair<K, V_T> _next = null;
+    private boolean _checkedNext = false;
 
     public PredicateKvIterator(CloseableKvIterator<K, V> backing, IteratorStart start, K startKey, Function<V, V_T> transformer) {
         _goingForward = true;
         _backing = backing;
         _transformer = transformer;
+
+        if (start == IteratorStart.GE || start == IteratorStart.GT)
+            return;
+
         fillNext();
 
         boolean shouldGoBack = false;
@@ -64,6 +69,7 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends Revers
                 continue;
             _next = Pair.of(next.getKey(), transformed);
         }
+        _checkedNext = true;
     }
 
     @Override
@@ -80,12 +86,14 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends Revers
             Log.tracev("Skipped in reverse: {0}", _next);
 
         _next = null;
-
-        fillNext();
+        _checkedNext = false;
     }
 
     @Override
     protected K peekImpl() {
+        if (!_checkedNext)
+            fillNext();
+
         if (_next == null)
             throw new NoSuchElementException();
         return _next.getKey();
@@ -93,24 +101,33 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends Revers
 
     @Override
     protected void skipImpl() {
+        if (!_checkedNext)
+            fillNext();
+
         if (_next == null)
             throw new NoSuchElementException();
         _next = null;
-        fillNext();
+        _checkedNext = false;
     }
 
     @Override
     protected boolean hasImpl() {
+        if (!_checkedNext)
+            fillNext();
+
         return _next != null;
     }
 
     @Override
     protected Pair<K, V_T> nextImpl() {
+        if (!_checkedNext)
+            fillNext();
+
         if (_next == null)
             throw new NoSuchElementException("No more elements");
         var ret = _next;
         _next = null;
-        fillNext();
+        _checkedNext = false;
         return ret;
     }
 

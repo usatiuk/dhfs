@@ -20,7 +20,12 @@ public class SnapshotKvIterator extends ReversibleKvIterator<JObjectKey, MaybeTo
         _objects = objects;
         _version = version;
         _goingForward = true;
-        _backing = new NavigableMapKvIterator<>(_objects, start, new SnapshotKey(startKey, Long.MIN_VALUE));
+        if (start == IteratorStart.LT || start == IteratorStart.GE)
+            _backing = new NavigableMapKvIterator<>(_objects, start, new SnapshotKey(startKey, Long.MIN_VALUE));
+        else if (start == IteratorStart.GT || start == IteratorStart.LE)
+            _backing = new NavigableMapKvIterator<>(_objects, start, new SnapshotKey(startKey, Long.MAX_VALUE));
+        else
+            throw new UnsupportedOperationException();
         fill();
 
         boolean shouldGoBack = false;
