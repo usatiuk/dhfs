@@ -111,29 +111,37 @@ public class JObjectManager {
                     }
                     writes.putAll(currentIteration);
                 } while (somethingChanged);
-
-                if (writes.isEmpty()) {
-                    Log.trace("Committing transaction - no changes");
-                    return new TransactionHandle() {
-                        @Override
-                        public void onFlush(Runnable runnable) {
-                            runnable.run();
-                        }
-                    };
-                }
-
-            } finally {
-                readSet = tx.reads();
-
-                Stream.concat(readSet.keySet().stream(), writes.keySet().stream())
-                        .sorted(Comparator.comparing(JObjectKey::toString))
-                        .forEach(addDependency);
-
-                for (var read : readSet.entrySet()) {
+            } catch (Throwable e) {
+                for (var read : tx.reads().entrySet()) {
                     if (read.getValue() instanceof TransactionObjectLocked<?> locked) {
                         toUnlock.add(locked.lock());
                     }
                 }
+                throw e;
+            }
+
+            readSet = tx.reads();
+
+            if (!writes.isEmpty()) {
+                Stream.concat(readSet.keySet().stream(), writes.keySet().stream())
+                        .sorted(Comparator.comparing(JObjectKey::toString))
+                        .forEach(addDependency);
+            }
+
+            for (var read : readSet.entrySet()) {
+                if (read.getValue() instanceof TransactionObjectLocked<?> locked) {
+                    toUnlock.add(locked.lock());
+                }
+            }
+
+            if (writes.isEmpty()) {
+                Log.trace("Committing transaction - no changes");
+                return new TransactionHandle() {
+                    @Override
+                    public void onFlush(Runnable runnable) {
+                        runnable.run();
+                    }
+                };
             }
 
             Log.trace("Committing transaction start");
