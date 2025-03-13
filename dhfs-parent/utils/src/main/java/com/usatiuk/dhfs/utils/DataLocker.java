@@ -1,6 +1,8 @@
 package com.usatiuk.dhfs.utils;
 
 import io.quarkus.logging.Log;
+import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 
 import java.lang.ref.Cleaner;
 import java.util.concurrent.ConcurrentHashMap;
@@ -10,6 +12,7 @@ public class DataLocker {
     };
     private final ConcurrentHashMap<Object, LockTag> _locks = new ConcurrentHashMap<>();
 
+    @Nonnull
     public AutoCloseableNoThrow lock(Object data) {
         while (true) {
             try {
@@ -26,6 +29,30 @@ public class DataLocker {
                     }
                 }
             } catch (InterruptedException ignored) {
+            }
+
+            var newTag = new LockTag();
+            var oldTag = _locks.putIfAbsent(data, newTag);
+            if (oldTag == null) {
+                return new Lock(data, newTag);
+            }
+        }
+    }
+
+    @Nullable
+    public AutoCloseableNoThrow tryLock(Object data) {
+        while (true) {
+            var tag = _locks.get(data);
+            if (tag != null) {
+                synchronized (tag) {
+                    if (!tag.released) {
+                        if (tag.owner == Thread.currentThread()) {
+                            return DUMMY_LOCK;
+                        }
+                        return null;
+                    }
+                    continue;
+                }
             }
 
             var newTag = new LockTag();
