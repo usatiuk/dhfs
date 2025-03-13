@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.objects;
 import com.usatiuk.dhfs.objects.persistence.CachingObjectPersistentStore;
 import com.usatiuk.dhfs.objects.persistence.IteratorStart;
 import com.usatiuk.dhfs.objects.persistence.TxManifestObj;
+import com.usatiuk.dhfs.objects.snapshot.Snapshot;
 import com.usatiuk.dhfs.objects.transaction.TxRecord;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
@@ -457,25 +458,72 @@ public class WritebackObjectPersistentStore {
         return r -> asyncFence(bundleId, r);
     }
 
-    // Returns an iterator with a view of all commited objects
-    // Does not have to guarantee consistent view, snapshots are handled by upper layers
-    // Invalidated by commitBundle, but might return data after it has been really committed
-    public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-        Log.tracev("Getting writeback iterator: {0}, {1}", start, key);
-        _pendingWritesVersionLock.readLock().lock();
+
+    public Snapshot<JObjectKey, JDataVersionedWrapper> getSnapshot() {
+        PSortedMap<JObjectKey, PendingWriteEntry> pendingWrites;
+        Snapshot<JObjectKey, JDataVersionedWrapper> cache = null;
+        long lastTxId;
+
         try {
-            var curPending = _pendingWrites.get();
-            return new TombstoneMergingKvIterator<>("writeback-ps", start, key,
-                    (tS, tK) -> new MappingKvIterator<>(
-                            new NavigableMapKvIterator<>(curPending, tS, tK),
-                            e -> switch (e) {
-                                case PendingWrite pw -> new Data<>(pw.data());
-                                case PendingDelete d -> new Tombstone<>();
-                                default -> throw new IllegalStateException("Unexpected value: " + e);
-                            }),
-                    (tS, tK) -> cachedStore.getIterator(tS, tK));
-        } finally {
-            _pendingWritesVersionLock.readLock().unlock();
+            _pendingWritesVersionLock.readLock().lock();
+            try {
+                pendingWrites = _pendingWrites.get();
+                cache = cachedStore.getSnapshot();
+                lastTxId = getLastTxId();
+            } finally {
+                _pendingWritesVersionLock.readLock().unlock();
+            }
+
+            Snapshot<JObjectKey, JDataVersionedWrapper> finalCache = cache;
+            return new Snapshot<JObjectKey, JDataVersionedWrapper>() {
+                private final PSortedMap<JObjectKey, PendingWriteEntry> _pendingWrites = pendingWrites;
+                private final Snapshot<JObjectKey, JDataVersionedWrapper> _cache = finalCache;
+                private final long txId = lastTxId;
+
+                @Override
+                public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
+                    return new TombstoneMergingKvIterator<>("writeback-ps", start, key,
+                            (tS, tK) -> new MappingKvIterator<>(
+                                    new NavigableMapKvIterator<>(_pendingWrites, tS, tK),
+                                    e -> switch (e) {
+                                        case PendingWrite pw -> new Data<>(pw.data());
+                                        case PendingDelete d -> new Tombstone<>();
+                                        default -> throw new IllegalStateException("Unexpected value: " + e);
+                                    }),
+                            (tS, tK) -> new MappingKvIterator<>(_cache.getIterator(tS, tK), Data::new));
+                }
+
+                @Nonnull
+                @Override
+                public Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
+                    var cached = _pendingWrites.get(name);
+                    if (cached != null) {
+                        return switch (cached) {
+                            case PendingWrite c -> Optional.of(c.data());
+                            case PendingDelete d -> {
+                                yield Optional.empty();
+                            }
+                            default -> throw new IllegalStateException("Unexpected value: " + cached);
+                        };
+                    }
+                    return _cache.readObject(name);
+                }
+
+                @Override
+                public long id() {
+                    assert lastTxId >= _cache.id();
+                    return lastTxId;
+                }
+
+                @Override
+                public void close() {
+                    _cache.close();
+                }
+            };
+        } catch (Throwable e) {
+            if (cache != null)
+                cache.close();
+            throw e;
         }
     }
 

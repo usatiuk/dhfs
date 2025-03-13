@@ -1,7 +1,9 @@
 package com.usatiuk.dhfs.objects.transaction;
 
 import com.usatiuk.dhfs.objects.JData;
+import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
 import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.snapshot.Snapshot;
 import com.usatiuk.dhfs.objects.snapshot.SnapshotManager;
 import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
 
@@ -19,5 +21,5 @@ public interface TransactionPrivate extends Transaction, TransactionHandlePrivat
 
     Collection<Runnable> getOnCommit();
 
-    SnapshotManager.Snapshot snapshot();
+    Snapshot<JObjectKey, JDataVersionedWrapper> snapshot();
 }

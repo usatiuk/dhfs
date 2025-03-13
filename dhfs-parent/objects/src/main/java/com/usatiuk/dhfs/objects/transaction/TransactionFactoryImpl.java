@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.objects.transaction;
 
 import com.usatiuk.dhfs.objects.*;
 import com.usatiuk.dhfs.objects.persistence.IteratorStart;
+import com.usatiuk.dhfs.objects.snapshot.Snapshot;
 import com.usatiuk.dhfs.objects.snapshot.SnapshotManager;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -50,13 +51,15 @@ public class TransactionFactoryImpl implements TransactionFactory {
     }
 
     private class TransactionImpl implements TransactionPrivate {
+        private boolean _closed = false;
+
         private final Map<JObjectKey, TransactionObject<?>> _readSet = new HashMap<>();
         private final NavigableMap<JObjectKey, TxRecord.TxObjectRecord<?>> _writes = new TreeMap<>();
 
         private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _newWrites = new HashMap<>();
         private final List<Runnable> _onCommit = new ArrayList<>();
         private final List<Runnable> _onFlush = new ArrayList<>();
-        private final SnapshotManager.Snapshot _snapshot;
+        private final Snapshot<JObjectKey, JDataVersionedWrapper> _snapshot;
 
         private TransactionImpl() {
             _snapshot = snapshotManager.createSnapshot();
@@ -139,7 +142,7 @@ public class TransactionFactoryImpl implements TransactionFactory {
         }
 
         @Override
-        public SnapshotManager.Snapshot snapshot() {
+        public Snapshot<JObjectKey, JDataVersionedWrapper> snapshot() {
             return _snapshot;
         }
 
@@ -253,6 +256,8 @@ public class TransactionFactoryImpl implements TransactionFactory {
 
         @Override
         public void close() {
+            if (_closed) return;
+            _closed = true;
             _snapshot.close();
         }
     }

@@ -1,11 +1,18 @@
 package com.usatiuk.dhfs.objects.persistence;
 
+import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.objects.*;
+import com.usatiuk.dhfs.objects.snapshot.Snapshot;
+import com.usatiuk.dhfs.utils.RefcountedCloseable;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
+import org.lmdbjava.Txn;
 
 import javax.annotation.Nonnull;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -28,12 +35,6 @@ public class SerializingObjectPersistentStore {
         return delegateStore.readObject(name).map(serializer::deserialize);
     }
 
-    // Returns an iterator with a view of all commited objects
-    // Does not have to guarantee consistent view, snapshots are handled by upper layers
-    public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-        return new MappingKvIterator<>(delegateStore.getIterator(start, key), d -> serializer.deserialize(d));
-    }
-
     public TxManifestRaw prepareManifest(TxManifestObj<? extends JDataVersionedWrapper> names) {
         return new TxManifestRaw(
                 names.written().stream()
@@ -41,6 +42,35 @@ public class SerializingObjectPersistentStore {
                         .toList()
                 , names.deleted());
     }
+
+    public Snapshot<JObjectKey, JDataVersionedWrapper> getSnapshot() {
+        return new Snapshot<JObjectKey, JDataVersionedWrapper>() {
+            private final Snapshot<JObjectKey, ByteString> _backing = delegateStore.getSnapshot();
+
+            @Override
+            public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
+                return new MappingKvIterator<>(_backing.getIterator(start, key), d -> serializer.deserialize(d));
+            }
+
+            @Nonnull
+            @Override
+            public Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
+                return _backing.readObject(name).map(serializer::deserialize);
+            }
+
+            @Override
+            public long id() {
+                return _backing.id();
+            }
+
+            @Override
+            public void close() {
+                _backing.close();
+            }
+        };
+
+    }
+
 
 //    void commitTx(TxManifestObj<? extends JDataVersionedWrapper> names, Consumer<Runnable> commitLocked) {
 //        delegateStore.commitTx(prepareManifest(names), commitLocked);

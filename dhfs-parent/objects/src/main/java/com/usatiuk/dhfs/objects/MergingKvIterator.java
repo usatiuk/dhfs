@@ -54,6 +54,9 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
                 }
                 iteratorsTmp.put(iterator, counter++);
             }
+            for (var prodFn : iterators) {
+                prodFn.close();
+            }
             _iterators = Map.copyOf(iteratorsTmp);
             _pendingIterators = null;
         }
@@ -129,6 +132,9 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
                 iteratorsTmp.put(iterator, counter++);
             }
             _iterators = Map.copyOf(iteratorsTmp);
+            for (var prodFn : _pendingIterators) {
+                prodFn.close();
+            }
         }
 
         doInitialAdvance();

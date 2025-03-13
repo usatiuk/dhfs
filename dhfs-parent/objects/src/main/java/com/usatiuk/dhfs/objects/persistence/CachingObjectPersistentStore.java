@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects.persistence;
 
 import com.usatiuk.dhfs.objects.*;
+import com.usatiuk.dhfs.objects.snapshot.Snapshot;
 import com.usatiuk.dhfs.utils.DataLocker;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.Startup;
@@ -102,7 +103,9 @@ public class CachingObjectPersistentStore {
 
     public void commitTx(TxManifestObj<? extends JDataVersionedWrapper> names, long txId) {
         var serialized = delegate.prepareManifest(names);
+
         Log.tracev("Committing: {0} writes, {1} deletes", names.written().size(), names.deleted().size());
+        // A little complicated locking to minimize write lock holding time
         delegate.commitTx(serialized, txId, (commit) -> {
             _lock.writeLock().lock();
             try {
@@ -122,14 +125,13 @@ public class CachingObjectPersistentStore {
         Log.tracev("Committed: {0} writes, {1} deletes", names.written().size(), names.deleted().size());
     }
 
-
     private class CachingKvIterator implements CloseableKvIterator<JObjectKey, JDataVersionedWrapper> {
         private final CloseableKvIterator<JObjectKey, JDataVersionedWrapper> _delegate;
-        // This should be created under lock
-        private final long _curCacheVersion = _cacheVersion;
+        private final long _curCacheVersion;
 
-        private CachingKvIterator(CloseableKvIterator<JObjectKey, JDataVersionedWrapper> delegate) {
+        private CachingKvIterator(CloseableKvIterator<JObjectKey, JDataVersionedWrapper> delegate, long cacheVersion) {
             _delegate = delegate;
+            _curCacheVersion = cacheVersion;
         }
 
         @Override
@@ -196,28 +198,74 @@ public class CachingObjectPersistentStore {
         }
     }
 
-    // Returns an iterator with a view of all commited objects
-    // Does not have to guarantee consistent view, snapshots are handled by upper layers
-    // Warning: it has a nasty side effect of global caching, so in this case don't even call next on it,
-    // if some objects are still in writeback
-    public CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>> getIterator(IteratorStart start, JObjectKey key) {
-        _lock.readLock().lock();
+    public Snapshot<JObjectKey, JDataVersionedWrapper> getSnapshot() {
+        TreePMap<JObjectKey, CacheEntry> curSortedCache;
+        Snapshot<JObjectKey, JDataVersionedWrapper> backing = null;
+        long cacheVersion;
+
         try {
-            Log.tracev("Getting cache iterator: {0}, {1}", start, key);
-            var curSortedCache = _sortedCache;
-            return new MergingKvIterator<>("cache", start, key,
-                    (mS, mK)
-                            -> new MappingKvIterator<>(
-                            new NavigableMapKvIterator<>(curSortedCache, mS, mK),
-                            e -> {
-                                Log.tracev("Taken from cache: {0}", e);
-                                return e.object();
+            Log.tracev("Getting cache snapshot");
+            // Decrease the lock time as much as possible
+            _lock.readLock().lock();
+            try {
+                curSortedCache = _sortedCache;
+                cacheVersion = _cacheVersion;
+                backing = delegate.getSnapshot();
+            } finally {
+                _lock.readLock().unlock();
+            }
+
+            Snapshot<JObjectKey, JDataVersionedWrapper> finalBacking = backing;
+            return new Snapshot<JObjectKey, JDataVersionedWrapper>() {
+                private final TreePMap<JObjectKey, CacheEntry> _curSortedCache = curSortedCache;
+                private final Snapshot<JObjectKey, JDataVersionedWrapper> _backing = finalBacking;
+                private final long _cacheVersion = cacheVersion;
+
+                @Override
+                public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
+                    return new TombstoneMergingKvIterator<>("cache", start, key,
+                            (mS, mK)
+                                    -> new MappingKvIterator<>(
+                                    new NavigableMapKvIterator<>(_curSortedCache, mS, mK),
+                                    e -> {
+                                        Log.tracev("Taken from cache: {0}", e);
+                                        return e.object();
+                                    }
+                            ),
+                            (mS, mK) -> new MappingKvIterator<>(new CachingKvIterator(_backing.getIterator(start, key), _cacheVersion), Data::new));
+                }
+
+                @Nonnull
+                @Override
+                public Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
+                    var cached = _curSortedCache.get(name);
+                    if (cached != null) {
+                        return switch (cached.object()) {
+                            case Data<JDataVersionedWrapper> data -> Optional.of(data.value());
+                            case Tombstone<JDataVersionedWrapper> tombstone -> {
+                                yield Optional.empty();
                             }
-                    ),
-                    (mS, mK)
-                            -> new MappingKvIterator<>(new CachingKvIterator(delegate.getIterator(mS, mK)), Data::new));
-        } finally {
-            _lock.readLock().unlock();
+                            default -> throw new IllegalStateException("Unexpected value: " + cached.object());
+                        };
+                    }
+                    return _backing.readObject(name);
+                }
+
+                @Override
+                public long id() {
+                    return _backing.id();
+                }
+
+                @Override
+                public void close() {
+                    _backing.close();
+                }
+            };
+        } catch (Throwable ex) {
+            if (backing != null) {
+                backing.close();
+            }
+            throw ex;
         }
     }
 
