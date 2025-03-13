@@ -35,9 +35,9 @@ public class JKleppmannTreeManager {
     @Inject
     PeerInfoService peerInfoService;
 
-    public JKleppmannTree getTree(JObjectKey name) {
+    public JKleppmannTree getTree(JObjectKey name, LockingStrategy lockingStrategy) {
         return txManager.executeTx(() -> {
-            var data = curTx.get(JKleppmannTreePersistentData.class, name, LockingStrategy.WRITE).orElse(null);
+            var data = curTx.get(JKleppmannTreePersistentData.class, name, lockingStrategy).orElse(null);
             if (data == null) {
                 data = new JKleppmannTreePersistentData(
                         name,
@@ -57,6 +57,10 @@ public class JKleppmannTreeManager {
             return new JKleppmannTree(data);
 //            opObjectRegistry.registerObject(tree);
         });
+    }
+
+    public JKleppmannTree getTree(JObjectKey name) {
+        return getTree(name, LockingStrategy.WRITE);
     }
 
     public class JKleppmannTree {

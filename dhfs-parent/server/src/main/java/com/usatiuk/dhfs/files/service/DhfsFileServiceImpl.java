@@ -75,8 +75,12 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Inject
     JMapHelper jMapHelper;
 
-    private JKleppmannTreeManager.JKleppmannTree getTree() {
+    private JKleppmannTreeManager.JKleppmannTree getTreeW() {
         return jKleppmannTreeManager.getTree(new JObjectKey("fs"));
+    }
+
+    private JKleppmannTreeManager.JKleppmannTree getTreeR() {
+        return jKleppmannTreeManager.getTree(new JObjectKey("fs"), LockingStrategy.OPTIMISTIC);
     }
 
     private ChunkData createChunk(ByteString bytes) {
@@ -87,18 +91,25 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     void init(@Observes @Priority(500) StartupEvent event) {
         Log.info("Initializing file service");
-        getTree();
+        getTreeW();
     }
 
-    private JKleppmannTreeNode getDirEntry(String name) {
-        var res = getTree().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
+    private JKleppmannTreeNode getDirEntryW(String name) {
+        var res = getTreeW().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
+        if (res == null) throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
+        var ret = curTx.get(JKleppmannTreeNode.class, res).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
+        return ret;
+    }
+
+    private JKleppmannTreeNode getDirEntryR(String name) {
+        var res = getTreeR().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
         if (res == null) throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
         var ret = curTx.get(JKleppmannTreeNode.class, res).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
         return ret;
     }
 
     private Optional<JKleppmannTreeNode> getDirEntryOpt(String name) {
-        var res = getTree().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
+        var res = getTreeW().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
         if (res == null) return Optional.empty();
         var ret = curTx.get(JKleppmannTreeNode.class, res);
         return ret;
@@ -130,7 +141,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     public Optional<JObjectKey> open(String name) {
         return jObjectTxManager.executeTx(() -> {
             try {
-                var ret = getDirEntry(name);
+                var ret = getDirEntryR(name);
                 return switch (ret.meta()) {
                     case JKleppmannTreeNodeMetaFile f -> Optional.of(f.getFileIno());
                     case JKleppmannTreeNodeMetaDirectory f -> Optional.of(ret.key());
@@ -154,7 +165,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     public Optional<JObjectKey> create(String name, long mode) {
         return jObjectTxManager.executeTx(() -> {
             Path path = Path.of(name);
-            var parent = getDirEntry(path.getParent().toString());
+            var parent = getDirEntryW(path.getParent().toString());
 
             ensureDir(parent);
 
@@ -166,7 +177,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             remoteTx.putData(f);
 
             try {
-                getTree().move(parent.key(), new JKleppmannTreeNodeMetaFile(fname, f.key()), getTree().getNewNodeId());
+                getTreeW().move(parent.key(), new JKleppmannTreeNodeMetaFile(fname, f.key()), getTreeW().getNewNodeId());
             } catch (Exception e) {
 //                fobj.getMeta().removeRef(newNodeId);
                 throw e;
@@ -179,7 +190,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Override
     public Pair<String, JObjectKey> inoToParent(JObjectKey ino) {
         return jObjectTxManager.executeTx(() -> {
-            return getTree().findParent(w -> {
+            return getTreeW().findParent(w -> {
                 if (w.meta() instanceof JKleppmannTreeNodeMetaFile f)
                     return f.getFileIno().equals(ino);
                 return false;
@@ -191,14 +202,14 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     public void mkdir(String name, long mode) {
         jObjectTxManager.executeTx(() -> {
             Path path = Path.of(name);
-            var parent = getDirEntry(path.getParent().toString());
+            var parent = getDirEntryW(path.getParent().toString());
             ensureDir(parent);
 
             String dname = path.getFileName().toString();
 
             Log.debug("Creating directory " + name);
 
-            getTree().move(parent.key(), new JKleppmannTreeNodeMetaDirectory(dname), getTree().getNewNodeId());
+            getTreeW().move(parent.key(), new JKleppmannTreeNodeMetaDirectory(dname), getTreeW().getNewNodeId());
         });
     }
 
@@ -210,21 +221,21 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 if (!allowRecursiveDelete && !node.children().isEmpty())
                     throw new DirectoryNotEmptyException();
             }
-            getTree().trash(node.meta(), node.key());
+            getTreeW().trash(node.meta(), node.key());
         });
     }
 
     @Override
     public Boolean rename(String from, String to) {
         return jObjectTxManager.executeTx(() -> {
-            var node = getDirEntry(from);
+            var node = getDirEntryW(from);
             JKleppmannTreeNodeMeta meta = node.meta();
 
             var toPath = Path.of(to);
-            var toDentry = getDirEntry(toPath.getParent().toString());
+            var toDentry = getDirEntryW(toPath.getParent().toString());
             ensureDir(toDentry);
 
-            getTree().move(toDentry.key(), meta.withName(toPath.getFileName().toString()), node.key());
+            getTreeW().move(toDentry.key(), meta.withName(toPath.getFileName().toString()), node.key());
             return true;
         });
     }
@@ -253,7 +264,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Override
     public Iterable<String> readDir(String name) {
         return jObjectTxManager.executeTx(() -> {
-            var found = getDirEntry(name);
+            var found = getDirEntryW(name);
 
             if (!(found.meta() instanceof JKleppmannTreeNodeMetaDirectory md))
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
@@ -696,7 +707,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     public JObjectKey symlink(String oldpath, String newpath) {
         return jObjectTxManager.executeTx(() -> {
             Path path = Path.of(newpath);
-            var parent = getDirEntry(path.getParent().toString());
+            var parent = getDirEntryW(path.getParent().toString());
 
             ensureDir(parent);
 
@@ -710,7 +721,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             jMapHelper.put(f, JMapLongKey.of(0), newChunkData.key());
 
             remoteTx.putData(f);
-            getTree().move(parent.key(), new JKleppmannTreeNodeMetaFile(fname, f.key()), getTree().getNewNodeId());
+            getTreeW().move(parent.key(), new JKleppmannTreeNodeMetaFile(fname, f.key()), getTreeW().getNewNodeId());
             return f.key();
         });
     }
