@@ -5,5 +5,5 @@ import io.quarkus.test.junit.TestProfile;
 
 @QuarkusTest
 @TestProfile(Profiles.ObjectsTestProfileExtraChecks.class)
-public class ObjectsTestExtraChecks extends ObjectsTestImpl {
+public class ObjectsTestExtraChecksTest extends ObjectsTestImpl {
 }
