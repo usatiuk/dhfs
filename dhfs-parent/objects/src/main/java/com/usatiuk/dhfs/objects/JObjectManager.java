@@ -170,6 +170,11 @@ public class JObjectManager {
 
             if (writes.isEmpty()) {
                 Log.trace("Committing transaction - no changes");
+
+                for (var callback : tx.getOnCommit()) {
+                    callback.run();
+                }
+
                 return new TransactionHandle() {
                     @Override
                     public void onFlush(Runnable runnable) {
