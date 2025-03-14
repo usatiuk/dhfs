@@ -60,4 +60,5 @@ public class JMapRefcounterTxHook implements PreCommitTxHook {
         curTx.put(referencedOld.withRefsFrom(referencedOld.refsFrom().minus(key)));
         Log.tracev("Removed ref from {0} to {1}", key, oldRef);
     }
+
 }

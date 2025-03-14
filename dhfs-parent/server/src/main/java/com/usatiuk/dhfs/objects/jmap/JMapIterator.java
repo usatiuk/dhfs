@@ -50,6 +50,7 @@ public class JMapIterator<K extends JMapKey & Comparable<K>> implements Closeabl
         if (!_hasNext) {
             throw new IllegalStateException("No next element");
         }
+        _backing.skip();
         advance();
     }
 
