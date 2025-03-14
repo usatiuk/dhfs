@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects.repository;
 
 import com.usatiuk.dhfs.objects.PeerId;
-import com.usatiuk.dhfs.objects.TransactionManager;
+import com.usatiuk.dhfs.objects.transaction.TransactionManager;
 import com.usatiuk.dhfs.objects.repository.peerdiscovery.PeerAddress;
 import com.usatiuk.dhfs.objects.repository.peerdiscovery.PeerDiscoveryDirectory;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerInfo;

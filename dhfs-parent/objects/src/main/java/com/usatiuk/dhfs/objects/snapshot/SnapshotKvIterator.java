@@ -1,7 +1,8 @@
 package com.usatiuk.dhfs.objects.snapshot;
 
 import com.usatiuk.dhfs.objects.*;
-import com.usatiuk.dhfs.objects.persistence.IteratorStart;
+import com.usatiuk.dhfs.objects.iterators.*;
+import com.usatiuk.dhfs.objects.iterators.IteratorStart;
 import io.quarkus.logging.Log;
 import org.apache.commons.lang3.tuple.Pair;
 

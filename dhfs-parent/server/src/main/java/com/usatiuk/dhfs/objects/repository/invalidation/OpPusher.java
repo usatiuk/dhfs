@@ -3,7 +3,7 @@ package com.usatiuk.dhfs.objects.repository.invalidation;
 import com.usatiuk.dhfs.objects.JData;
 import com.usatiuk.dhfs.objects.RemoteObjectMeta;
 import com.usatiuk.dhfs.objects.RemoteTransaction;
-import com.usatiuk.dhfs.objects.TransactionManager;
+import com.usatiuk.dhfs.objects.transaction.TransactionManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreePersistentData;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;

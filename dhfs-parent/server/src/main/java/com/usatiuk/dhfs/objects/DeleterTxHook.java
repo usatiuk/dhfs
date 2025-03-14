@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.objects;
 
+import com.usatiuk.dhfs.objects.transaction.PreCommitTxHook;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;

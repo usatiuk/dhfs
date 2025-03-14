@@ -3,7 +3,7 @@ package com.usatiuk.dhfs.objects.repository.peersync;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.PeerId;
 import com.usatiuk.dhfs.objects.RemoteTransaction;
-import com.usatiuk.dhfs.objects.TransactionManager;
+import com.usatiuk.dhfs.objects.transaction.TransactionManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;

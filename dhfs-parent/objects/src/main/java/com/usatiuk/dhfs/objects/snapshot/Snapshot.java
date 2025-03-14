@@ -1,9 +1,9 @@
 package com.usatiuk.dhfs.objects.snapshot;
 
 import com.usatiuk.dhfs.objects.*;
-import com.usatiuk.dhfs.objects.persistence.IteratorStart;
+import com.usatiuk.dhfs.objects.iterators.CloseableKvIterator;
+import com.usatiuk.dhfs.objects.iterators.IteratorStart;
 import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
-import io.quarkus.logging.Log;
 
 import javax.annotation.Nonnull;
 import java.util.Optional;

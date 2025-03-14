@@ -1,8 +1,8 @@
 package com.usatiuk.dhfs.objects.jmap;
 
-import com.usatiuk.dhfs.objects.CloseableKvIterator;
+import com.usatiuk.dhfs.objects.iterators.CloseableKvIterator;
 import com.usatiuk.dhfs.objects.JObjectKey;
-import com.usatiuk.dhfs.objects.persistence.IteratorStart;
+import com.usatiuk.dhfs.objects.iterators.IteratorStart;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

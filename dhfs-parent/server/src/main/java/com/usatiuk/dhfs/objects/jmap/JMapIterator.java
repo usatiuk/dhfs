@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.objects.jmap;
 
-import com.usatiuk.dhfs.objects.CloseableKvIterator;
+import com.usatiuk.dhfs.objects.iterators.CloseableKvIterator;
 import com.usatiuk.dhfs.objects.JData;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import org.apache.commons.lang3.NotImplementedException;
