@@ -1,16 +1,17 @@
 package com.usatiuk.dhfs.objects;
 
-import com.google.protobuf.ByteString;
-import com.usatiuk.dhfs.utils.SerializationHelper;
+import java.util.function.Supplier;
 
 public class JDataVersionedWrapperLazy implements JDataVersionedWrapper {
     private final long _version;
-    private ByteString _rawData;
+    private final int _estimatedSize;
+    private Supplier<JData> _producer;
     private JData _data;
 
-    public JDataVersionedWrapperLazy(long version, ByteString rawData) {
+    public JDataVersionedWrapperLazy(long version, int estimatedSize, Supplier<JData> producer) {
         _version = version;
-        _rawData = rawData;
+        _estimatedSize = estimatedSize;
+        _producer = producer;
     }
 
     public JData data() {
@@ -21,12 +22,8 @@ public class JDataVersionedWrapperLazy implements JDataVersionedWrapper {
             if (_data != null)
                 return _data;
 
-            try (var is = _rawData.newInput()) {
-                _data = SerializationHelper.deserialize(is);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-            _rawData = null;
+            _data = _producer.get();
+            _producer = null;
             return _data;
         }
     }
@@ -37,8 +34,6 @@ public class JDataVersionedWrapperLazy implements JDataVersionedWrapper {
 
     @Override
     public int estimateSize() {
-        if (_data != null)
-            return _data.estimateSize();
-        return _rawData.size();
+        return _estimatedSize;
     }
 }

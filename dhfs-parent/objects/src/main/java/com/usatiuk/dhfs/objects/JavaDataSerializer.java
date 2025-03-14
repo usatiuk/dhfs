@@ -3,24 +3,25 @@ package com.usatiuk.dhfs.objects;
 
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.utils.SerializationHelper;
+import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
 
-import java.nio.ByteBuffer;
+import java.io.IOException;
 
 @ApplicationScoped
-public class JavaDataSerializer implements ObjectSerializer<JDataVersionedWrapper> {
+@DefaultBean
+public class JavaDataSerializer implements ObjectSerializer<JData> {
     @Override
-    public ByteString serialize(JDataVersionedWrapper obj) {
-        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
-        buffer.putLong(obj.version());
-        buffer.flip();
-        return ByteString.copyFrom(buffer).concat(SerializationHelper.serialize(obj.data()));
+    public ByteString serialize(JData obj) {
+        return SerializationHelper.serialize(obj);
     }
 
     @Override
-    public JDataVersionedWrapper deserialize(ByteString data) {
-        var version = data.substring(0, Long.BYTES).asReadOnlyByteBuffer().getLong();
-        var rawData = data.substring(Long.BYTES);
-        return new JDataVersionedWrapperLazy(version, rawData);
+    public JData deserialize(ByteString data) {
+        try (var is = data.newInput()) {
+            return SerializationHelper.deserialize(is);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
