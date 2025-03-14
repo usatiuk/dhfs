@@ -90,22 +90,6 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
 
     @Nonnull
     @Override
-    public Collection<JObjectKey> findAllObjects() {
-//        try (Txn<ByteBuffer> txn = env.txnRead()) {
-//            try (var cursor = db.openCursor(txn)) {
-//                var keys = List.of();
-//                while (cursor.next()) {
-//                    keys.add(JObjectKey.fromBytes(cursor.key()));
-//                }
-//                return keys;
-//            }
-//        }
-        return List.of();
-    }
-
-
-    @Nonnull
-    @Override
     public Optional<ByteString> readObject(JObjectKey name) {
         verifyReady();
         try (Txn<ByteBuffer> txn = _env.txnRead()) {

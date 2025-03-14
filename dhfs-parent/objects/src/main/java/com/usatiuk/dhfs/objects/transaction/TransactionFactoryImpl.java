@@ -214,13 +214,6 @@ public class TransactionFactoryImpl implements TransactionFactory {
             _newWrites.put(key, new TxRecord.TxObjectRecordDeleted(key));
         }
 
-        @Nonnull
-        @Override
-        public Collection<JObjectKey> findAllObjects() {
-//            return store.findAllObjects();
-            return List.of();
-        }
-
         @Override
         public CloseableKvIterator<JObjectKey, JData> getIterator(IteratorStart start, JObjectKey key) {
             Log.tracev("Getting tx iterator with start={0}, key={1}", start, key);

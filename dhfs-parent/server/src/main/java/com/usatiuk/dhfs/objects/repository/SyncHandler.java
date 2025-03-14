@@ -78,7 +78,13 @@ public class SyncHandler {
 
     public void doInitialSync(PeerId peer) {
         txm.run(() -> {
-            for (var cur : curTx.findAllObjects()) invalidationQueueService.pushInvalidationToOne(peer, cur, true);
+            try (var it = curTx.getIterator(IteratorStart.GE, JObjectKey.first())) {
+                while (it.hasNext()) {
+                    var key = it.peekNextKey();
+                    invalidationQueueService.pushInvalidationToOne(peer, key, true);
+                    it.skip();
+                }
+            }
         });
     }
 }

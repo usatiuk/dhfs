@@ -26,11 +26,6 @@ public class SerializingObjectPersistentStore {
     ObjectPersistentStore delegateStore;
 
     @Nonnull
-    Collection<JObjectKey> findAllObjects() {
-        return delegateStore.findAllObjects();
-    }
-
-    @Nonnull
     Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
         return delegateStore.readObject(name).map(serializer::deserialize);
     }

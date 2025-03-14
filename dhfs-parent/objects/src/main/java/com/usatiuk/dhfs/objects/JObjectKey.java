@@ -11,6 +11,10 @@ public record JObjectKey(String name) implements Serializable, Comparable<JObjec
         return new JObjectKey(name);
     }
 
+    public static JObjectKey first() {
+        return new JObjectKey("");
+    }
+
     @Override
     public int compareTo(JObjectKey o) {
         return name.compareTo(o.name);

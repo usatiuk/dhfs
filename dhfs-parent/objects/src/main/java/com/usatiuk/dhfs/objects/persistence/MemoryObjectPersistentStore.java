@@ -26,14 +26,6 @@ public class MemoryObjectPersistentStore implements ObjectPersistentStore {
 
     @Nonnull
     @Override
-    public Collection<JObjectKey> findAllObjects() {
-        synchronized (this) {
-            return _objects.keySet();
-        }
-    }
-
-    @Nonnull
-    @Override
     public Optional<ByteString> readObject(JObjectKey name) {
         synchronized (this) {
             return Optional.ofNullable(_objects.get(name));

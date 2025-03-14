@@ -37,12 +37,6 @@ public class CurrentTransaction implements Transaction {
         transactionManager.current().delete(key);
     }
 
-    @Nonnull
-    @Override
-    public Collection<JObjectKey> findAllObjects() {
-        return transactionManager.current().findAllObjects();
-    }
-
     @Override
     public CloseableKvIterator<JObjectKey, JData> getIterator(IteratorStart start, JObjectKey key) {
         return transactionManager.current().getIterator(start, key);

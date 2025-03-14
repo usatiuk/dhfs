@@ -15,9 +15,6 @@ import java.util.function.Consumer;
 // All changes are written as sequential transactions
 public interface ObjectPersistentStore {
     @Nonnull
-    Collection<JObjectKey> findAllObjects();
-
-    @Nonnull
     Optional<ByteString> readObject(JObjectKey name);
 
     // Returns an iterator with a view of all commited objects
