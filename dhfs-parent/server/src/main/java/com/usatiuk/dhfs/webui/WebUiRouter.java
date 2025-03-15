@@ -15,11 +15,14 @@ import java.util.Optional;
 @ApplicationScoped
 public class WebUiRouter {
 
-    @ConfigProperty(name = "dhfs.webui.root")
-    Optional<String> root;
+    private final Optional<String> _root;
+
+    public WebUiRouter(@ConfigProperty(name = "dhfs.webui.root") Optional<String> root) {
+        _root = root.map(s -> Path.of(s).normalize().toString());
+    }
 
     void installRoute(@Observes StartupEvent startupEvent, Router router) {
-        root.ifPresent(r -> {
+        _root.ifPresent(r -> {
             router.route().path("/").handler(ctx -> ctx.redirect("/webui"));
             router.route()
                     .path("/webui/*")
@@ -28,7 +31,7 @@ public class WebUiRouter {
     }
 
     public void handle(RoutingContext event) {
-        var indexHtml = Paths.get(root.orElseThrow(() -> new IllegalStateException("Web ui root not set but handler called")), "index.html").toString();
+        var indexHtml = Paths.get(_root.orElseThrow(() -> new IllegalStateException("Web ui root not set but handler called")), "index.html").toString();
 
         HttpServerRequest request = event.request();
         String requestedPath = Path.of(event.currentRoute().getPath()).relativize(Path.of(event.normalizedPath())).toString();
@@ -38,8 +41,8 @@ public class WebUiRouter {
             return;
         }
 
-        Path requested = Paths.get(root.get(), requestedPath);
-        if (!requested.normalize().startsWith(Paths.get(root.get()))) {
+        Path requested = Paths.get(_root.get(), requestedPath);
+        if (!requested.normalize().startsWith(Paths.get(_root.get()))) {
             request.response().setStatusCode(404).end();
             return;
         }
