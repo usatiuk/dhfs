@@ -38,7 +38,14 @@ public class LmdbKvIteratorTest {
                 ), -1, Runnable::run
         );
 
-        var iterator = store.getIterator(IteratorStart.LE, JObjectKey.of(Long.toString(3)));
+        var iterator = store.getIterator(IteratorStart.GE, JObjectKey.of(""));
+        Just.checkIterator(iterator, List.of(Pair.of(JObjectKey.of(Long.toString(1)), ByteString.copyFrom(new byte[]{2})),
+                Pair.of(JObjectKey.of(Long.toString(2)), ByteString.copyFrom(new byte[]{3})),
+                Pair.of(JObjectKey.of(Long.toString(3)), ByteString.copyFrom(new byte[]{4}))));
+        Assertions.assertFalse(iterator.hasNext());
+        iterator.close();
+
+        iterator = store.getIterator(IteratorStart.LE, JObjectKey.of(Long.toString(3)));
         Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(3)), ByteString.copyFrom(new byte[]{4})));
         Assertions.assertFalse(iterator.hasNext());
         iterator.close();
