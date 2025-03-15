@@ -1,17 +1,24 @@
 package com.usatiuk.dhfs.objects.repository;
 
-import com.usatiuk.dhfs.objects.*;
+import com.usatiuk.dhfs.objects.JDataRemote;
+import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.PeerId;
 import com.usatiuk.dhfs.objects.iterators.IteratorStart;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.dhfs.objects.transaction.TransactionManager;
-import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
-import org.pcollections.HashTreePMap;
 import org.pcollections.PMap;
 
 import javax.annotation.Nullable;
+import java.lang.reflect.ParameterizedType;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 @ApplicationScoped
 public class SyncHandler {
@@ -23,58 +30,46 @@ public class SyncHandler {
     TransactionManager txm;
     @Inject
     InvalidationQueueService invalidationQueueService;
+    @Inject
+    DefaultObjSyncHandler defaultObjSyncHandler;
 
-    public <T extends JDataRemote> void handleRemoteUpdate(PeerId from, JObjectKey key, PMap<PeerId, Long> receivedChangelog, @Nullable JDataRemote receivedData) {
-        var current = curTx.get(RemoteObjectMeta.class, key).orElse(null);
-        if (current == null) {
-            current = new RemoteObjectMeta(key, HashTreePMap.empty());
-            curTx.put(current);
-        }
+    private final Map<Class<? extends JDataRemote>, ObjSyncHandler> _objToSyncHandler;
+    private final Map<Class<? extends JDataRemoteDto>, ObjSyncHandler> _dtoToSyncHandler;
 
-        var changelogCompare = SyncHelper.compareChangelogs(current.changelog(), receivedChangelog);
+    public SyncHandler(Instance<ObjSyncHandler<?, ?>> syncHandlers) {
+        HashMap<Class<? extends JDataRemote>, ObjSyncHandler> objToHandlerMap = new HashMap<>();
+        HashMap<Class<? extends JDataRemoteDto>, ObjSyncHandler> dtoToHandlerMap = new HashMap<>();
 
-        switch (changelogCompare) {
-            case EQUAL -> {
-                Log.debug("No action on update: " + key + " from " + from);
-                if (!current.hasLocalData() && receivedData != null) {
-                    current = current.withHaveLocal(true);
-                    curTx.put(current);
-                    curTx.put(curTx.get(RemoteObjectDataWrapper.class, RemoteObjectMeta.ofDataKey(current.key()))
-                            .map(w -> w.withData(receivedData)).orElse(new RemoteObjectDataWrapper<>(receivedData)));
-                }
-            }
-            case NEWER -> {
-                Log.debug("Received newer index update than known: " + key + " from " + from);
-                var newChangelog = receivedChangelog.containsKey(persistentPeerDataService.getSelfUuid()) ?
-                        receivedChangelog : receivedChangelog.plus(persistentPeerDataService.getSelfUuid(), 0L);
-                current = current.withChangelog(newChangelog);
-
-                if (receivedData != null) {
-                    current = current.withHaveLocal(true);
-                    curTx.put(current);
-                    curTx.put(curTx.get(RemoteObjectDataWrapper.class, RemoteObjectMeta.ofDataKey(current.key()))
-                            .map(w -> w.withData(receivedData)).orElse(new RemoteObjectDataWrapper<>(receivedData)));
-                } else {
-                    current = current.withHaveLocal(false);
-                    curTx.put(current);
-                }
-            }
-            case OLDER -> {
-                Log.debug("Received older index update than known: " + key + " from " + from);
-                return;
-            }
-            case CONFLICT -> {
-                Log.debug("Conflict on update (inconsistent version): " + key + " from " + from);
-                // TODO:
-                return;
+        for (var syncHandler : syncHandlers.handles()) {
+            for (var type : Arrays.stream(syncHandler.getBean().getBeanClass().getGenericInterfaces()).flatMap(
+                    t -> {
+                        if (!(t instanceof ParameterizedType pm)) return Stream.empty();
+                        if (pm.getRawType().equals(ObjSyncHandler.class)) return Stream.of(pm);
+                        return Stream.empty();
+                    }
+            ).toList()) {
+                var orig = type.getActualTypeArguments()[0];
+                var dto = type.getActualTypeArguments()[1];
+                assert JDataRemote.class.isAssignableFrom((Class<?>) orig);
+                assert JDataRemoteDto.class.isAssignableFrom((Class<?>) dto);
+                objToHandlerMap.put((Class<? extends JDataRemote>) orig, syncHandler.get());
+                dtoToHandlerMap.put((Class<? extends JDataRemoteDto>) dto, syncHandler.get());
             }
         }
-        var curKnownRemoteVersion = current.knownRemoteVersions().get(from);
-        var receivedTotalVer = receivedChangelog.values().stream().mapToLong(Long::longValue).sum();
 
-        if (curKnownRemoteVersion == null || curKnownRemoteVersion < receivedTotalVer) {
-            current = current.withKnownRemoteVersions(current.knownRemoteVersions().plus(from, receivedTotalVer));
-            curTx.put(current);
+        _objToSyncHandler = Map.copyOf(objToHandlerMap);
+        _dtoToSyncHandler = Map.copyOf(dtoToHandlerMap);
+    }
+
+    public <D extends JDataRemoteDto> void handleRemoteUpdate(PeerId from, JObjectKey key,
+                                                              PMap<PeerId, Long> receivedChangelog,
+                                                              @Nullable D receivedData) {
+        var got = Optional.ofNullable(receivedData).flatMap(d -> Optional.ofNullable(_dtoToSyncHandler.get(d.getClass()))).orElse(null);
+        if (got == null) {
+            assert receivedData == null || receivedData.objClass().equals(receivedData.getClass());
+            defaultObjSyncHandler.handleRemoteUpdate(from, key, receivedChangelog, (JDataRemote) receivedData);
+        } else {
+            got.handleRemoteUpdate(from, key, receivedChangelog, receivedData);
         }
     }
 

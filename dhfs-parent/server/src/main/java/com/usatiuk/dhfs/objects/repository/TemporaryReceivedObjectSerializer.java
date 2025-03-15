@@ -1,21 +1,21 @@
 package com.usatiuk.dhfs.objects.repository;
 
 import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
-import com.usatiuk.dhfs.objects.JDataRemote;
 import com.usatiuk.dhfs.objects.PeerId;
 import com.usatiuk.dhfs.objects.ReceivedObject;
-import com.usatiuk.dhfs.objects.persistence.JDataRemoteP;
+import com.usatiuk.dhfs.objects.persistence.JDataRemoteDtoP;
 import com.usatiuk.dhfs.objects.persistence.JObjectKeyP;
 import com.usatiuk.dhfs.objects.persistence.PeerIdP;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.pcollections.HashTreePMap;
 import org.pcollections.PMap;
 
-@Singleton
+@ApplicationScoped
 public class TemporaryReceivedObjectSerializer implements ProtoSerializer<GetObjectReply, ReceivedObject> {
     @Inject
-    ProtoSerializer<JDataRemoteP, JDataRemote> remoteObjectSerializer;
+    ProtoSerializer<JDataRemoteDtoP, JDataRemoteDto> remoteObjectSerializer;
 
     @Override
     public ReceivedObject deserialize(GetObjectReply message) {

@@ -27,7 +27,7 @@ message GetObjectRequest {
 
 message GetObjectReply {
   dhfs.objects.persistence.ObjectChangelog changelog = 5;
-  dhfs.objects.persistence.JDataRemoteP pushedData = 6;
+  dhfs.objects.persistence.JDataRemoteDtoP pushedData = 6;
 }
 
 message CanDeleteRequest {

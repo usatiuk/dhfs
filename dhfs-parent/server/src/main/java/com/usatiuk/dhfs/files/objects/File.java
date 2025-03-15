@@ -4,6 +4,7 @@ import com.usatiuk.dhfs.objects.JDataRemote;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.jmap.JMapHolder;
 import com.usatiuk.dhfs.objects.jmap.JMapLongKey;
+import com.usatiuk.dhfs.objects.repository.JDataRemoteDto;
 
 import java.util.Collection;
 import java.util.Set;
@@ -37,5 +38,10 @@ public record File(JObjectKey key, long mode, long cTime, long mTime,
     public int estimateSize() {
         return 64;
 //        return chunks.size() * 64;
+    }
+
+    @Override
+    public Class<? extends JDataRemoteDto> dtoClass() {
+        return FileDto.class;
     }
 }

@@ -6,6 +6,7 @@ import com.usatiuk.dhfs.objects.persistence.JObjectKeyP;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.repository.invalidation.Op;
 import com.usatiuk.dhfs.objects.repository.invalidation.OpHandler;
+import com.usatiuk.dhfs.objects.repository.syncmap.DtoMapperService;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.dhfs.objects.transaction.TransactionManager;
 import io.grpc.Status;
@@ -47,13 +48,15 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     RemoteTransaction remoteTx;
     @Inject
     OpHandler opHandler;
+    @Inject
+    DtoMapperService dtoMapperService;
 
     @Override
     @Blocking
     public Uni<GetObjectReply> getObject(GetObjectRequest request) {
         Log.info("<-- getObject: " + request.getName() + " from " + identity.getPrincipal().getName().substring(3));
 
-        Pair<RemoteObjectMeta, JDataRemote> got = txm.run(() -> {
+        Pair<RemoteObjectMeta, JDataRemoteDto> got = txm.run(() -> {
             var meta = remoteTx.getMeta(JObjectKey.of(request.getName().getName())).orElse(null);
             var obj = remoteTx.getDataLocal(JDataRemote.class, JObjectKey.of(request.getName().getName())).orElse(null);
             if (meta != null && !meta.seen())
@@ -64,7 +67,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
                     if (refMeta != null && !refMeta.seen())
                         curTx.put(refMeta.withSeen(true));
                 }
-            return Pair.of(meta, obj);
+            return Pair.of(meta, dtoMapperService.toDto(obj, obj.dtoClass()));
         });
 
         if ((got.getValue() != null) && (got.getKey() == null)) {
@@ -77,7 +80,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
             throw new StatusRuntimeException(Status.NOT_FOUND);
         }
 
-        var serialized = receivedObjectProtoSerializer.serialize(new ReceivedObject(got.getKey().changelog(), got.getValue()));
+        var serialized = receivedObjectProtoSerializer.serialize(new ReceivedObject(got.getKey().changelog(), got.getRight()));
         return Uni.createFrom().item(serialized);
 //        // Does @Blocking break this?
 //        return Uni.createFrom().emitter(emitter -> {

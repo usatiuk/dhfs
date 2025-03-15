@@ -23,9 +23,25 @@ message ObjectChangelog {
 }
 
 // TODO: Serialization
-
-message JDataRemoteP {
+message FileDtoP {
   bytes serializedData = 1;
+}
+
+message ChunkDataP {
+  JObjectKeyP key = 1;
+  bytes data = 2;
+}
+
+message PeerInfoP {
+  bytes serializedData = 1;
+}
+
+message JDataRemoteDtoP {
+  oneof obj {
+    FileDtoP fileDto = 1;
+    ChunkDataP chunkData = 2;
+    PeerInfoP peerInfo = 3;
+  }
 }
 
 message JDataP {

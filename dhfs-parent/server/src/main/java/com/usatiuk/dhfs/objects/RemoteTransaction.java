@@ -28,7 +28,7 @@ public class RemoteTransaction {
 
         try {
             remoteObjectServiceClient.getObject(obj.key(), rcv -> {
-                if (!obj.knownType().isInstance(rcv.getRight().data()))
+                if (!obj.knownType().isAssignableFrom(rcv.getRight().data().objClass()))
                     throw new IllegalStateException("Object type mismatch: " + obj.knownType() + " vs " + rcv.getRight().data().getClass());
 
                 syncHandler.handleRemoteUpdate(rcv.getLeft(), obj.key(), rcv.getRight().changelog(), rcv.getRight().data());
