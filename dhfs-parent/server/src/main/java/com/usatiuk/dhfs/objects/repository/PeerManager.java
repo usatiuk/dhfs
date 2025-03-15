@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.objects.repository;
 
 import com.usatiuk.dhfs.objects.PeerId;
-import com.usatiuk.dhfs.objects.transaction.TransactionManager;
 import com.usatiuk.dhfs.objects.repository.peerdiscovery.PeerAddress;
 import com.usatiuk.dhfs.objects.repository.peerdiscovery.PeerDiscoveryDirectory;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerInfo;
@@ -10,6 +9,7 @@ import com.usatiuk.dhfs.objects.repository.peersync.api.PeerSyncApiClientDynamic
 import com.usatiuk.dhfs.objects.repository.peertrust.PeerTrustManager;
 import com.usatiuk.dhfs.objects.repository.webapi.AvailablePeerInfo;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
+import com.usatiuk.dhfs.objects.transaction.TransactionManager;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
@@ -68,16 +68,16 @@ public class PeerManager {
                     .<Callable<Void>>map(host -> () -> {
                         try {
                             if (isReachable(host))
-                                Log.trace("Heartbeat: " + host);
+                                Log.tracev("Heartbeat: {0}", host);
                             else
-                                Log.debug("Trying to connect to " + host);
+                                Log.debugv("Trying to connect to {0}", host);
                             var bestAddr = selectBestAddress(host.id());
                             if (pingCheck(host, bestAddr))
                                 handleConnectionSuccess(host, bestAddr);
                             else
                                 handleConnectionError(host);
                         } catch (Exception e) {
-                            Log.error("Failed to connect to " + host, e);
+                            Log.errorv("Failed to connect to {0} because {1}", host, e);
                         }
                         return null;
                     }).toList(), 30, TimeUnit.SECONDS); //FIXME:
@@ -112,7 +112,7 @@ public class PeerManager {
 
         if (wasReachable) return;
 
-        Log.info("Connected to " + host);
+        Log.infov("Connected to {0}", host);
 
 //        for (var l : _connectedListeners) {
 //            l.apply(host);
@@ -123,7 +123,7 @@ public class PeerManager {
         boolean wasReachable = isReachable(host);
 
         if (wasReachable)
-            Log.info("Lost connection to " + host);
+            Log.infov("Lost connection to {0}", host);
 
         _states.remove(host.id());
 
@@ -140,7 +140,7 @@ public class PeerManager {
                 return true;
             });
         } catch (Exception ignored) {
-            Log.debug("Host " + host + " is unreachable: " + ignored.getMessage() + " " + ignored.getCause());
+            Log.debugv("Host {0} is unreachable: {1}, {2}", host, ignored.getMessage(), ignored.getCause());
             return false;
         }
     }
