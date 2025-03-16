@@ -17,11 +17,14 @@ import io.smallrye.common.annotation.Blocking;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Base64;
+import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
@@ -29,8 +32,8 @@ import java.util.stream.Collectors;
 public class PeerManager {
     private final ConcurrentMap<PeerId, PeerAddress> _states = new ConcurrentHashMap<>();
     // FIXME: Ideally not call them on every ping
-    private final ArrayList<ConnectionEventListener> _connectedListeners = new ArrayList<>();
-    private final ArrayList<ConnectionEventListener> _disconnectedListeners = new ArrayList<>();
+    private final Collection<PeerConnectedEventListener> _connectedListeners;
+    private final Collection<PeerDisconnectedEventListener> _disconnectedListeners;
     @Inject
     PersistentPeerDataService persistentPeerDataService;
     @Inject
@@ -52,6 +55,11 @@ public class PeerManager {
     @Inject
     SyncHandler syncHandler;
     private ExecutorService _heartbeatExecutor;
+
+    public PeerManager(Instance<PeerConnectedEventListener> connectedListeners, Instance<PeerDisconnectedEventListener> disconnectedListeners) {
+        _connectedListeners = List.copyOf(connectedListeners.stream().toList());
+        _disconnectedListeners = List.copyOf(disconnectedListeners.stream().toList());
+    }
 
     // Note: keep priority updated with below
     void init(@Observes @Priority(600) StartupEvent event) throws IOException {
@@ -86,20 +94,6 @@ public class PeerManager {
         }
     }
 
-    // Note: registrations should be completed with Priority < 600
-    public void registerConnectEventListener(ConnectionEventListener listener) {
-        synchronized (_connectedListeners) {
-            _connectedListeners.add(listener);
-        }
-    }
-
-    // Note: registrations should be completed with Priority < 600
-    public void registerDisconnectEventListener(ConnectionEventListener listener) {
-        synchronized (_disconnectedListeners) {
-            _disconnectedListeners.add(listener);
-        }
-    }
-
     private void handleConnectionSuccess(PeerInfo host, PeerAddress address) {
         boolean wasReachable = isReachable(host);
 
@@ -114,9 +108,9 @@ public class PeerManager {
 
         Log.infov("Connected to {0}", host);
 
-//        for (var l : _connectedListeners) {
-//            l.apply(host);
-//        }
+        for (var l : _connectedListeners) {
+            l.handlePeerConnected(host.id());
+        }
     }
 
     public void handleConnectionError(PeerInfo host) {
@@ -127,9 +121,9 @@ public class PeerManager {
 
         _states.remove(host.id());
 
-//        for (var l : _disconnectedListeners) {
-//            l.apply(host);
-//        }
+        for (var l : _disconnectedListeners) {
+            l.handlePeerDisconnected(host.id());
+        }
     }
 
     // FIXME:
@@ -208,11 +202,6 @@ public class PeerManager {
             return peerDiscoveryDirectory.getReachablePeers().stream().filter(p -> !peerInfoService.getPeerInfo(p).isPresent())
                     .map(p -> new AvailablePeerInfo(p.toString())).toList();
         });
-    }
-
-    @FunctionalInterface
-    public interface ConnectionEventListener {
-        void apply(UUID host);
     }
 
     public record HostStateSnapshot(Collection<PeerId> available, Collection<PeerId> unavailable) {

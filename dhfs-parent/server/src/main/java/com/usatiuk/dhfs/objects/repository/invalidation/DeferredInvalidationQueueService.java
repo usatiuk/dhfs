@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects.repository.invalidation;
 
 import com.usatiuk.dhfs.objects.PeerId;
+import com.usatiuk.dhfs.objects.repository.PeerConnectedEventListener;
 import com.usatiuk.dhfs.objects.repository.PeerManager;
 import com.usatiuk.dhfs.utils.SerializationHelper;
 import io.quarkus.logging.Log;
@@ -20,7 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 @ApplicationScoped
-public class DeferredInvalidationQueueService {
+public class DeferredInvalidationQueueService implements PeerConnectedEventListener {
     private static final String dataFileName = "invqueue";
     @Inject
     PeerManager remoteHostManager;
@@ -37,7 +38,6 @@ public class DeferredInvalidationQueueService {
             Log.info("Reading invalidation queue");
             _persistentData = SerializationHelper.deserialize(Files.readAllBytes(Paths.get(dataRoot).resolve(dataFileName)));
         }
-//        remoteHostManager.registerConnectEventListener(this::returnForHost);
     }
 
     void shutdown(@Observes @Priority(300) ShutdownEvent event) throws IOException {
@@ -79,5 +79,10 @@ public class DeferredInvalidationQueueService {
             Log.tracev("Deferred invalidation: {0}", entry);
             _persistentData.deferredInvalidations.put(entry.peer(), entry);
         }
+    }
+
+    @Override
+    public void handlePeerConnected(PeerId peerId) {
+        returnForHost(peerId);
     }
 }
