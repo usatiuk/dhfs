@@ -11,7 +11,7 @@ public class JKleppmannTreeNodeMetaPeer extends JKleppmannTreeNodeMeta {
     private final JObjectKey _peerId;
 
     public JKleppmannTreeNodeMetaPeer(PeerId id) {
-        super(id.toString());
+        super(peerIdToNodeId(id).name());
         _peerId = id.toJObjectKey();
     }
 
@@ -19,9 +19,14 @@ public class JKleppmannTreeNodeMetaPeer extends JKleppmannTreeNodeMeta {
         return _peerId;
     }
 
+    public static JObjectKey peerIdToNodeId(PeerId id) {
+        return JObjectKey.of(id.toJObjectKey().name() + "_tree_node");
+    }
+
     @Override
     public JKleppmannTreeNodeMeta withName(String name) {
-        assert false;
+        assert name.equals(peerIdToNodeId(PeerId.of(getPeerId().name())).toString());
+        assert getName().equals(name);
         return this;
     }
 

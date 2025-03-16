@@ -8,6 +8,7 @@ import org.apache.commons.collections4.multimap.HashSetValuedHashMap;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -49,6 +50,9 @@ public class PeerDiscoveryDirectory {
     public Collection<PeerAddress> getForPeer(PeerId peer) {
         synchronized (_entries) {
             long curTime = System.currentTimeMillis();
+            if (_entries.asMap().get(peer) == null) {
+                return List.of();
+            }
             var partitioned = _entries.asMap().get(peer).stream()
                     .collect(Collectors.partitioningBy(e -> e.lastSeen() + timeout < curTime));
             for (var entry : partitioned.get(true)) {

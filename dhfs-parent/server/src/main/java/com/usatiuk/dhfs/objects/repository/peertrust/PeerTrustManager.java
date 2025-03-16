@@ -1,8 +1,12 @@
 package com.usatiuk.dhfs.objects.repository.peertrust;
 
 import com.usatiuk.dhfs.objects.repository.peersync.PeerInfo;
+import com.usatiuk.dhfs.objects.repository.peersync.PeerInfoService;
 import io.quarkus.logging.Log;
+import io.quarkus.scheduler.Scheduled;
+import io.smallrye.common.annotation.Blocking;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 
 import javax.net.ssl.TrustManager;
@@ -17,6 +21,9 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @ApplicationScoped
 public class PeerTrustManager implements X509TrustManager {
+    @Inject
+    PeerInfoService peerInfoService;
+
     private final AtomicReference<X509TrustManager> trustManager = new AtomicReference<>();
 
     @Override
@@ -42,6 +49,13 @@ public class PeerTrustManager implements X509TrustManager {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    // FIXME:
+    @Scheduled(every = "15s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    @Blocking
+    void hackRefresh() {
+        reloadTrustManagerHosts(peerInfoService.getPeers());
     }
 
     private synchronized void reloadTrustManager(Collection<Pair<String, X509Certificate>> certs) throws Exception {

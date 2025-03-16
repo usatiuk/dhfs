@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
@@ -71,7 +72,13 @@ public class PeerManager {
     public void tryConnectAll() {
         if (_heartbeatExecutor == null) return;
         try {
-            _heartbeatExecutor.invokeAll(peerInfoService.getPeersNoSelf()
+            var peers = peerInfoService.getPeersNoSelf();
+            var pids = peers.stream().map(PeerInfo::id).toList();
+
+            List<PeerId> stale = _states.keySet().stream().filter(p -> !pids.contains(p)).toList();
+            stale.forEach(_states.keySet()::remove);
+
+            _heartbeatExecutor.invokeAll(peers
                     .stream()
                     .<Callable<Void>>map(host -> () -> {
                         try {
@@ -79,13 +86,13 @@ public class PeerManager {
                                 Log.tracev("Heartbeat: {0}", host);
                             else
                                 Log.debugv("Trying to connect to {0}", host);
-                            var bestAddr = selectBestAddress(host.id());
-                            if (pingCheck(host, bestAddr))
+                            var bestAddr = selectBestAddress(host.id()).orElse(null);
+                            if (bestAddr != null && pingCheck(host, bestAddr))
                                 handleConnectionSuccess(host, bestAddr);
                             else
                                 handleConnectionError(host);
                         } catch (Exception e) {
-                            Log.errorv("Failed to connect to {0} because {1}", host, e);
+                            Log.error("Failed to connect to " + host.key(), e);
                         }
                         return null;
                     }).toList(), 30, TimeUnit.SECONDS); //FIXME:
@@ -175,20 +182,17 @@ public class PeerManager {
         });
     }
 
-    private PeerAddress selectBestAddress(PeerId host) {
-        return peerDiscoveryDirectory.getForPeer(host).stream().findFirst().orElseThrow();
+    private Optional<PeerAddress> selectBestAddress(PeerId host) {
+        return peerDiscoveryDirectory.getForPeer(host).stream().findFirst();
     }
 
     public void addRemoteHost(PeerId host) {
-        if (_states.containsKey(host)) {
-            throw new IllegalStateException("Host " + host + " is already added");
-        }
-
         transactionManager.run(() -> {
             if (peerInfoService.getPeerInfo(host).isPresent())
                 throw new IllegalStateException("Host " + host + " is already added");
 
-            var info = peerSyncApiClient.getSelfInfo(selectBestAddress(host));
+            var addr = selectBestAddress(host).orElseThrow(() -> new IllegalStateException("Host " + host + " is unreachable"));
+            var info = peerSyncApiClient.getSelfInfo(addr);
 
             var cert = Base64.getDecoder().decode(info.cert());
             peerInfoService.putPeer(host, cert);

@@ -38,9 +38,19 @@ public class PeerInfoService {
         return jKleppmannTreeManager.getTree(JObjectKey.of("peers"), LockingStrategy.OPTIMISTIC);
     }
 
+    public Optional<PeerInfo> getPeerInfoImpl(JObjectKey key) {
+        return jObjectTxManager.run(() -> {
+            return curTx.get(JKleppmannTreeNode.class, key).flatMap(node -> {
+                var meta = (JKleppmannTreeNodeMetaPeer) node.meta();
+                return remoteTx.getData(PeerInfo.class, meta.getPeerId());
+            });
+        });
+
+    }
+
     public Optional<PeerInfo> getPeerInfo(PeerId peer) {
         return jObjectTxManager.run(() -> {
-            var gotKey = getTreeR().traverse(List.of(peer.toString()));
+            var gotKey = getTreeR().traverse(List.of(JKleppmannTreeNodeMetaPeer.peerIdToNodeId(peer).name()));
             if (gotKey == null) {
                 return Optional.empty();
             }
@@ -56,8 +66,12 @@ public class PeerInfoService {
             var gotKey = getTreeR().traverse(List.of());
             return curTx.get(JKleppmannTreeNode.class, gotKey).map(
                             node -> node.children().keySet().stream()
-                                    .map(PeerId::of).map(this::getPeerInfo)
-                                    .map(Optional::get).toList())
+                                    .map(JObjectKey::of).map(this::getPeerInfoImpl)
+                                    .filter(o -> {
+                                        if (o.isEmpty())
+                                            Log.warnv("Could not get peer info for peer {0}", o);
+                                        return o.isPresent();
+                                    }).map(Optional::get).toList())
                     .orElseThrow();
         });
     }
@@ -67,7 +81,7 @@ public class PeerInfoService {
             var gotKey = getTreeR().traverse(List.of());
             return curTx.get(JKleppmannTreeNode.class, gotKey).map(
                             node -> node.children().keySet().stream()
-                                    .map(PeerId::of).map(this::getPeerInfo)
+                                    .map(JObjectKey::of).map(this::getPeerInfoImpl)
                                     .map(Optional::get).filter(
                                             peerInfo -> !peerInfo.id().equals(persistentPeerDataService.getSelfUuid())).toList())
                     .orElseThrow();
@@ -79,22 +93,23 @@ public class PeerInfoService {
             var parent = getTreeW().traverse(List.of());
             var newPeerInfo = new PeerInfo(id, cert);
             remoteTx.putData(newPeerInfo);
-            getTreeW().move(parent, new JKleppmannTreeNodeMetaPeer(newPeerInfo.id()), getTreeW().getNewNodeId());
+            getTreeW().move(parent, new JKleppmannTreeNodeMetaPeer(newPeerInfo.id()), JKleppmannTreeNodeMetaPeer.peerIdToNodeId(newPeerInfo.id()));
         });
     }
 
     public void removePeer(PeerId id) {
         jObjectTxManager.run(() -> {
-            var gotKey = getTreeW().traverse(List.of(id.toString()));
+            var gotKey = getTreeR().traverse(List.of(JKleppmannTreeNodeMetaPeer.peerIdToNodeId(id).name()));
             if (gotKey == null) {
                 return;
             }
-            var meta = curTx.get(JKleppmannTreeNode.class, gotKey).map(node -> (JKleppmannTreeNodeMetaPeer) node.meta()).orElse(null);
-            if (meta == null) {
+            var node = curTx.get(JKleppmannTreeNode.class, gotKey).orElse(null);
+            if (node == null) {
                 Log.warn("Peer " + id + " not found in the tree");
                 return;
             }
-            getTreeW().trash(meta, id.toJObjectKey());
+            getTreeW().trash(node.meta(), node.key());
+            curTx.onCommit(persistentPeerDataService::updateCerts);
         });
     }
 }

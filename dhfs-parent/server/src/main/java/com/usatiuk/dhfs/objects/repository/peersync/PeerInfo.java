@@ -6,9 +6,11 @@ import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.PeerId;
 import com.usatiuk.dhfs.objects.repository.CertificateTools;
 import com.usatiuk.dhfs.objects.repository.JDataRemoteDto;
+import com.usatiuk.dhfs.objects.repository.JDataRemotePush;
 
 import java.security.cert.X509Certificate;
 
+@JDataRemotePush
 public record PeerInfo(JObjectKey key, PeerId id, ByteString cert) implements JDataRemote, JDataRemoteDto {
     public PeerInfo(PeerId id, byte[] cert) {
         this(id.toJObjectKey(), id, ByteString.copyFrom(cert));

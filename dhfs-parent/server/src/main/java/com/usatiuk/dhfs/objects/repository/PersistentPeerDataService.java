@@ -102,20 +102,9 @@ public class PersistentPeerDataService {
         return _selfUuid;
     }
 
-//    private void updateCerts() {
-//        try {
-//            peerDirectory.get().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> {
-//                peerTrustManager.reloadTrustManagerHosts(getHostsNoNulls());
-//                // Fixme:? I don't think it should be needed with custom trust store
-//                // but it doesn't work?
-//                rpcClientFactory.dropCache();
-//                return null;
-//            });
-//        } catch (Exception ex) {
-//            Log.warn("Error when refreshing certificates, will retry: " + ex.getMessage());
-//            pushPeerUpdates();
-//        }
-//    }
+    public void updateCerts() {
+        peerTrustManager.reloadTrustManagerHosts(txm.run(() -> peerInfoService.getPeers().stream().toList())); //FIXME:
+    }
 
     public KeyPair getSelfKeypair() {
         return _selfKeyPair;

@@ -100,6 +100,7 @@ public class InvalidationQueueService {
                     long success = 0;
 
                     for (var e : data) {
+                        // TODO: Race?
                         if (peerInfoService.getPeerInfo(e.peer()).isEmpty()) continue;
 
                         if (!remoteHostManager.isReachable(e.peer())) {
