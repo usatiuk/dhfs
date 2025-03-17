@@ -120,8 +120,12 @@ public class PersistentPeerDataService {
             var data = curTx.get(PersistentRemoteHostsData.class, PersistentRemoteHostsData.KEY).orElse(null);
             if (data == null) throw new IllegalStateException("Self data not found");
             boolean exists = data.initialSyncDone().contains(peerId);
-            if (exists) return false;
+            if (exists) {
+                Log.tracev("Already marked sync state for {0}", peerId);
+                return false;
+            }
             curTx.put(data.withInitialSyncDone(data.initialSyncDone().plus(peerId)));
+            Log.infov("Did mark sync state for {0}", peerId);
             return true;
         });
     }
@@ -132,8 +136,12 @@ public class PersistentPeerDataService {
             var data = curTx.get(PersistentRemoteHostsData.class, PersistentRemoteHostsData.KEY).orElse(null);
             if (data == null) throw new IllegalStateException("Self data not found");
             boolean exists = data.initialSyncDone().contains(peerId);
-            if (!exists) return false;
+            if (!exists) {
+                Log.infov("Already reset sync state for {0}", peerId);
+                return false;
+            }
             curTx.put(data.withInitialSyncDone(data.initialSyncDone().minus(peerId)));
+            Log.infov("Did reset sync state for {0}", peerId);
             return true;
         });
     }

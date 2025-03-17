@@ -23,6 +23,13 @@ public class JKleppmannTreeNodeMetaPeer extends JKleppmannTreeNodeMeta {
         return JObjectKey.of(id.toJObjectKey().name() + "_tree_node");
     }
 
+    public static PeerId nodeIdToPeerId(JObjectKey id) {
+        if (!id.name().endsWith("_tree_node")) {
+            throw new IllegalArgumentException("Not a tree node key: " + id);
+        }
+        return PeerId.of(id.name().substring(0, id.name().length() - "_tree_node".length()));
+    }
+
     @Override
     public JKleppmannTreeNodeMeta withName(String name) {
         assert name.equals(peerIdToNodeId(PeerId.of(getPeerId().name())).toString());

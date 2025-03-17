@@ -7,6 +7,7 @@ import com.usatiuk.dhfs.objects.iterators.IteratorStart;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.dhfs.objects.transaction.TransactionManager;
+import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
@@ -75,6 +76,7 @@ public class SyncHandler {
 
     public void doInitialSync(PeerId peer) {
         txm.run(() -> {
+            Log.tracev("Will do initial sync for {0}", peer);
             try (var it = curTx.getIterator(IteratorStart.GE, JObjectKey.first())) {
                 while (it.hasNext()) {
                     var key = it.peekNextKey();

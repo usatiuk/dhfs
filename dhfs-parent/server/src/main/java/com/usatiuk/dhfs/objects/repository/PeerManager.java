@@ -111,7 +111,8 @@ public class PeerManager {
 
         _states.put(host.id(), address);
 
-        if (wasReachable) return;
+        if (wasReachable)
+            return;
 
         Log.infov("Connected to {0}", host);
 
