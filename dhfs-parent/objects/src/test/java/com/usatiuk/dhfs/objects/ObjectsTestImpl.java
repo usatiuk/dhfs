@@ -70,6 +70,30 @@ public abstract class ObjectsTestImpl {
     }
 
     @Test
+    void onCommitHookTest() {
+        txm.run(() -> {
+            var newParent = new Parent(JObjectKey.of("ParentOnCommitHook"), "John");
+            curTx.put(newParent);
+            curTx.onCommit(() -> txm.run(() -> {
+                curTx.put(new Parent(JObjectKey.of("ParentOnCommitHook2"), "John2"));
+            }));
+        });
+        txm.run(() -> {
+            curTx.onCommit(() -> txm.run(() -> {
+                curTx.put(new Parent(JObjectKey.of("ParentOnCommitHook3"), "John3"));
+            }));
+        });
+        txm.run(() -> {
+            var parent = curTx.get(Parent.class, new JObjectKey("ParentOnCommitHook")).orElse(null);
+            Assertions.assertEquals("John", parent.name());
+            var parent2 = curTx.get(Parent.class, new JObjectKey("ParentOnCommitHook2")).orElse(null);
+            Assertions.assertEquals("John2", parent2.name());
+            var parent3 = curTx.get(Parent.class, new JObjectKey("ParentOnCommitHook3")).orElse(null);
+            Assertions.assertEquals("John3", parent3.name());
+        });
+    }
+
+    @Test
     void createGetObject() {
         txm.run(() -> {
             var newParent = new Parent(JObjectKey.of("ParentCreateGet"), "John");

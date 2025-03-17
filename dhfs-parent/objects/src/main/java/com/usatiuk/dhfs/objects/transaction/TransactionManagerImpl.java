@@ -3,6 +3,9 @@ package com.usatiuk.dhfs.objects.transaction;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.tuple.Pair;
+
+import java.util.Collection;
 
 @ApplicationScoped
 public class TransactionManagerImpl implements TransactionManager {
@@ -28,8 +31,10 @@ public class TransactionManagerImpl implements TransactionManager {
         }
 
         Log.trace("Committing transaction");
+
+        Pair<Collection<Runnable>, TransactionHandle> ret;
         try {
-            return jObjectManager.commit(_currentTransaction.get());
+            ret = jObjectManager.commit(_currentTransaction.get());
         } catch (Throwable e) {
             Log.trace("Transaction commit failed", e);
             throw e;
@@ -37,6 +42,15 @@ public class TransactionManagerImpl implements TransactionManager {
             _currentTransaction.get().close();
             _currentTransaction.remove();
         }
+
+        for (var r : ret.getLeft()) {
+            try {
+                r.run();
+            } catch (Throwable e) {
+                Log.error("Transaction commit hook error: ", e);
+            }
+        }
+        return ret.getRight();
     }
 
     @Override

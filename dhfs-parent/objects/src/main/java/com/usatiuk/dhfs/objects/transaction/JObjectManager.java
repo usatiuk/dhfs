@@ -54,7 +54,7 @@ public class JObjectManager {
         return tx;
     }
 
-    public TransactionHandle commit(TransactionPrivate tx) {
+    public Pair<Collection<Runnable>, TransactionHandle> commit(TransactionPrivate tx) {
         verifyReady();
         var writes = new LinkedHashMap<JObjectKey, TxRecord.TxObjectRecord<?>>();
         var dependenciesLocked = new LinkedHashMap<JObjectKey, Optional<JDataVersionedWrapper>>();
@@ -173,16 +173,17 @@ public class JObjectManager {
             if (writes.isEmpty()) {
                 Log.trace("Committing transaction - no changes");
 
-                for (var callback : tx.getOnCommit()) {
-                    callback.run();
-                }
-
-                return new TransactionHandle() {
-                    @Override
-                    public void onFlush(Runnable runnable) {
-                        runnable.run();
-                    }
-                };
+                return Pair.of(
+                        Stream.concat(
+                                tx.getOnCommit().stream(),
+                                tx.getOnFlush().stream()
+                        ).toList(),
+                        new TransactionHandle() {
+                            @Override
+                            public void onFlush(Runnable runnable) {
+                                runnable.run();
+                            }
+                        });
             }
 
             Log.trace("Committing transaction start");
@@ -224,20 +225,18 @@ public class JObjectManager {
                                 return true;
                             }).toList());
 
-            for (var callback : tx.getOnCommit()) {
-                callback.run();
-            }
-
             for (var callback : tx.getOnFlush()) {
                 addFlushCallback.accept(callback);
             }
 
-            return new TransactionHandle() {
-                @Override
-                public void onFlush(Runnable runnable) {
-                    addFlushCallback.accept(runnable);
-                }
-            };
+            return Pair.of(
+                    List.copyOf(tx.getOnCommit()),
+                    new TransactionHandle() {
+                        @Override
+                        public void onFlush(Runnable runnable) {
+                            addFlushCallback.accept(runnable);
+                        }
+                    });
         } catch (Throwable t) {
             Log.trace("Error when committing transaction", t);
             throw new TxCommitException(t.getMessage(), t);
