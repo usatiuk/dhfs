@@ -50,12 +50,13 @@ public class RemoteObjectServiceClient {
 
     private final ExecutorService _batchExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
-//    public Pair<ObjectHeader, JObjectDataP> getSpecificObject(UUID host, String name) {
-//        return rpcClientFactory.withObjSyncClient(host, client -> {
-//            var reply = client.getObject(GetObjectRequest.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString()).setName(name).build());
-//            return Pair.of(reply.getObject().getHeader(), reply.getObject().getContent());
-//        });
-//    }
+    public Pair<PeerId, ReceivedObject> getSpecificObject(JObjectKey key, PeerId peerId) {
+        return rpcClientFactory.withObjSyncClient(peerId, (peer, client) -> {
+            var reply = client.getObject(GetObjectRequest.newBuilder().setName(JObjectKeyP.newBuilder().setName(key.toString()).build()).build());
+            var deserialized = receivedObjectProtoSerializer.deserialize(reply);
+            return Pair.of(peer, deserialized);
+        });
+    }
 
     public void getObject(JObjectKey key, Function<Pair<PeerId, ReceivedObject>, Boolean> onReceive) {
         var objMeta = remoteTx.getMeta(key).orElse(null);

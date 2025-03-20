@@ -75,6 +75,19 @@ public class RemoteTransaction {
         return curTx.get(RemoteObjectMeta.class, RemoteObjectMeta.ofMetaKey(key), strategy);
     }
 
+    public <T extends JDataRemote> void putDataRaw(T obj) {
+        var curMeta = getMeta(obj.key()).orElse(null);
+        if (curMeta == null)
+            throw new IllegalArgumentException("No data found for " + obj.key() + " when in putDataRaw");
+
+        if (!curMeta.knownType().isAssignableFrom(obj.getClass()))
+            throw new IllegalStateException("Object type mismatch: " + curMeta.knownType() + " vs " + obj.getClass());
+
+        var newData = curTx.get(RemoteObjectDataWrapper.class, RemoteObjectMeta.ofDataKey(obj.key()))
+                .map(w -> w.withData(obj)).orElse(new RemoteObjectDataWrapper<>(obj));
+        curTx.put(newData);
+    }
+
     public <T extends JDataRemote> void putData(T obj) {
         var curMeta = getMeta(obj.key()).orElse(null);
 
@@ -88,7 +101,12 @@ public class RemoteTransaction {
 //            return;
         if (!curMeta.knownType().isAssignableFrom(obj.getClass()))
             throw new IllegalStateException("Object type mismatch: " + curMeta.knownType() + " vs " + obj.getClass());
+
         var newMeta = curMeta;
+
+        if (!curMeta.knownType().equals(obj.getClass()))
+            newMeta = newMeta.withKnownType(obj.getClass());
+
         newMeta = newMeta.withChangelog(newMeta.changelog().plus(persistentPeerDataService.getSelfUuid(),
                 newMeta.changelog().get(persistentPeerDataService.getSelfUuid()) + 1));
         curTx.put(newMeta);
