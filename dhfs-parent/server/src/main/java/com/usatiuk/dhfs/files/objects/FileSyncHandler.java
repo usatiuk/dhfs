@@ -22,9 +22,7 @@ import org.pcollections.HashTreePMap;
 import org.pcollections.PMap;
 
 import javax.annotation.Nullable;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 @ApplicationScoped
@@ -56,6 +54,15 @@ public class FileSyncHandler implements ObjSyncHandler<File, FileDto> {
     private void resolveConflict(PeerId from, JObjectKey key, PMap<PeerId, Long> receivedChangelog,
                                  @Nullable FileDto receivedData) {
         var oursCurMeta = curTx.get(RemoteObjectMeta.class, key).orElse(null);
+
+        if (!oursCurMeta.knownType().isAssignableFrom(File.class))
+            throw new IllegalStateException("Object type mismatch: " + oursCurMeta.knownType() + " vs " + File.class);
+
+        if (!oursCurMeta.knownType().equals(File.class))
+            oursCurMeta = oursCurMeta.withKnownType(File.class);
+
+        curTx.put(oursCurMeta);
+
         var oursCurFile = remoteTx.getDataLocal(File.class, key).orElse(null);
         if (oursCurFile == null)
             throw new StatusRuntimeException(Status.ABORTED.withDescription("Conflict but we don't have local copy"));
@@ -162,6 +169,14 @@ public class FileSyncHandler implements ObjSyncHandler<File, FileDto> {
                     curTx.put(curTx.get(RemoteObjectDataWrapper.class, RemoteObjectMeta.ofDataKey(current.key()))
                             .map(w -> w.withData(receivedData.file())).orElse(new RemoteObjectDataWrapper<>(receivedData.file())));
 
+                    if (!current.knownType().isAssignableFrom(File.class))
+                        throw new IllegalStateException("Object type mismatch: " + current.knownType() + " vs " + File.class);
+
+                    if (!current.knownType().equals(File.class))
+                        current = current.withKnownType(File.class);
+
+                    curTx.put(current);
+
                     fileHelper.replaceChunks(receivedData.file(), receivedData.chunks());
                 }
             }
@@ -177,6 +192,14 @@ public class FileSyncHandler implements ObjSyncHandler<File, FileDto> {
                     curTx.put(curTx.get(RemoteObjectDataWrapper.class, RemoteObjectMeta.ofDataKey(current.key()))
                             .map(w -> w.withData(receivedData.file())).orElse(new RemoteObjectDataWrapper<>(receivedData.file())));
 
+                    if (!current.knownType().isAssignableFrom(File.class))
+                        throw new IllegalStateException("Object type mismatch: " + current.knownType() + " vs " + File.class);
+
+                    if (!current.knownType().equals(File.class))
+                        current = current.withKnownType(File.class);
+
+                    curTx.put(current);
+
                     fileHelper.replaceChunks(receivedData.file(), receivedData.chunks());
                 } else {
                     current = current.withHaveLocal(false);
@@ -189,6 +212,7 @@ public class FileSyncHandler implements ObjSyncHandler<File, FileDto> {
             }
             case CONFLICT -> {
                 Log.debug("Conflict on update (inconsistent version): " + key + " from " + from);
+                assert receivedData != null;
                 resolveConflict(from, key, receivedChangelog, receivedData);
                 // TODO:
                 return;

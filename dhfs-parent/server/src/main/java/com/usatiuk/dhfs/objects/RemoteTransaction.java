@@ -101,7 +101,12 @@ public class RemoteTransaction {
 //            return;
         if (!curMeta.knownType().isAssignableFrom(obj.getClass()))
             throw new IllegalStateException("Object type mismatch: " + curMeta.knownType() + " vs " + obj.getClass());
+
         var newMeta = curMeta;
+
+        if (!curMeta.knownType().equals(obj.getClass()))
+            newMeta = newMeta.withKnownType(obj.getClass());
+
         newMeta = newMeta.withChangelog(newMeta.changelog().plus(persistentPeerDataService.getSelfUuid(),
                 newMeta.changelog().get(persistentPeerDataService.getSelfUuid()) + 1));
         curTx.put(newMeta);

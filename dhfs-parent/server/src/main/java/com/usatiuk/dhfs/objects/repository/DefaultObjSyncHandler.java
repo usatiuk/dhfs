@@ -36,6 +36,14 @@ public class DefaultObjSyncHandler {
                     curTx.put(current);
                     curTx.put(curTx.get(RemoteObjectDataWrapper.class, RemoteObjectMeta.ofDataKey(current.key()))
                             .map(w -> w.withData(receivedData)).orElse(new RemoteObjectDataWrapper<>(receivedData)));
+
+                    if (!current.knownType().isAssignableFrom(receivedData.getClass()))
+                        throw new IllegalStateException("Object type mismatch: " + current.knownType() + " vs " + receivedData.getClass());
+
+                    if (!current.knownType().equals(receivedData.getClass()))
+                        current = current.withKnownType(receivedData.getClass());
+
+                    curTx.put(current);
                 }
             }
             case NEWER -> {
@@ -49,6 +57,14 @@ public class DefaultObjSyncHandler {
                     curTx.put(current);
                     curTx.put(curTx.get(RemoteObjectDataWrapper.class, RemoteObjectMeta.ofDataKey(current.key()))
                             .map(w -> w.withData(receivedData)).orElse(new RemoteObjectDataWrapper<>(receivedData)));
+
+                    if (!current.knownType().isAssignableFrom(receivedData.getClass()))
+                        throw new IllegalStateException("Object type mismatch: " + current.knownType() + " vs " + receivedData.getClass());
+
+                    if (!current.knownType().equals(receivedData.getClass()))
+                        current = current.withKnownType(receivedData.getClass());
+
+                    curTx.put(current);
                 } else {
                     current = current.withHaveLocal(false);
                     curTx.put(current);

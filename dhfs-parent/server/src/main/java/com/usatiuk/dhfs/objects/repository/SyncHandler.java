@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.objects.repository;
 import com.usatiuk.dhfs.objects.JDataRemote;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.PeerId;
+import com.usatiuk.dhfs.objects.RemoteTransaction;
 import com.usatiuk.dhfs.objects.iterators.IteratorStart;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
@@ -33,9 +34,13 @@ public class SyncHandler {
     InvalidationQueueService invalidationQueueService;
     @Inject
     DefaultObjSyncHandler defaultObjSyncHandler;
+    @Inject
+    RemoteTransaction remoteTx;
 
     private final Map<Class<? extends JDataRemote>, ObjSyncHandler> _objToSyncHandler;
     private final Map<Class<? extends JDataRemoteDto>, ObjSyncHandler> _dtoToSyncHandler;
+    @Inject
+    RemoteObjectServiceClient remoteObjectServiceClient;
 
     public SyncHandler(Instance<ObjSyncHandler<?, ?>> syncHandlers) {
         HashMap<Class<? extends JDataRemote>, ObjSyncHandler> objToHandlerMap = new HashMap<>();
@@ -65,6 +70,18 @@ public class SyncHandler {
     public <D extends JDataRemoteDto> void handleRemoteUpdate(PeerId from, JObjectKey key,
                                                               PMap<PeerId, Long> receivedChangelog,
                                                               @Nullable D receivedData) {
+        if (receivedData == null) {
+            var current = remoteTx.getMeta(key);
+            if (current.isPresent()) {
+                var cmp = SyncHelper.compareChangelogs(current.get().changelog(), receivedChangelog);
+                if (cmp.equals(SyncHelper.ChangelogCmpResult.CONFLICT)) {
+                    var got = remoteObjectServiceClient.getSpecificObject(key, from);
+                    handleRemoteUpdate(from, key, got.getRight().changelog(), got.getRight().data());
+                    return;
+                }
+            }
+        }
+
         var got = Optional.ofNullable(receivedData).flatMap(d -> Optional.ofNullable(_dtoToSyncHandler.get(d.getClass()))).orElse(null);
         if (got == null) {
             assert receivedData == null || receivedData.objClass().equals(receivedData.getClass());
