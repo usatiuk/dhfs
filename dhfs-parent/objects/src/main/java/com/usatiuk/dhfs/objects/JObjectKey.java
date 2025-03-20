@@ -5,10 +5,15 @@ import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 public record JObjectKey(String name) implements Serializable, Comparable<JObjectKey> {
     public static JObjectKey of(String name) {
         return new JObjectKey(name);
+    }
+
+    public static JObjectKey random() {
+        return new JObjectKey(UUID.randomUUID().toString());
     }
 
     public static JObjectKey first() {
