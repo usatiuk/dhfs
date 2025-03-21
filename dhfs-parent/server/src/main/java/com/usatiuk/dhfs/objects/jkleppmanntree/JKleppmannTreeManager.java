@@ -106,6 +106,8 @@ public class JKleppmannTreeManager {
                 collected.add(new JKleppmannTreeOpWrapper(_data.key(), node.getValue()));
                 if (collected.size() >= limit) break;
             }
+            Log.tracev("Collected pending op for host: {0} - {1}, out of {2}", host, collected,
+                    _data.queues().getOrDefault(host, TreePMap.empty()));
             return Collections.unmodifiableList(collected);
         }
 
@@ -114,11 +116,11 @@ public class JKleppmannTreeManager {
             if (!(op instanceof JKleppmannTreeOpWrapper jop))
                 throw new IllegalArgumentException("Invalid incoming op type for JKleppmannTree: " + op.getClass());
 
-            var firstOp = _data.queues().get(host).firstEntry().getValue();
-            if (!Objects.equals(firstOp, jop.op()))
+            var firstOp = _data.queues().get(host).firstEntry();
+            if (!Objects.equals(firstOp.getValue(), jop.op()))
                 throw new IllegalArgumentException("Committed op push was not the oldest");
 
-            _data = _data.withQueues(_data.queues().plus(host, _data.queues().get(host).minus(_data.queues().get(host).firstKey())));
+            _data = _data.withQueues(_data.queues().plus(host, _data.queues().get(host).minus(firstOp.getKey())));
             curTx.put(_data);
         }
 

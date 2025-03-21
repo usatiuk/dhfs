@@ -109,10 +109,10 @@ public class JObjectManager {
 
                         var curIteration = pendingWrites.get(hook);
 
-                        Log.trace("Commit iteration with " + curIteration.size() + " records for hook " + hook.getClass());
+//                        Log.trace("Commit iteration with " + curIteration.size() + " records for hook " + hook.getClass());
 
                         for (var entry : curIteration.entrySet()) {
-                            Log.trace("Running pre-commit hook " + hook.getClass() + " for" + entry.getKey());
+//                            Log.trace("Running pre-commit hook " + hook.getClass() + " for" + entry.getKey());
                             var oldObj = getPrev.apply(entry.getKey());
                             lastCurHookSeen.put(entry.getKey(), entry.getValue());
                             switch (entry.getValue()) {

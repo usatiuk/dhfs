@@ -35,4 +35,12 @@ public class JKleppmannTreeNodeMetaFile extends JKleppmannTreeNodeMeta {
     public int hashCode() {
         return Objects.hash(super.hashCode(), _fileIno);
     }
+
+    @Override
+    public String toString() {
+        return "JKleppmannTreeNodeMetaFile{" +
+                "_name=" + getName() + ", " +
+                "_fileIno=" + _fileIno +
+                '}';
+    }
 }

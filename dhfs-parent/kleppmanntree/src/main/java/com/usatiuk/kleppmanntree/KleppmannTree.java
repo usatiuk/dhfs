@@ -90,6 +90,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     private void undoOp(LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> op) {
+        LOGGER.finer(() -> "Will undo op: " + op);
         if (op.effects() != null)
             for (var e : op.effects().reversed())
                 undoEffect(e);
@@ -178,7 +179,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     // Returns true if the timestamp is newer than what's seen, false otherwise
     private boolean updateTimestampImpl(PeerIdT from, TimestampT newTimestamp) {
         TimestampT oldRef = _storage.getPeerTimestampLog().getForPeer(from);
-        if (oldRef != null && oldRef.compareTo(newTimestamp) > 0) { // FIXME?
+        if (oldRef != null && oldRef.compareTo(newTimestamp) >= 0) { // FIXME?
             LOGGER.warning("Wrong op order: received older than known from " + from.toString());
             return false;
         }
@@ -199,7 +200,9 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     private void applyOp(PeerIdT from, OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> op, boolean failCreatingIfExists) {
-        if (!updateTimestampImpl(from, op.timestamp().timestamp())) return;
+        if (!updateTimestampImpl(op.timestamp().nodeId(), op.timestamp().timestamp())) return;
+
+        LOGGER.finer(() -> "Will apply op: " + op + " from " + from);
 
         var log = _storage.getLog();
 
@@ -252,6 +255,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     private LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> doOp(OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> op, boolean failCreatingIfExists) {
+        LOGGER.finer(() -> "Doing op: " + op);
         LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> computed;
         try {
             computed = computeEffects(op, failCreatingIfExists);
@@ -291,6 +295,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
 
     private void applyEffects(OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> sourceOp, List<LogEffect<TimestampT, PeerIdT, MetaT, NodeIdT>> effects) {
         for (var effect : effects) {
+            LOGGER.finer(() -> "Applying effect: " + effect + " from op " + sourceOp);
             TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> oldParentNode = null;
             TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> newParentNode;
             TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> node;
@@ -354,6 +359,8 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                     return new LogRecord<>(op, null);
                 }
 
+                LOGGER.finer(() -> "Node creation conflict: " + conflictNode);
+
                 String newConflictNodeName = conflictNodeMeta.getName() + ".conflict." + conflictNode.key();
                 String newOursName = op.newMeta().getName() + ".conflict." + op.childId();
                 return new LogRecord<>(op, List.of(
@@ -361,6 +368,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                         new LogEffect<>(null, op, op.newParentId(), (MetaT) op.newMeta().withName(newOursName), op.childId())
                 ));
             } else {
+                LOGGER.finer(() -> "Simple node creation");
                 return new LogRecord<>(op, List.of(
                         new LogEffect<>(null, op, newParentId, op.newMeta(), op.childId())
                 ));
@@ -385,11 +393,15 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 return new LogRecord<>(op, null);
             }
 
+            LOGGER.finer(() -> "Node replacement: " + replaceNode);
+
             return new LogRecord<>(op, List.of(
                     new LogEffect<>(new LogEffectOld<>(replaceNode.lastEffectiveOp(), newParentId, replaceNodeMeta), replaceNode.lastEffectiveOp(), _storage.getTrashId(), (MetaT) replaceNodeMeta.withName(replaceNodeId.toString()), replaceNodeId),
                     new LogEffect<>(new LogEffectOld<>(node.lastEffectiveOp(), oldParentId, oldMeta), op, op.newParentId(), op.newMeta(), op.childId())
             ));
         }
+
+        LOGGER.finer(() -> "Simple node move");
         return new LogRecord<>(op, List.of(
                 new LogEffect<>(new LogEffectOld<>(node.lastEffectiveOp(), oldParentId, oldMeta), op, op.newParentId(), op.newMeta(), op.childId())
         ));

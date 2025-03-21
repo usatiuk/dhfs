@@ -30,4 +30,12 @@ public abstract class JKleppmannTreeNodeMeta implements NodeMeta {
     public int hashCode() {
         return Objects.hashCode(_name);
     }
+
+    @Override
+    public String toString() {
+        return "JKleppmannTreeNodeMeta{" +
+                "class=" + this.getClass().getSimpleName() + " " +
+                "_name='" + _name + '\'' +
+                '}';
+    }
 }
