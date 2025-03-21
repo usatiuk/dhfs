@@ -1,14 +1,16 @@
 package com.usatiuk.dhfs.objects.transaction;
 
-import com.usatiuk.dhfs.objects.*;
+import com.usatiuk.dhfs.objects.JData;
+import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
+import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.iterators.*;
-import com.usatiuk.dhfs.objects.iterators.IteratorStart;
 import com.usatiuk.dhfs.objects.snapshot.Snapshot;
 import com.usatiuk.dhfs.objects.snapshot.SnapshotManager;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.*;
 
@@ -18,6 +20,8 @@ public class TransactionFactoryImpl implements TransactionFactory {
     SnapshotManager snapshotManager;
     @Inject
     LockManager lockManager;
+    @ConfigProperty(name = "dhfs.objects.transaction.never-lock")
+    boolean neverLock;
 
     @Override
     public TransactionPrivate createTransaction() {
@@ -194,6 +198,9 @@ public class TransactionFactoryImpl implements TransactionFactory {
                 case null, default -> {
                 }
             }
+
+            if (neverLock)
+                return getFromSource(type, key);
 
             return switch (strategy) {
                 case OPTIMISTIC -> getFromSource(type, key);
