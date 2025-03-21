@@ -30,12 +30,14 @@ public class PeerInfoService {
     @Inject
     RemoteTransaction remoteTx;
 
+    public static final JObjectKey TREE_KEY = JObjectKey.of("peers");
+
     private JKleppmannTreeManager.JKleppmannTree getTreeW() {
-        return jKleppmannTreeManager.getTree(JObjectKey.of("peers"));
+        return jKleppmannTreeManager.getTree(TREE_KEY);
     }
 
     private JKleppmannTreeManager.JKleppmannTree getTreeR() {
-        return jKleppmannTreeManager.getTree(JObjectKey.of("peers"), LockingStrategy.OPTIMISTIC);
+        return jKleppmannTreeManager.getTree(TREE_KEY, LockingStrategy.OPTIMISTIC);
     }
 
     public Optional<PeerInfo> getPeerInfoImpl(JObjectKey key) {
