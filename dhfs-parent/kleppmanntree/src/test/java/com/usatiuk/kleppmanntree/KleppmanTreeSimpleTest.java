@@ -2,13 +2,15 @@ package com.usatiuk.kleppmanntree;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
 
 public class KleppmanTreeSimpleTest {
     private final TestNode testNode1 = new TestNode(1);
     private final TestNode testNode2 = new TestNode(2);
-
+    private final TestNode testNode3 = new TestNode(3);
 
     @Test
     void circularTest() {
@@ -89,4 +91,50 @@ public class KleppmanTreeSimpleTest {
         Assertions.assertTrue(testNode2._storageInterface.getLog().size() <= 1);
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void undoWithRenameTest(boolean opOrder) {
+        var d1id = testNode1._storageInterface.getNewNodeId();
+        var d2id = testNode2._storageInterface.getNewNodeId();
+        var d3id = testNode2._storageInterface.getNewNodeId();
+        testNode1._tree.move(testNode1._storageInterface.getRootId(), new TestNodeMetaDir("Test1"), d1id);
+        testNode2._tree.move(testNode1._storageInterface.getRootId(), new TestNodeMetaDir("Test1"), d2id);
+        testNode3._tree.move(testNode1._storageInterface.getRootId(), new TestNodeMetaDir("Test1"), d3id);
+        var r1 = testNode1.getRecorded();
+        var r2 = testNode2.getRecorded();
+        var r3 = testNode3.getRecorded();
+        Assertions.assertEquals(1, r1.size());
+        Assertions.assertEquals(1, r2.size());
+        Assertions.assertEquals(1, r3.size());
+
+        if (opOrder) {
+            testNode2._tree.applyExternalOp(3L, r3.getFirst());
+            testNode2._tree.applyExternalOp(1L, r1.getFirst());
+        } else {
+            testNode2._tree.applyExternalOp(1L, r1.getFirst());
+            testNode2._tree.applyExternalOp(3L, r3.getFirst());
+        }
+
+        Assertions.assertIterableEquals(List.of("Test1", "Test1.conflict." + d1id, "Test1.conflict." + d2id), testNode2._storageInterface.getById(testNode2._storageInterface.getRootId()).children().keySet());
+
+        if (opOrder) {
+            testNode1._tree.applyExternalOp(3L, r3.getFirst());
+            testNode1._tree.applyExternalOp(2L, r2.getFirst());
+        } else {
+            testNode1._tree.applyExternalOp(2L, r2.getFirst());
+            testNode1._tree.applyExternalOp(3L, r3.getFirst());
+        }
+
+        Assertions.assertIterableEquals(List.of("Test1", "Test1.conflict." + d1id, "Test1.conflict." + d2id), testNode1._storageInterface.getById(testNode1._storageInterface.getRootId()).children().keySet());
+
+        if (opOrder) {
+            testNode3._tree.applyExternalOp(2L, r2.getFirst());
+            testNode3._tree.applyExternalOp(1L, r1.getFirst());
+        } else {
+            testNode3._tree.applyExternalOp(1L, r1.getFirst());
+            testNode3._tree.applyExternalOp(2L, r2.getFirst());
+        }
+
+        Assertions.assertIterableEquals(List.of("Test1", "Test1.conflict." + d1id, "Test1.conflict." + d2id), testNode3._storageInterface.getById(testNode3._storageInterface.getRootId()).children().keySet());
+    }
 }

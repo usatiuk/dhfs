@@ -64,7 +64,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             // Needs to be read after changing curParent, as it might be the same node
             var oldParent = _storage.getById(effect.oldInfo().oldParent());
             {
-                var newOldParentChildren = oldParent.children().plus(node.meta().getName(), node.key());
+                var newOldParentChildren = oldParent.children().plus(effect.oldInfo().oldMeta().getName(), node.key());
                 oldParent = oldParent.withChildren(newOldParentChildren);
                 _storage.putNode(oldParent);
             }
