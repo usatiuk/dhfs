@@ -66,8 +66,8 @@ public class ResyncIT {
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c1uuid));
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c2uuid));
 
-        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Ignoring new address"), 60, TimeUnit.SECONDS);
-        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Ignoring new address"), 60, TimeUnit.SECONDS);
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("New address"), 60, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("New address"), 60, TimeUnit.SECONDS);
 
         var c1curl = container1.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
@@ -83,6 +83,7 @@ public class ResyncIT {
 
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+
         await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
     }
 
@@ -105,8 +106,8 @@ public class ResyncIT {
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c1uuid));
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c2uuid));
 
-        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Ignoring new address"), 60, TimeUnit.SECONDS);
-        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Ignoring new address"), 60, TimeUnit.SECONDS);
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("New address"), 60, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("New address"), 60, TimeUnit.SECONDS);
 
         var c1curl = container1.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
