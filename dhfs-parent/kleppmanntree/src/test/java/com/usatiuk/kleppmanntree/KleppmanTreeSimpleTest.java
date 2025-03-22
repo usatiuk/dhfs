@@ -96,7 +96,7 @@ public class KleppmanTreeSimpleTest {
     void undoWithRenameTest(boolean opOrder) {
         var d1id = testNode1._storageInterface.getNewNodeId();
         var d2id = testNode2._storageInterface.getNewNodeId();
-        var d3id = testNode2._storageInterface.getNewNodeId();
+        var d3id = testNode3._storageInterface.getNewNodeId();
         testNode1._tree.move(testNode1._storageInterface.getRootId(), new TestNodeMetaDir("Test1"), d1id);
         testNode2._tree.move(testNode1._storageInterface.getRootId(), new TestNodeMetaDir("Test1"), d2id);
         testNode3._tree.move(testNode1._storageInterface.getRootId(), new TestNodeMetaDir("Test1"), d3id);
@@ -136,5 +136,15 @@ public class KleppmanTreeSimpleTest {
         }
 
         Assertions.assertIterableEquals(List.of("Test1", "Test1.conflict." + d1id, "Test1.conflict." + d2id), testNode3._storageInterface.getById(testNode3._storageInterface.getRootId()).children().keySet());
+    }
+
+    @Test
+    void noFailedOpRecordTest() {
+        var d1id = testNode1._storageInterface.getNewNodeId();
+        var d2id = testNode1._storageInterface.getNewNodeId();
+        testNode1._tree.move(testNode1._storageInterface.getRootId(), new TestNodeMetaDir("Test1"), d1id);
+        Assertions.assertThrows(AlreadyExistsException.class, () -> testNode1._tree.move(testNode1._storageInterface.getRootId(), new TestNodeMetaDir("Test1"), d2id));
+        var r1 = testNode1.getRecorded();
+        Assertions.assertEquals(1, r1.size());
     }
 }

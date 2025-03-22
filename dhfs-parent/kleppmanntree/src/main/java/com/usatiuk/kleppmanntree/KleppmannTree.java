@@ -167,8 +167,8 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
 
     public void move(NodeIdT newParent, MetaT newMeta, NodeIdT child, boolean failCreatingIfExists) {
         var createdMove = createMove(newParent, newMeta, child);
-        _opRecorder.recordOp(createdMove);
         applyOp(_peers.getSelfId(), createdMove, failCreatingIfExists);
+        _opRecorder.recordOp(createdMove);
     }
 
     public void applyExternalOp(PeerIdT from, OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> op) {
