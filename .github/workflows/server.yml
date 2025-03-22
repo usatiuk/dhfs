@@ -32,7 +32,8 @@ jobs:
         run: |
           cd "$HOME"
           mkdir maven-bin
-          curl -s -L https://dlcdn.apache.org/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz | tar xvz --strip-components=1 -C maven-bin
+          # https://issues.apache.org/jira/browse/MNG-7868
+          curl -s -L https://dlcdn.apache.org/maven/maven-3/3.8.8/binaries/apache-maven-3.8.8-bin.tar.gz | tar xvz --strip-components=1 -C maven-bin
           echo "$HOME"/maven-bin/bin >> $GITHUB_PATH
 
       - name: Maven info
