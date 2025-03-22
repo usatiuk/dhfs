@@ -192,6 +192,12 @@ public class DhfsFuseIT {
                 0 == container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getExitCode());
         Log.info("Deleted");
 
+        // TODO: Fix this
+        Log.info("Dummy write");
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testd1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testd2").getExitCode());
+        Log.info("Dummy written");
+
         // FIXME?
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Deleting from persistent"), 60, TimeUnit.SECONDS, 3);
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Deleting from persistent"), 60, TimeUnit.SECONDS, 3);
