@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs.objects.stores;
 
-import com.usatiuk.dhfs.objects.*;
+import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
+import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.iterators.*;
 import com.usatiuk.dhfs.objects.snapshot.Snapshot;
 import com.usatiuk.dhfs.objects.transaction.LockManager;
@@ -145,7 +146,7 @@ public class CachingObjectPersistentStore {
         long cacheVersion;
 
         try {
-            Log.tracev("Getting cache snapshot");
+//            Log.tracev("Getting cache snapshot");
             // Decrease the lock time as much as possible
             _lock.readLock().lock();
             try {
@@ -170,9 +171,9 @@ public class CachingObjectPersistentStore {
                     _lock.writeLock().lock();
                     try {
                         if (_snapshotCacheVersion != _cacheVersion) {
-                            Log.tracev("Not caching: {0}", key);
+//                            Log.tracev("Not caching: {0}", key);
                         } else {
-                            Log.tracev("Caching: {0}", key);
+//                            Log.tracev("Caching: {0}", key);
                             put(key, obj);
                         }
                     } finally {
@@ -244,7 +245,7 @@ public class CachingObjectPersistentStore {
                                     -> new MappingKvIterator<>(
                                     new NavigableMapKvIterator<>(_curSortedCache, mS, mK),
                                     e -> {
-                                        Log.tracev("Taken from cache: {0}", e);
+//                                        Log.tracev("Taken from cache: {0}", e);
                                         return e.object();
                                     }
                             ),

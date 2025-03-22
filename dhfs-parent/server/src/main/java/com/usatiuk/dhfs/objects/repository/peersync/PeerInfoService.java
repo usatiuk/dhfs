@@ -84,7 +84,11 @@ public class PeerInfoService {
             return curTx.get(JKleppmannTreeNode.class, gotKey).map(
                             node -> node.children().keySet().stream()
                                     .map(JObjectKey::of).map(this::getPeerInfoImpl)
-                                    .map(Optional::get).filter(
+                                    .filter(o -> {
+                                        if (o.isEmpty())
+                                            Log.warnv("Could not get peer info for peer {0}", o);
+                                        return o.isPresent();
+                                    }).map(Optional::get).filter(
                                             peerInfo -> !peerInfo.id().equals(persistentPeerDataService.getSelfUuid())).toList())
                     .orElseThrow();
         });

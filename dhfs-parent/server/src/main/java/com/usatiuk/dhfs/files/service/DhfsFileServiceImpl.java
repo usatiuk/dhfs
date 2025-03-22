@@ -5,6 +5,7 @@ import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.files.objects.ChunkData;
 import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.objects.*;
+import com.usatiuk.dhfs.objects.iterators.IteratorStart;
 import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
@@ -13,7 +14,6 @@ import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaFil
 import com.usatiuk.dhfs.objects.jmap.JMapEntry;
 import com.usatiuk.dhfs.objects.jmap.JMapHelper;
 import com.usatiuk.dhfs.objects.jmap.JMapLongKey;
-import com.usatiuk.dhfs.objects.iterators.IteratorStart;
 import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.dhfs.objects.transaction.TransactionManager;

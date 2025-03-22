@@ -9,6 +9,7 @@ import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.mutable.MutableObject;
+import org.pcollections.HashTreePSet;
 
 import java.util.Optional;
 
@@ -83,6 +84,10 @@ public class RemoteTransaction {
         if (!curMeta.knownType().isAssignableFrom(obj.getClass()))
             throw new IllegalStateException("Object type mismatch: " + curMeta.knownType() + " vs " + obj.getClass());
 
+        var newMeta = curMeta;
+        newMeta = newMeta.withConfirmedDeletes(HashTreePSet.empty());
+        curTx.put(newMeta);
+
         var newData = curTx.get(RemoteObjectDataWrapper.class, RemoteObjectMeta.ofDataKey(obj.key()))
                 .map(w -> w.withData(obj)).orElse(new RemoteObjectDataWrapper<>(obj));
         curTx.put(newData);
@@ -106,6 +111,8 @@ public class RemoteTransaction {
 
         if (!curMeta.knownType().equals(obj.getClass()))
             newMeta = newMeta.withKnownType(obj.getClass());
+
+        newMeta = newMeta.withConfirmedDeletes(HashTreePSet.empty());
 
         newMeta = newMeta.withChangelog(newMeta.changelog().plus(persistentPeerDataService.getSelfUuid(),
                 newMeta.changelog().get(persistentPeerDataService.getSelfUuid()) + 1));

@@ -1,9 +1,6 @@
 package com.usatiuk.dhfs.objects.repository;
 
-import com.usatiuk.dhfs.objects.JDataRemote;
-import com.usatiuk.dhfs.objects.JObjectKey;
-import com.usatiuk.dhfs.objects.PeerId;
-import com.usatiuk.dhfs.objects.RemoteTransaction;
+import com.usatiuk.dhfs.objects.*;
 import com.usatiuk.dhfs.objects.iterators.IteratorStart;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
@@ -12,14 +9,12 @@ import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import org.pcollections.HashTreePSet;
 import org.pcollections.PMap;
 
 import javax.annotation.Nullable;
 import java.lang.reflect.ParameterizedType;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Stream;
 
 @ApplicationScoped
@@ -39,12 +34,14 @@ public class SyncHandler {
 
     private final Map<Class<? extends JDataRemote>, ObjSyncHandler> _objToSyncHandler;
     private final Map<Class<? extends JDataRemoteDto>, ObjSyncHandler> _dtoToSyncHandler;
+    private final Map<Class<? extends JData>, InitialSyncProcessor> _initialSyncProcessors;
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
 
-    public SyncHandler(Instance<ObjSyncHandler<?, ?>> syncHandlers) {
+    public SyncHandler(Instance<ObjSyncHandler<?, ?>> syncHandlers, Instance<InitialSyncProcessor<?>> initialSyncProcessors) {
         HashMap<Class<? extends JDataRemote>, ObjSyncHandler> objToHandlerMap = new HashMap<>();
         HashMap<Class<? extends JDataRemoteDto>, ObjSyncHandler> dtoToHandlerMap = new HashMap<>();
+        HashMap<Class<? extends JData>, InitialSyncProcessor> initialSyncProcessorHashMap = new HashMap<>();
 
         for (var syncHandler : syncHandlers.handles()) {
             for (var type : Arrays.stream(syncHandler.getBean().getBeanClass().getGenericInterfaces()).flatMap(
@@ -65,15 +62,37 @@ public class SyncHandler {
 
         _objToSyncHandler = Map.copyOf(objToHandlerMap);
         _dtoToSyncHandler = Map.copyOf(dtoToHandlerMap);
+
+        for (var initialSyncProcessor : initialSyncProcessors.handles()) {
+            for (var type : Arrays.stream(initialSyncProcessor.getBean().getBeanClass().getGenericInterfaces()).flatMap(
+                    t -> {
+                        if (!(t instanceof ParameterizedType pm)) return Stream.empty();
+                        if (pm.getRawType().equals(InitialSyncProcessor.class)) return Stream.of(pm);
+                        return Stream.empty();
+                    }
+            ).toList()) {
+                var orig = type.getActualTypeArguments()[0];
+                assert JData.class.isAssignableFrom((Class<?>) orig);
+                initialSyncProcessorHashMap.put((Class<? extends JData>) orig, initialSyncProcessor.get());
+            }
+        }
+
+        _initialSyncProcessors = Map.copyOf(initialSyncProcessorHashMap);
     }
 
     public <D extends JDataRemoteDto> void handleRemoteUpdate(PeerId from, JObjectKey key,
                                                               PMap<PeerId, Long> receivedChangelog,
                                                               @Nullable D receivedData) {
+        var current = remoteTx.getMeta(key).orElse(null);
+
+        if (current != null) {
+            current = current.withConfirmedDeletes(HashTreePSet.empty());
+            curTx.put(current);
+        }
+
         if (receivedData == null) {
-            var current = remoteTx.getMeta(key);
-            if (current.isPresent()) {
-                var cmp = SyncHelper.compareChangelogs(current.get().changelog(), receivedChangelog);
+            if (current != null) {
+                var cmp = SyncHelper.compareChangelogs(current.changelog(), receivedChangelog);
                 if (cmp.equals(SyncHelper.ChangelogCmpResult.CONFLICT)) {
                     var got = remoteObjectServiceClient.getSpecificObject(key, from);
                     handleRemoteUpdate(from, key, got.getRight().changelog(), got.getRight().data());
@@ -92,15 +111,26 @@ public class SyncHandler {
     }
 
     public void doInitialSync(PeerId peer) {
+        ArrayList<JObjectKey> objs = new ArrayList<>();
         txm.run(() -> {
             Log.tracev("Will do initial sync for {0}", peer);
             try (var it = curTx.getIterator(IteratorStart.GE, JObjectKey.first())) {
                 while (it.hasNext()) {
                     var key = it.peekNextKey();
-                    invalidationQueueService.pushInvalidationToOne(peer, key, true);
+                    objs.add(key);
+                    // TODO: Nested transactions
                     it.skip();
                 }
             }
         });
+
+        for (var obj : objs) {
+            txm.run(() -> {
+                var proc = curTx.get(JData.class, obj).flatMap(o -> Optional.ofNullable(_initialSyncProcessors.get(o.getClass()))).orElse(null);
+                if (proc != null) {
+                    proc.prepareForInitialSync(peer, obj);
+                }
+            });
+        }
     }
 }

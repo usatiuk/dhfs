@@ -52,8 +52,6 @@ public class OpPusher {
                 }
                 case JKleppmannTreePersistentData pd -> {
                     var tree = jKleppmannTreeManager.getTree(pd.key());
-                    if (entry.forced())
-                        tree.recordBootstrap(entry.peer());
 
                     if (!tree.hasPendingOpsForHost(entry.peer()))
                         return null;

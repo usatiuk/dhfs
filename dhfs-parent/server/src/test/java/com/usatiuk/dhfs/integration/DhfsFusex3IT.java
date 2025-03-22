@@ -270,12 +270,29 @@ public class DhfsFusex3IT {
         waitingConsumer3.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
         Log.warn("Connected");
 
+        // TODO: There's some issue with cache, so avoid file reads
         await().atMost(45, TimeUnit.SECONDS).until(() -> {
+            Log.info("Listing consistency 1");
+            var ls1 = container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
+            var ls2 = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
+            var ls3 = container3.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
+            Log.info(ls1);
+            Log.info(ls2);
+            Log.info(ls3);
+
+            return (ls1.getExitCode() == 0 && ls2.getExitCode() == 0 && ls3.getExitCode() == 0)
+                    && (ls1.getStdout().equals(ls2.getStdout()) && ls2.getStdout().equals(ls3.getStdout()));
+        });
+
+        await().atMost(45, TimeUnit.SECONDS).until(() -> {
+            Log.info("Listing");
             for (var c : List.of(container1, container2, container3)) {
                 var ls = c.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
                 var cat = c.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
                 Log.info(ls);
                 Log.info(cat);
+                if (!(cat.getExitCode() == 0 && ls.getExitCode() == 0))
+                    return false;
                 if (!(cat.getStdout().contains("test1") && cat.getStdout().contains("test2") && cat.getStdout().contains("test3")))
                     return false;
             }
@@ -283,12 +300,24 @@ public class DhfsFusex3IT {
         });
 
         await().atMost(45, TimeUnit.SECONDS).until(() -> {
-            return container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout().equals(
-                    container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout()) &&
-                    container3.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout().equals(
-                            container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse").getStdout()) &&
-                    container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout().equals(
-                            container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*").getStdout());
+            Log.info("Listing consistency");
+            var ls1 = container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
+            var cat1 = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
+            var ls2 = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
+            var cat2 = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
+            var ls3 = container3.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
+            var cat3 = container3.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
+            Log.info(ls1);
+            Log.info(cat1);
+            Log.info(ls2);
+            Log.info(cat2);
+            Log.info(ls3);
+            Log.info(cat3);
+
+            return (ls1.getExitCode() == 0 && ls2.getExitCode() == 0 && ls3.getExitCode() == 0)
+                    && (cat1.getExitCode() == 0 && cat2.getExitCode() == 0 && cat3.getExitCode() == 0)
+                    && (cat1.getStdout().equals(cat2.getStdout()) && cat2.getStdout().equals(cat3.getStdout()))
+                    && (ls1.getStdout().equals(ls2.getStdout()) && ls2.getStdout().equals(ls3.getStdout()));
         });
     }
 

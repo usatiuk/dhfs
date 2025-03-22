@@ -5,5 +5,5 @@ import com.usatiuk.dhfs.objects.PeerId;
 
 import java.io.Serializable;
 
-public record InvalidationQueueEntry(PeerId peer, JObjectKey key, boolean forced) implements Serializable {
+public record InvalidationQueueEntry(PeerId peer, JObjectKey key) implements Serializable {
 }

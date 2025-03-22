@@ -67,7 +67,7 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
                     if (refMeta != null && !refMeta.seen())
                         curTx.put(refMeta.withSeen(true));
                 }
-            return Pair.of(meta, dtoMapperService.toDto(obj, obj.dtoClass()));
+            return Pair.of(meta, obj == null ? null : dtoMapperService.toDto(obj, obj.dtoClass()));
         });
 
         if ((got.getValue() != null) && (got.getKey() == null)) {

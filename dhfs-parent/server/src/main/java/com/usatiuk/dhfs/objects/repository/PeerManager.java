@@ -104,10 +104,12 @@ public class PeerManager {
     private void handleConnectionSuccess(PeerInfo host, PeerAddress address) {
         boolean wasReachable = isReachable(host);
 
-        boolean shouldSync = persistentPeerDataService.markInitialSyncDone(host.id());
+        boolean shouldSync = !persistentPeerDataService.isInitialSyncDone(host.id());
 
-        if (shouldSync)
+        if (shouldSync) {
             syncHandler.doInitialSync(host.id());
+            persistentPeerDataService.markInitialSyncDone(host.id());
+        }
 
         _states.put(host.id(), address);
 

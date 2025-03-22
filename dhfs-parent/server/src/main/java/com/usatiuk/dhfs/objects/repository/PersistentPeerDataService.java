@@ -146,4 +146,11 @@ public class PersistentPeerDataService {
         });
     }
 
+    public boolean isInitialSyncDone(PeerId peerId) {
+        return txm.run(() -> {
+            var data = curTx.get(PersistentRemoteHostsData.class, PersistentRemoteHostsData.KEY).orElse(null);
+            if (data == null) throw new IllegalStateException("Self data not found");
+            return data.initialSyncDone().contains(peerId);
+        });
+    }
 }

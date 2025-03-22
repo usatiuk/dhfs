@@ -3,6 +3,7 @@ package com.usatiuk.dhfs.objects.repository.invalidation;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.PeerId;
 import com.usatiuk.dhfs.objects.repository.PeerManager;
+import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerInfoService;
 import com.usatiuk.dhfs.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
@@ -35,6 +36,9 @@ public class InvalidationQueueService {
     OpPusher opPusher;
     @ConfigProperty(name = "dhfs.objects.invalidation.threads")
     int threads;
+    @Inject
+    PersistentPeerDataService persistentPeerDataService;
+
     private ExecutorService _executor;
     private volatile boolean _shutdown = false;
 
@@ -87,9 +91,9 @@ public class InvalidationQueueService {
                             var hostInfo = remoteHostManager.getHostStateSnapshot();
                             for (var o : toAllQueue) {
                                 for (var h : hostInfo.available())
-                                    _queue.add(new InvalidationQueueEntry(h, o, false));
+                                    _queue.add(new InvalidationQueueEntry(h, o));
                                 for (var u : hostInfo.unavailable())
-                                    deferredInvalidationQueueService.defer(new InvalidationQueueEntry(u, o, false));
+                                    deferredInvalidationQueueService.defer(new InvalidationQueueEntry(u, o));
                             }
                         }
                     }
@@ -105,6 +109,11 @@ public class InvalidationQueueService {
 
                         if (!remoteHostManager.isReachable(e.peer())) {
                             deferredInvalidationQueueService.defer(e);
+                            continue;
+                        }
+
+                        if (!persistentPeerDataService.isInitialSyncDone(e.peer())) {
+                            pushInvalidationToOne(e);
                             continue;
                         }
 
@@ -156,13 +165,9 @@ public class InvalidationQueueService {
             deferredInvalidationQueueService.defer(entry);
     }
 
-    public void pushInvalidationToOne(PeerId host, JObjectKey obj, boolean forced) {
-        var entry = new InvalidationQueueEntry(host, obj, forced);
-        pushInvalidationToOne(entry);
-    }
-
     public void pushInvalidationToOne(PeerId host, JObjectKey obj) {
-        pushInvalidationToOne(host, obj, false);
+        var entry = new InvalidationQueueEntry(host, obj);
+        pushInvalidationToOne(entry);
     }
 
     void pushDeferredInvalidations(InvalidationQueueEntry entry) {

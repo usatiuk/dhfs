@@ -69,6 +69,8 @@ public class FileSyncHandler implements ObjSyncHandler<File, FileDto> {
 
         var theirsFile = receivedData.file();
 
+        var oursChunks = fileHelper.getChunks(oursCurFile);
+
         File first;
         File second;
         List<Pair<Long, JObjectKey>> firstChunks;
@@ -77,17 +79,20 @@ public class FileSyncHandler implements ObjSyncHandler<File, FileDto> {
 
         if (oursCurFile.mTime() >= theirsFile.mTime()) {
             first = oursCurFile;
-            firstChunks = fileHelper.getChunks(oursCurFile);
+            firstChunks = oursChunks;
             second = theirsFile;
             secondChunks = receivedData.chunks();
             otherHostname = from;
         } else {
             second = oursCurFile;
-            secondChunks = fileHelper.getChunks(oursCurFile);
+            secondChunks = oursChunks;
             first = theirsFile;
             firstChunks = receivedData.chunks();
             otherHostname = persistentPeerDataService.getSelfUuid();
         }
+
+        Log.tracev("Conflict resolution: ours: {0}, theirs: {1}, chunks: {2}, {3}", oursCurFile, theirsFile, oursChunks, receivedData.chunks());
+        Log.tracev("Conflict resolution: first: {0}, second: {1}, chunks: {2}, {3}", first, second, firstChunks, secondChunks);
 
         HashPMap<PeerId, Long> newChangelog = HashTreePMap.from(oursCurMeta.changelog());
 
@@ -97,25 +102,27 @@ public class FileSyncHandler implements ObjSyncHandler<File, FileDto> {
             );
         }
 
+        oursCurMeta = oursCurMeta.withChangelog(newChangelog);
+        curTx.put(oursCurMeta);
+
         boolean chunksDiff = !Objects.equals(firstChunks, secondChunks);
 
         boolean wasChanged = first.mTime() != second.mTime()
                 || first.cTime() != second.cTime()
+                || first.mode() != second.mode()
                 || first.symlink() != second.symlink()
                 || chunksDiff;
 
         if (wasChanged) {
             oursCurMeta = oursCurMeta.withChangelog(
-                    newChangelog.plus(persistentPeerDataService.getSelfUuid(), newChangelog.get(persistentPeerDataService.getSelfUuid()) + 1)
+                    newChangelog.plus(persistentPeerDataService.getSelfUuid(), newChangelog.getOrDefault(persistentPeerDataService.getSelfUuid(), 0L) + 1)
             );
-
             curTx.put(oursCurMeta);
+
             remoteTx.putDataRaw(oursCurFile.withCTime(first.cTime()).withMTime(first.mTime()).withMode(first.mode()).withSymlink(first.symlink()));
             fileHelper.replaceChunks(oursCurFile, firstChunks);
 
-            var newFile = new File(
-                    JObjectKey.random(), second.mode(), second.cTime(), second.mTime(), second.symlink()
-            );
+            var newFile = new File(JObjectKey.random(), second.mode(), second.cTime(), second.mTime(), second.symlink());
             remoteTx.putData(newFile);
             fileHelper.replaceChunks(newFile, secondChunks);
 
