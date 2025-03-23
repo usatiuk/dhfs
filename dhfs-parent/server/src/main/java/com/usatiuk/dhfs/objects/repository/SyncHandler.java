@@ -129,7 +129,7 @@ public class SyncHandler {
                 if (proc != null) {
                     proc.prepareForInitialSync(peer, obj);
                 }
-                Log.tracev("Adding to initial sync for peer {0}: {1}", peer, obj);
+                Log.infov("Adding to initial sync for peer {0}: {1}", peer, obj);
                 invalidationQueueService.pushInvalidationToOne(peer, obj);
             });
         }

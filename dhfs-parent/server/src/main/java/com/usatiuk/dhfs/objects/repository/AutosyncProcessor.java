@@ -46,30 +46,28 @@ public class AutosyncProcessor {
         }
 
         executorService.submit(() -> {
+            Log.info("Adding all to autosync");
+            ArrayList<JObjectKey> objs = new ArrayList<>();
             txm.run(() -> {
-                Log.info("Adding all to autosync");
-                ArrayList<JObjectKey> objs = new ArrayList<>();
-                txm.run(() -> {
-                    try (var it = curTx.getIterator(IteratorStart.GE, JObjectKey.first())) {
-                        while (it.hasNext()) {
-                            var key = it.peekNextKey();
-                            objs.add(key);
-                            // TODO: Nested transactions
-                            it.skip();
-                        }
+                try (var it = curTx.getIterator(IteratorStart.GE, JObjectKey.first())) {
+                    while (it.hasNext()) {
+                        var key = it.peekNextKey();
+                        objs.add(key);
+                        // TODO: Nested transactions
+                        it.skip();
                     }
-                });
-
-                for (var obj : objs) {
-                    txm.run(() -> {
-                        var gotObj = curTx.get(JData.class, obj).orElse(null);
-                        if (!(gotObj instanceof RemoteObjectMeta meta))
-                            return;
-                        if (!meta.hasLocalData())
-                            add(meta.key());
-                    });
                 }
             });
+
+            for (var obj : objs) {
+                txm.run(() -> {
+                    var gotObj = curTx.get(JData.class, obj).orElse(null);
+                    if (!(gotObj instanceof RemoteObjectMeta meta))
+                        return;
+                    if (!meta.hasLocalData())
+                        add(meta.key());
+                });
+            }
             Log.info("Adding all to autosync: finished");
         });
     }
