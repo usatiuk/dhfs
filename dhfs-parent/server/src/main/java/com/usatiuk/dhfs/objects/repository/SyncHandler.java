@@ -110,7 +110,7 @@ public class SyncHandler {
     }
 
     public void doInitialSync(PeerId peer) {
-        ArrayList<JObjectKey> objs = new ArrayList<>();
+        List<JObjectKey> objs = new LinkedList<>();
         txm.run(() -> {
             Log.tracev("Will do initial sync for {0}", peer);
             try (var it = curTx.getIterator(IteratorStart.GE, JObjectKey.first())) {

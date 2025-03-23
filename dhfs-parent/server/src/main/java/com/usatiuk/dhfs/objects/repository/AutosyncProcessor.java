@@ -15,7 +15,8 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -47,7 +48,7 @@ public class AutosyncProcessor {
 
         executorService.submit(() -> {
             Log.info("Adding all to autosync");
-            ArrayList<JObjectKey> objs = new ArrayList<>();
+            List<JObjectKey> objs = new LinkedList<>();
             txm.run(() -> {
                 try (var it = curTx.getIterator(IteratorStart.GE, JObjectKey.first())) {
                     while (it.hasNext()) {
