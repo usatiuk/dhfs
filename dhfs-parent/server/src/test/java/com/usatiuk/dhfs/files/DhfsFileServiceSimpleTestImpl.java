@@ -39,7 +39,7 @@ class Profiles {
     }
 }
 
-public class DhfsFileServiceSimpleTestImpl {
+public abstract class DhfsFileServiceSimpleTestImpl {
     @Inject
     DhfsFileService fileService;
     @Inject
