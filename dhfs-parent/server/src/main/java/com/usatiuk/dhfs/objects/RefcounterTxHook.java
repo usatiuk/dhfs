@@ -33,16 +33,16 @@ public class RefcounterTxHook implements PreCommitTxHook {
 
         for (var curRef : curRefs) {
             if (!oldRefs.contains(curRef)) {
-                var referenced = getRef(curRef.obj());
-                curTx.put(referenced.withRefsFrom(referenced.refsFrom().plus(new JDataNormalRef(curRef.obj()))));
+                var referenced = getRef(curRef);
+                curTx.put(referenced.withRefsFrom(referenced.refsFrom().plus(new JDataNormalRef(key))));
                 Log.tracev("Added ref from {0} to {1}", key, curRef);
             }
         }
 
         for (var oldRef : oldRefs) {
             if (!curRefs.contains(oldRef)) {
-                var referenced = getRef(oldRef.obj());
-                curTx.put(referenced.withRefsFrom(referenced.refsFrom().minus(new JDataNormalRef(oldRef.obj()))));
+                var referenced = getRef(oldRef);
+                curTx.put(referenced.withRefsFrom(referenced.refsFrom().minus(new JDataNormalRef(key))));
                 Log.tracev("Removed ref from {0} to {1}", key, oldRef);
             }
         }
@@ -55,8 +55,8 @@ public class RefcounterTxHook implements PreCommitTxHook {
         }
 
         for (var newRef : refCur.collectRefsTo()) {
-            var referenced = getRef(newRef.obj());
-            curTx.put(referenced.withRefsFrom(referenced.refsFrom().plus(new JDataNormalRef(newRef.obj()))));
+            var referenced = getRef(newRef);
+            curTx.put(referenced.withRefsFrom(referenced.refsFrom().plus(new JDataNormalRef(key))));
             Log.tracev("Added ref from {0} to {1}", key, newRef);
         }
     }
@@ -68,8 +68,8 @@ public class RefcounterTxHook implements PreCommitTxHook {
         }
 
         for (var removedRef : refCur.collectRefsTo()) {
-            var referenced = getRef(removedRef.obj());
-            curTx.put(referenced.withRefsFrom(referenced.refsFrom().minus(new JDataNormalRef(removedRef.obj()))));
+            var referenced = getRef(removedRef);
+            curTx.put(referenced.withRefsFrom(referenced.refsFrom().minus(new JDataNormalRef(key))));
             Log.tracev("Removed ref from {0} to {1}", key, removedRef);
         }
     }

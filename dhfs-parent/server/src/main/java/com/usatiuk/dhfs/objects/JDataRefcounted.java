@@ -14,7 +14,7 @@ public interface JDataRefcounted extends JData {
 
     JDataRefcounted withFrozen(boolean frozen);
 
-    default Collection<JDataRef> collectRefsTo() {
+    default Collection<JObjectKey> collectRefsTo() {
         return List.of();
     }
 }

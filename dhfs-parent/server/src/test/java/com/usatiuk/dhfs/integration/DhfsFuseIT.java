@@ -355,4 +355,82 @@ public class DhfsFuseIT {
 
     }
 
+    @Test
+    void removeAndMove() throws IOException, InterruptedException, TimeoutException {
+        var client = DockerClientFactory.instance().client();
+        Log.info("Creating");
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty > /root/dhfs_default/fuse/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
+        Log.info("Listing");
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf1").getStdout()));
+
+        client.pauseContainerCmd(container1.getContainerId()).exec();
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS, 1);
+
+        Log.info("Removing");
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "rm /root/dhfs_default/fuse/testf1").getExitCode());
+
+        client.pauseContainerCmd(container2.getContainerId()).exec();
+        client.unpauseContainerCmd(container1.getContainerId()).exec();
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS, 1);
+        Log.info("Moving");
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "mv /root/dhfs_default/fuse/testf1 /root/dhfs_default/fuse/testf2").getExitCode());
+        Log.info("Listing");
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/").getExitCode());
+        Log.info("Reading");
+        await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testf2").getStdout()));
+        client.unpauseContainerCmd(container2.getContainerId()).exec();
+
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 1);
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 1);
+        // Either removed, or moved
+        // TODO: it always seems to be removed?
+        Log.info("Reading both");
+        await().atMost(45, TimeUnit.SECONDS).until(() -> {
+            var ls1 = container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/");
+            var ls2 = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse/");
+            var cat1 = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
+            var cat2 = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
+            Log.info("cat1: " + cat1);
+            Log.info("cat2: " + cat2);
+            Log.info("ls1: " + ls1);
+            Log.info("ls2: " + ls2);
+
+            if (!ls1.getStdout().equals(ls2.getStdout())) {
+                Log.info("Different ls?");
+                return false;
+            }
+
+            if (ls1.getStdout().trim().isEmpty() && ls2.getStdout().trim().isEmpty()) {
+                Log.info("Both empty");
+                return true;
+            }
+
+            if (!cat1.getStdout().equals(cat2.getStdout())) {
+                Log.info("Different cat?");
+                return false;
+            }
+
+            if (!(cat1.getExitCode() == 0 && cat2.getExitCode() == 0 && ls1.getExitCode() == 0 && ls2.getExitCode() == 0)) {
+                return false;
+            }
+
+            boolean hasMoved = cat1.getStdout().contains("tesempty") && cat2.getStdout().contains("tesempty")
+                    && ls1.getStdout().contains("testf2") && !ls1.getStdout().contains("testf1")
+                    && ls2.getStdout().contains("testf2") && !ls2.getStdout().contains("testf1");
+
+            boolean removed = !cat1.getStdout().contains("tesempty") && !cat2.getStdout().contains("tesempty")
+                    && !ls1.getStdout().contains("testf2") && !ls1.getStdout().contains("testf1")
+                    && !ls2.getStdout().contains("testf2") && !ls2.getStdout().contains("testf1");
+
+            if (hasMoved && removed) {
+                Log.info("Both removed and moved");
+                return false;
+            }
+
+            return hasMoved || removed;
+        });
+    }
+
 }

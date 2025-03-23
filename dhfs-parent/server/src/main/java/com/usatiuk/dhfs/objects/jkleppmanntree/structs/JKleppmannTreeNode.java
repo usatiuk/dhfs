@@ -1,6 +1,9 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
-import com.usatiuk.dhfs.objects.*;
+import com.usatiuk.dhfs.objects.JDataRef;
+import com.usatiuk.dhfs.objects.JDataRefcounted;
+import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.PeerId;
 import com.usatiuk.dhfs.objects.repository.peersync.structs.JKleppmannTreeNodeMetaPeer;
 import com.usatiuk.kleppmanntree.OpMove;
 import com.usatiuk.kleppmanntree.TreeNode;
@@ -55,12 +58,12 @@ public record JKleppmannTreeNode(JObjectKey key, PCollection<JDataRef> refsFrom,
     }
 
     @Override
-    public Collection<JDataRef> collectRefsTo() {
-        return Stream.<JDataRef>concat(children().values().stream().map(JDataNormalRef::new),
+    public Collection<JObjectKey> collectRefsTo() {
+        return Stream.<JObjectKey>concat(children().values().stream(),
                 switch (meta()) {
-                    case JKleppmannTreeNodeMetaDirectory dir -> Stream.<JDataNormalRef>of();
-                    case JKleppmannTreeNodeMetaFile file -> Stream.of(new JDataNormalRef(file.getFileIno()));
-                    case JKleppmannTreeNodeMetaPeer peer -> Stream.of(new JDataNormalRef(peer.getPeerId()));
+                    case JKleppmannTreeNodeMetaDirectory dir -> Stream.of();
+                    case JKleppmannTreeNodeMetaFile file -> Stream.of(file.getFileIno());
+                    case JKleppmannTreeNodeMetaPeer peer -> Stream.of(peer.getPeerId());
                     default -> throw new IllegalStateException("Unexpected value: " + meta());
                 }
         ).collect(Collectors.toUnmodifiableSet());

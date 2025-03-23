@@ -91,8 +91,8 @@ public record RemoteObjectMeta(PCollection<JDataRef> refsFrom, boolean frozen,
     }
 
     @Override
-    public Collection<JDataRef> collectRefsTo() {
-        if (hasLocalData) return List.of(new JDataNormalRef(dataKey()));
+    public Collection<JObjectKey> collectRefsTo() {
+        if (hasLocalData) return List.of(dataKey());
         return List.of();
     }
 

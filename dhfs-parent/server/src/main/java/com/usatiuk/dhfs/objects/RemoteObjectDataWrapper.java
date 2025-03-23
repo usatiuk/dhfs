@@ -32,8 +32,8 @@ public record RemoteObjectDataWrapper<T extends JDataRemote>(PCollection<JDataRe
     }
 
     @Override
-    public Collection<JDataRef> collectRefsTo() {
-        return data.collectRefsTo().stream().<JDataRef>map(JDataNormalRef::new).toList();
+    public Collection<JObjectKey> collectRefsTo() {
+        return data.collectRefsTo();
     }
 
     @Override
