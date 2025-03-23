@@ -50,6 +50,8 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
     OpHandler opHandler;
     @Inject
     DtoMapperService dtoMapperService;
+    @Inject
+    AutosyncProcessor autosyncProcessor;
 
     @Override
     @Blocking
@@ -137,13 +139,12 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
             builder.setDeletionCandidate(!obj.frozen() && obj.refsFrom().isEmpty());
 
-            if (!builder.getDeletionCandidate())
-                for (var r : obj.refsFrom())
+            if (!builder.getDeletionCandidate()) {
+                for (var r : obj.refsFrom()) {
                     builder.addReferrers(JObjectKeyP.newBuilder().setName(r.toString()).build());
-
-//            if (!ret.getDeletionCandidate())
-//                for (var rr : request.getOurReferrersList())
-//                    autoSyncProcessor.add(rr);
+                    curTx.onCommit(() -> autosyncProcessor.add(r));
+                }
+            }
         });
         return Uni.createFrom().item(builder.build());
     }

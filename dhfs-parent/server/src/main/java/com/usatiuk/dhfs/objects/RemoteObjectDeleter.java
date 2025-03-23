@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.objects;
 
+import com.usatiuk.dhfs.objects.repository.AutosyncProcessor;
 import com.usatiuk.dhfs.objects.repository.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerInfo;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerInfoService;
@@ -42,6 +43,8 @@ public class RemoteObjectDeleter {
     PeerInfoService peerInfoService;
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
+    @Inject
+    AutosyncProcessor autosyncProcessor;
 
     @ConfigProperty(name = "dhfs.objects.move-processor.threads")
     int moveProcessorThreads;
@@ -138,8 +141,8 @@ public class RemoteObjectDeleter {
 
                     for (var r : ret) {
                         if (!r.getValue().getDeletionCandidate()) {
-//                            for (var rr : r.getReferrersList())
-//                                autoSyncProcessor.add(rr);
+                            for (var rr : r.getRight().getReferrersList())
+                                curTx.onCommit(() -> autosyncProcessor.add(JObjectKey.of(rr.getName())));
                         } else {
                             target = target.withConfirmedDeletes(target.confirmedDeletes().plus(r.getKey()));
                             ok++;

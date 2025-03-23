@@ -1,39 +1,45 @@
-package com.usatiuk.dhfs.objects;
+package com.usatiuk.dhfs.objects.repository;
 
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreePersistentData;
+import com.usatiuk.dhfs.objects.JData;
+import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.RemoteObjectMeta;
 import com.usatiuk.dhfs.objects.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.objects.transaction.PreCommitTxHook;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 @ApplicationScoped
-public class RemoteObjPusherTxHook implements PreCommitTxHook {
+public class AutosyncTxHook implements PreCommitTxHook {
     @Inject
     Transaction curTx;
     @Inject
     InvalidationQueueService invalidationQueueService;
+    @Inject
+    AutosyncProcessor autosyncProcessor;
+
+    @ConfigProperty(name = "dhfs.objects.autosync.download-all")
+    boolean downloadAll;
 
     @Override
     public void onChange(JObjectKey key, JData old, JData cur) {
-        boolean invalidate = switch (cur) {
-            case RemoteObjectMeta remote -> !remote.changelog().equals(((RemoteObjectMeta) old).changelog());
-            case JKleppmannTreePersistentData pd -> !pd.queues().equals(((JKleppmannTreePersistentData) old).queues());
-            default -> false;
-        };
+        if (!(cur instanceof RemoteObjectMeta meta))
+            return;
 
-        if (invalidate) {
-            curTx.onCommit(() -> invalidationQueueService.pushInvalidationToAll(cur.key()));
+        if (!meta.hasLocalData() && downloadAll) {
+            curTx.onCommit(() -> autosyncProcessor.add(meta.key()));
         }
     }
 
     @Override
     public void onCreate(JObjectKey key, JData cur) {
-        if (!(cur instanceof RemoteObjectMeta remote)) {
+        if (!(cur instanceof RemoteObjectMeta meta))
             return;
-        }
 
-        curTx.onCommit(() -> invalidationQueueService.pushInvalidationToAll(remote.key()));
+        if (!meta.hasLocalData() && downloadAll) {
+            curTx.onCommit(() -> autosyncProcessor.add(meta.key()));
+        }
     }
 
     @Override
