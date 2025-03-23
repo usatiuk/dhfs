@@ -9,27 +9,12 @@ import java.util.stream.Collectors;
 public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, V> {
     private final NavigableMap<K, CloseableKvIterator<K, V>> _sortedIterators = new TreeMap<>();
     private final String _name;
-    private Map<CloseableKvIterator<K, V>, Integer> _iterators;
-
     private final IteratorStart _initialStartType;
     private final K _initialStartKey;
-
-    private interface FirstMatchState<K extends Comparable<K>, V> {
-    }
-
-    private record FirstMatchNone<K extends Comparable<K>, V>() implements FirstMatchState<K, V> {
-    }
-
-    private record FirstMatchFound<K extends Comparable<K>, V>(
-            CloseableKvIterator<K, V> iterator) implements FirstMatchState<K, V> {
-    }
-
-    private record FirstMatchConsumed<K extends Comparable<K>, V>() implements FirstMatchState<K, V> {
-    }
-
+    private final List<IterProdFn<K, V>> _pendingIterators;
+    private Map<CloseableKvIterator<K, V>, Integer> _iterators;
     // Fast path for the first element
     private FirstMatchState<K, V> _firstMatchState;
-    private final List<IterProdFn<K, V>> _pendingIterators;
 
     public MergingKvIterator(String name, IteratorStart startType, K startKey, List<IterProdFn<K, V>> iterators) {
         _goingForward = true;
@@ -59,6 +44,11 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
 
         _firstMatchState = new FirstMatchNone<>();
         doInitialAdvance();
+    }
+
+    @SafeVarargs
+    public MergingKvIterator(String name, IteratorStart startType, K startKey, IterProdFn<K, V>... iterators) {
+        this(name, startType, startKey, List.of(iterators));
     }
 
     private void doInitialAdvance() {
@@ -131,11 +121,6 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
         }
 
         doInitialAdvance();
-    }
-
-    @SafeVarargs
-    public MergingKvIterator(String name, IteratorStart startType, K startKey, IterProdFn<K, V>... iterators) {
-        this(name, startType, startKey, List.of(iterators));
     }
 
     private void advanceIterator(CloseableKvIterator<K, V> iterator) {
@@ -288,7 +273,6 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
         return curVal;
     }
 
-
     @Override
     public void close() {
         if (_firstMatchState instanceof FirstMatchFound(CloseableKvIterator iterator)) {
@@ -306,5 +290,18 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
                 ", _sortedIterators=" + _sortedIterators.keySet() +
                 ", _iterators=" + _iterators +
                 '}';
+    }
+
+    private interface FirstMatchState<K extends Comparable<K>, V> {
+    }
+
+    private record FirstMatchNone<K extends Comparable<K>, V>() implements FirstMatchState<K, V> {
+    }
+
+    private record FirstMatchFound<K extends Comparable<K>, V>(
+            CloseableKvIterator<K, V> iterator) implements FirstMatchState<K, V> {
+    }
+
+    private record FirstMatchConsumed<K extends Comparable<K>, V>() implements FirstMatchState<K, V> {
     }
 }

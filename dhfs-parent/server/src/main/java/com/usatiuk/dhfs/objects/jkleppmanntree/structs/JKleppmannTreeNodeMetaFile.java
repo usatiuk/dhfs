@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
-import com.usatiuk.autoprotomap.runtime.ProtoMirror;
 import com.usatiuk.dhfs.objects.JObjectKey;
 
 import java.util.Objects;

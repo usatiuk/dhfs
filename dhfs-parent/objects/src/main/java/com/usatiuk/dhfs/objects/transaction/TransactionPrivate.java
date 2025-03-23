@@ -4,7 +4,6 @@ import com.usatiuk.dhfs.objects.JData;
 import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.snapshot.Snapshot;
-import com.usatiuk.dhfs.objects.snapshot.SnapshotManager;
 import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
 
 import java.util.Collection;

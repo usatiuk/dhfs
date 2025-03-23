@@ -2,8 +2,6 @@ package com.usatiuk.dhfs.objects.jkleppmanntree;
 
 import com.usatiuk.dhfs.objects.PeerId;
 
-import java.util.UUID;
-
 public class JKleppmannTreePeriodicPushOp {
     private final PeerId _from;
     private final long _timestamp;

@@ -23,21 +23,17 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 @ApplicationScoped
 public class CachingObjectPersistentStore {
     private final LinkedHashMap<JObjectKey, CacheEntry> _cache = new LinkedHashMap<>();
-    private TreePMap<JObjectKey, CacheEntry> _sortedCache = TreePMap.empty();
-    private long _cacheVersion = 0;
-
     private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
-
     @Inject
     LockManager lockManager;
-
     @Inject
     SerializingObjectPersistentStore delegate;
     @ConfigProperty(name = "dhfs.objects.lru.limit")
     long sizeLimit;
     @ConfigProperty(name = "dhfs.objects.lru.print-stats")
     boolean printStats;
-
+    private TreePMap<JObjectKey, CacheEntry> _sortedCache = TreePMap.empty();
+    private long _cacheVersion = 0;
     private long _curSize = 0;
     private long _evict = 0;
 
@@ -181,6 +177,48 @@ public class CachingObjectPersistentStore {
                     }
                 }
 
+                @Override
+                public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
+                    return new TombstoneMergingKvIterator<>("cache", start, key,
+                            (mS, mK)
+                                    -> new MappingKvIterator<>(
+                                    new NavigableMapKvIterator<>(_curSortedCache, mS, mK),
+                                    e -> {
+//                                        Log.tracev("Taken from cache: {0}", e);
+                                        return e.object();
+                                    }
+                            ),
+                            (mS, mK) -> new MappingKvIterator<>(new CachingKvIterator(_backing.getIterator(start, key)), Data::new));
+                }
+
+                @Nonnull
+                @Override
+                public Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
+                    var cached = _curSortedCache.get(name);
+                    if (cached != null) {
+                        return switch (cached.object()) {
+                            case Data<JDataVersionedWrapper> data -> Optional.of(data.value());
+                            case Tombstone<JDataVersionedWrapper> tombstone -> {
+                                yield Optional.empty();
+                            }
+                            default -> throw new IllegalStateException("Unexpected value: " + cached.object());
+                        };
+                    }
+                    var read = _backing.readObject(name);
+                    maybeCache(name, read);
+                    return _backing.readObject(name);
+                }
+
+                @Override
+                public long id() {
+                    return _backing.id();
+                }
+
+                @Override
+                public void close() {
+                    _backing.close();
+                }
+
                 private class CachingKvIterator implements CloseableKvIterator<JObjectKey, JDataVersionedWrapper> {
                     private final CloseableKvIterator<JObjectKey, JDataVersionedWrapper> _delegate;
 
@@ -237,48 +275,6 @@ public class CachingObjectPersistentStore {
                         return next;
                     }
                 }
-
-                @Override
-                public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-                    return new TombstoneMergingKvIterator<>("cache", start, key,
-                            (mS, mK)
-                                    -> new MappingKvIterator<>(
-                                    new NavigableMapKvIterator<>(_curSortedCache, mS, mK),
-                                    e -> {
-//                                        Log.tracev("Taken from cache: {0}", e);
-                                        return e.object();
-                                    }
-                            ),
-                            (mS, mK) -> new MappingKvIterator<>(new CachingKvIterator(_backing.getIterator(start, key)), Data::new));
-                }
-
-                @Nonnull
-                @Override
-                public Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
-                    var cached = _curSortedCache.get(name);
-                    if (cached != null) {
-                        return switch (cached.object()) {
-                            case Data<JDataVersionedWrapper> data -> Optional.of(data.value());
-                            case Tombstone<JDataVersionedWrapper> tombstone -> {
-                                yield Optional.empty();
-                            }
-                            default -> throw new IllegalStateException("Unexpected value: " + cached.object());
-                        };
-                    }
-                    var read = _backing.readObject(name);
-                    maybeCache(name, read);
-                    return _backing.readObject(name);
-                }
-
-                @Override
-                public long id() {
-                    return _backing.id();
-                }
-
-                @Override
-                public void close() {
-                    _backing.close();
-                }
             };
         } catch (Throwable ex) {
             if (backing != null) {
@@ -288,10 +284,10 @@ public class CachingObjectPersistentStore {
         }
     }
 
-    private record CacheEntry(MaybeTombstone<JDataVersionedWrapper> object, long size) {
-    }
-
     public long getLastTxId() {
         return delegate.getLastCommitId();
+    }
+
+    private record CacheEntry(MaybeTombstone<JDataVersionedWrapper> object, long size) {
     }
 }

@@ -15,10 +15,6 @@ public class JKleppmannTreeNodeMetaPeer extends JKleppmannTreeNodeMeta {
         _peerId = id.toJObjectKey();
     }
 
-    public JObjectKey getPeerId() {
-        return _peerId;
-    }
-
     public static JObjectKey peerIdToNodeId(PeerId id) {
         return JObjectKey.of(id.toJObjectKey().name() + "_tree_node");
     }
@@ -28,6 +24,10 @@ public class JKleppmannTreeNodeMetaPeer extends JKleppmannTreeNodeMeta {
             throw new IllegalArgumentException("Not a tree node key: " + id);
         }
         return PeerId.of(id.name().substring(0, id.name().length() - "_tree_node".length()));
+    }
+
+    public JObjectKey getPeerId() {
+        return _peerId;
     }
 
     @Override

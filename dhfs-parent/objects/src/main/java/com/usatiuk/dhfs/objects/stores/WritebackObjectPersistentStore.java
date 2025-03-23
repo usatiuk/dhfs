@@ -1,6 +1,8 @@
 package com.usatiuk.dhfs.objects.stores;
 
-import com.usatiuk.dhfs.objects.*;
+import com.usatiuk.dhfs.objects.JDataVersionedWrapper;
+import com.usatiuk.dhfs.objects.JDataVersionedWrapperImpl;
+import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.iterators.*;
 import com.usatiuk.dhfs.objects.snapshot.Snapshot;
 import com.usatiuk.dhfs.objects.transaction.TxCommitException;
@@ -304,6 +306,150 @@ public class WritebackObjectPersistentStore {
         }
     }
 
+    public Optional<PendingWriteEntry> getPendingWrite(JObjectKey key) {
+        synchronized (_pendingBundles) {
+            return Optional.ofNullable(_pendingWrites.get().get(key));
+        }
+    }
+
+    @Nonnull
+    public Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
+        var pending = getPendingWrite(name).orElse(null);
+        return switch (pending) {
+            case PendingWrite write -> Optional.of(write.data());
+            case PendingDelete ignored -> Optional.empty();
+            case null -> cachedStore.readObject(name);
+            default -> throw new IllegalStateException("Unexpected value: " + pending);
+        };
+    }
+
+    @Nonnull
+    public VerboseReadResult readObjectVerbose(JObjectKey key) {
+        var pending = getPendingWrite(key).orElse(null);
+        if (pending != null) {
+            return new VerboseReadResultPending(pending);
+        }
+        return new VerboseReadResultPersisted(cachedStore.readObject(key));
+    }
+
+    /**
+     * @param commitLocked - a function that will be called with a Consumer of a new transaction id,
+     *                     that will commit the transaction the changes in the store will be visible to new transactions
+     *                     only after the runnable is called
+     */
+    public Consumer<Runnable> commitTx(Collection<TxRecord.TxObjectRecord<?>> writes, BiConsumer<Long, Runnable> commitLocked) {
+        var bundle = createBundle();
+        long bundleId = bundle.getId();
+        try {
+            for (var action : writes) {
+                switch (action) {
+                    case TxRecord.TxObjectRecordWrite<?> write -> {
+                        Log.trace("Flushing object " + write.key());
+                        bundle.commit(new JDataVersionedWrapperImpl(write.data(), bundleId));
+                    }
+                    case TxRecord.TxObjectRecordDeleted deleted -> {
+                        Log.trace("Deleting object " + deleted.key());
+                        bundle.delete(deleted.key());
+                    }
+                    default -> {
+                        throw new TxCommitException("Unexpected value: " + action.key());
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            dropBundle(bundle);
+            throw new TxCommitException(t.getMessage(), t);
+        }
+
+
+        Log.tracef("Committing transaction %d to storage", bundleId);
+        commitLocked.accept(bundleId, () -> {
+            commitBundle(bundle);
+        });
+
+        return r -> asyncFence(bundleId, r);
+    }
+
+    public Snapshot<JObjectKey, JDataVersionedWrapper> getSnapshot() {
+        PSortedMap<JObjectKey, PendingWriteEntry> pendingWrites;
+        Snapshot<JObjectKey, JDataVersionedWrapper> cache = null;
+        long lastTxId;
+
+        try {
+            _pendingWritesVersionLock.readLock().lock();
+            try {
+                pendingWrites = _pendingWrites.get();
+                cache = cachedStore.getSnapshot();
+                lastTxId = getLastTxId();
+            } finally {
+                _pendingWritesVersionLock.readLock().unlock();
+            }
+
+            Snapshot<JObjectKey, JDataVersionedWrapper> finalCache = cache;
+            return new Snapshot<JObjectKey, JDataVersionedWrapper>() {
+                private final PSortedMap<JObjectKey, PendingWriteEntry> _pendingWrites = pendingWrites;
+                private final Snapshot<JObjectKey, JDataVersionedWrapper> _cache = finalCache;
+                private final long txId = lastTxId;
+
+                @Override
+                public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
+                    return new TombstoneMergingKvIterator<>("writeback-ps", start, key,
+                            (tS, tK) -> new MappingKvIterator<>(
+                                    new NavigableMapKvIterator<>(_pendingWrites, tS, tK),
+                                    e -> switch (e) {
+                                        case PendingWrite pw -> new Data<>(pw.data());
+                                        case PendingDelete d -> new Tombstone<>();
+                                        default -> throw new IllegalStateException("Unexpected value: " + e);
+                                    }),
+                            (tS, tK) -> new MappingKvIterator<>(_cache.getIterator(tS, tK), Data::new));
+                }
+
+                @Nonnull
+                @Override
+                public Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
+                    var cached = _pendingWrites.get(name);
+                    if (cached != null) {
+                        return switch (cached) {
+                            case PendingWrite c -> Optional.of(c.data());
+                            case PendingDelete d -> {
+                                yield Optional.empty();
+                            }
+                            default -> throw new IllegalStateException("Unexpected value: " + cached);
+                        };
+                    }
+                    return _cache.readObject(name);
+                }
+
+                @Override
+                public long id() {
+                    assert lastTxId >= _cache.id();
+                    return lastTxId;
+                }
+
+                @Override
+                public void close() {
+                    _cache.close();
+                }
+            };
+        } catch (Throwable e) {
+            if (cache != null)
+                cache.close();
+            throw e;
+        }
+    }
+
+    public long getLastTxId() {
+        _pendingWritesVersionLock.readLock().lock();
+        try {
+            return _lastCommittedTx.get();
+        } finally {
+            _pendingWritesVersionLock.readLock().unlock();
+        }
+    }
+
+    public interface VerboseReadResult {
+    }
+
     private static class TxBundle {
         private final LinkedHashMap<JObjectKey, BundleEntry> _entries = new LinkedHashMap<>();
         private final ArrayList<Runnable> _callbacks = new ArrayList<>();
@@ -385,154 +531,9 @@ public class WritebackObjectPersistentStore {
         }
     }
 
-    public Optional<PendingWriteEntry> getPendingWrite(JObjectKey key) {
-        synchronized (_pendingBundles) {
-            return Optional.ofNullable(_pendingWrites.get().get(key));
-        }
-    }
-
-    @Nonnull
-    public Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
-        var pending = getPendingWrite(name).orElse(null);
-        return switch (pending) {
-            case PendingWrite write -> Optional.of(write.data());
-            case PendingDelete ignored -> Optional.empty();
-            case null -> cachedStore.readObject(name);
-            default -> throw new IllegalStateException("Unexpected value: " + pending);
-        };
-    }
-
-    public interface VerboseReadResult {
-    }
-
     public record VerboseReadResultPersisted(Optional<JDataVersionedWrapper> data) implements VerboseReadResult {
     }
 
     public record VerboseReadResultPending(PendingWriteEntry pending) implements VerboseReadResult {
-    }
-
-    @Nonnull
-    public VerboseReadResult readObjectVerbose(JObjectKey key) {
-        var pending = getPendingWrite(key).orElse(null);
-        if (pending != null) {
-            return new VerboseReadResultPending(pending);
-        }
-        return new VerboseReadResultPersisted(cachedStore.readObject(key));
-    }
-
-    /**
-     * @param commitLocked - a function that will be called with a Consumer of a new transaction id,
-     *                     that will commit the transaction the changes in the store will be visible to new transactions
-     *                     only after the runnable is called
-     */
-    public Consumer<Runnable> commitTx(Collection<TxRecord.TxObjectRecord<?>> writes, BiConsumer<Long, Runnable> commitLocked) {
-        var bundle = createBundle();
-        long bundleId = bundle.getId();
-        try {
-            for (var action : writes) {
-                switch (action) {
-                    case TxRecord.TxObjectRecordWrite<?> write -> {
-                        Log.trace("Flushing object " + write.key());
-                        bundle.commit(new JDataVersionedWrapperImpl(write.data(), bundleId));
-                    }
-                    case TxRecord.TxObjectRecordDeleted deleted -> {
-                        Log.trace("Deleting object " + deleted.key());
-                        bundle.delete(deleted.key());
-                    }
-                    default -> {
-                        throw new TxCommitException("Unexpected value: " + action.key());
-                    }
-                }
-            }
-        } catch (Throwable t) {
-            dropBundle(bundle);
-            throw new TxCommitException(t.getMessage(), t);
-        }
-
-
-        Log.tracef("Committing transaction %d to storage", bundleId);
-        commitLocked.accept(bundleId, () -> {
-            commitBundle(bundle);
-        });
-
-        return r -> asyncFence(bundleId, r);
-    }
-
-
-    public Snapshot<JObjectKey, JDataVersionedWrapper> getSnapshot() {
-        PSortedMap<JObjectKey, PendingWriteEntry> pendingWrites;
-        Snapshot<JObjectKey, JDataVersionedWrapper> cache = null;
-        long lastTxId;
-
-        try {
-            _pendingWritesVersionLock.readLock().lock();
-            try {
-                pendingWrites = _pendingWrites.get();
-                cache = cachedStore.getSnapshot();
-                lastTxId = getLastTxId();
-            } finally {
-                _pendingWritesVersionLock.readLock().unlock();
-            }
-
-            Snapshot<JObjectKey, JDataVersionedWrapper> finalCache = cache;
-            return new Snapshot<JObjectKey, JDataVersionedWrapper>() {
-                private final PSortedMap<JObjectKey, PendingWriteEntry> _pendingWrites = pendingWrites;
-                private final Snapshot<JObjectKey, JDataVersionedWrapper> _cache = finalCache;
-                private final long txId = lastTxId;
-
-                @Override
-                public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-                    return new TombstoneMergingKvIterator<>("writeback-ps", start, key,
-                            (tS, tK) -> new MappingKvIterator<>(
-                                    new NavigableMapKvIterator<>(_pendingWrites, tS, tK),
-                                    e -> switch (e) {
-                                        case PendingWrite pw -> new Data<>(pw.data());
-                                        case PendingDelete d -> new Tombstone<>();
-                                        default -> throw new IllegalStateException("Unexpected value: " + e);
-                                    }),
-                            (tS, tK) -> new MappingKvIterator<>(_cache.getIterator(tS, tK), Data::new));
-                }
-
-                @Nonnull
-                @Override
-                public Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
-                    var cached = _pendingWrites.get(name);
-                    if (cached != null) {
-                        return switch (cached) {
-                            case PendingWrite c -> Optional.of(c.data());
-                            case PendingDelete d -> {
-                                yield Optional.empty();
-                            }
-                            default -> throw new IllegalStateException("Unexpected value: " + cached);
-                        };
-                    }
-                    return _cache.readObject(name);
-                }
-
-                @Override
-                public long id() {
-                    assert lastTxId >= _cache.id();
-                    return lastTxId;
-                }
-
-                @Override
-                public void close() {
-                    _cache.close();
-                }
-            };
-        } catch (Throwable e) {
-            if (cache != null)
-                cache.close();
-            throw e;
-        }
-    }
-
-    public long getLastTxId() {
-        _pendingWritesVersionLock.readLock().lock();
-        try {
-            return _lastCommittedTx.get();
-        } finally {
-            _pendingWritesVersionLock.readLock().unlock();
-        }
     }
 }

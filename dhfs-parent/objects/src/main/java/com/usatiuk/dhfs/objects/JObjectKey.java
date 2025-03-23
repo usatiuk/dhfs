@@ -20,6 +20,14 @@ public record JObjectKey(String name) implements Serializable, Comparable<JObjec
         return new JObjectKey("");
     }
 
+    public static JObjectKey fromBytes(byte[] bytes) {
+        return new JObjectKey(new String(bytes, StandardCharsets.UTF_8));
+    }
+
+    public static JObjectKey fromByteBuffer(ByteBuffer buff) {
+        return new JObjectKey(StandardCharsets.UTF_8.decode(buff).toString());
+    }
+
     @Override
     public int compareTo(JObjectKey o) {
         return name.compareTo(o.name);
@@ -41,13 +49,5 @@ public record JObjectKey(String name) implements Serializable, Comparable<JObjec
         directBb.put(heapBb);
         directBb.flip();
         return directBb;
-    }
-
-    public static JObjectKey fromBytes(byte[] bytes) {
-        return new JObjectKey(new String(bytes, StandardCharsets.UTF_8));
-    }
-
-    public static JObjectKey fromByteBuffer(ByteBuffer buff) {
-        return new JObjectKey(StandardCharsets.UTF_8.decode(buff).toString());
     }
 }

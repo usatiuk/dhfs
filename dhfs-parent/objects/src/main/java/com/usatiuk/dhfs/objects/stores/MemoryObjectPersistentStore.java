@@ -1,8 +1,8 @@
 package com.usatiuk.dhfs.objects.stores;
 
 import com.google.protobuf.ByteString;
-import com.usatiuk.dhfs.objects.iterators.CloseableKvIterator;
 import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.iterators.CloseableKvIterator;
 import com.usatiuk.dhfs.objects.iterators.IteratorStart;
 import com.usatiuk.dhfs.objects.iterators.NavigableMapKvIterator;
 import com.usatiuk.dhfs.objects.snapshot.Snapshot;
@@ -18,9 +18,9 @@ import java.util.function.Consumer;
 @ApplicationScoped
 @IfBuildProperty(name = "dhfs.objects.persistence", stringValue = "memory")
 public class MemoryObjectPersistentStore implements ObjectPersistentStore {
+    private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
     private TreePMap<JObjectKey, ByteString> _objects = TreePMap.empty();
     private long _lastCommitId = 0;
-    private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
 
     @Nonnull
     @Override

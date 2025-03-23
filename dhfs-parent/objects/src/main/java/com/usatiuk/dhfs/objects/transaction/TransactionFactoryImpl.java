@@ -55,79 +55,16 @@ public class TransactionFactoryImpl implements TransactionFactory {
     }
 
     private class TransactionImpl implements TransactionPrivate {
-        private boolean _closed = false;
-
         private final Map<JObjectKey, TransactionObject<?>> _readSet = new HashMap<>();
         private final NavigableMap<JObjectKey, TxRecord.TxObjectRecord<?>> _writes = new TreeMap<>();
-
-        private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _newWrites = new HashMap<>();
         private final List<Runnable> _onCommit = new ArrayList<>();
         private final List<Runnable> _onFlush = new ArrayList<>();
         private final Snapshot<JObjectKey, JDataVersionedWrapper> _snapshot;
+        private boolean _closed = false;
+        private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _newWrites = new HashMap<>();
 
         private TransactionImpl() {
             _snapshot = snapshotManager.createSnapshot();
-        }
-
-        private class ReadTrackingIterator implements CloseableKvIterator<JObjectKey, JData> {
-            private final CloseableKvIterator<JObjectKey, ReadTrackingInternalCrap> _backing;
-
-            public ReadTrackingIterator(CloseableKvIterator<JObjectKey, ReadTrackingInternalCrap> backing) {
-                _backing = backing;
-            }
-
-            @Override
-            public JObjectKey peekNextKey() {
-                return _backing.peekNextKey();
-            }
-
-            @Override
-            public void skip() {
-                _backing.skip();
-            }
-
-            @Override
-            public JObjectKey peekPrevKey() {
-                return _backing.peekPrevKey();
-            }
-
-            @Override
-            public Pair<JObjectKey, JData> prev() {
-                var got = _backing.prev();
-                if (got.getValue() instanceof ReadTrackingInternalCrapSource(JDataVersionedWrapper wrapped)) {
-                    _readSet.putIfAbsent(got.getKey(), new TransactionObjectNoLock<>(Optional.of(wrapped)));
-                }
-                return Pair.of(got.getKey(), got.getValue().obj());
-            }
-
-            @Override
-            public boolean hasPrev() {
-                return _backing.hasPrev();
-            }
-
-            @Override
-            public void skipPrev() {
-                _backing.skipPrev();
-            }
-
-            @Override
-            public void close() {
-                _backing.close();
-            }
-
-            @Override
-            public boolean hasNext() {
-                return _backing.hasNext();
-            }
-
-            @Override
-            public Pair<JObjectKey, JData> next() {
-                var got = _backing.next();
-                if (got.getValue() instanceof ReadTrackingInternalCrapSource(JDataVersionedWrapper wrapped)) {
-                    _readSet.putIfAbsent(got.getKey(), new TransactionObjectNoLock<>(Optional.of(wrapped)));
-                }
-                return Pair.of(got.getKey(), got.getValue().obj());
-            }
         }
 
         @Override
@@ -259,6 +196,67 @@ public class TransactionFactoryImpl implements TransactionFactory {
             if (_closed) return;
             _closed = true;
             _snapshot.close();
+        }
+
+        private class ReadTrackingIterator implements CloseableKvIterator<JObjectKey, JData> {
+            private final CloseableKvIterator<JObjectKey, ReadTrackingInternalCrap> _backing;
+
+            public ReadTrackingIterator(CloseableKvIterator<JObjectKey, ReadTrackingInternalCrap> backing) {
+                _backing = backing;
+            }
+
+            @Override
+            public JObjectKey peekNextKey() {
+                return _backing.peekNextKey();
+            }
+
+            @Override
+            public void skip() {
+                _backing.skip();
+            }
+
+            @Override
+            public JObjectKey peekPrevKey() {
+                return _backing.peekPrevKey();
+            }
+
+            @Override
+            public Pair<JObjectKey, JData> prev() {
+                var got = _backing.prev();
+                if (got.getValue() instanceof ReadTrackingInternalCrapSource(JDataVersionedWrapper wrapped)) {
+                    _readSet.putIfAbsent(got.getKey(), new TransactionObjectNoLock<>(Optional.of(wrapped)));
+                }
+                return Pair.of(got.getKey(), got.getValue().obj());
+            }
+
+            @Override
+            public boolean hasPrev() {
+                return _backing.hasPrev();
+            }
+
+            @Override
+            public void skipPrev() {
+                _backing.skipPrev();
+            }
+
+            @Override
+            public void close() {
+                _backing.close();
+            }
+
+            @Override
+            public boolean hasNext() {
+                return _backing.hasNext();
+            }
+
+            @Override
+            public Pair<JObjectKey, JData> next() {
+                var got = _backing.next();
+                if (got.getValue() instanceof ReadTrackingInternalCrapSource(JDataVersionedWrapper wrapped)) {
+                    _readSet.putIfAbsent(got.getKey(), new TransactionObjectNoLock<>(Optional.of(wrapped)));
+                }
+                return Pair.of(got.getKey(), got.getValue().obj());
+            }
         }
     }
 }

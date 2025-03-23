@@ -3,7 +3,6 @@ package com.usatiuk.dhfs.objects.repository.peersync;
 import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.persistence.PeerInfoP;
 import com.usatiuk.dhfs.utils.SerializationHelper;
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Singleton;
 
 import java.io.IOException;

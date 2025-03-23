@@ -49,7 +49,7 @@ public class JMapHelper {
         curTx.delete(makeKey(holder.key(), key));
     }
 
-    public  <K extends JMapKey> void deleteAll(JMapHolder<K> he) {
+    public <K extends JMapKey> void deleteAll(JMapHolder<K> he) {
         ArrayList<K> collectedKeys = new ArrayList<>();
         try (var it = getIterator(he)) {
             while (it.hasNext()) {

@@ -16,6 +16,8 @@ import java.util.stream.Stream;
 @ApplicationScoped
 public class StaticPeerDiscovery {
     private final List<IpPeerAddress> _peers;
+    @Inject
+    PeerDiscoveryDirectory peerDiscoveryDirectory;
 
     public StaticPeerDiscovery(@ConfigProperty(name = "dhfs.peerdiscovery.static-peers") Optional<String> staticPeers) {
         var peers = staticPeers.orElse("");
@@ -33,9 +35,6 @@ public class StaticPeerDiscovery {
             }
         }).toList();
     }
-
-    @Inject
-    PeerDiscoveryDirectory peerDiscoveryDirectory;
 
     @Scheduled(every = "1s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     public void discoverPeers() {

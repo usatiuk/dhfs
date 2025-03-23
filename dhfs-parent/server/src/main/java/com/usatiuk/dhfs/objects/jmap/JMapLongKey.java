@@ -8,13 +8,13 @@ public record JMapLongKey(long key) implements JMapKey, Comparable<JMapKey>, Ser
         return new JMapLongKey(key);
     }
 
+    public static JMapLongKey max() {
+        return new JMapLongKey(Long.MAX_VALUE);
+    }
+
     @Override
     public String toString() {
         return String.format("%016d", key);
-    }
-
-    public static JMapLongKey max() {
-        return new JMapLongKey(Long.MAX_VALUE);
     }
 
     @Override

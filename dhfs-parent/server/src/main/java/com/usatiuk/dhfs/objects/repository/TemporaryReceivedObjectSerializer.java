@@ -8,7 +8,6 @@ import com.usatiuk.dhfs.objects.persistence.JObjectKeyP;
 import com.usatiuk.dhfs.objects.persistence.PeerIdP;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import org.pcollections.HashTreePMap;
 import org.pcollections.PMap;
 

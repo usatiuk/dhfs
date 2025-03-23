@@ -24,13 +24,10 @@ import java.nio.ByteBuffer;
 public class LocalPeerDiscoveryClient {
     @Inject
     PeerDiscoveryDirectory peerDiscoveryDirectory;
-
-    private Thread _clientThread;
-
-    private DatagramSocket _socket;
-
     @ConfigProperty(name = "dhfs.objects.peerdiscovery.broadcast")
     boolean enabled;
+    private Thread _clientThread;
+    private DatagramSocket _socket;
 
     @Startup
     void init() throws SocketException, UnknownHostException {

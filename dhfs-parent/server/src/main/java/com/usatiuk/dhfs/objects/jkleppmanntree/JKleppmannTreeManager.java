@@ -2,7 +2,6 @@ package com.usatiuk.dhfs.objects.jkleppmanntree;
 
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.PeerId;
-import com.usatiuk.dhfs.objects.transaction.TransactionManager;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaDirectory;
@@ -11,6 +10,7 @@ import com.usatiuk.dhfs.objects.repository.invalidation.Op;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerInfoService;
 import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
+import com.usatiuk.dhfs.objects.transaction.TransactionManager;
 import com.usatiuk.kleppmanntree.*;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;

@@ -35,17 +35,17 @@ public record RemoteObjectMeta(PCollection<JDataRef> refsFrom, boolean frozen,
                 false);
     }
 
-    @Override
-    public JObjectKey key() {
-        return ofMetaKey(key);
-    }
-
     public static JObjectKey ofMetaKey(JObjectKey key) {
         return key;
     }
 
     public static JObjectKey ofDataKey(JObjectKey key) {
         return JObjectKey.of("data_" + key.name());
+    }
+
+    @Override
+    public JObjectKey key() {
+        return ofMetaKey(key);
     }
 
     public JObjectKey dataKey() {

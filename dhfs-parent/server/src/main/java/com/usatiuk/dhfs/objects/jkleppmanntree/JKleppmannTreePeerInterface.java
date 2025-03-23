@@ -9,8 +9,6 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.util.Collection;
-import java.util.List;
-import java.util.UUID;
 
 @Singleton
 public class JKleppmannTreePeerInterface implements PeerInterface<PeerId> {

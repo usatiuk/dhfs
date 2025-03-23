@@ -12,80 +12,6 @@ import java.util.NoSuchElementException;
 
 public class MergingKvIteratorTest {
 
-    private class SimpleIteratorWrapper<K extends Comparable<K>, V> implements CloseableKvIterator<K, V> {
-        private final Iterator<Pair<K, V>> _iterator;
-        private Pair<K, V> _next;
-
-        public SimpleIteratorWrapper(Iterator<Pair<K, V>> iterator) {
-            _iterator = iterator;
-            fillNext();
-        }
-
-        private void fillNext() {
-            while (_iterator.hasNext() && _next == null) {
-                _next = _iterator.next();
-            }
-        }
-
-        @Override
-        public K peekNextKey() {
-            if (_next == null) {
-                throw new NoSuchElementException();
-            }
-            return _next.getKey();
-        }
-
-        @Override
-        public void skip() {
-            if (_next == null) {
-                throw new NoSuchElementException();
-            }
-            _next = null;
-            fillNext();
-        }
-
-        @Override
-        public K peekPrevKey() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Pair<K, V> prev() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean hasPrev() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void skipPrev() {
-            throw new UnsupportedOperationException();
-
-        }
-
-        @Override
-        public void close() {
-        }
-
-        @Override
-        public boolean hasNext() {
-            return _next != null;
-        }
-
-        @Override
-        public Pair<K, V> next() {
-            if (_next == null) {
-                throw new NoSuchElementException("No more elements");
-            }
-            var ret = _next;
-            _next = null;
-            fillNext();
-            return ret;
-        }
-    }
-
     @Test
     public void testTestIterator() {
         var list = List.of(Pair.of(1, 2), Pair.of(3, 4), Pair.of(5, 6));
@@ -344,5 +270,79 @@ public class MergingKvIteratorTest {
             Assertions.assertEquals(pair, mergingIterator2.next());
         }
         Assertions.assertFalse(mergingIterator2.hasNext());
+    }
+
+    private class SimpleIteratorWrapper<K extends Comparable<K>, V> implements CloseableKvIterator<K, V> {
+        private final Iterator<Pair<K, V>> _iterator;
+        private Pair<K, V> _next;
+
+        public SimpleIteratorWrapper(Iterator<Pair<K, V>> iterator) {
+            _iterator = iterator;
+            fillNext();
+        }
+
+        private void fillNext() {
+            while (_iterator.hasNext() && _next == null) {
+                _next = _iterator.next();
+            }
+        }
+
+        @Override
+        public K peekNextKey() {
+            if (_next == null) {
+                throw new NoSuchElementException();
+            }
+            return _next.getKey();
+        }
+
+        @Override
+        public void skip() {
+            if (_next == null) {
+                throw new NoSuchElementException();
+            }
+            _next = null;
+            fillNext();
+        }
+
+        @Override
+        public K peekPrevKey() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Pair<K, V> prev() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public boolean hasPrev() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void skipPrev() {
+            throw new UnsupportedOperationException();
+
+        }
+
+        @Override
+        public void close() {
+        }
+
+        @Override
+        public boolean hasNext() {
+            return _next != null;
+        }
+
+        @Override
+        public Pair<K, V> next() {
+            if (_next == null) {
+                throw new NoSuchElementException("No more elements");
+            }
+            var ret = _next;
+            _next = null;
+            fillNext();
+            return ret;
+        }
     }
 }

@@ -6,10 +6,10 @@ import org.apache.commons.lang3.mutable.MutableObject;
 import java.lang.ref.Cleaner;
 
 public class RefcountedCloseable<T extends AutoCloseable> {
-    private final T _closeable;
-    private int _refCount = 1;
-    private final MutableObject<Boolean> _closed = new MutableObject<>(false);
     private static final Cleaner CLEANER = Cleaner.create();
+    private final T _closeable;
+    private final MutableObject<Boolean> _closed = new MutableObject<>(false);
+    private int _refCount = 1;
 
     public RefcountedCloseable(T closeable) {
         _closeable = closeable;

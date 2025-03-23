@@ -19,6 +19,7 @@ import java.util.Optional;
 
 @ApplicationScoped
 public class PeerInfoService {
+    public static final JObjectKey TREE_KEY = JObjectKey.of("peers");
     @Inject
     Transaction curTx;
     @Inject
@@ -29,8 +30,6 @@ public class PeerInfoService {
     PersistentPeerDataService persistentPeerDataService;
     @Inject
     RemoteTransaction remoteTx;
-
-    public static final JObjectKey TREE_KEY = JObjectKey.of("peers");
 
     private JKleppmannTreeManager.JKleppmannTree getTreeW() {
         return jKleppmannTreeManager.getTree(TREE_KEY);

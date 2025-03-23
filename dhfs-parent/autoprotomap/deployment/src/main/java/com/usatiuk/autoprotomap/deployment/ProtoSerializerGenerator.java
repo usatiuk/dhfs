@@ -6,8 +6,8 @@ import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import io.quarkus.gizmo.*;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
-import org.jboss.jandex.Type;
 import org.jboss.jandex.*;
+import org.jboss.jandex.Type;
 import org.objectweb.asm.Opcodes;
 
 import java.util.ArrayList;

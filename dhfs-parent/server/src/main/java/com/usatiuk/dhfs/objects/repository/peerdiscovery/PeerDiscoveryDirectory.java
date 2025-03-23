@@ -15,28 +15,9 @@ import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class PeerDiscoveryDirectory {
+    private final MultiValuedMap<PeerId, PeerEntry> _entries = new HashSetValuedHashMap<>();
     @ConfigProperty(name = "dhfs.peerdiscovery.timeout")
     long timeout;
-
-    private record PeerEntry(PeerAddress addr, long lastSeen) {
-        public PeerEntry withLastSeen(long lastSeen) {
-            return new PeerEntry(addr, lastSeen);
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (o == null || getClass() != o.getClass()) return false;
-            PeerEntry peerEntry = (PeerEntry) o;
-            return Objects.equals(addr, peerEntry.addr);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hashCode(addr);
-        }
-    }
-
-    private final MultiValuedMap<PeerId, PeerEntry> _entries = new HashSetValuedHashMap<>();
 
     public void notifyAddr(PeerAddress addr) {
         Log.tracev("New address {0}", addr);
@@ -71,6 +52,24 @@ public class PeerDiscoveryDirectory {
                 _entries.removeMapping(entry.getKey(), entry.getValue());
             }
             return partitioned.get(false).stream().map(Map.Entry::getKey).collect(Collectors.toUnmodifiableSet());
+        }
+    }
+
+    private record PeerEntry(PeerAddress addr, long lastSeen) {
+        public PeerEntry withLastSeen(long lastSeen) {
+            return new PeerEntry(addr, lastSeen);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()) return false;
+            PeerEntry peerEntry = (PeerEntry) o;
+            return Objects.equals(addr, peerEntry.addr);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(addr);
         }
     }
 }

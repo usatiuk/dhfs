@@ -19,6 +19,9 @@ import java.util.stream.Stream;
 
 @ApplicationScoped
 public class SyncHandler {
+    private final Map<Class<? extends JDataRemote>, ObjSyncHandler> _objToSyncHandler;
+    private final Map<Class<? extends JDataRemoteDto>, ObjSyncHandler> _dtoToSyncHandler;
+    private final Map<Class<? extends JData>, InitialSyncProcessor> _initialSyncProcessors;
     @Inject
     Transaction curTx;
     @Inject
@@ -31,10 +34,6 @@ public class SyncHandler {
     DefaultObjSyncHandler defaultObjSyncHandler;
     @Inject
     RemoteTransaction remoteTx;
-
-    private final Map<Class<? extends JDataRemote>, ObjSyncHandler> _objToSyncHandler;
-    private final Map<Class<? extends JDataRemoteDto>, ObjSyncHandler> _dtoToSyncHandler;
-    private final Map<Class<? extends JData>, InitialSyncProcessor> _initialSyncProcessors;
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
 

@@ -26,19 +26,17 @@ import java.util.stream.Collectors;
 
 @ApplicationScoped
 public class RemoteObjectServiceClient {
+    private final ExecutorService _batchExecutor = Executors.newVirtualThreadPerTaskExecutor();
     @Inject
     PersistentPeerDataService persistentPeerDataService;
-
     @Inject
     RpcClientFactory rpcClientFactory;
-
     @Inject
     TransactionManager txm;
     @Inject
     Transaction curTx;
     @Inject
     RemoteTransaction remoteTx;
-
     @Inject
     SyncHandler syncHandler;
     @Inject
@@ -47,8 +45,6 @@ public class RemoteObjectServiceClient {
     ProtoSerializer<OpP, Op> opProtoSerializer;
     @Inject
     ProtoSerializer<GetObjectReply, ReceivedObject> receivedObjectProtoSerializer;
-
-    private final ExecutorService _batchExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     public Pair<PeerId, ReceivedObject> getSpecificObject(JObjectKey key, PeerId peerId) {
         return rpcClientFactory.withObjSyncClient(peerId, (peer, client) -> {

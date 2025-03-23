@@ -3,7 +3,6 @@ package com.usatiuk.kleppmanntree;
 import org.pcollections.PMap;
 
 import java.io.Serializable;
-import java.util.Map;
 
 public interface TreeNode<TimestampT extends Comparable<TimestampT>, PeerIdT extends Comparable<PeerIdT>, MetaT extends NodeMeta, NodeIdT> extends Serializable {
     NodeIdT key();

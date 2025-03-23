@@ -7,13 +7,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class SyncHelper {
-    public enum ChangelogCmpResult {
-        EQUAL,
-        NEWER,
-        OLDER,
-        CONFLICT
-    }
-
     public static ChangelogCmpResult compareChangelogs(PMap<PeerId, Long> current, PMap<PeerId, Long> other) {
         boolean hasLower = false;
         boolean hasHigher = false;
@@ -34,6 +27,13 @@ public class SyncHelper {
             return ChangelogCmpResult.NEWER;
 
         return ChangelogCmpResult.EQUAL;
+    }
+
+    public enum ChangelogCmpResult {
+        EQUAL,
+        NEWER,
+        OLDER,
+        CONFLICT
     }
 
 //    public static PMap<PeerId,Long> mergeChangelogs(PMap<PeerId, Long> current, PMap<PeerId, Long> other) {

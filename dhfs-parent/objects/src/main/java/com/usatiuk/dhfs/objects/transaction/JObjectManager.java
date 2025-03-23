@@ -26,13 +26,18 @@ import java.util.stream.Stream;
 @ApplicationScoped
 public class JObjectManager {
     private final List<PreCommitTxHook> _preCommitTxHooks;
-    private boolean _ready = false;
     @Inject
     SnapshotManager snapshotManager;
     @Inject
     TransactionFactory transactionFactory;
     @Inject
     LockManager lockManager;
+    private boolean _ready = false;
+
+    JObjectManager(Instance<PreCommitTxHook> preCommitTxHooks) {
+        _preCommitTxHooks = List.copyOf(preCommitTxHooks.stream().sorted(Comparator.comparingInt(PreCommitTxHook::getPriority)).toList());
+        Log.debugv("Pre-commit hooks: {0}", String.join("->", _preCommitTxHooks.stream().map(Objects::toString).toList()));
+    }
 
     private void verifyReady() {
         if (!_ready) throw new IllegalStateException("Wrong service order!");
@@ -40,11 +45,6 @@ public class JObjectManager {
 
     void init(@Observes @Priority(200) StartupEvent event) {
         _ready = true;
-    }
-
-    JObjectManager(Instance<PreCommitTxHook> preCommitTxHooks) {
-        _preCommitTxHooks = List.copyOf(preCommitTxHooks.stream().sorted(Comparator.comparingInt(PreCommitTxHook::getPriority)).toList());
-        Log.debugv("Pre-commit hooks: {0}", String.join("->", _preCommitTxHooks.stream().map(Objects::toString).toList()));
     }
 
     public TransactionPrivate createTransaction() {
