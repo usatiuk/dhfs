@@ -54,7 +54,7 @@ public class OpPusher {
                     var tree = jKleppmannTreeManager.getTree(pd.key());
 
                     if (!tree.hasPendingOpsForHost(entry.peer()))
-                        return null;
+                        return List.of(tree.getPeriodicPushOp());
 
                     var ops = tree.getPendingOpsForHost(entry.peer(), 1);
 

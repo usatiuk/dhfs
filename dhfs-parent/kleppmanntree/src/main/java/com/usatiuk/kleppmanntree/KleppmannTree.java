@@ -187,16 +187,14 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         return true;
     }
 
-    public boolean updateExternalTimestamp(PeerIdT from, TimestampT timestamp) {
-        // TODO: Ideally no point in this separate locking?
+    public void updateExternalTimestamp(PeerIdT from, TimestampT timestamp) {
         var gotExt = _storage.getPeerTimestampLog().getForPeer(from);
         var gotSelf = _storage.getPeerTimestampLog().getForPeer(_peers.getSelfId());
-        if ((gotExt != null && gotExt.compareTo(timestamp) >= 0)
-                && (gotSelf != null && gotSelf.compareTo(_clock.peekTimestamp()) >= 0)) return false;
-        updateTimestampImpl(_peers.getSelfId(), _clock.peekTimestamp()); // FIXME:? Kind of a hack?
-        updateTimestampImpl(from, timestamp);
+        if (!(gotExt != null && gotExt.compareTo(timestamp) >= 0))
+            updateTimestampImpl(from, timestamp);
+        if (!(gotSelf != null && gotSelf.compareTo(_clock.peekTimestamp()) >= 0))
+            updateTimestampImpl(_peers.getSelfId(), _clock.peekTimestamp()); // FIXME:? Kind of a hack?
         tryTrimLog();
-        return true;
     }
 
     private void applyOp(PeerIdT from, OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> op, boolean failCreatingIfExists) {

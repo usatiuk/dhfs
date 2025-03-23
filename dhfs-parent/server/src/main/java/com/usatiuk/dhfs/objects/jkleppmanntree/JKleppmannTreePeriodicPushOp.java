@@ -1,26 +1,17 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree;
 
+import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.PeerId;
+import com.usatiuk.dhfs.objects.repository.invalidation.Op;
 
-public class JKleppmannTreePeriodicPushOp {
-    private final PeerId _from;
-    private final long _timestamp;
+import java.io.Serializable;
+import java.util.Collection;
+import java.util.List;
 
-    public JKleppmannTreePeriodicPushOp(PeerId from, long timestamp) {
-        _from = from;
-        _timestamp = timestamp;
+public record JKleppmannTreePeriodicPushOp(JObjectKey treeName, PeerId from,
+                                           long timestamp) implements Op, Serializable {
+    @Override
+    public Collection<JObjectKey> getEscapedRefs() {
+        return List.of();
     }
-
-    public PeerId getFrom() {
-        return _from;
-    }
-
-    public long getTimestamp() {
-        return _timestamp;
-    }
-
-//    @Override
-//    public Collection<String> getEscapedRefs() {
-//        return List.of();
-//    }
 }

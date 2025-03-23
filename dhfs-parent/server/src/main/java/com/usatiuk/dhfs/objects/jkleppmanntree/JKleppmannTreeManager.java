@@ -6,6 +6,7 @@ import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaDirectory;
 import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreePersistentData;
+import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.objects.repository.invalidation.Op;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerInfoService;
 import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
@@ -34,6 +35,8 @@ public class JKleppmannTreeManager {
     JKleppmannTreePeerInterface peerInterface;
     @Inject
     PeerInfoService peerInfoService;
+    @Inject
+    PersistentPeerDataService persistentPeerDataService;
 
     public JKleppmannTree getTree(JObjectKey name, LockingStrategy lockingStrategy) {
         return txManager.executeTx(() -> {
@@ -113,6 +116,9 @@ public class JKleppmannTreeManager {
 
         //        @Override
         public void commitOpForHost(PeerId host, Op op) {
+            if (op instanceof JKleppmannTreePeriodicPushOp)
+                return;
+
             if (!(op instanceof JKleppmannTreeOpWrapper jop))
                 throw new IllegalArgumentException("Invalid incoming op type for JKleppmannTree: " + op.getClass());
 
@@ -133,9 +139,10 @@ public class JKleppmannTreeManager {
         }
 
         //        @Override
-        public boolean acceptExternalOp(PeerId from, Op op) {
-            if (op instanceof JKleppmannTreePeriodicPushOp pushOp) {
-                return _tree.updateExternalTimestamp(pushOp.getFrom(), pushOp.getTimestamp());
+        public void acceptExternalOp(PeerId from, Op op) {
+            if (op instanceof JKleppmannTreePeriodicPushOp(JObjectKey treeName, PeerId from1, long timestamp)) {
+                _tree.updateExternalTimestamp(from1, timestamp);
+                return;
             }
 
             if (!(op instanceof JKleppmannTreeOpWrapper jop))
@@ -192,13 +199,11 @@ public class JKleppmannTreeManager {
 //                    }
 //                }
             }
-            return true;
         }
 
-//        @Override
-//        public Op getPeriodicPushOp() {
-//            return new JKleppmannTreePeriodicPushOp(persistentPeerDataService.getSelfUuid(), _clock.peekTimestamp());
-//        }
+        public Op getPeriodicPushOp() {
+            return new JKleppmannTreePeriodicPushOp(_treeName, persistentPeerDataService.getSelfUuid(), _clock.peekTimestamp());
+        }
 
 //        @Override
 //        public void addToTx() {
