@@ -10,6 +10,6 @@ import lombok.Getter;
 @Getter
 public class SimpleObject extends AbstractObject {
     public int numfield = 0;
-    public ByteString someBytes;
     private String name;
+    public ByteString someBytes;
 }
