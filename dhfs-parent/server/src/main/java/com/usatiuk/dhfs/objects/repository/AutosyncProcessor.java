@@ -34,6 +34,9 @@ public class AutosyncProcessor {
     Transaction curTx;
     @Inject
     RemoteTransaction remoteTx;
+    @ConfigProperty(name = "dhfs.objects.autosync.download-all")
+    boolean downloadAll;
+
     private ExecutorService _autosyncExcecutor;
 
     void init(@Observes @Priority(300) StartupEvent event) {
@@ -46,31 +49,32 @@ public class AutosyncProcessor {
             _autosyncExcecutor.submit(this::autosync);
         }
 
-        executorService.submit(() -> {
-            Log.info("Adding all to autosync");
-            List<JObjectKey> objs = new LinkedList<>();
-            txm.run(() -> {
-                try (var it = curTx.getIterator(IteratorStart.GE, JObjectKey.first())) {
-                    while (it.hasNext()) {
-                        var key = it.peekNextKey();
-                        objs.add(key);
-                        // TODO: Nested transactions
-                        it.skip();
-                    }
-                }
-            });
-
-            for (var obj : objs) {
+        if (downloadAll)
+            executorService.submit(() -> {
+                Log.info("Adding all to autosync");
+                List<JObjectKey> objs = new LinkedList<>();
                 txm.run(() -> {
-                    var gotObj = curTx.get(JData.class, obj).orElse(null);
-                    if (!(gotObj instanceof RemoteObjectMeta meta))
-                        return;
-                    if (!meta.hasLocalData())
-                        add(meta.key());
+                    try (var it = curTx.getIterator(IteratorStart.GE, JObjectKey.first())) {
+                        while (it.hasNext()) {
+                            var key = it.peekNextKey();
+                            objs.add(key);
+                            // TODO: Nested transactions
+                            it.skip();
+                        }
+                    }
                 });
-            }
-            Log.info("Adding all to autosync: finished");
-        });
+
+                for (var obj : objs) {
+                    txm.run(() -> {
+                        var gotObj = curTx.get(JData.class, obj).orElse(null);
+                        if (!(gotObj instanceof RemoteObjectMeta meta))
+                            return;
+                        if (!meta.hasLocalData())
+                            add(meta.key());
+                    });
+                }
+                Log.info("Adding all to autosync: finished");
+            });
     }
 
     void shutdown(@Observes @Priority(10) ShutdownEvent event) {
