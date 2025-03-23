@@ -23,7 +23,12 @@ public class DataLocker {
                             if (tag.owner == Thread.currentThread()) {
                                 return DUMMY_LOCK;
                             }
-                            tag.wait();
+                            tag.wait(4000L);
+                            if (!tag.released) {
+                                System.out.println("Timeout waiting for lock: " + data);
+                                System.exit(1);
+                                throw new InterruptedException();
+                            }
                         }
                         continue;
                     }
