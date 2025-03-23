@@ -105,7 +105,10 @@ public class InvalidationQueueService {
 
                     for (var e : data) {
                         // TODO: Race?
-                        if (peerInfoService.getPeerInfo(e.peer()).isEmpty()) continue;
+                        if (!peerInfoService.existsPeer(e.peer())) {
+                            Log.warnv("Will ignore invalidation of {0} to {1}, peer not found", e.key(), e.peer());
+                            continue;
+                        }
 
                         if (!remoteHostManager.isReachable(e.peer())) {
                             deferredInvalidationQueueService.defer(e);

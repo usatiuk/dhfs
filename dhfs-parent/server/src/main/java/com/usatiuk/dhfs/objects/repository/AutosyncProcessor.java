@@ -102,11 +102,20 @@ public class AutosyncProcessor {
                     JObjectKey finalName = name;
                     boolean ok = txm.run(() -> {
                         var obj = remoteTx.getMeta(finalName).orElse(null);
-                        if (obj == null) return true;
-                        if (obj.hasLocalData()) return true;
+                        if (obj == null) {
+                            Log.debugv("Not downloading object {0}, not found", finalName);
+                            return true;
+                        }
+                        if (obj.hasLocalData()) {
+                            Log.debugv("Not downloading object {0}, already have local data", finalName);
+                            return true;
+                        }
                         var data = remoteTx.getData(JDataRemote.class, finalName);
                         return data.isPresent();
                     });
+                    if (ok) {
+                        Log.debugv("Downloaded object {0}", name);
+                    }
                     if (!ok) {
                         Log.debug("Failed downloading object " + name + ", will retry.");
                         _retries.add(name);

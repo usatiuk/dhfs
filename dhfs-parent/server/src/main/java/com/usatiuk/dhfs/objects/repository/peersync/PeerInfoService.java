@@ -49,6 +49,16 @@ public class PeerInfoService {
 
     }
 
+    public boolean existsPeer(PeerId peer) {
+        return jObjectTxManager.run(() -> {
+            var gotKey = getTreeR().traverse(List.of(JKleppmannTreeNodeMetaPeer.peerIdToNodeId(peer).name()));
+            if (gotKey == null) {
+                return false;
+            }
+            return true;
+        });
+    }
+
     public Optional<PeerInfo> getPeerInfo(PeerId peer) {
         return jObjectTxManager.run(() -> {
             var gotKey = getTreeR().traverse(List.of(JKleppmannTreeNodeMetaPeer.peerIdToNodeId(peer).name()));

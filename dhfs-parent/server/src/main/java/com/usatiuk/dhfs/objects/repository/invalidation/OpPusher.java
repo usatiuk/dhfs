@@ -72,6 +72,7 @@ public class OpPusher {
         if (info == null) {
             return;
         }
+        Log.debugv("Pushing invalidation: entry {0}, sending {1}", entry, info);
         remoteObjectServiceClient.pushOps(entry.peer(), info);
         txm.run(() -> {
             var obj = curTx.get(JData.class, entry.key()).orElse(null);
