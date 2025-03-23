@@ -1,4 +1,4 @@
 package com.usatiuk.dhfs.objects.jmap;
 
-public interface JMapKey {
+public interface JMapKey extends Comparable<JMapKey> {
 }

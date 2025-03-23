@@ -1,27 +1,25 @@
 package com.usatiuk.dhfs.objects.jkleppmanntree.structs;
 
-import com.usatiuk.dhfs.objects.JDataRefcounted;
-import com.usatiuk.dhfs.objects.JObjectKey;
-import com.usatiuk.dhfs.objects.PeerId;
+import com.usatiuk.dhfs.objects.*;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
 import com.usatiuk.kleppmanntree.LogRecord;
 import com.usatiuk.kleppmanntree.OpMove;
 import org.pcollections.PCollection;
 import org.pcollections.PMap;
 import org.pcollections.PSortedMap;
-import org.pcollections.TreePMap;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
 
 public record JKleppmannTreePersistentData(
-        JObjectKey key, PCollection<JObjectKey> refsFrom, boolean frozen,
+        JObjectKey key, PCollection<JDataRef> refsFrom, boolean frozen,
         long clock,
         PMap<PeerId, PSortedMap<CombinedTimestamp<Long, PeerId>, OpMove<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>>> queues,
         PMap<PeerId, Long> peerTimestampLog,
         PSortedMap<CombinedTimestamp<Long, PeerId>, LogRecord<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>> log
 ) implements JDataRefcounted {
     @Override
-    public JKleppmannTreePersistentData withRefsFrom(PCollection<JObjectKey> refs) {
+    public JKleppmannTreePersistentData withRefsFrom(PCollection<JDataRef> refs) {
         return new JKleppmannTreePersistentData(key, refs, frozen, clock, queues, peerTimestampLog, log);
     }
 
@@ -47,7 +45,8 @@ public record JKleppmannTreePersistentData(
     }
 
     @Override
-    public Collection<JObjectKey> collectRefsTo() {
-        return List.of(new JObjectKey(key().name() + "_jt_trash"), new JObjectKey(key().name() + "_jt_root"));
+    public Collection<JDataRef> collectRefsTo() {
+        return List.of(new JObjectKey(key().name() + "_jt_trash"), new JObjectKey(key().name() + "_jt_root"))
+                .stream().<JDataRef>map(JDataNormalRef::new).toList();
     }
 }

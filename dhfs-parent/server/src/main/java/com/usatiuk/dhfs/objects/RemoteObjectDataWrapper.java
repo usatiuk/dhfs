@@ -5,7 +5,7 @@ import org.pcollections.PCollection;
 
 import java.util.Collection;
 
-public record RemoteObjectDataWrapper<T extends JDataRemote>(PCollection<JObjectKey> refsFrom,
+public record RemoteObjectDataWrapper<T extends JDataRemote>(PCollection<JDataRef> refsFrom,
                                                              boolean frozen,
                                                              T data) implements JDataRefcounted {
     public RemoteObjectDataWrapper(T data) {
@@ -13,7 +13,7 @@ public record RemoteObjectDataWrapper<T extends JDataRemote>(PCollection<JObject
     }
 
     @Override
-    public RemoteObjectDataWrapper<T> withRefsFrom(PCollection<JObjectKey> refs) {
+    public RemoteObjectDataWrapper<T> withRefsFrom(PCollection<JDataRef> refs) {
         return new RemoteObjectDataWrapper<>(refs, frozen, data);
     }
 
@@ -32,8 +32,8 @@ public record RemoteObjectDataWrapper<T extends JDataRemote>(PCollection<JObject
     }
 
     @Override
-    public Collection<JObjectKey> collectRefsTo() {
-        return data.collectRefsTo();
+    public Collection<JDataRef> collectRefsTo() {
+        return data.collectRefsTo().stream().<JDataRef>map(JDataNormalRef::new).toList();
     }
 
     @Override

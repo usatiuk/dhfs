@@ -6,7 +6,7 @@ import com.usatiuk.dhfs.objects.JObjectKey;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.tuple.Pair;
 
-public class JMapIterator<K extends JMapKey & Comparable<K>> implements CloseableKvIterator<K, JMapEntry<K>> {
+public class JMapIterator<K extends JMapKey> implements CloseableKvIterator<K, JMapEntry<K>> {
     private final CloseableKvIterator<JObjectKey, JData> _backing;
     private final JObjectKey _prefix;
     private boolean _hasNext = true;

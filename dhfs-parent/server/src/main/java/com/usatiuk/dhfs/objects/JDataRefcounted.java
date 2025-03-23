@@ -6,15 +6,15 @@ import java.util.Collection;
 import java.util.List;
 
 public interface JDataRefcounted extends JData {
-    PCollection<JObjectKey> refsFrom();
+    PCollection<JDataRef> refsFrom();
 
-    JDataRefcounted withRefsFrom(PCollection<JObjectKey> refs);
+    JDataRefcounted withRefsFrom(PCollection<JDataRef> refs);
 
     boolean frozen();
 
     JDataRefcounted withFrozen(boolean frozen);
 
-    default Collection<JObjectKey> collectRefsTo() {
+    default Collection<JDataRef> collectRefsTo() {
         return List.of();
     }
 }

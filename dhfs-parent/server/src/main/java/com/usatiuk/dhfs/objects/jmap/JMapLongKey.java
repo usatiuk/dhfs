@@ -3,7 +3,7 @@ package com.usatiuk.dhfs.objects.jmap;
 import javax.annotation.Nonnull;
 import java.io.Serializable;
 
-public record JMapLongKey(long key) implements JMapKey, Comparable<JMapLongKey>, Serializable {
+public record JMapLongKey(long key) implements JMapKey, Comparable<JMapKey>, Serializable {
     public static JMapLongKey of(long key) {
         return new JMapLongKey(key);
     }
@@ -18,7 +18,10 @@ public record JMapLongKey(long key) implements JMapKey, Comparable<JMapLongKey>,
     }
 
     @Override
-    public int compareTo(@Nonnull JMapLongKey o) {
-        return Long.compare(key, o.key);
+    public int compareTo(@Nonnull JMapKey o) {
+        if (!(o instanceof JMapLongKey lk)) {
+            throw new IllegalArgumentException("Unknown type of JMapKey");
+        }
+        return Long.compare(key, lk.key);
     }
 }

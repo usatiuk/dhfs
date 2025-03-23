@@ -1,6 +1,9 @@
 package com.usatiuk.dhfs.objects.jmap;
 
-import com.usatiuk.dhfs.objects.*;
+import com.usatiuk.dhfs.objects.JData;
+import com.usatiuk.dhfs.objects.JDataRefcounted;
+import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.dhfs.objects.RemoteObjectMeta;
 import com.usatiuk.dhfs.objects.transaction.PreCommitTxHook;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import io.quarkus.logging.Log;
@@ -32,9 +35,9 @@ public class JMapRefcounterTxHook implements PreCommitTxHook {
         var oldRef = oldMe.ref();
         var curRef = me.ref();
         var referencedOld = getRef(oldRef);
-        curTx.put(referencedOld.withRefsFrom(referencedOld.refsFrom().minus(key)));
+        curTx.put(referencedOld.withRefsFrom(referencedOld.refsFrom().minus(new JMapRef(me.holder(), me.selfKey()))));
         var referencedCur = getRef(curRef);
-        curTx.put(referencedCur.withRefsFrom(referencedCur.refsFrom().plus(key)));
+        curTx.put(referencedCur.withRefsFrom(referencedCur.refsFrom().plus(new JMapRef(me.holder(), me.selfKey()))));
         Log.tracev("Removed ref from {0} to {1}, added ref to {2}", key, oldRef, curRef);
     }
 
@@ -46,7 +49,7 @@ public class JMapRefcounterTxHook implements PreCommitTxHook {
 
         var curRef = me.ref();
         var referencedCur = getRef(curRef);
-        curTx.put(referencedCur.withRefsFrom(referencedCur.refsFrom().plus(key)));
+        curTx.put(referencedCur.withRefsFrom(referencedCur.refsFrom().plus(new JMapRef(me.holder(), me.selfKey()))));
         Log.tracev("Added ref from {0} to {1}", key, curRef);
     }
 
@@ -58,7 +61,7 @@ public class JMapRefcounterTxHook implements PreCommitTxHook {
 
         var oldRef = me.ref();
         var referencedOld = getRef(oldRef);
-        curTx.put(referencedOld.withRefsFrom(referencedOld.refsFrom().minus(key)));
+        curTx.put(referencedOld.withRefsFrom(referencedOld.refsFrom().minus(new JMapRef(me.holder(), me.selfKey()))));
         Log.tracev("Removed ref from {0} to {1}", key, oldRef);
     }
 

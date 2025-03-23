@@ -141,8 +141,8 @@ public class RemoteObjectServiceServer implements DhfsObjectSyncGrpc {
 
             if (!builder.getDeletionCandidate()) {
                 for (var r : obj.refsFrom()) {
-                    builder.addReferrers(JObjectKeyP.newBuilder().setName(r.toString()).build());
-                    curTx.onCommit(() -> autosyncProcessor.add(r));
+                    builder.addReferrers(JObjectKeyP.newBuilder().setName(r.obj().toString()).build());
+                    curTx.onCommit(() -> autosyncProcessor.add(r.obj()));
                 }
             }
         });

@@ -2,7 +2,7 @@ package com.usatiuk.dhfs.objects.iterators;
 
 import org.apache.commons.lang3.tuple.Pair;
 
-public class ReversedKvIterator<K extends Comparable<K>, V> implements CloseableKvIterator<K, V> {
+public class ReversedKvIterator<K extends Comparable<? super K>, V> implements CloseableKvIterator<K, V> {
     private final CloseableKvIterator<K, V> _backing;
 
     public ReversedKvIterator(CloseableKvIterator<K, V> backing) {

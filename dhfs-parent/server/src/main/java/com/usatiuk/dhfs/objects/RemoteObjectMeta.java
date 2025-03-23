@@ -5,7 +5,7 @@ import org.pcollections.*;
 import java.util.Collection;
 import java.util.List;
 
-public record RemoteObjectMeta(PCollection<JObjectKey> refsFrom, boolean frozen,
+public record RemoteObjectMeta(PCollection<JDataRef> refsFrom, boolean frozen,
                                JObjectKey key,
                                PMap<PeerId, Long> knownRemoteVersions,
                                Class<? extends JDataRemote> knownType,
@@ -53,7 +53,7 @@ public record RemoteObjectMeta(PCollection<JObjectKey> refsFrom, boolean frozen,
     }
 
     @Override
-    public RemoteObjectMeta withRefsFrom(PCollection<JObjectKey> refs) {
+    public RemoteObjectMeta withRefsFrom(PCollection<JDataRef> refs) {
         return new RemoteObjectMeta(refs, frozen, key, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, hasLocalData);
     }
 
@@ -91,8 +91,8 @@ public record RemoteObjectMeta(PCollection<JObjectKey> refsFrom, boolean frozen,
     }
 
     @Override
-    public Collection<JObjectKey> collectRefsTo() {
-        if (hasLocalData) return List.of(dataKey());
+    public Collection<JDataRef> collectRefsTo() {
+        if (hasLocalData) return List.of(new JDataNormalRef(dataKey()));
         return List.of();
     }
 

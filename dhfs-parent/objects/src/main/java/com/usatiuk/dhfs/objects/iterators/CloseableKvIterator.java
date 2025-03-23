@@ -5,7 +5,7 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.Iterator;
 
-public interface CloseableKvIterator<K extends Comparable<K>, V> extends Iterator<Pair<K, V>>, AutoCloseableNoThrow {
+public interface CloseableKvIterator<K extends Comparable<? super K>, V> extends Iterator<Pair<K, V>>, AutoCloseableNoThrow {
     K peekNextKey();
 
     void skip();
@@ -19,6 +19,6 @@ public interface CloseableKvIterator<K extends Comparable<K>, V> extends Iterato
     void skipPrev();
 
     default CloseableKvIterator<K, V> reversed() {
-        return new ReversedKvIterator<>(this);
+        return new ReversedKvIterator<K, V>(this);
     }
 }
