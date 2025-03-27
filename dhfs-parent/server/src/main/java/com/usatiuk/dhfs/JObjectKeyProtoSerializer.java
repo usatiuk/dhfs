@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs;
 
 import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.persistence.JObjectKeyP;
 import jakarta.inject.Singleton;
 

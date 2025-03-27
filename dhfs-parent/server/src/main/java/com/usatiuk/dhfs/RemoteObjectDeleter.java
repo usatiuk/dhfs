@@ -1,12 +1,12 @@
 package com.usatiuk.dhfs;
 
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.repository.AutosyncProcessor;
 import com.usatiuk.dhfs.repository.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.repository.peersync.PeerInfo;
 import com.usatiuk.dhfs.repository.peersync.PeerInfoService;
-import com.usatiuk.dhfs.objects.transaction.Transaction;
-import com.usatiuk.dhfs.objects.transaction.TransactionManager;
+import com.usatiuk.objects.transaction.Transaction;
+import com.usatiuk.objects.transaction.TransactionManager;
 import com.usatiuk.dhfs.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;

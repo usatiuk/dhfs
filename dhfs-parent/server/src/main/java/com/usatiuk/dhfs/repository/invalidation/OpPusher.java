@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.repository.invalidation;
 
-import com.usatiuk.dhfs.objects.JData;
+import com.usatiuk.objects.JData;
 import com.usatiuk.dhfs.RemoteObjectMeta;
 import com.usatiuk.dhfs.RemoteTransaction;
 import com.usatiuk.dhfs.jkleppmanntree.JKleppmannTreeManager;
@@ -9,8 +9,8 @@ import com.usatiuk.dhfs.repository.JDataRemoteDto;
 import com.usatiuk.dhfs.repository.JDataRemotePush;
 import com.usatiuk.dhfs.repository.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.repository.syncmap.DtoMapperService;
-import com.usatiuk.dhfs.objects.transaction.Transaction;
-import com.usatiuk.dhfs.objects.transaction.TransactionManager;
+import com.usatiuk.objects.transaction.Transaction;
+import com.usatiuk.objects.transaction.TransactionManager;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

@@ -1,9 +1,9 @@
 package com.usatiuk.dhfs;
 
-import com.usatiuk.dhfs.objects.JObjectKey;
-import com.usatiuk.dhfs.objects.testobjs.TestRefcount;
-import com.usatiuk.dhfs.objects.transaction.Transaction;
-import com.usatiuk.dhfs.objects.transaction.TransactionManager;
+import com.usatiuk.objects.JObjectKey;
+import com.usatiuk.objects.testobjs.TestRefcount;
+import com.usatiuk.objects.transaction.Transaction;
+import com.usatiuk.objects.transaction.TransactionManager;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;

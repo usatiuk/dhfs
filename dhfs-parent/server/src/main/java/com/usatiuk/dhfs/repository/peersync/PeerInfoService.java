@@ -1,15 +1,15 @@
 package com.usatiuk.dhfs.repository.peersync;
 
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.dhfs.RemoteTransaction;
 import com.usatiuk.dhfs.jkleppmanntree.JKleppmannTreeManager;
 import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.repository.peersync.structs.JKleppmannTreeNodeMetaPeer;
-import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
-import com.usatiuk.dhfs.objects.transaction.Transaction;
-import com.usatiuk.dhfs.objects.transaction.TransactionManager;
+import com.usatiuk.objects.transaction.LockingStrategy;
+import com.usatiuk.objects.transaction.Transaction;
+import com.usatiuk.objects.transaction.TransactionManager;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

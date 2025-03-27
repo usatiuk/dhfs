@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs;
 
 import com.usatiuk.dhfs.jmap.JMapRef;
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKey;
 
 public record JDataNormalRef(JObjectKey obj) implements JDataRef {
     @Override

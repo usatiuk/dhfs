@@ -3,7 +3,7 @@ package com.usatiuk.dhfs.benchmarks;
 import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.TempDataProfile;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKey;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;

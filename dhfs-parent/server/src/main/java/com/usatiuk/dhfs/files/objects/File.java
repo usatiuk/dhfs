@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.files.objects;
 
 import com.usatiuk.dhfs.JDataRemote;
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.jmap.JMapHolder;
 import com.usatiuk.dhfs.jmap.JMapLongKey;
 import com.usatiuk.dhfs.repository.JDataRemoteDto;

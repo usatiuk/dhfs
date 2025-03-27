@@ -1,11 +1,11 @@
 package com.usatiuk.dhfs;
 
 import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreePersistentData;
-import com.usatiuk.dhfs.objects.JData;
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.JData;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.repository.invalidation.InvalidationQueueService;
-import com.usatiuk.dhfs.objects.transaction.PreCommitTxHook;
-import com.usatiuk.dhfs.objects.transaction.Transaction;
+import com.usatiuk.objects.transaction.PreCommitTxHook;
+import com.usatiuk.objects.transaction.Transaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 

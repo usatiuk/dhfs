@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.repository.invalidation;
 
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.dhfs.repository.PeerManager;
 import com.usatiuk.dhfs.repository.PersistentPeerDataService;

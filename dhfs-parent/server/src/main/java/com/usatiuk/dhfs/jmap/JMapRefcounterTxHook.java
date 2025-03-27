@@ -1,11 +1,11 @@
 package com.usatiuk.dhfs.jmap;
 
-import com.usatiuk.dhfs.objects.JData;
+import com.usatiuk.objects.JData;
 import com.usatiuk.dhfs.JDataRefcounted;
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.RemoteObjectMeta;
-import com.usatiuk.dhfs.objects.transaction.PreCommitTxHook;
-import com.usatiuk.dhfs.objects.transaction.Transaction;
+import com.usatiuk.objects.transaction.PreCommitTxHook;
+import com.usatiuk.objects.transaction.Transaction;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

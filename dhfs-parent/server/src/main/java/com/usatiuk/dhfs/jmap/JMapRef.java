@@ -2,7 +2,7 @@ package com.usatiuk.dhfs.jmap;
 
 import com.usatiuk.dhfs.JDataNormalRef;
 import com.usatiuk.dhfs.JDataRef;
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKey;
 
 import java.util.Comparator;
 

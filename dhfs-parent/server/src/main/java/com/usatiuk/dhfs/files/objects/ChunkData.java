@@ -2,7 +2,7 @@ package com.usatiuk.dhfs.files.objects;
 
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.JDataRemote;
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.repository.JDataRemoteDto;
 
 public record ChunkData(JObjectKey key, ByteString data) implements JDataRemote, JDataRemoteDto {

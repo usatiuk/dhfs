@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs;
 
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.repository.JDataRemoteDto;
 
 import java.io.Serializable;

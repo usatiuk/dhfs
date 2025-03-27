@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.jkleppmanntree.structs;
 
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKey;
 
 import java.util.Objects;
 

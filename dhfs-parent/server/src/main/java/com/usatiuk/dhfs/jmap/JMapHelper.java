@@ -1,9 +1,9 @@
 package com.usatiuk.dhfs.jmap;
 
-import com.usatiuk.dhfs.objects.JObjectKey;
-import com.usatiuk.dhfs.objects.iterators.CloseableKvIterator;
-import com.usatiuk.dhfs.objects.iterators.IteratorStart;
-import com.usatiuk.dhfs.objects.transaction.Transaction;
+import com.usatiuk.objects.JObjectKey;
+import com.usatiuk.objects.iterators.CloseableKvIterator;
+import com.usatiuk.objects.iterators.IteratorStart;
+import com.usatiuk.objects.transaction.Transaction;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

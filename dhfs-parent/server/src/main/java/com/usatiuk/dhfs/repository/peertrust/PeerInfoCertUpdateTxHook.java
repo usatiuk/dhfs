@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.repository.peertrust;
 
-import com.usatiuk.dhfs.objects.JData;
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.JData;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.RemoteObjectDataWrapper;
 import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.repository.PersistentPeerDataService;
@@ -9,8 +9,8 @@ import com.usatiuk.dhfs.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.repository.peersync.PeerInfo;
 import com.usatiuk.dhfs.repository.peersync.PeerInfoService;
 import com.usatiuk.dhfs.repository.peersync.structs.JKleppmannTreeNodeMetaPeer;
-import com.usatiuk.dhfs.objects.transaction.PreCommitTxHook;
-import com.usatiuk.dhfs.objects.transaction.Transaction;
+import com.usatiuk.objects.transaction.PreCommitTxHook;
+import com.usatiuk.objects.transaction.Transaction;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

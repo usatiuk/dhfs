@@ -1,6 +1,6 @@
 package com.usatiuk.dhfs.files.objects;
 
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.jmap.JMapHelper;
 import com.usatiuk.dhfs.jmap.JMapLongKey;
 import jakarta.enterprise.context.ApplicationScoped;

@@ -2,7 +2,7 @@ package com.usatiuk.dhfs.jkleppmanntree.structs;
 
 import com.usatiuk.dhfs.JDataRef;
 import com.usatiuk.dhfs.JDataRefcounted;
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.dhfs.repository.peersync.structs.JKleppmannTreeNodeMetaPeer;
 import com.usatiuk.kleppmanntree.OpMove;

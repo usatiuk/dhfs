@@ -2,7 +2,7 @@ package com.usatiuk.dhfs.repository.peersync;
 
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.JDataRemote;
-import com.usatiuk.dhfs.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.dhfs.repository.CertificateTools;
 import com.usatiuk.dhfs.repository.JDataRemoteDto;
