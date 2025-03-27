@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.files.objects;
 
-import com.usatiuk.dhfs.objects.jmap.JMapHelper;
-import com.usatiuk.dhfs.objects.repository.syncmap.DtoMapper;
+import com.usatiuk.dhfs.jmap.JMapHelper;
+import com.usatiuk.dhfs.repository.syncmap.DtoMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 

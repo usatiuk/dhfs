@@ -2,8 +2,8 @@ package com.usatiuk.dhfs.files.objects;
 
 import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
 import com.usatiuk.dhfs.objects.JObjectKey;
-import com.usatiuk.dhfs.objects.persistence.ChunkDataP;
-import com.usatiuk.dhfs.objects.persistence.JObjectKeyP;
+import com.usatiuk.dhfs.persistence.ChunkDataP;
+import com.usatiuk.dhfs.persistence.JObjectKeyP;
 import jakarta.inject.Singleton;
 
 @Singleton

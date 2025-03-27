@@ -1,13 +1,17 @@
 package com.usatiuk.dhfs.files.objects;
 
+import com.usatiuk.dhfs.PeerId;
+import com.usatiuk.dhfs.RemoteObjectDataWrapper;
+import com.usatiuk.dhfs.RemoteObjectMeta;
+import com.usatiuk.dhfs.RemoteTransaction;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
 import com.usatiuk.dhfs.objects.*;
-import com.usatiuk.dhfs.objects.jkleppmanntree.JKleppmannTreeManager;
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaFile;
-import com.usatiuk.dhfs.objects.jmap.JMapHelper;
-import com.usatiuk.dhfs.objects.repository.ObjSyncHandler;
-import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
-import com.usatiuk.dhfs.objects.repository.SyncHelper;
+import com.usatiuk.dhfs.jkleppmanntree.JKleppmannTreeManager;
+import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeMetaFile;
+import com.usatiuk.dhfs.jmap.JMapHelper;
+import com.usatiuk.dhfs.repository.ObjSyncHandler;
+import com.usatiuk.dhfs.repository.PersistentPeerDataService;
+import com.usatiuk.dhfs.repository.SyncHelper;
 import com.usatiuk.dhfs.objects.transaction.LockingStrategy;
 import com.usatiuk.dhfs.objects.transaction.Transaction;
 import com.usatiuk.kleppmanntree.AlreadyExistsException;

@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs;
 
-import com.usatiuk.dhfs.objects.JDataRef;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.testobjs.TestRefcount;
 import com.usatiuk.dhfs.objects.transaction.Transaction;

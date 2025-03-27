@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.objects.testobjs;
 
-import com.usatiuk.dhfs.objects.JDataRef;
-import com.usatiuk.dhfs.objects.JDataRefcounted;
+import com.usatiuk.dhfs.JDataRef;
+import com.usatiuk.dhfs.JDataRefcounted;
 import com.usatiuk.dhfs.objects.JObjectKey;
 import org.pcollections.HashTreePSet;
 import org.pcollections.PCollection;

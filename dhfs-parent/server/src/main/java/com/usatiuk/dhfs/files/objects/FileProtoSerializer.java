@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.files.objects;
 
 import com.usatiuk.autoprotomap.runtime.ProtoSerializer;
-import com.usatiuk.dhfs.objects.persistence.FileDtoP;
+import com.usatiuk.dhfs.persistence.FileDtoP;
 import com.usatiuk.dhfs.utils.SerializationHelper;
 import jakarta.inject.Singleton;
 
