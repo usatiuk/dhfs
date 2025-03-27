@@ -597,7 +597,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 long start = curSize;
 
                 // Hack
-                HashMap<Long, ByteString> zeroCache = new HashMap<>();
+                HashMap<Long, ChunkData> zeroCache = new HashMap<>();
 
                 {
                     long cur = 0;
@@ -615,9 +615,9 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                         }
 
                         if (!zeroCache.containsKey(end - cur))
-                            zeroCache.put(end - cur, UnsafeByteOperations.unsafeWrap(new byte[Math.toIntExact(end - cur)]));
+                            zeroCache.put(end - cur, createChunk(UnsafeByteOperations.unsafeWrap(new byte[Math.toIntExact(end - cur)])));
 
-                        ChunkData newChunkData = createChunk(zeroCache.get(end - cur));
+                        ChunkData newChunkData = zeroCache.get(end - cur);
                         newChunks.put(start, newChunkData.key());
 
                         start += newChunkData.data().size();
