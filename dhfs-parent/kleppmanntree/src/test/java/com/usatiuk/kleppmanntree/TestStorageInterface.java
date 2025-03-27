@@ -14,6 +14,7 @@ public class TestStorageInterface implements StorageInterface<Long, Long, TestNo
         _peerId = peerId;
         _nodes.put(getRootId(), new TestTreeNode(getRootId(), null, null));
         _nodes.put(getTrashId(), new TestTreeNode(getTrashId(), null, null));
+        _nodes.put(getLostFoundId(), new TestTreeNode(getLostFoundId(), null, null));
     }
 
     @Override
@@ -24,6 +25,11 @@ public class TestStorageInterface implements StorageInterface<Long, Long, TestNo
     @Override
     public Long getTrashId() {
         return -1L;
+    }
+
+    @Override
+    public Long getLostFoundId() {
+        return -2L;
     }
 
     @Override

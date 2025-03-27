@@ -147,4 +147,19 @@ public class KleppmanTreeSimpleTest {
         var r1 = testNode1.getRecorded();
         Assertions.assertEquals(1, r1.size());
     }
+
+    @Test
+    void externalOpWithDummy() {
+        Long d1id = testNode1._storageInterface.getNewNodeId();
+        Long f1id = testNode1._storageInterface.getNewNodeId();
+
+        testNode1._tree.applyExternalOp(2L, new OpMove<>(
+                new CombinedTimestamp<>(2L, 2L), d1id, new TestNodeMetaFile("Hi", 123), f1id
+        ));
+        testNode1._tree.applyExternalOp(2L, new OpMove<>(
+                new CombinedTimestamp<>(3L, 2L), testNode1._storageInterface.getRootId(), new TestNodeMetaDir("HiDir"), d1id
+        ));
+
+        Assertions.assertEquals(f1id, testNode1._tree.traverse(List.of("HiDir", "Hi")));
+    }
 }

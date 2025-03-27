@@ -8,4 +8,17 @@ public record LogEffect<TimestampT extends Comparable<TimestampT>, PeerIdT exten
         NodeIdT newParentId,
         MetaT newMeta,
         NodeIdT childId) implements Serializable {
+    public String oldName() {
+        if (oldInfo.oldMeta() != null) {
+            return oldInfo.oldMeta().getName();
+        }
+        return childId.toString();
+    }
+
+    public String newName() {
+        if (newMeta != null) {
+            return newMeta.getName();
+        }
+        return childId.toString();
+    }
 }

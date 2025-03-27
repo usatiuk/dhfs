@@ -133,4 +133,39 @@ public class ResyncIT {
         });
     }
 
+    @Test
+    void folderAfterMove() throws IOException, InterruptedException, TimeoutException {
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "mkdir /root/dhfs_default/fuse/testd1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty1 > /root/dhfs_default/fuse/testd1/testf1").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "mv /root/dhfs_default/fuse/testd1 /root/dhfs_default/fuse/testd2").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty2 > /root/dhfs_default/fuse/testd2/testf2").getExitCode());
+
+        c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/data/stuff/self_uuid").getStdout();
+        c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/data/stuff/self_uuid").getStdout();
+
+        Assertions.assertDoesNotThrow(() -> UUID.fromString(c1uuid));
+        Assertions.assertDoesNotThrow(() -> UUID.fromString(c2uuid));
+
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("New address"), 60, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("New address"), 60, TimeUnit.SECONDS);
+
+        var c1curl = container1.execInContainer("/bin/sh", "-c",
+                "curl --header \"Content-Type: application/json\" " +
+                        "  --request PUT " +
+                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
+                        "  http://localhost:8080/objects-manage/known-peers");
+
+        var c2curl = container2.execInContainer("/bin/sh", "-c",
+                "curl --header \"Content-Type: application/json\" " +
+                        "  --request PUT " +
+                        "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
+                        "  http://localhost:8080/objects-manage/known-peers");
+
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+
+        await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty1\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testd2/testf1").getStdout()));
+        await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty2\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/testd2/testf2").getStdout()));
+    }
+
 }

@@ -49,6 +49,6 @@ public record JKleppmannTreePersistentData(
 
     @Override
     public Collection<JObjectKey> collectRefsTo() {
-        return List.of(new JObjectKey(key().name() + "_jt_trash"), new JObjectKey(key().name() + "_jt_root"));
+        return List.of(new JObjectKey(key().name() + "_jt_trash"), new JObjectKey(key().name() + "_jt_root"), new JObjectKey(key().name() + "_jt_lf"));
     }
 }

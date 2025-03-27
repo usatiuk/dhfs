@@ -2,10 +2,7 @@ package com.usatiuk.dhfs.objects.jkleppmanntree;
 
 import com.usatiuk.dhfs.objects.JObjectKey;
 import com.usatiuk.dhfs.objects.PeerId;
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNode;
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreeNodeMetaDirectory;
-import com.usatiuk.dhfs.objects.jkleppmanntree.structs.JKleppmannTreePersistentData;
+import com.usatiuk.dhfs.objects.jkleppmanntree.structs.*;
 import com.usatiuk.dhfs.objects.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.objects.repository.invalidation.Op;
 import com.usatiuk.dhfs.objects.repository.peersync.PeerInfoService;
@@ -56,6 +53,8 @@ public class JKleppmannTreeManager {
                 curTx.put(rootNode);
                 var trashNode = new JKleppmannTreeNode(JObjectKey.of(name.name() + "_jt_trash"), null, new JKleppmannTreeNodeMetaDirectory(""));
                 curTx.put(trashNode);
+                var lf_node = new JKleppmannTreeNode(JObjectKey.of(name.name() + "_jt_lf"), null, new JKleppmannTreeNodeMetaDirectory(""));
+                curTx.put(lf_node);
             }
             return new JKleppmannTree(data);
 //            opObjectRegistry.registerObject(tree);
@@ -265,6 +264,11 @@ public class JKleppmannTreeManager {
             @Override
             public JObjectKey getTrashId() {
                 return new JObjectKey(_treeName.name() + "_jt_trash");
+            }
+
+            @Override
+            public JObjectKey getLostFoundId() {
+                return new JObjectKey(_treeName.name() + "_jt_lf");
             }
 
             @Override

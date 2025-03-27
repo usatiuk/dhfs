@@ -61,9 +61,10 @@ public record JKleppmannTreeNode(JObjectKey key, PCollection<JDataRef> refsFrom,
     public Collection<JObjectKey> collectRefsTo() {
         return Stream.<JObjectKey>concat(children().values().stream(),
                 switch (meta()) {
-                    case JKleppmannTreeNodeMetaDirectory dir -> Stream.of();
+                    case JKleppmannTreeNodeMetaDirectory dir -> Stream.<JObjectKey>empty();
                     case JKleppmannTreeNodeMetaFile file -> Stream.of(file.getFileIno());
                     case JKleppmannTreeNodeMetaPeer peer -> Stream.of(peer.getPeerId());
+                    case null -> Stream.<JObjectKey>empty();
                     default -> throw new IllegalStateException("Unexpected value: " + meta());
                 }
         ).collect(Collectors.toUnmodifiableSet());

@@ -9,6 +9,8 @@ public interface StorageInterface<
 
     NodeIdT getTrashId();
 
+    NodeIdT getLostFoundId();
+
     NodeIdT getNewNodeId();
 
     TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> getById(NodeIdT id);

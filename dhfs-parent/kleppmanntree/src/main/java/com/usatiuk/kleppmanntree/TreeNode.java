@@ -1,5 +1,6 @@
 package com.usatiuk.kleppmanntree;
 
+import jakarta.annotation.Nullable;
 import org.pcollections.PMap;
 
 import java.io.Serializable;
@@ -11,7 +12,14 @@ public interface TreeNode<TimestampT extends Comparable<TimestampT>, PeerIdT ext
 
     OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> lastEffectiveOp();
 
+    @Nullable
     MetaT meta();
+
+    default String name() {
+        var meta = meta();
+        if (meta != null) return meta.getName();
+        return key().toString();
+    }
 
     PMap<String, NodeIdT> children();
 

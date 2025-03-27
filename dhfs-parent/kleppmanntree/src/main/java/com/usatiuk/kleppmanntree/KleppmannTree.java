@@ -1,5 +1,7 @@
 package com.usatiuk.kleppmanntree;
 
+import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
@@ -53,18 +55,20 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             var node = _storage.getById(effect.childId());
             var curParent = _storage.getById(effect.newParentId());
             {
-                var newCurParentChildren = curParent.children().minus(node.meta().getName());
+                var newCurParentChildren = curParent.children().minus(node.name());
                 curParent = curParent.withChildren(newCurParentChildren);
                 _storage.putNode(curParent);
             }
 
-            if (!node.meta().getClass().equals(effect.oldInfo().oldMeta().getClass()))
+            if (effect.oldInfo().oldMeta() != null
+                    && node.meta() != null
+                    && !node.meta().getClass().equals(effect.oldInfo().oldMeta().getClass()))
                 throw new IllegalArgumentException("Class mismatch for meta for node " + node.key());
 
             // Needs to be read after changing curParent, as it might be the same node
             var oldParent = _storage.getById(effect.oldInfo().oldParent());
             {
-                var newOldParentChildren = oldParent.children().plus(effect.oldInfo().oldMeta().getName(), node.key());
+                var newOldParentChildren = oldParent.children().plus(effect.oldName(), node.key());
                 oldParent = oldParent.withChildren(newOldParentChildren);
                 _storage.putNode(oldParent);
             }
@@ -77,7 +81,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             var node = _storage.getById(effect.childId());
             var curParent = _storage.getById(effect.newParentId());
             {
-                var newCurParentChildren = curParent.children().minus(node.meta().getName());
+                var newCurParentChildren = curParent.children().minus(node.name());
                 curParent = curParent.withChildren(newCurParentChildren);
                 _storage.putNode(curParent);
             }
@@ -141,8 +145,8 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                             }
                         }
                 }
-
             }
+
             if (!inTrash.isEmpty()) {
                 var trash = _storage.getById(_storage.getTrashId());
                 for (var n : inTrash) {
@@ -307,7 +311,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 node = _storage.getById(effect.childId());
             }
             if (oldParentNode != null) {
-                var newOldParentChildren = oldParentNode.children().minus(effect.oldInfo().oldMeta().getName());
+                var newOldParentChildren = oldParentNode.children().minus(effect.oldName());
                 oldParentNode = oldParentNode.withChildren(newOldParentChildren);
                 _storage.putNode(oldParentNode);
             }
@@ -316,12 +320,12 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             newParentNode = _storage.getById(effect.newParentId());
 
             {
-                var newNewParentChildren = newParentNode.children().plus(effect.newMeta().getName(), effect.childId());
+                var newNewParentChildren = newParentNode.children().plus(effect.newName(), effect.childId());
                 newParentNode = newParentNode.withChildren(newNewParentChildren);
                 _storage.putNode(newParentNode);
             }
             if (effect.newParentId().equals(_storage.getTrashId()) &&
-                    !Objects.equals(effect.newMeta().getName(), effect.childId().toString()))
+                    !Objects.equals(effect.newName(), effect.childId().toString()))
                 throw new IllegalArgumentException("Move to trash should have id of node as name");
             _storage.putNode(
                     node.withParent(effect.newParentId())
@@ -338,17 +342,32 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         NodeIdT newParentId = op.newParentId();
         TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> newParent = _storage.getById(newParentId);
 
+
         if (newParent == null) {
-            LOGGER.log(Level.SEVERE, "New parent not found " + op.newMeta().getName() + " " + op.childId());
-            return new LogRecord<>(op, null);
+            LOGGER.log(Level.SEVERE, "New parent not found " + op.newName() + " " + op.childId());
+
+            // Creation
+            if (oldParentId == null) {
+                LOGGER.severe(() -> "Creating both dummy parent and child node");
+                return new LogRecord<>(op, List.of(
+                        new LogEffect<>(null, op, _storage.getLostFoundId(), null, newParentId),
+                        new LogEffect<>(null, op, newParentId, op.newMeta(), op.childId())
+                ));
+            } else {
+                LOGGER.severe(() -> "Moving child node to dummy parent");
+                return new LogRecord<>(op, List.of(
+                        new LogEffect<>(null, op, _storage.getLostFoundId(), null, newParentId),
+                        new LogEffect<>(new LogEffectOld<>(node.lastEffectiveOp(), oldParentId, node.meta()), op, op.newParentId(), op.newMeta(), op.childId())
+                ));
+            }
         }
 
         if (oldParentId == null) {
-            var conflictNodeId = newParent.children().get(op.newMeta().getName());
+            var conflictNodeId = newParent.children().get(op.newName());
 
             if (conflictNodeId != null) {
                 if (failCreatingIfExists)
-                    throw new AlreadyExistsException("Already exists: " + op.newMeta().getName() + ": " + conflictNodeId);
+                    throw new AlreadyExistsException("Already exists: " + op.newName() + ": " + conflictNodeId);
 
                 var conflictNode = _storage.getById(conflictNodeId);
                 MetaT conflictNodeMeta = conflictNode.meta();
@@ -359,8 +378,8 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
 
                 LOGGER.finer(() -> "Node creation conflict: " + conflictNode);
 
-                String newConflictNodeName = conflictNodeMeta.getName() + ".conflict." + conflictNode.key();
-                String newOursName = op.newMeta().getName() + ".conflict." + op.childId();
+                String newConflictNodeName = op.newName() + ".conflict." + conflictNode.key();
+                String newOursName = op.newName() + ".conflict." + op.childId();
                 return new LogRecord<>(op, List.of(
                         new LogEffect<>(new LogEffectOld<>(conflictNode.lastEffectiveOp(), newParentId, conflictNodeMeta), conflictNode.lastEffectiveOp(), newParentId, (MetaT) conflictNodeMeta.withName(newConflictNodeName), conflictNodeId),
                         new LogEffect<>(null, op, op.newParentId(), (MetaT) op.newMeta().withName(newOursName), op.childId())
@@ -378,11 +397,13 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         }
 
         MetaT oldMeta = node.meta();
-        if (!oldMeta.getClass().equals(op.newMeta().getClass())) {
+        if (oldMeta != null
+                && op.newMeta() != null
+                && !oldMeta.getClass().equals(op.newMeta().getClass())) {
             LOGGER.log(Level.SEVERE, "Class mismatch for meta for node " + node.key());
             return new LogRecord<>(op, null);
         }
-        var replaceNodeId = newParent.children().get(op.newMeta().getName());
+        var replaceNodeId = newParent.children().get(op.newName());
         if (replaceNodeId != null) {
             var replaceNode = _storage.getById(replaceNodeId);
             var replaceNodeMeta = replaceNode.meta();
@@ -454,18 +475,18 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         walkTree(node -> {
             var op = node.lastEffectiveOp();
             if (node.lastEffectiveOp() == null) return;
-            LOGGER.info("visited bootstrap op for " + host + ": " + op.timestamp().toString() + " " + op.newMeta().getName() + " " + op.childId() + "->" + op.newParentId());
+            LOGGER.info("visited bootstrap op for " + host + ": " + op.timestamp().toString() + " " + op.newName() + " " + op.childId() + "->" + op.newParentId());
             result.put(node.lastEffectiveOp().timestamp(), node.lastEffectiveOp());
         });
 
         for (var le : _storage.getLog().getAll()) {
             var op = le.getValue().op();
-            LOGGER.info("bootstrap op from log for " + host + ": " + op.timestamp().toString() + " " + op.newMeta().getName() + " " + op.childId() + "->" + op.newParentId());
+            LOGGER.info("bootstrap op from log for " + host + ": " + op.timestamp().toString() + " " + op.newName() + " " + op.childId() + "->" + op.newParentId());
             result.put(le.getKey(), le.getValue().op());
         }
 
         for (var op : result.values()) {
-            LOGGER.info("Recording bootstrap op for " + host + ": " + op.timestamp().toString() + " " + op.newMeta().getName() + " " + op.childId() + "->" + op.newParentId());
+            LOGGER.info("Recording bootstrap op for " + host + ": " + op.timestamp().toString() + " " + op.newName() + " " + op.childId() + "->" + op.newParentId());
             _opRecorder.recordOpForPeer(host, op);
         }
     }
