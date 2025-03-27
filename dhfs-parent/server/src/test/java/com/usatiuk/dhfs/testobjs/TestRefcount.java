@@ -1,4 +1,4 @@
-package com.usatiuk.objects.testobjs;
+package com.usatiuk.dhfs.testobjs;
 
 import com.usatiuk.dhfs.JDataRef;
 import com.usatiuk.dhfs.JDataRefcounted;
