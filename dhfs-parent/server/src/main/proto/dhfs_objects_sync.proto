@@ -15,8 +15,23 @@ service DhfsObjectSyncGrpc {
   rpc CanDelete (CanDeleteRequest) returns (CanDeleteReply) {}
 
   rpc Ping (PingRequest) returns (PingReply) {}
+
+  // TODO: Probably this would be better in a separate service
+  // but it will be more boilerplate with the client factories
+  rpc ProxyAvailableGet (ProxyAvailableRequest) returns (ProxyAvailableReply) {}
 }
 
+message ProxyAvailableInfo {
+  string uuid = 1;
+}
+
+message ProxyAvailableRequest {
+
+}
+
+message ProxyAvailableReply {
+  repeated ProxyAvailableInfo availableTargets = 1;
+}
 message PingRequest {}
 
 message PingReply {}

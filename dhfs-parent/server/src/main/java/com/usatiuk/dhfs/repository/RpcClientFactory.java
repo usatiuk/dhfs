@@ -3,9 +3,13 @@ package com.usatiuk.dhfs.repository;
 import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.dhfs.repository.peerdiscovery.IpPeerAddress;
 import com.usatiuk.dhfs.repository.peerdiscovery.PeerAddress;
+import com.usatiuk.dhfs.repository.peerdiscovery.ProxyPeerAddress;
+import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.quarkus.grpc.GrpcClientUtils;
 import io.quarkus.logging.Log;
+import jakarta.annotation.Nullable;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -17,6 +21,9 @@ import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
+
+import static com.usatiuk.dhfs.repository.ProxyConstants.PROXY_FROM_HEADER_KEY;
+import static com.usatiuk.dhfs.repository.ProxyConstants.PROXY_TO_HEADER_KEY;
 
 // TODO: Dedup this
 @ApplicationScoped
@@ -51,30 +58,52 @@ public class RpcClientFactory {
         throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("No reachable targets!"));
     }
 
-    public <R> R withObjSyncClient(PeerId target, ObjectSyncClientFunction<R> fn) {
-        var hostinfo = peerManager.getAddress(target);
+    public <R> R withObjSyncClient(PeerId target, PeerId proxyFrom, PeerId proxyTo, ObjectSyncClientFunction<R> fn) {
+        var hostInfo = peerManager.getAddress(target);
 
-        if (hostinfo == null)
+        if (hostInfo == null)
             throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Not known to be reachable: " + target));
 
-        return withObjSyncClient(target, hostinfo, syncTimeout, fn);
+        return withObjSyncClient(target, proxyFrom, proxyTo, hostInfo, syncTimeout, fn);
     }
 
-    public <R> R withObjSyncClient(PeerId host, PeerAddress address, long timeout, ObjectSyncClientFunction<R> fn) {
+    public <R> R withObjSyncClient(PeerId host, PeerId proxyFrom, PeerId proxyTo, PeerAddress address, long timeout, ObjectSyncClientFunction<R> fn) {
         return switch (address) {
             case IpPeerAddress ipPeerAddress ->
-                    withObjSyncClient(host, ipPeerAddress.address(), ipPeerAddress.securePort(), timeout, fn);
+                    withObjSyncClient(host, proxyFrom, proxyTo, ipPeerAddress.address(), ipPeerAddress.securePort(), timeout, fn);
+            case ProxyPeerAddress pp -> withObjSyncClient(pp.proxyThrough(), null, host, fn); // TODO: Timeout
             default -> throw new IllegalStateException("Unexpected value: " + address);
         };
     }
 
-    public <R> R withObjSyncClient(PeerId host, InetAddress addr, int port, long timeout, ObjectSyncClientFunction<R> fn) {
-        var key = new ObjSyncStubKey(host, addr, port);
+    public <R> R withObjSyncClient(PeerId target, ObjectSyncClientFunction<R> fn) {
+        return withObjSyncClient(target, null, null, fn);
+    }
+
+    public <R> R withObjSyncClient(PeerId host, PeerAddress address, long timeout, ObjectSyncClientFunction<R> fn) {
+        return withObjSyncClient(host, null, null, address, timeout, fn);
+    }
+
+    public <R> R withObjSyncClient(PeerId host, @Nullable PeerId proxyFrom, @Nullable PeerId proxyTo, InetAddress addr, int port, long timeout, ObjectSyncClientFunction<R> fn) {
+        var key = new ObjSyncStubKey(host, proxyFrom, proxyTo, addr, port);
         var stub = _objSyncCache.computeIfAbsent(key, (k) -> {
             var channel = rpcChannelFactory.getSecureChannel(host, addr.getHostAddress(), port);
-            return DhfsObjectSyncGrpcGrpc.newBlockingStub(channel)
+
+            var client = DhfsObjectSyncGrpcGrpc.newBlockingStub(channel)
                     .withMaxOutboundMessageSize(Integer.MAX_VALUE)
                     .withMaxInboundMessageSize(Integer.MAX_VALUE);
+
+            if (proxyFrom != null) {
+                Metadata headers = new Metadata();
+                headers.put(PROXY_FROM_HEADER_KEY, proxyFrom.toString());
+                return GrpcClientUtils.attachHeaders(client, headers);
+            } else if (proxyTo != null) {
+                Metadata headers = new Metadata();
+                headers.put(PROXY_TO_HEADER_KEY, proxyTo.toString());
+                return GrpcClientUtils.attachHeaders(client, headers);
+            } else {
+                return client;
+            }
         });
         return fn.apply(host, stub.withDeadlineAfter(timeout, TimeUnit.SECONDS));
     }
@@ -88,7 +117,7 @@ public class RpcClientFactory {
         R apply(PeerId peer, DhfsObjectSyncGrpcGrpc.DhfsObjectSyncGrpcBlockingStub client);
     }
 
-    private record ObjSyncStubKey(PeerId id, InetAddress addr, int port) {
+    private record ObjSyncStubKey(PeerId id, @Nullable PeerId from, @Nullable PeerId to, InetAddress addr, int port) {
     }
 
 }

@@ -82,59 +82,9 @@ public class RemoteObjectServiceClient {
             }
 
             return null;
-//            return jObjectTxManager.executeTx(() -> {
-//                return key.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (md, d, b, v) -> {
-//                    var unexpected = !Objects.equals(
-//                            Maps.filterValues(md.getChangelog(), val -> val != 0),
-//                            Maps.filterValues(receivedMap, val -> val != 0));
-//
-//                    if (unexpected) {
-//                        try {
-//                            syncHandler.handleOneUpdate(UUID.fromString(reply.getSelfUuid()), reply.getObject().getHeader());
-//                        } catch (SyncHandler.OutdatedUpdateException ignored) {
-//                            Log.info("Outdated update of " + md.getName() + " from " + reply.getSelfUuid());
-//                            invalidationQueueService.pushInvalidationToOne(UUID.fromString(reply.getSelfUuid()), md.getName()); // True?
-//                            throw new StatusRuntimeException(Status.ABORTED.withDescription("Received outdated object version"));
-//                        } catch (Exception e) {
-//                            Log.error("Received unexpected object version from " + reply.getSelfUuid()
-//                                    + " for " + reply.getObject().getHeader().getName() + " and conflict resolution failed", e);
-//                            throw new StatusRuntimeException(Status.ABORTED.withDescription("Received unexpected object version"));
-//                        }
-//                    }
-//
-//                    return reply.getObject().getContent();
-//                });
-//            });
         });
     }
 
-    //    @Nullable
-//    public IndexUpdateReply notifyUpdate(JObject<?> obj, UUID host) {
-//        var builder = IndexUpdatePush.newBuilder().setSelfUuid(persistentPeerDataService.getSelfUuid().toString());
-//
-//        var header = obj
-//                .runReadLocked(
-//                        obj.getMeta().getKnownClass().isAnnotationPresent(PushResolution.class)
-//                                ? JObjectManager.ResolutionStrategy.LOCAL_ONLY
-//                                : JObjectManager.ResolutionStrategy.NO_RESOLUTION,
-//                        (m, d) -> {
-//                            if (obj.getMeta().isDeleted()) return null;
-//                            if (m.getKnownClass().isAnnotationPresent(PushResolution.class) && d == null)
-//                                Log.warn("Object " + m.getName() + " is marked as PushResolution but no resolution found");
-//                            if (m.getKnownClass().isAnnotationPresent(PushResolution.class))
-//                                return m.toRpcHeader(dataProtoSerializer.serialize(d));
-//                            else
-//                                return m.toRpcHeader();
-//                        });
-//        if (header == null) return null;
-//        jObjectTxManager.executeTx(obj::markSeen);
-//        builder.setHeader(header);
-//
-//        var send = builder.build();
-//
-//        return rpcClientFactory.withObjSyncClient(host, client -> client.indexUpdate(send));
-//    }
-//
     public OpPushReply pushOps(PeerId target, List<Op> ops) {
         for (Op op : ops) {
             txm.run(() -> {
