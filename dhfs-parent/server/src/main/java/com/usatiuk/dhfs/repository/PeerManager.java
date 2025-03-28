@@ -2,7 +2,6 @@ package com.usatiuk.dhfs.repository;
 
 import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.dhfs.repository.peerdiscovery.PeerAddress;
-import com.usatiuk.dhfs.repository.peerdiscovery.PeerAddressType;
 import com.usatiuk.dhfs.repository.peerdiscovery.PeerDiscoveryDirectory;
 import com.usatiuk.dhfs.repository.peersync.PeerInfo;
 import com.usatiuk.dhfs.repository.peersync.PeerInfoService;
@@ -80,12 +79,11 @@ public class PeerManager {
                     .stream()
                     .<Callable<Void>>map(host -> () -> {
                         try {
-                            boolean wasReachable = isReachable(host);
-                            var bestAddr = selectBestAddress(host.id()).orElse(null);
-                            if (wasReachable)
-                                Log.tracev("Heartbeat: {0} - {1}", host, bestAddr);
+                            if (isReachable(host))
+                                Log.tracev("Heartbeat: {0}", host);
                             else
-                                Log.debugv("Trying to connect to {0} - {1}", host, bestAddr);
+                                Log.debugv("Trying to connect to {0}", host);
+                            var bestAddr = selectBestAddress(host.id()).orElse(null);
                             if (bestAddr != null && pingCheck(host, bestAddr))
                                 handleConnectionSuccess(host, bestAddr);
                             else
@@ -143,7 +141,7 @@ public class PeerManager {
                 return true;
             });
         } catch (Exception ignored) {
-            Log.debugv("Host {0} via {1} is unreachable: {2}, {3}", host, address, ignored.getMessage(), ignored.getCause());
+            Log.debugv("Host {0} is unreachable: {1}, {2}", host, ignored.getMessage(), ignored.getCause());
             return false;
         }
     }
@@ -162,13 +160,6 @@ public class PeerManager {
 
     public List<PeerId> getAvailableHosts() {
         return _states.keySet().stream().toList();
-    }
-
-    public List<PeerId> getDirectAvailableHosts() {
-        return _states.entrySet().stream()
-                .filter(p -> !p.getValue().type().equals(PeerAddressType.PROXY))
-                .map(Map.Entry::getKey)
-                .toList();
     }
 
 //    public List<UUID> getUnavailableHosts() {
