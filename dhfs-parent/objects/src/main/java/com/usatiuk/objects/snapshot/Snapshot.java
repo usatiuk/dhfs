@@ -9,7 +9,7 @@ import javax.annotation.Nonnull;
 import java.util.Optional;
 
 public interface Snapshot<K extends Comparable<K>, V> extends AutoCloseableNoThrow {
-    CloseableKvIterator<K, V> getIterator(IteratorStart start, JObjectKey key);
+    CloseableKvIterator<K, V> getIterator(IteratorStart start, K key);
 
     @Nonnull
     Optional<V> readObject(K name);
