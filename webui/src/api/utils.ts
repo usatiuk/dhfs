@@ -44,14 +44,17 @@ export async function fetchJSON<T, P extends { parse: (arg: string) => T }>(
     body?: string | Record<string, unknown> | File,
     headers?: Record<string, string>,
 ): Promise<T> {
-    const reqBody = () =>
-        body instanceof File
+    const reqBody = () => {
+        if (typeof body === "string" || body instanceof String)
+            return body.toString();
+        return body instanceof File
             ? (() => {
                   const fd = new FormData();
                   fd.append("file", body);
                   return fd;
               })()
             : JSON.stringify(body);
+    };
 
     const reqHeaders = () =>
         body instanceof File

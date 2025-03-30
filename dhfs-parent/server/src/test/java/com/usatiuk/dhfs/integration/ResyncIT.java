@@ -73,13 +73,13 @@ public class ResyncIT {
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
                         "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
-                        "  http://localhost:8080/objects-manage/known-peers");
+                        "  http://localhost:8080/peers-manage/known-peers");
 
         var c2curl = container2.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
                         "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
-                        "  http://localhost:8080/objects-manage/known-peers");
+                        "  http://localhost:8080/peers-manage/known-peers");
 
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
@@ -113,13 +113,13 @@ public class ResyncIT {
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
                         "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
-                        "  http://localhost:8080/objects-manage/known-peers");
+                        "  http://localhost:8080/peers-manage/known-peers");
 
         var c2curl = container2.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
                         "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
-                        "  http://localhost:8080/objects-manage/known-peers");
+                        "  http://localhost:8080/peers-manage/known-peers");
 
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
@@ -153,13 +153,13 @@ public class ResyncIT {
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
                         "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
-                        "  http://localhost:8080/objects-manage/known-peers");
+                        "  http://localhost:8080/peers-manage/known-peers");
 
         var c2curl = container2.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
                         "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
-                        "  http://localhost:8080/objects-manage/known-peers");
+                        "  http://localhost:8080/peers-manage/known-peers");
 
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);

@@ -64,6 +64,19 @@ export type TKnownPeerInfoArrTo = z.infer<typeof KnownPeerInfoArrTo>;
 export const KnownPeerInfoToResp = CreateAPIResponse(KnownPeerInfoArrTo);
 export type TKnownPeerInfoToResp = z.infer<typeof KnownPeerInfoToResp>;
 
+// PeerAddressInfo
+export const PeerAddressInfoTo = z.object({
+    uuid: z.string(),
+    address: z.string(),
+});
+export type TPeerAddressInfoTo = z.infer<typeof PeerAddressInfoTo>;
+
+export const PeerAddressInfoArrTo = z.array(PeerAddressInfoTo);
+export type TPeerAddressInfoArrTo = z.infer<typeof PeerAddressInfoArrTo>;
+
+export const PeerAddressInfoToResp = CreateAPIResponse(PeerAddressInfoArrTo);
+export type TPeerAddressInfoToResp = z.infer<typeof PeerAddressInfoToResp>;
+
 // KnownPeerPut
 export const KnownPeerPutTo = z.object({ uuid: z.string() });
 export type TKnownPeerPutTo = z.infer<typeof KnownPeerPutTo>;

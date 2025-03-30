@@ -3,11 +3,9 @@ package com.usatiuk.dhfs.repository;
 import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.dhfs.repository.peerdiscovery.PeerAddress;
 import com.usatiuk.dhfs.repository.peerdiscovery.PeerDiscoveryDirectory;
-import com.usatiuk.dhfs.repository.peersync.PeerInfo;
 import com.usatiuk.dhfs.repository.peersync.PeerInfoService;
 import com.usatiuk.dhfs.repository.peersync.api.PeerSyncApiClientDynamic;
 import com.usatiuk.dhfs.repository.peertrust.PeerTrustManager;
-import com.usatiuk.dhfs.repository.webapi.AvailablePeerInfo;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;
 import io.quarkus.logging.Log;
@@ -70,7 +68,7 @@ public class PeerManager {
         if (_heartbeatExecutor == null) return;
         try {
             var peers = peerInfoService.getPeersNoSelf();
-            var pids = peers.stream().map(PeerInfo::id).toList();
+            var pids = peers.stream().map(com.usatiuk.dhfs.repository.peersync.PeerInfo::id).toList();
 
             List<PeerId> stale = _states.keySet().stream().filter(p -> !pids.contains(p)).toList();
             stale.forEach(_states.keySet()::remove);
@@ -98,7 +96,7 @@ public class PeerManager {
         }
     }
 
-    private void handleConnectionSuccess(PeerInfo host, PeerAddress address) {
+    private void handleConnectionSuccess(com.usatiuk.dhfs.repository.peersync.PeerInfo host, PeerAddress address) {
         boolean wasReachable = isReachable(host);
 
         boolean shouldSync = !persistentPeerDataService.isInitialSyncDone(host.id());
@@ -120,7 +118,7 @@ public class PeerManager {
         }
     }
 
-    public void handleConnectionError(PeerInfo host) {
+    public void handleConnectionError(com.usatiuk.dhfs.repository.peersync.PeerInfo host) {
         boolean wasReachable = isReachable(host);
 
         if (wasReachable)
@@ -134,7 +132,7 @@ public class PeerManager {
     }
 
     // FIXME:
-    private boolean pingCheck(PeerInfo host, PeerAddress address) {
+    private boolean pingCheck(com.usatiuk.dhfs.repository.peersync.PeerInfo host, PeerAddress address) {
         try {
             return rpcClientFactory.withObjSyncClient(host.id(), address, pingTimeout, (peer, c) -> {
                 c.ping(PingRequest.getDefaultInstance());
@@ -150,7 +148,7 @@ public class PeerManager {
         return _states.containsKey(host);
     }
 
-    public boolean isReachable(PeerInfo host) {
+    public boolean isReachable(com.usatiuk.dhfs.repository.peersync.PeerInfo host) {
         return isReachable(host.id());
     }
 
@@ -170,7 +168,7 @@ public class PeerManager {
 
     public HostStateSnapshot getHostStateSnapshot() {
         return transactionManager.run(() -> {
-            var partition = peerInfoService.getPeersNoSelf().stream().map(PeerInfo::id)
+            var partition = peerInfoService.getPeersNoSelf().stream().map(com.usatiuk.dhfs.repository.peersync.PeerInfo::id)
                     .collect(Collectors.partitioningBy(this::isReachable));
             return new HostStateSnapshot(partition.get(true), partition.get(false));
         });
@@ -201,10 +199,9 @@ public class PeerManager {
         peerTrustManager.reloadTrustManagerHosts(transactionManager.run(() -> peerInfoService.getPeers().stream().toList())); //FIXME:
     }
 
-    public Collection<AvailablePeerInfo> getSeenButNotAddedHosts() {
+    public Collection<PeerId> getSeenButNotAddedHosts() {
         return transactionManager.run(() -> {
-            return peerDiscoveryDirectory.getReachablePeers().stream().filter(p -> !peerInfoService.getPeerInfo(p).isPresent())
-                    .map(p -> new AvailablePeerInfo(p.toString())).toList();
+            return peerDiscoveryDirectory.getReachablePeers().stream().filter(p -> !peerInfoService.getPeerInfo(p).isPresent()).toList();
         });
     }
 

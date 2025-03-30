@@ -10,27 +10,31 @@
   "browserslist": "> 0.5%, last 2 versions, not dead",
   "dependencies": {
     "jwt-decode": "^4.0.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.24.0",
-    "zod": "^3.23.8"
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router": "^7.4.1",
+    "react-router-dom": "^7.4.1",
+    "zod": "^3.24.2"
+  },
+  "@parcel/resolver-default": {
+    "packageExports": true
   },
   "devDependencies": {
-    "@parcel/transformer-sass": "^2.12.0",
-    "@parcel/transformer-typescript-tsc": "^2.12.0",
-    "@parcel/validator-typescript": "^2.12.0",
-    "@types/eslint": "^8.56.10",
+    "@parcel/transformer-sass": "^2.14.4",
+    "@parcel/transformer-typescript-tsc": "^2.14.4",
+    "@parcel/validator-typescript": "^2.14.4",
+    "@types/eslint": "^9.6.1",
     "@types/eslint-config-prettier": "^6.11.3",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@typescript-eslint/eslint-plugin": "^7.14.1",
-    "@typescript-eslint/parser": "^7.14.1",
-    "eslint": "^8",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-react": "^7.34.3",
-    "parcel": "^2.12.0",
-    "prettier": "^3.3.2",
+    "@types/react": "^19.0.12",
+    "@types/react-dom": "^19.0.4",
+    "@typescript-eslint/eslint-plugin": "^8.28.0",
+    "@typescript-eslint/parser": "^8.28.0",
+    "eslint": "^9",
+    "eslint-config-prettier": "^10.1.1",
+    "eslint-plugin-react": "^7.37.4",
+    "parcel": "^2.14.4",
+    "prettier": "^3.5.3",
     "process": "^0.11.10",
-    "typescript": "^5.5.2"
+    "typescript": "^5.8.2"
   }
 }

@@ -12,8 +12,8 @@ import jakarta.ws.rs.Path;
 import java.util.Collection;
 import java.util.List;
 
-@Path("/objects-manage")
-public class ManagementApi {
+@Path("/peers-manage")
+public class PeerManagementApi {
     @Inject
     PeerInfoService peerInfoService;
     @Inject
@@ -39,7 +39,20 @@ public class ManagementApi {
 
     @Path("available-peers")
     @GET
-    public Collection<AvailablePeerInfo> availablePeers() {
-        return peerManager.getSeenButNotAddedHosts();
+    public Collection<KnownPeerInfo> availablePeers() {
+        return peerManager.getSeenButNotAddedHosts().stream().map(p -> new KnownPeerInfo(p.toString())).toList();
+    }
+
+    @Path("peer-state")
+    @GET
+    public Collection<PeerInfo> peerInfos(Collection<String> peerIdStrings) {
+        return peerIdStrings.stream().map(PeerId::of).map(
+                peerId -> {
+                    return new PeerInfo(
+                            peerId.toString(),
+                            peerManager.getAddress(peerId).toString()
+                    );
+                }
+        ).toList();
     }
 }

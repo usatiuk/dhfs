@@ -9,7 +9,6 @@ export interface TPeerAvailableCardProps {
 
 export function PeerAvailableCard({ peerInfo }: TPeerAvailableCardProps) {
     const fetcher = useFetcher();
-
     return (
         <div className="peerAvailableCard">
             <div className={"peerInfo"}>
@@ -22,8 +21,8 @@ export function PeerAvailableCard({ peerInfo }: TPeerAvailableCardProps) {
                 action={"/home/peers"}
             >
                 <button type="submit">connect</button>
-                <input name="intent" hidden={true} value={"add_peer"} />
-                <input name="uuid" hidden={true} value={peerInfo.uuid} />
+                <input name="intent" hidden={true} defaultValue={"add_peer"} />
+                <input name="uuid" hidden={true} defaultValue={peerInfo.uuid} />
             </fetcher.Form>
         </div>
     );

@@ -1,7 +1,9 @@
 import { TKnownPeerInfoTo } from "./api/dto";
 
 import "./PeerKnownCard.scss";
-import { useFetcher } from "react-router-dom";
+import { useFetcher, useLoaderData } from "react-router-dom";
+import { LoaderToType } from "./commonPlumbing";
+import { peerStateLoader } from "./PeerStatePlumbing";
 
 export interface TPeerKnownCardProps {
     peerInfo: TKnownPeerInfoTo;
@@ -9,12 +11,42 @@ export interface TPeerKnownCardProps {
 
 export function PeerKnownCard({ peerInfo }: TPeerKnownCardProps) {
     const fetcher = useFetcher();
+    const loaderData = useLoaderData() as LoaderToType<typeof peerStateLoader>;
+
+    const addr = loaderData.peerAddresses.find(
+        (item) => item.uuid === peerInfo.uuid,
+    );
 
     return (
         <div className="peerKnownCard">
             <div className={"peerInfo"}>
-                <span>UUID: </span>
-                <span>{peerInfo.uuid}</span>
+                <div>
+                    <span>UUID: </span>
+                    <span>{peerInfo.uuid}</span>
+                </div>
+                <div>
+                    <fetcher.Form
+                        className="actions"
+                        method="put"
+                        action={"/home/peers"}
+                    >
+                        <input
+                            name="intent"
+                            hidden={true}
+                            defaultValue={"save_addr"}
+                        />
+                        <input
+                            name="uuid"
+                            hidden={true}
+                            defaultValue={peerInfo.uuid}
+                        />
+                        <input
+                            name="address"
+                            defaultValue={addr?.address || ""}
+                        />
+                        <button type="submit">save</button>
+                    </fetcher.Form>
+                </div>
             </div>
             <fetcher.Form
                 className="actions"
@@ -22,8 +54,12 @@ export function PeerKnownCard({ peerInfo }: TPeerKnownCardProps) {
                 action={"/home/peers"}
             >
                 <button type="submit">remove</button>
-                <input name="intent" hidden={true} value={"remove_peer"} />
-                <input name="uuid" hidden={true} value={peerInfo.uuid} />
+                <input
+                    name="intent"
+                    hidden={true}
+                    defaultValue={"remove_peer"}
+                />
+                <input name="uuid" hidden={true} defaultValue={peerInfo.uuid} />
             </fetcher.Form>
         </div>
     );

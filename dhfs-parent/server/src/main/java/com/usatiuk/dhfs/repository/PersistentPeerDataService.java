@@ -1,7 +1,9 @@
 package com.usatiuk.dhfs.repository;
 
-import com.usatiuk.dhfs.ShutdownChecker;
 import com.usatiuk.dhfs.PeerId;
+import com.usatiuk.dhfs.ShutdownChecker;
+import com.usatiuk.dhfs.repository.peerdiscovery.IpPeerAddress;
+import com.usatiuk.dhfs.repository.peerdiscovery.PeerAddressType;
 import com.usatiuk.dhfs.repository.peersync.PeerInfoService;
 import com.usatiuk.dhfs.repository.peertrust.PeerTrustManager;
 import com.usatiuk.objects.transaction.Transaction;
@@ -13,6 +15,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.pcollections.HashTreePMap;
 import org.pcollections.HashTreePSet;
 
 import java.io.File;
@@ -23,6 +26,7 @@ import java.nio.file.StandardOpenOption;
 import java.security.KeyPair;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -70,7 +74,7 @@ public class PersistentPeerDataService {
                     _selfKeyPair = CertificateTools.generateKeyPair();
                     _selfCertificate = CertificateTools.generateCertificate(_selfKeyPair, _selfUuid.toString());
 
-                    curTx.put(new PersistentRemoteHostsData(_selfUuid, _selfCertificate, _selfKeyPair, HashTreePSet.empty()));
+                    curTx.put(new PersistentRemoteHostsData(_selfUuid, _selfCertificate, _selfKeyPair, HashTreePSet.empty(), HashTreePMap.empty()));
                     peerInfoService.putPeer(_selfUuid, _selfCertificate.getEncoded());
                 } catch (CertificateEncodingException e) {
                     throw new RuntimeException(e);
@@ -151,6 +155,41 @@ public class PersistentPeerDataService {
             var data = curTx.get(PersistentRemoteHostsData.class, PersistentRemoteHostsData.KEY).orElse(null);
             if (data == null) throw new IllegalStateException("Self data not found");
             return data.initialSyncDone().contains(peerId);
+        });
+    }
+
+
+    public List<IpPeerAddress> getPersistentPeerAddresses() {
+        return txm.run(() -> {
+            var data = curTx.get(PersistentRemoteHostsData.class, PersistentRemoteHostsData.KEY).orElse(null);
+            if (data == null) throw new IllegalStateException("Self data not found");
+            return data.persistentPeerAddress().values().stream().toList();
+        });
+    }
+
+    public void addPersistentPeerAddress(PeerId peerId, IpPeerAddress address) {
+        txm.run(() -> {
+            var data = curTx.get(PersistentRemoteHostsData.class, PersistentRemoteHostsData.KEY).orElse(null);
+            if (data == null) throw new IllegalStateException("Self data not found");
+            var newData = data.persistentPeerAddress().plus(peerId, address.withType(PeerAddressType.WAN)); //TODO:
+            curTx.put(data.withPersistentPeerAddress(newData));
+        });
+    }
+
+    public void removePersistentPeerAddress(PeerId peerId) {
+        txm.run(() -> {
+            var data = curTx.get(PersistentRemoteHostsData.class, PersistentRemoteHostsData.KEY).orElse(null);
+            if (data == null) throw new IllegalStateException("Self data not found");
+            var newData = data.persistentPeerAddress().minus(peerId);
+            curTx.put(data.withPersistentPeerAddress(newData));
+        });
+    }
+
+    public IpPeerAddress getPersistentPeerAddress(PeerId peerId) {
+        return txm.run(() -> {
+            var data = curTx.get(PersistentRemoteHostsData.class, PersistentRemoteHostsData.KEY).orElse(null);
+            if (data == null) throw new IllegalStateException("Self data not found");
+            return data.persistentPeerAddress().get(peerId);
         });
     }
 }
