@@ -3,7 +3,6 @@ package com.usatiuk.objects.stores;
 import com.usatiuk.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.iterators.*;
-import com.usatiuk.objects.iterators.*;
 import com.usatiuk.objects.snapshot.Snapshot;
 import com.usatiuk.objects.transaction.LockManager;
 import io.quarkus.logging.Log;
@@ -49,7 +48,7 @@ public class CachingObjectPersistentStore {
                     while (true) {
                         Thread.sleep(10000);
                         if (_curSize > 0)
-                            Log.info("Cache status: size=" + _curSize / 1024 / 1024 + "MB" + " evicted=" + _evict);
+                            Log.debugv("Cache status: size=" + _curSize / 1024 / 1024 + "MB" + " evicted=" + _evict);
                         _evict = 0;
                     }
                 } catch (InterruptedException ignored) {
