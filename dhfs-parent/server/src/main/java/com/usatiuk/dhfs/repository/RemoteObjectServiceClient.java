@@ -96,10 +96,13 @@ public class RemoteObjectServiceClient {
                     curTx.get(RemoteObjectMeta.class, ref).map(m -> m.withSeen(true)).ifPresent(curTx::put);
                 }
             });
-            var serialized = opProtoSerializer.serialize(op);
-            var built = OpPushRequest.newBuilder().addMsg(serialized).build();
-            rpcClientFactory.withObjSyncClient(target, (tgt, client) -> client.opPush(built));
         }
+        var builder = OpPushRequest.newBuilder();
+        for (Op op : ops) {
+            builder.addMsg(opProtoSerializer.serialize(op));
+        }
+        var built = builder.build();
+        rpcClientFactory.withObjSyncClient(target, (tgt, client) -> client.opPush(built));
         return OpPushReply.getDefaultInstance();
     }
 
