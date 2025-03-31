@@ -734,13 +734,22 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @Override
     public Boolean setTimes(JObjectKey fileUuid, long atimeMs, long mtimeMs) {
         return jObjectTxManager.executeTx(() -> {
-            var file = remoteTx.getData(File.class, fileUuid).orElseThrow(
-                    () -> new StatusRuntimeException(Status.NOT_FOUND.withDescription(
-                            "File not found for setTimes: " + fileUuid))
-            );
+            var dent = curTx.get(JData.class, fileUuid).orElseThrow(() -> new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND));
 
-            remoteTx.putData(file.withCTime(atimeMs).withMTime(mtimeMs));
-            return true;
+            // FIXME:
+            if (dent instanceof JKleppmannTreeNode) {
+                return true;
+            } else if (dent instanceof RemoteObjectMeta) {
+                var remote = remoteTx.getData(JDataRemote.class, fileUuid).orElse(null);
+                if (remote instanceof File f) {
+                    remoteTx.putData(f.withCTime(atimeMs).withMTime(mtimeMs));
+                    return true;
+                } else {
+                    throw new IllegalArgumentException(fileUuid + " is not a file");
+                }
+            } else {
+                throw new IllegalArgumentException(fileUuid + " is not a file");
+            }
         });
     }
 
