@@ -123,24 +123,13 @@ public class ResyncIT {
 
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
-        Thread.sleep(20000);
         await().atMost(120, TimeUnit.SECONDS).until(() -> {
             var foundWc2 = container2.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -type f | wc -l");
-            int val = 0;
-            try {
-                val = Integer.valueOf(foundWc2.getStdout().strip());
-            } catch (NumberFormatException ignored) {
-            }
-            return 400 == val;
+            return 400 == Integer.valueOf(foundWc2.getStdout().strip());
         });
         await().atMost(120, TimeUnit.SECONDS).until(() -> {
-            var foundWc1 = container1.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -type f | wc -l");
-            int val = 0;
-            try {
-                val = Integer.valueOf(foundWc1.getStdout().strip());
-            } catch (NumberFormatException ignored) {
-            }
-            return 400 == val;
+            var foundWc2 = container1.execInContainer("/bin/sh", "-c", "find /root/dhfs_default/fuse -type f | wc -l");
+            return 400 == Integer.valueOf(foundWc2.getStdout().strip());
         });
     }
 

@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.repository.invalidation;
 
-import com.usatiuk.dhfs.utils.DataLocker;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.dhfs.repository.PeerManager;
@@ -16,7 +15,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
-import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.concurrent.ExecutorService;
@@ -40,8 +38,6 @@ public class InvalidationQueueService {
     int threads;
     @Inject
     PersistentPeerDataService persistentPeerDataService;
-
-    private final DataLocker _pushLocker = new DataLocker();
 
     private ExecutorService _executor;
     private volatile boolean _shutdown = false;
@@ -124,7 +120,7 @@ public class InvalidationQueueService {
                             continue;
                         }
 
-                        try (var lock = _pushLocker.lock(Pair.of(e.peer(), e.key()))) {
+                        try {
                             opPusher.doPush(e);
                             success++;
                         } catch (Exception ex) {
