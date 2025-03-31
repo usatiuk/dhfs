@@ -105,7 +105,14 @@ public class AutosyncProcessor {
                 try {
                     JObjectKey finalName = name;
                     boolean ok = txm.run(() -> {
-                        var obj = remoteTx.getMeta(finalName).orElse(null);
+                        RemoteObjectMeta obj;
+                        try {
+                            obj = remoteTx.getMeta(finalName).orElse(null);
+                        } catch (ClassCastException cex) {
+                            Log.debugv("Not downloading object {0}, not remote object", finalName);
+                            return true;
+                        }
+
                         if (obj == null) {
                             Log.debugv("Not downloading object {0}, not found", finalName);
                             return true;
