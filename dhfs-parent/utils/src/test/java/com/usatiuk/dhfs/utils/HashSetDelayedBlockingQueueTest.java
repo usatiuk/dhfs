@@ -24,6 +24,19 @@ public class HashSetDelayedBlockingQueueTest {
         Assertions.assertTrue((gotTime - curTime) >= 1000);
     }
 
+
+    @Test
+    void addNoDelay() throws InterruptedException {
+        var queue = new HashSetDelayedBlockingQueue<>(1000);
+
+        var curTime = System.currentTimeMillis();
+        queue.addNoDelay("hello!");
+        var thing = queue.get();
+        var gotTime = System.currentTimeMillis();
+        Assertions.assertEquals("hello!", thing);
+        Assertions.assertTrue((gotTime - curTime) < 500);
+    }
+
     @Test
     void GetImmediate() throws InterruptedException {
         var queue = new HashSetDelayedBlockingQueue<>(0);

@@ -65,7 +65,7 @@ public class OpPusher {
 
                         if (tree.hasPendingOpsForHost(entry.peer())) {
                             doAgain.set(true);
-                            invalidationQueueService.pushInvalidationToOne(entry.peer(), pd.key());
+                            invalidationQueueService.pushInvalidationToOneNoDelay(entry.peer(), pd.key());
                         }
                         return ops;
                     }

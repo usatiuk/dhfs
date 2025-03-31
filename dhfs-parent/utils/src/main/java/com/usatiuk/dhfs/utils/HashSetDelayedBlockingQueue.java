@@ -44,6 +44,24 @@ public class HashSetDelayedBlockingQueue<T> {
         }
     }
 
+
+    // Adds the object to the queue, if it exists re-adds it
+    // With no delay
+    // Returns the old object, or null
+    public T addNoDelay(T el) {
+        synchronized (this) {
+            if (_closed) throw new IllegalStateException("Adding to a queue that is closed!");
+
+            SetElement<T> old = _set.putFirst(el, new SetElement<>(el, 0));
+            this.notify();
+
+            if (old != null)
+                return old.el();
+            else
+                return null;
+        }
+    }
+
     // Adds the object to the queue, if it exists re-adds it with a new delay
     // Returns the old object, or null
     public T readd(T el) {
