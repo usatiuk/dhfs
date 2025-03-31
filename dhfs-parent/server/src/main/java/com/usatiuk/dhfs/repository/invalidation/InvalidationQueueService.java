@@ -122,7 +122,11 @@ public class InvalidationQueueService {
                             continue;
                         }
 
-                        try (var lock = _locker.lock(e)) {
+                        try (var lock = _locker.tryLock(e)) {
+                            if (lock == null) {
+                                pushInvalidationToOne(e);
+                                continue;
+                            }
                             opPusher.doPush(e);
                             success++;
                         } catch (Exception ex) {
