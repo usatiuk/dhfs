@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.repository.invalidation;
 
+import com.usatiuk.dhfs.utils.DataLocker;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.dhfs.repository.PeerManager;
@@ -39,6 +40,7 @@ public class InvalidationQueueService {
     @Inject
     PersistentPeerDataService persistentPeerDataService;
 
+    private final DataLocker _locker = new DataLocker();
     private ExecutorService _executor;
     private volatile boolean _shutdown = false;
 
@@ -120,7 +122,7 @@ public class InvalidationQueueService {
                             continue;
                         }
 
-                        try {
+                        try (var lock = _locker.lock(e)) {
                             opPusher.doPush(e);
                             success++;
                         } catch (Exception ex) {

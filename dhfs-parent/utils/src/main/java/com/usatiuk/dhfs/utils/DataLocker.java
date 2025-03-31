@@ -19,16 +19,17 @@ public class DataLocker {
                 var tag = _locks.get(data);
                 if (tag != null) {
                     synchronized (tag) {
-                        if (!tag.released) {
+                        while (!tag.released) {
                             if (tag.owner == Thread.currentThread()) {
                                 return DUMMY_LOCK;
                             }
-                            tag.wait(4000L);
-                            if (!tag.released) {
-                                System.out.println("Timeout waiting for lock: " + data);
-                                System.exit(1);
-                                throw new InterruptedException();
-                            }
+                            tag.wait();
+//                            tag.wait(4000L);
+//                            if (!tag.released) {
+//                                System.out.println("Timeout waiting for lock: " + data);
+//                                System.exit(1);
+//                                throw new InterruptedException();
+//                            }
                         }
                         continue;
                     }
