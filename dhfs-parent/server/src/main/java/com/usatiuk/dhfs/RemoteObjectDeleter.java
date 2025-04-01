@@ -142,6 +142,7 @@ public class RemoteObjectDeleter {
 
                     for (var r : ret) {
                         if (!r.getValue().getDeletionCandidate()) {
+                            Log.infov("Could not delete {0}: reply from {1}: {2}", target, r.getKey(), r.getValue());
                             for (var rr : r.getRight().getReferrersList())
                                 curTx.onCommit(() -> autosyncProcessor.add(JObjectKey.of(rr.getName())));
                         } else {

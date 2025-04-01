@@ -94,6 +94,10 @@ public class RemoteObjectServiceServerImpl {
                     curTx.onCommit(() -> autosyncProcessor.add(r.obj()));
                 }
             }
+
+            if (!builder.getDeletionCandidate()) {
+                Log.infov("Not deletion candidate: {0}, {1} (asked from {2})", obj, builder, peerId);
+            }
         });
         return Uni.createFrom().item(builder.build());
     }
