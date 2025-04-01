@@ -72,9 +72,7 @@ public class RemoteObjectServiceServerImpl {
     }
 
     public Uni<CanDeleteReply> canDelete(PeerId from, CanDeleteRequest request) {
-        var peerId = from;
-
-        Log.info("<-- canDelete: " + request.getName() + " from " + peerId);
+        Log.infov("<-- canDelete: {0} from {1}", request, from);
 
         var builder = CanDeleteReply.newBuilder();
 
@@ -96,7 +94,7 @@ public class RemoteObjectServiceServerImpl {
             }
 
             if (!builder.getDeletionCandidate()) {
-                Log.infov("Not deletion candidate: {0}, {1} (asked from {2})", obj, builder, peerId);
+                Log.infov("Not deletion candidate: {0}, {1} (asked from {2})", obj, builder, from);
             }
         });
         return Uni.createFrom().item(builder.build());
@@ -106,7 +104,7 @@ public class RemoteObjectServiceServerImpl {
         try {
             var ops = request.getMsgList().stream().map(opProtoSerializer::deserialize).toList();
             for (var op : ops) {
-                Log.info("<-- op: " + op + " from " + from);
+                Log.infov("<-- opPush: {0} from {1}", op, from);
                 txm.run(() -> {
                     opHandler.handleOp(from, op);
                 });

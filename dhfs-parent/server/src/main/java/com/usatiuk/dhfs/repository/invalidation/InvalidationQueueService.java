@@ -143,8 +143,8 @@ public class InvalidationQueueService {
                             locks.add(lock);
                             try {
                                 var prepared = opPusher.preparePush(e);
-                                ops.putAll(e.peer(), prepared.getLeft());
-                                commits.putAll(e.peer(), prepared.getRight());
+                                ops.get(e.peer()).addAll(prepared.getLeft());
+                                commits.get(e.peer()).addAll(prepared.getRight());
                                 success++;
                             } catch (Exception ex) {
                                 Log.warnv("Failed to prepare invalidation to {0}, will retry: {1}", e, ex);
@@ -158,7 +158,7 @@ public class InvalidationQueueService {
 
                         for (var p : ops.keySet()) {
                             var list = ops.get(p);
-                            Log.debugv("Pushing invalidations to {0}: {1}", p, list);
+                            Log.infov("Pushing invalidations to {0}: {1}", p, list);
                             remoteObjectServiceClient.pushOps(p, list);
                             commits.get(p).forEach(Runnable::run);
                         }
