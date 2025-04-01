@@ -117,7 +117,6 @@ public class InvalidationQueueService {
                     try {
                         ArrayListValuedHashMap<PeerId, Op> ops = new ArrayListValuedHashMap<>();
                         ArrayListValuedHashMap<PeerId, Runnable> commits = new ArrayListValuedHashMap<>();
-
                         for (var e : data) {
                             // TODO: Race?
                             if (!peerInfoService.existsPeer(e.peer())) {
@@ -161,6 +160,11 @@ public class InvalidationQueueService {
                             Log.infov("Pushing invalidations to {0}: {1}", p, list);
                             remoteObjectServiceClient.pushOps(p, list);
                             commits.get(p).forEach(Runnable::run);
+                        }
+                    } catch (Exception e) {
+                        Log.warnv("Failed to send invalidations, will retry", e);
+                        for (var inv : data) {
+                            pushInvalidationToOne(inv);
                         }
                     } finally {
                         locks.forEach(AutoCloseableNoThrow::close);

@@ -110,7 +110,7 @@ public class RemoteObjectServiceServerImpl {
                 });
             }
         } catch (Exception e) {
-            Log.error(e, e);
+            Log.error("Error handling ops", e);
             throw e;
         }
         return Uni.createFrom().item(OpPushReply.getDefaultInstance());
