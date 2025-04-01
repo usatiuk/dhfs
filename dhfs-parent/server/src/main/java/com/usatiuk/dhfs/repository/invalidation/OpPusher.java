@@ -14,6 +14,7 @@ import com.usatiuk.objects.transaction.TransactionManager;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -35,65 +36,60 @@ public class OpPusher {
     @Inject
     DtoMapperService dtoMapperService;
 
-    public void doPush(InvalidationQueueEntry entry) {
-        AtomicBoolean doAgain = new AtomicBoolean(false);
-        do {
-            // FIXME:
-            doAgain.set(false);
-            List<Op> info = txm.run(() -> {
-                var obj = curTx.get(JData.class, entry.key()).orElse(null);
-                switch (obj) {
-                    case RemoteObjectMeta remote -> {
-                        JDataRemoteDto data =
-                                remote.knownType().isAnnotationPresent(JDataRemotePush.class)
-                                        ? remoteTransaction.getData(remote.knownType(), entry.key())
-                                        .map(d -> dtoMapperService.toDto(d, d.dtoClass())).orElse(null)
-                                        : null;
+    public Pair<List<Op>, List<Runnable>> preparePush(InvalidationQueueEntry entry) {
+        List<Op> info = txm.run(() -> {
+            var obj = curTx.get(JData.class, entry.key()).orElse(null);
+            switch (obj) {
+                case RemoteObjectMeta remote -> {
+                    JDataRemoteDto data =
+                            remote.knownType().isAnnotationPresent(JDataRemotePush.class)
+                                    ? remoteTransaction.getData(remote.knownType(), entry.key())
+                                    .map(d -> dtoMapperService.toDto(d, d.dtoClass())).orElse(null)
+                                    : null;
 
-                        if (remote.knownType().isAnnotationPresent(JDataRemotePush.class) && data == null) {
-                            Log.warnv("Failed to get data for push {0} of type {1}", entry.key(), remote.knownType());
-                        }
-                        return List.of(new IndexUpdateOp(entry.key(), remote.changelog(), data));
+                    if (remote.knownType().isAnnotationPresent(JDataRemotePush.class) && data == null) {
+                        Log.warnv("Failed to get data for push {0} of type {1}", entry.key(), remote.knownType());
                     }
-                    case JKleppmannTreePersistentData pd -> {
-                        var tree = jKleppmannTreeManager.getTree(pd.key());
-
-                        if (!tree.hasPendingOpsForHost(entry.peer()))
-                            return List.of(tree.getPeriodicPushOp());
-
-                        var ops = tree.getPendingOpsForHost(entry.peer(), 100);
-
-                        if (tree.hasPendingOpsForHost(entry.peer())) {
-                            doAgain.set(true);
-                            invalidationQueueService.pushInvalidationToOneNoDelay(entry.peer(), pd.key());
-                        }
-                        return ops;
-                    }
-                    case null,
-                         default -> {
-                        return null;
-                    }
+                    return List.of(new IndexUpdateOp(entry.key(), remote.changelog(), data));
                 }
-            });
-            if (info == null) {
-                return;
+                case JKleppmannTreePersistentData pd -> {
+                    var tree = jKleppmannTreeManager.getTree(pd.key());
+
+                    if (!tree.hasPendingOpsForHost(entry.peer()))
+                        return List.of(tree.getPeriodicPushOp());
+
+                    var ops = tree.getPendingOpsForHost(entry.peer(), 100);
+
+                    if (tree.hasPendingOpsForHost(entry.peer())) {
+                        invalidationQueueService.pushInvalidationToOneNoDelay(entry.peer(), pd.key());
+                    }
+                    return ops;
+                }
+                case null,
+                     default -> {
+                    return List.of();
+                }
             }
-            Log.debugv("Pushing invalidation: entry {0}, sending {1}", entry, info);
-            remoteObjectServiceClient.pushOps(entry.peer(), info);
-            txm.run(() -> {
-                var obj = curTx.get(JData.class, entry.key()).orElse(null);
-                switch (obj) {
-                    case JKleppmannTreePersistentData pd: {
-                        var tree = jKleppmannTreeManager.getTree(pd.key());
-                        for (var op : info) {
-                            tree.commitOpForHost(entry.peer(), op);
+        });
+        List<Runnable> commits = info.stream().<Runnable>map(o -> {
+            return () -> {
+                txm.run(() -> {
+                    var obj = curTx.get(JData.class, entry.key()).orElse(null);
+                    switch (obj) {
+                        case JKleppmannTreePersistentData pd: {
+                            var tree = jKleppmannTreeManager.getTree(pd.key());
+                            for (var op : info) {
+                                tree.commitOpForHost(entry.peer(), op);
+                            }
+                            break;
                         }
-                        break;
+                        case null:
+                        default:
                     }
-                    case null:
-                    default:
-                }
-            });
-        } while (doAgain.get());
+                });
+            };
+        }).toList();
+
+        return Pair.of(info, commits);
     }
 }

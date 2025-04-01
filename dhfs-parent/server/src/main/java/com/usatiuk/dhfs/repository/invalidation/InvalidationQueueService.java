@@ -1,5 +1,7 @@
 package com.usatiuk.dhfs.repository.invalidation;
 
+import com.usatiuk.dhfs.repository.RemoteObjectServiceClient;
+import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
 import com.usatiuk.dhfs.utils.DataLocker;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.PeerId;
@@ -15,9 +17,13 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import jakarta.ws.rs.core.Link;
+import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -41,6 +47,8 @@ public class InvalidationQueueService {
     PersistentPeerDataService persistentPeerDataService;
 
     private final DataLocker _locker = new DataLocker();
+    @Inject
+    RemoteObjectServiceClient remoteObjectServiceClient;
     private ExecutorService _executor;
     private volatile boolean _shutdown = false;
 
@@ -105,38 +113,57 @@ public class InvalidationQueueService {
                     String stats = "Sent invalidation: ";
                     long success = 0;
 
-                    for (var e : data) {
-                        // TODO: Race?
-                        if (!peerInfoService.existsPeer(e.peer())) {
-                            Log.warnv("Will ignore invalidation of {0} to {1}, peer not found", e.key(), e.peer());
-                            continue;
-                        }
+                    List<AutoCloseableNoThrow> locks = new LinkedList<>();
+                    try {
+                        ArrayListValuedHashMap<PeerId, Op> ops = new ArrayListValuedHashMap<>();
+                        ArrayListValuedHashMap<PeerId, Runnable> commits = new ArrayListValuedHashMap<>();
 
-                        if (!remoteHostManager.isReachable(e.peer())) {
-                            deferredInvalidationQueueService.defer(e);
-                            continue;
-                        }
+                        for (var e : data) {
+                            // TODO: Race?
+                            if (!peerInfoService.existsPeer(e.peer())) {
+                                Log.warnv("Will ignore invalidation of {0} to {1}, peer not found", e.key(), e.peer());
+                                continue;
+                            }
 
-                        if (!persistentPeerDataService.isInitialSyncDone(e.peer())) {
-                            pushInvalidationToOne(e);
-                            continue;
-                        }
+                            if (!remoteHostManager.isReachable(e.peer())) {
+                                deferredInvalidationQueueService.defer(e);
+                                continue;
+                            }
 
-                        try (var lock = _locker.tryLock(e)) {
+                            if (!persistentPeerDataService.isInitialSyncDone(e.peer())) {
+                                pushInvalidationToOne(e);
+                                continue;
+                            }
+
+                            var lock = _locker.tryLock(e);
                             if (lock == null) {
                                 pushInvalidationToOne(e);
                                 continue;
                             }
-                            opPusher.doPush(e);
-                            success++;
-                        } catch (Exception ex) {
-                            Log.warnv("Failed to send invalidation to {0}, will retry: {1}", e, ex);
-                            pushInvalidationToOne(e);
+                            locks.add(lock);
+                            try {
+                                var prepared = opPusher.preparePush(e);
+                                ops.putAll(e.peer(), prepared.getLeft());
+                                commits.putAll(e.peer(), prepared.getRight());
+                                success++;
+                            } catch (Exception ex) {
+                                Log.warnv("Failed to prepare invalidation to {0}, will retry: {1}", e, ex);
+                                pushInvalidationToOne(e);
+                            }
+                            if (_shutdown) {
+                                Log.info("Invalidation sender exiting");
+                                break;
+                            }
                         }
-                        if (_shutdown) {
-                            Log.info("Invalidation sender exiting");
-                            break;
+
+                        for (var p : ops.keySet()) {
+                            var list = ops.get(p);
+                            Log.debugv("Pushing invalidations to {0}: {1}", p, list);
+                            remoteObjectServiceClient.pushOps(p, list);
+                            commits.get(p).forEach(Runnable::run);
                         }
+                    } finally {
+                        locks.forEach(AutoCloseableNoThrow::close);
                     }
 
                     stats += success + "/" + data.size() + " ";
