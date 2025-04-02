@@ -29,14 +29,6 @@ public class SerializingObjectPersistentStore {
         return delegateStore.readObject(name).map(serializer::deserialize);
     }
 
-    public TxManifestRaw prepareManifest(TxManifestObj<? extends JDataVersionedWrapper> names) {
-        return new TxManifestRaw(
-                names.written().stream()
-                        .map(e -> Pair.of(e.getKey(), serializer.serialize(e.getValue())))
-                        .toList()
-                , names.deleted());
-    }
-
     public Snapshot<JObjectKey, JDataVersionedWrapper> getSnapshot() {
         return new Snapshot<JObjectKey, JDataVersionedWrapper>() {
             private final Snapshot<JObjectKey, ByteString> _backing = delegateStore.getSnapshot();
@@ -65,16 +57,15 @@ public class SerializingObjectPersistentStore {
 
     }
 
-
-//    void commitTx(TxManifestObj<? extends JDataVersionedWrapper> names, Consumer<Runnable> commitLocked) {
-//        delegateStore.commitTx(prepareManifest(names), commitLocked);
-//    }
-
-    void commitTx(TxManifestRaw names, long txId, Consumer<Runnable> commitLocked) {
-        delegateStore.commitTx(names, txId, commitLocked);
+    private TxManifestRaw prepareManifest(TxManifestObj<? extends JDataVersionedWrapper> objs) {
+        return new TxManifestRaw(
+                objs.written().stream()
+                        .map(e -> Pair.of(e.getKey(), serializer.serialize(e.getValue())))
+                        .toList()
+                , objs.deleted());
     }
 
-    long getLastCommitId() {
-        return delegateStore.getLastCommitId();
+    Runnable prepareTx(TxManifestObj<? extends JDataVersionedWrapper> objects, long txId) {
+        return delegateStore.prepareTx(prepareManifest(objects), txId);
     }
 }

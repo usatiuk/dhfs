@@ -43,12 +43,9 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
     private static final String DB_NAME = "objects";
     private static final byte[] DB_VER_OBJ_NAME = "__DB_VER_OBJ".getBytes(StandardCharsets.UTF_8);
     private final Path _root;
-    private final AtomicReference<RefcountedCloseable<Txn<ByteBuffer>>> _curReadTxn = new AtomicReference<>();
-    private final ReentrantReadWriteLock _lock = new ReentrantReadWriteLock();
     private Env<ByteBuffer> _env;
     private Dbi<ByteBuffer> _db;
     private boolean _ready = false;
-    private long _lastTxId = 0;
 
     public LmdbObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.persistence.files.root") String root) {
         _root = Path.of(root).resolve("objects");
@@ -65,20 +62,31 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
                 .open(_root.toFile(), EnvFlags.MDB_NOTLS);
         _db = _env.openDbi(DB_NAME, MDB_CREATE);
 
-        var bb = ByteBuffer.allocateDirect(DB_VER_OBJ_NAME.length);
-        bb.put(DB_VER_OBJ_NAME);
-        bb.flip();
-
-        try (Txn<ByteBuffer> txn = _env.txnRead()) {
-            var value = _db.get(txn, bb);
-            if (value != null) {
-                var ver = value.getLong();
-                Log.infov("Read version: {0}", ver);
-                _lastTxId = ver;
+        try (Txn<ByteBuffer> txn = _env.txnWrite()) {
+            var read = readTxId(txn);
+            if (read.isPresent()) {
+                Log.infov("Read tx id {0}", read.get());
+            } else {
+                var bb = ByteBuffer.allocateDirect(DB_VER_OBJ_NAME.length);
+                bb.put(DB_VER_OBJ_NAME);
+                bb.flip();
+                var bbData = ByteBuffer.allocateDirect(8);
+                bbData.putLong(0);
+                bbData.flip();
+                _db.put(txn, bb, bbData);
+                txn.commit();
             }
         }
 
         _ready = true;
+    }
+
+    private Optional<Long> readTxId(Txn<ByteBuffer> txn) {
+        var bb = ByteBuffer.allocateDirect(DB_VER_OBJ_NAME.length);
+        bb.put(DB_VER_OBJ_NAME);
+        bb.flip();
+        var value = _db.get(txn, bb);
+        return Optional.ofNullable(value).map(ByteBuffer::getLong);
     }
 
     void shutdown(@Observes @Priority(900) ShutdownEvent event) throws IOException {
@@ -101,76 +109,50 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
         }
     }
 
-    private RefcountedCloseable<Txn<ByteBuffer>> getCurTxn() {
-        _lock.readLock().lock();
-        try {
-            var got = _curReadTxn.get();
-            var refInc = Optional.ofNullable(got).map(RefcountedCloseable::ref).orElse(null);
-            if (refInc != null) {
-                return got;
-            } else {
-                var newTxn = new RefcountedCloseable<>(_env.txnRead());
-                _curReadTxn.compareAndSet(got, newTxn);
-                return newTxn;
-            }
-        } finally {
-            _lock.readLock().unlock();
-        }
-    }
-
-    @Override
-    public CloseableKvIterator<JObjectKey, ByteString> getIterator(IteratorStart start, JObjectKey key) {
-        return new KeyPredicateKvIterator<>(new LmdbKvIterator(start, key), start, key, (k) -> !Arrays.equals(k.name().getBytes(StandardCharsets.UTF_8), DB_VER_OBJ_NAME));
-    }
-
     @Override
     public Snapshot<JObjectKey, ByteString> getSnapshot() {
-        _lock.readLock().lock();
-        try {
-            var txn = new RefcountedCloseable<>(_env.txnRead());
-            var commitId = getLastCommitId();
-            return new Snapshot<JObjectKey, ByteString>() {
-                private final RefcountedCloseable<Txn<ByteBuffer>> _txn = txn;
-                private final long _id = commitId;
-                private boolean _closed = false;
+        var txn = new RefcountedCloseable<>(_env.txnRead());
+        long commitId = readTxId(txn.get()).orElseThrow();
+        return new Snapshot<JObjectKey, ByteString>() {
+            private final RefcountedCloseable<Txn<ByteBuffer>> _txn = txn;
+            private final long _id = commitId;
+            private boolean _closed = false;
 
-                @Override
-                public CloseableKvIterator<JObjectKey, ByteString> getIterator(IteratorStart start, JObjectKey key) {
-                    assert !_closed;
-                    return new KeyPredicateKvIterator<>(new LmdbKvIterator(_txn.ref(), start, key), start, key, (k) -> !Arrays.equals(k.name().getBytes(StandardCharsets.UTF_8), DB_VER_OBJ_NAME));
-                }
+            @Override
+            public CloseableKvIterator<JObjectKey, ByteString> getIterator(IteratorStart start, JObjectKey key) {
+                assert !_closed;
+                return new KeyPredicateKvIterator<>(new LmdbKvIterator(_txn.ref(), start, key), start, key, (k) -> !Arrays.equals(k.name().getBytes(StandardCharsets.UTF_8), DB_VER_OBJ_NAME));
+            }
 
-                @Nonnull
-                @Override
-                public Optional<ByteString> readObject(JObjectKey name) {
-                    assert !_closed;
-                    var got = _db.get(_txn.get(), name.toByteBuffer());
-                    var ret = Optional.ofNullable(got).map(ByteString::copyFrom);
-                    return ret;
-                }
+            @Nonnull
+            @Override
+            public Optional<ByteString> readObject(JObjectKey name) {
+                assert !_closed;
+                var got = _db.get(_txn.get(), name.toByteBuffer());
+                var ret = Optional.ofNullable(got).map(ByteString::copyFrom);
+                return ret;
+            }
 
-                @Override
-                public long id() {
-                    assert !_closed;
-                    return _id;
-                }
+            @Override
+            public long id() {
+                assert !_closed;
+                return _id;
+            }
 
-                @Override
-                public void close() {
-                    assert !_closed;
-                    _closed = true;
-                    _txn.unref();
-                }
-            };
-        } finally {
-            _lock.readLock().unlock();
-        }
+            @Override
+            public void close() {
+                assert !_closed;
+                _closed = true;
+                _txn.unref();
+            }
+        };
     }
 
     @Override
-    public void commitTx(TxManifestRaw names, long txId, Consumer<Runnable> commitLocked) {
+    public Runnable prepareTx(TxManifestRaw names, long txId) {
         verifyReady();
-        try (Txn<ByteBuffer> txn = _env.txnWrite()) {
+        var txn = _env.txnWrite();
+        try {
             for (var written : names.written()) {
                 // TODO:
                 var bb = UninitializedByteBuffer.allocateUninitialized(written.getValue().size());
@@ -182,33 +164,26 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
                 _db.delete(txn, key.toByteBuffer());
             }
 
+            assert txId > readTxId(txn).orElseThrow();
+
             var bb = ByteBuffer.allocateDirect(DB_VER_OBJ_NAME.length);
             bb.put(DB_VER_OBJ_NAME);
             bb.flip();
             var bbData = ByteBuffer.allocateDirect(8);
-
-            commitLocked.accept(() -> {
-                _lock.writeLock().lock();
-                try {
-                    var realTxId = txId;
-                    if (realTxId == -1)
-                        realTxId = _lastTxId + 1;
-
-                    assert realTxId > _lastTxId;
-                    _lastTxId = realTxId;
-
-                    bbData.putLong(realTxId);
-                    bbData.flip();
-                    _db.put(txn, bb, bbData);
-
-                    _curReadTxn.set(null);
-
-                    txn.commit();
-                } finally {
-                    _lock.writeLock().unlock();
-                }
-            });
+            bbData.putLong(txId);
+            bbData.flip();
+            _db.put(txn, bb, bbData);
+        } catch (Throwable t) {
+            txn.close();
+            throw t;
         }
+        return () -> {
+            try {
+                txn.commit();
+            } finally {
+                txn.close();
+            }
+        };
     }
 
     @Override
@@ -227,16 +202,6 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
     public long getUsableSpace() {
         verifyReady();
         return _root.toFile().getUsableSpace();
-    }
-
-    @Override
-    public long getLastCommitId() {
-        _lock.readLock().lock();
-        try {
-            return _lastTxId;
-        } finally {
-            _lock.readLock().unlock();
-        }
     }
 
     private class LmdbKvIterator extends ReversibleKvIterator<JObjectKey, ByteString> {
@@ -324,10 +289,6 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
                 }
             }
             Log.tracev("got: {0}, hasNext: {1}", realGot, _hasNext);
-        }
-
-        LmdbKvIterator(IteratorStart start, JObjectKey key) {
-            this(getCurTxn(), start, key);
         }
 
         @Override

@@ -54,7 +54,7 @@ public class WritebackObjectPersistentStore {
     private ExecutorService _statusExecutor;
     private volatile boolean _ready = false;
 
-    void init(@Observes @Priority(110) StartupEvent event) {
+    void init(@Observes @Priority(120) StartupEvent event) {
         {
             BasicThreadFactory factory = new BasicThreadFactory.Builder()
                     .namingPattern("tx-writeback-%d")
@@ -75,8 +75,12 @@ public class WritebackObjectPersistentStore {
             } catch (InterruptedException ignored) {
             }
         });
-        _counter.set(cachedStore.getLastTxId());
-        _lastCommittedTx.set(cachedStore.getLastTxId());
+        long lastTxId;
+        try (var s = cachedStore.getSnapshot()) {
+            lastTxId = s.id();
+        }
+        _counter.set(lastTxId);
+        _lastCommittedTx.set(lastTxId);
         _ready = true;
     }
 
@@ -311,26 +315,6 @@ public class WritebackObjectPersistentStore {
         synchronized (_pendingBundles) {
             return Optional.ofNullable(_pendingWrites.get().get(key));
         }
-    }
-
-    @Nonnull
-    public Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
-        var pending = getPendingWrite(name).orElse(null);
-        return switch (pending) {
-            case PendingWrite write -> Optional.of(write.data());
-            case PendingDelete ignored -> Optional.empty();
-            case null -> cachedStore.readObject(name);
-            default -> throw new IllegalStateException("Unexpected value: " + pending);
-        };
-    }
-
-    @Nonnull
-    public VerboseReadResult readObjectVerbose(JObjectKey key) {
-        var pending = getPendingWrite(key).orElse(null);
-        if (pending != null) {
-            return new VerboseReadResultPending(pending);
-        }
-        return new VerboseReadResultPersisted(cachedStore.readObject(key));
     }
 
     /**

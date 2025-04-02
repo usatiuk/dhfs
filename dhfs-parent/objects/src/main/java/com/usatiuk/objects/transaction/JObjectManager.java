@@ -3,6 +3,7 @@ package com.usatiuk.objects.transaction;
 import com.usatiuk.objects.JData;
 import com.usatiuk.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.JObjectKey;
+import com.usatiuk.objects.snapshot.Snapshot;
 import com.usatiuk.objects.snapshot.SnapshotManager;
 import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
 import io.quarkus.logging.Log;
@@ -58,17 +59,9 @@ public class JObjectManager {
         verifyReady();
         var writes = new LinkedHashMap<JObjectKey, TxRecord.TxObjectRecord<?>>();
         var dependenciesLocked = new LinkedHashMap<JObjectKey, Optional<JDataVersionedWrapper>>();
+        Snapshot<JObjectKey, JDataVersionedWrapper> commitSnapshot = null;
         Map<JObjectKey, TransactionObject<?>> readSet;
         var toUnlock = new ArrayList<AutoCloseableNoThrow>();
-
-        Consumer<JObjectKey> addDependency =
-                key -> {
-                    dependenciesLocked.computeIfAbsent(key, k -> {
-                        var lock = lockManager.lockObject(k);
-                        toUnlock.add(lock);
-                        return snapshotManager.readObjectDirect(k);
-                    });
-                };
 
         try {
             try {
@@ -161,7 +154,12 @@ public class JObjectManager {
             if (!writes.isEmpty()) {
                 Stream.concat(readSet.keySet().stream(), writes.keySet().stream())
                         .sorted(Comparator.comparing(JObjectKey::toString))
-                        .forEach(addDependency);
+                        .forEach(k -> {
+                            var lock = lockManager.lockObject(k);
+                            toUnlock.add(lock);
+                        });
+
+                commitSnapshot = snapshotManager.createSnapshot();
             }
 
             for (var read : readSet.entrySet()) {
@@ -189,39 +187,47 @@ public class JObjectManager {
             Log.trace("Committing transaction start");
             var snapshotId = tx.snapshot().id();
 
-            for (var read : readSet.entrySet()) {
-                var dep = dependenciesLocked.get(read.getKey());
+            if (snapshotId != commitSnapshot.id()) {
+                for (var read : readSet.entrySet()) {
+                    dependenciesLocked.put(read.getKey(), commitSnapshot.readObject(read.getKey()));
+                    var dep = dependenciesLocked.get(read.getKey());
 
-                if (dep.isEmpty() != read.getValue().data().isEmpty()) {
-                    Log.trace("Checking read dependency " + read.getKey() + " - not found");
-                    throw new TxCommitException("Serialization hazard: " + dep.isEmpty() + " vs " + read.getValue().data().isEmpty());
-                }
+                    if (dep.isEmpty() != read.getValue().data().isEmpty()) {
+                        Log.trace("Checking read dependency " + read.getKey() + " - not found");
+                        throw new TxCommitException("Serialization hazard: " + dep.isEmpty() + " vs " + read.getValue().data().isEmpty());
+                    }
 
-                if (dep.isEmpty()) {
-                    // TODO: Every write gets a dependency due to hooks
-                    continue;
+                    if (dep.isEmpty()) {
+                        // TODO: Every write gets a dependency due to hooks
+                        continue;
 //                    assert false;
 //                    throw new TxCommitException("Serialization hazard: " + dep.isEmpty() + " vs " + read.getValue().data().isEmpty());
-                }
+                    }
 
-                if (dep.get().version() > snapshotId) {
-                    Log.trace("Checking dependency " + read.getKey() + " - newer than");
-                    throw new TxCommitException("Serialization hazard: " + dep.get().data().key() + " " + dep.get().version() + " vs " + snapshotId);
-                }
+                    if (dep.get().version() > snapshotId) {
+                        Log.trace("Checking dependency " + read.getKey() + " - newer than");
+                        throw new TxCommitException("Serialization hazard: " + dep.get().data().key() + " " + dep.get().version() + " vs " + snapshotId);
+                    }
 
-                Log.trace("Checking dependency " + read.getKey() + " - ok with read");
+                    Log.trace("Checking dependency " + read.getKey() + " - ok with read");
+                }
+            } else {
+                Log.tracev("Skipped dependency checks: no changes");
             }
+
+            boolean same = snapshotId == commitSnapshot.id();
 
             var addFlushCallback = snapshotManager.commitTx(
                     writes.values().stream()
                             .filter(r -> {
-                                if (r instanceof TxRecord.TxObjectRecordWrite<?>(JData data)) {
-                                    var dep = dependenciesLocked.get(data.key());
-                                    if (dep.isPresent() && dep.get().version() > snapshotId) {
-                                        Log.trace("Skipping write " + data.key() + " - dependency " + dep.get().version() + " vs " + snapshotId);
-                                        return false;
+                                if (!same)
+                                    if (r instanceof TxRecord.TxObjectRecordWrite<?>(JData data)) {
+                                        var dep = dependenciesLocked.get(data.key());
+                                        if (dep.isPresent() && dep.get().version() > snapshotId) {
+                                            Log.trace("Skipping write " + data.key() + " - dependency " + dep.get().version() + " vs " + snapshotId);
+                                            return false;
+                                        }
                                     }
-                                }
                                 return true;
                             }).toList());
 
@@ -244,6 +250,8 @@ public class JObjectManager {
             for (var unlock : toUnlock) {
                 unlock.close();
             }
+            if (commitSnapshot != null)
+                commitSnapshot.close();
             tx.close();
         }
     }

@@ -30,9 +30,4 @@ public class SnapshotManager {
             });
         }
     }
-
-    @Nonnull
-    public Optional<JDataVersionedWrapper> readObjectDirect(JObjectKey name) {
-        return writebackStore.readObject(name);
-    }
 }
