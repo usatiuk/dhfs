@@ -23,11 +23,6 @@ public class SnapshotManager {
 
     // This should not be called for the same objects concurrently
     public Consumer<Runnable> commitTx(Collection<TxRecord.TxObjectRecord<?>> writes) {
-        // TODO: FIXME:
-        synchronized (this) {
-            return writebackStore.commitTx(writes, (id, commit) -> {
-                commit.run();
-            });
-        }
+        return writebackStore.commitTx(writes);
     }
 }
