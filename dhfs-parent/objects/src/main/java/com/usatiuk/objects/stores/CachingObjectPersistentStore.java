@@ -19,6 +19,7 @@ import javax.annotation.Nonnull;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 @ApplicationScoped
@@ -64,6 +65,9 @@ public class CachingObjectPersistentStore {
 
     private final AtomicReference<Cache> _cache;
     private ExecutorService _commitExecutor;
+    private ExecutorService _statusExecutor;
+    private AtomicLong _cached = new AtomicLong();
+    private AtomicLong _cacheTries = new AtomicLong();
 
     public CachingObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.lru.limit") int sizeLimit) {
         _cache = new AtomicReference<>(
@@ -78,12 +82,14 @@ public class CachingObjectPersistentStore {
 
         _commitExecutor = Executors.newSingleThreadExecutor();
         if (printStats) {
-            ExecutorService _statusExecutor = Executors.newSingleThreadExecutor();
+            _statusExecutor = Executors.newSingleThreadExecutor();
             _statusExecutor.submit(() -> {
                 try {
                     while (true) {
-                        Log.debugv("Cache status: size=" + _cache.get().size() / 1024 / 1024 + "MB");
-                        Thread.sleep(10000);
+                        Log.infov("Cache status: size=" + _cache.get().size() / 1024 / 1024 + "MB" + " cache success ratio: " + (_cached.get() / (double) _cacheTries.get()));
+                        _cached.set(0);
+                        _cacheTries.set(0);
+                        Thread.sleep(1000);
                     }
                 } catch (InterruptedException ignored) {
                 }
@@ -136,26 +142,23 @@ public class CachingObjectPersistentStore {
                 Cache finalCurCache = curCache;
                 return new Snapshot<JObjectKey, JDataVersionedWrapper>() {
                     private boolean _invalid = false;
-                    private Cache _curCache = finalCurCache;
+                    private final Cache _curCache = finalCurCache;
                     private final Snapshot<JObjectKey, JDataVersionedWrapper> _backing = finalBacking;
 
                     private void maybeCache(JObjectKey key, Optional<JDataVersionedWrapper> obj) {
+                        _cacheTries.incrementAndGet();
                         if (_invalid)
                             return;
 
-                        for (int i = 0; i < 10; i++) {
-                            var globalCache = _cache.get();
-                            if (globalCache.version() != _curCache.version()) {
-                                _invalid = true;
-                                return;
-                            }
-
-                            var newCache = globalCache.withPut(key, obj);
-                            if (!_cache.compareAndSet(globalCache, newCache))
-                                continue;
-
-                            _curCache = newCache;
+                        var globalCache = _cache.get();
+                        if (globalCache.version() != _curCache.version()) {
+                            _invalid = true;
+                            return;
                         }
+
+                        var newCache = globalCache.withPut(key, obj);
+                        if (_cache.compareAndSet(globalCache, newCache))
+                            _cached.incrementAndGet();
                     }
 
                     @Override
