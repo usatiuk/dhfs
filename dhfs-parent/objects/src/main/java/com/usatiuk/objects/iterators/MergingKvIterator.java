@@ -4,7 +4,6 @@ import io.quarkus.logging.Log;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, V> {
@@ -27,18 +26,34 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
             // We have a bunch of iterators that have given us theirs "greatest LT/LE key"
             // now we need to pick the greatest of those to start with
             // But if some of them don't have a lesser key, we need to pick the smallest of those
-            var found = _iterators.keySet().stream()
-                    .filter(CloseableKvIterator::hasNext)
-                    .map((i) -> {
-                        var peeked = i.peekNextKey();
-//                            Log.warnv("peeked: {0}, from {1}", peeked, i.getClass());
-                        return peeked;
-                    }).distinct().collect(Collectors.partitioningBy(e -> startType == IteratorStart.LE ? e.compareTo(startKey) <= 0 : e.compareTo(startKey) < 0));
+
+            K greatestLess = null;
+            K smallestMore = null;
+
+            for (var it : _iterators.keySet()) {
+                if (it.hasNext()) {
+                    var peeked = it.peekNextKey();
+                    if (startType == IteratorStart.LE ? peeked.compareTo(startKey) <= 0 : peeked.compareTo(startKey) < 0) {
+                        if (greatestLess == null || peeked.compareTo(greatestLess) > 0) {
+                            greatestLess = peeked;
+                        }
+                    } else {
+                        if (smallestMore == null || peeked.compareTo(smallestMore) < 0) {
+                            smallestMore = peeked;
+                        }
+                    }
+                }
+            }
+
             K initialMaxValue;
-            if (!found.get(true).isEmpty())
-                initialMaxValue = found.get(true).stream().max(Comparator.naturalOrder()).orElse(null);
+            if (greatestLess != null)
+                initialMaxValue = greatestLess;
             else
-                initialMaxValue = found.get(false).stream().min(Comparator.naturalOrder()).orElse(null);
+                initialMaxValue = smallestMore;
+
+            if (initialMaxValue == null) {
+                // Empty iterators
+            }
 
             for (var iterator : _iterators.keySet()) {
                 while (iterator.hasNext() && iterator.peekNextKey().compareTo(initialMaxValue) < 0) {
