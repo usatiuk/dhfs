@@ -3,6 +3,7 @@ package com.usatiuk.objects.stores;
 import com.usatiuk.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.JDataVersionedWrapperImpl;
 import com.usatiuk.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKeyImpl;
 import com.usatiuk.objects.iterators.*;
 import com.usatiuk.objects.snapshot.Snapshot;
 import com.usatiuk.objects.transaction.TxCommitException;
@@ -26,7 +27,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
 @ApplicationScoped

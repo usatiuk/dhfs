@@ -7,6 +7,7 @@ import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.dhfs.repository.peersync.structs.JKleppmannTreeNodeMetaPeer;
 import com.usatiuk.kleppmanntree.OpMove;
 import com.usatiuk.kleppmanntree.TreeNode;
+import com.usatiuk.objects.JObjectKeyImpl;
 import org.pcollections.HashTreePMap;
 import org.pcollections.PCollection;
 import org.pcollections.PMap;

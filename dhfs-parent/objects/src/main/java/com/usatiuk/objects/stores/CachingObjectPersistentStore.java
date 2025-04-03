@@ -5,7 +5,6 @@ import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.iterators.*;
 import com.usatiuk.objects.snapshot.Snapshot;
 import io.quarkus.logging.Log;
-import io.quarkus.runtime.Startup;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;

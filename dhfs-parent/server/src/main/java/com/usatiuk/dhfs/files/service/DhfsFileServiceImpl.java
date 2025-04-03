@@ -9,6 +9,7 @@ import com.usatiuk.dhfs.files.objects.ChunkData;
 import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.objects.JData;
 import com.usatiuk.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKeyImpl;
 import com.usatiuk.objects.iterators.IteratorStart;
 import com.usatiuk.dhfs.jkleppmanntree.JKleppmannTreeManager;
 import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNode;
@@ -81,11 +82,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     JMapHelper jMapHelper;
 
     private JKleppmannTreeManager.JKleppmannTree getTreeW() {
-        return jKleppmannTreeManager.getTree(new JObjectKey("fs"));
+        return jKleppmannTreeManager.getTree(JObjectKey.of("fs"));
     }
 
     private JKleppmannTreeManager.JKleppmannTree getTreeR() {
-        return jKleppmannTreeManager.getTree(new JObjectKey("fs"), LockingStrategy.OPTIMISTIC);
+        return jKleppmannTreeManager.getTree(JObjectKey.of("fs"), LockingStrategy.OPTIMISTIC);
     }
 
     private ChunkData createChunk(ByteString bytes) {

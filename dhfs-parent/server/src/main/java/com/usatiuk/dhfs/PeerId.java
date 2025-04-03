@@ -1,6 +1,7 @@
 package com.usatiuk.dhfs;
 
 import com.usatiuk.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKeyImpl;
 
 import java.io.Serializable;
 

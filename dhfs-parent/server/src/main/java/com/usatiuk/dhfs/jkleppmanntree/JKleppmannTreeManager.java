@@ -6,6 +6,7 @@ import com.usatiuk.dhfs.jkleppmanntree.structs.*;
 import com.usatiuk.dhfs.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.repository.invalidation.Op;
 import com.usatiuk.dhfs.repository.peersync.PeerInfoService;
+import com.usatiuk.objects.JObjectKeyImpl;
 import com.usatiuk.objects.transaction.LockingStrategy;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;
@@ -258,22 +259,22 @@ public class JKleppmannTreeManager {
 
             @Override
             public JObjectKey getRootId() {
-                return new JObjectKey(_treeName.name() + "_jt_root");
+                return JObjectKey.of(_treeName.name() + "_jt_root");
             }
 
             @Override
             public JObjectKey getTrashId() {
-                return new JObjectKey(_treeName.name() + "_jt_trash");
+                return JObjectKey.of(_treeName.name() + "_jt_trash");
             }
 
             @Override
             public JObjectKey getLostFoundId() {
-                return new JObjectKey(_treeName.name() + "_jt_lf");
+                return JObjectKey.of(_treeName.name() + "_jt_lf");
             }
 
             @Override
             public JObjectKey getNewNodeId() {
-                return new JObjectKey(UUID.randomUUID().toString());
+                return JObjectKey.of(UUID.randomUUID().toString());
             }
 
             @Override

@@ -7,6 +7,7 @@ import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
 import com.usatiuk.kleppmanntree.LogRecord;
 import com.usatiuk.kleppmanntree.OpMove;
+import com.usatiuk.objects.JObjectKeyImpl;
 import org.pcollections.PCollection;
 import org.pcollections.PMap;
 import org.pcollections.PSortedMap;
@@ -49,6 +50,6 @@ public record JKleppmannTreePersistentData(
 
     @Override
     public Collection<JObjectKey> collectRefsTo() {
-        return List.of(new JObjectKey(key().name() + "_jt_trash"), new JObjectKey(key().name() + "_jt_root"), new JObjectKey(key().name() + "_jt_lf"));
+        return List.of(JObjectKey.of(key().name() + "_jt_trash"), JObjectKey.of(key().name() + "_jt_root"), JObjectKey.of(key().name() + "_jt_lf"));
     }
 }

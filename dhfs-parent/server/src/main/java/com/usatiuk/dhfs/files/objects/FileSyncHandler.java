@@ -48,11 +48,11 @@ public class FileSyncHandler implements ObjSyncHandler<File, FileDto> {
     DhfsFileService fileService;
 
     private JKleppmannTreeManager.JKleppmannTree getTreeW() {
-        return jKleppmannTreeManager.getTree(new JObjectKey("fs"));
+        return jKleppmannTreeManager.getTree(JObjectKey.of("fs"));
     }
 
     private JKleppmannTreeManager.JKleppmannTree getTreeR() {
-        return jKleppmannTreeManager.getTree(new JObjectKey("fs"), LockingStrategy.OPTIMISTIC);
+        return jKleppmannTreeManager.getTree(JObjectKey.of("fs"), LockingStrategy.OPTIMISTIC);
     }
 
     private void resolveConflict(PeerId from, JObjectKey key, PMap<PeerId, Long> receivedChangelog,

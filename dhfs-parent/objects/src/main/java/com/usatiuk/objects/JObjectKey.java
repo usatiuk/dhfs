@@ -1,53 +1,47 @@
 package com.usatiuk.objects;
 
-import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
-
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
-public record JObjectKey(String name) implements Serializable, Comparable<JObjectKey> {
-    public static JObjectKey of(String name) {
-        return new JObjectKey(name);
+public sealed interface JObjectKey extends Serializable, Comparable<JObjectKey> permits JObjectKeyImpl, JObjectKeyMax, JObjectKeyMin {
+    JObjectKeyMin MIN = new JObjectKeyMin();
+    JObjectKeyMax MAX = new JObjectKeyMax();
+
+    static JObjectKey of(String name) {
+        return new JObjectKeyImpl(name);
     }
 
-    public static JObjectKey random() {
-        return new JObjectKey(UUID.randomUUID().toString());
+    static JObjectKey random() {
+        return new JObjectKeyImpl(UUID.randomUUID().toString());
     }
 
-    public static JObjectKey first() {
-        return new JObjectKey("");
+    static JObjectKey first() {
+        return MIN;
     }
 
-    public static JObjectKey fromBytes(byte[] bytes) {
-        return new JObjectKey(new String(bytes, StandardCharsets.UTF_8));
+    static JObjectKey last() {
+        return MAX;
     }
 
-    public static JObjectKey fromByteBuffer(ByteBuffer buff) {
-        return new JObjectKey(StandardCharsets.UTF_8.decode(buff).toString());
+    static JObjectKey fromBytes(byte[] bytes) {
+        return new JObjectKeyImpl(new String(bytes, StandardCharsets.UTF_8));
+    }
+
+    static JObjectKey fromByteBuffer(ByteBuffer buff) {
+        return new JObjectKeyImpl(StandardCharsets.UTF_8.decode(buff).toString());
     }
 
     @Override
-    public int compareTo(JObjectKey o) {
-        return name.compareTo(o.name);
-    }
+    int compareTo(JObjectKey o);
 
     @Override
-    public String toString() {
-        return name;
-    }
+    String toString();
 
-    public byte[] bytes() {
-        return name.getBytes(StandardCharsets.UTF_8);
-    }
+    byte[] bytes();
 
-    public ByteBuffer toByteBuffer() {
-        var heapBb = StandardCharsets.UTF_8.encode(name);
-        if (heapBb.isDirect()) return heapBb;
-        var directBb = UninitializedByteBuffer.allocateUninitialized(heapBb.remaining());
-        directBb.put(heapBb);
-        directBb.flip();
-        return directBb;
-    }
+    ByteBuffer toByteBuffer();
+
+    String name();
 }

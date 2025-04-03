@@ -64,7 +64,7 @@ public abstract class ObjectsTestImpl {
         });
 
         txm.run(() -> {
-            var parent = curTx.get(Parent.class, new JObjectKey("ParentCreate")).orElse(null);
+            var parent = curTx.get(Parent.class, new JObjectKeyImpl("ParentCreate")).orElse(null);
             Assertions.assertEquals("John", parent.name());
         });
     }
@@ -84,11 +84,11 @@ public abstract class ObjectsTestImpl {
             }));
         });
         txm.run(() -> {
-            var parent = curTx.get(Parent.class, new JObjectKey("ParentOnCommitHook")).orElse(null);
+            var parent = curTx.get(Parent.class, new JObjectKeyImpl("ParentOnCommitHook")).orElse(null);
             Assertions.assertEquals("John", parent.name());
-            var parent2 = curTx.get(Parent.class, new JObjectKey("ParentOnCommitHook2")).orElse(null);
+            var parent2 = curTx.get(Parent.class, new JObjectKeyImpl("ParentOnCommitHook2")).orElse(null);
             Assertions.assertEquals("John2", parent2.name());
-            var parent3 = curTx.get(Parent.class, new JObjectKey("ParentOnCommitHook3")).orElse(null);
+            var parent3 = curTx.get(Parent.class, new JObjectKeyImpl("ParentOnCommitHook3")).orElse(null);
             Assertions.assertEquals("John3", parent3.name());
         });
     }
@@ -103,7 +103,7 @@ public abstract class ObjectsTestImpl {
         });
 
         txm.run(() -> {
-            var parent = curTx.get(Parent.class, new JObjectKey("ParentCreateGet")).orElse(null);
+            var parent = curTx.get(Parent.class, new JObjectKeyImpl("ParentCreateGet")).orElse(null);
             Assertions.assertEquals("John", parent.name());
         });
     }
@@ -121,11 +121,11 @@ public abstract class ObjectsTestImpl {
         });
 
         txm.run(() -> {
-            curTx.delete(new JObjectKey("ParentCreateDeleteObject"));
+            curTx.delete(new JObjectKeyImpl("ParentCreateDeleteObject"));
         });
 
         txm.run(() -> {
-            var parent = curTx.get(Parent.class, new JObjectKey("ParentCreateDeleteObject")).orElse(null);
+            var parent = curTx.get(Parent.class, new JObjectKeyImpl("ParentCreateDeleteObject")).orElse(null);
             Assertions.assertNull(parent);
         });
     }
@@ -141,7 +141,7 @@ public abstract class ObjectsTestImpl {
             curTx.put(newParent);
         });
         txm.run(() -> {
-            var parent = curTx.get(Parent.class, new JObjectKey("Parent7")).orElse(null);
+            var parent = curTx.get(Parent.class, new JObjectKeyImpl("Parent7")).orElse(null);
             Assertions.assertEquals("John2", parent.name());
         });
     }
@@ -154,17 +154,17 @@ public abstract class ObjectsTestImpl {
         });
 
         txm.run(() -> {
-            var parent = curTx.get(Parent.class, new JObjectKey("Parent3"), LockingStrategy.OPTIMISTIC).orElse(null);
+            var parent = curTx.get(Parent.class, new JObjectKeyImpl("Parent3"), LockingStrategy.OPTIMISTIC).orElse(null);
             Assertions.assertEquals("John", parent.name());
             curTx.put(parent.withName("John2"));
         });
         txm.run(() -> {
-            var parent = curTx.get(Parent.class, new JObjectKey("Parent3"), LockingStrategy.WRITE).orElse(null);
+            var parent = curTx.get(Parent.class, new JObjectKeyImpl("Parent3"), LockingStrategy.WRITE).orElse(null);
             Assertions.assertEquals("John2", parent.name());
             curTx.put(parent.withName("John3"));
         });
         txm.run(() -> {
-            var parent = curTx.get(Parent.class, new JObjectKey("Parent3")).orElse(null);
+            var parent = curTx.get(Parent.class, new JObjectKeyImpl("Parent3")).orElse(null);
             Assertions.assertEquals("John3", parent.name());
         });
     }
@@ -187,7 +187,7 @@ public abstract class ObjectsTestImpl {
                     } catch (Throwable e) {
                         throw new RuntimeException(e);
                     }
-                    var got = curTx.get(Parent.class, new JObjectKey("Parent2")).orElse(null);
+                    var got = curTx.get(Parent.class, new JObjectKeyImpl("Parent2")).orElse(null);
                     var newParent = new Parent(JObjectKey.of("Parent2"), "John");
                     curTx.put(newParent);
                     Log.warn("Thread 1 commit");
@@ -207,7 +207,7 @@ public abstract class ObjectsTestImpl {
                     } catch (Throwable e) {
                         throw new RuntimeException(e);
                     }
-                    var got = curTx.get(Parent.class, new JObjectKey("Parent2")).orElse(null);
+                    var got = curTx.get(Parent.class, new JObjectKeyImpl("Parent2")).orElse(null);
                     var newParent = new Parent(JObjectKey.of("Parent2"), "John2");
                     curTx.put(newParent);
                     Log.warn("Thread 2 commit");
@@ -226,7 +226,7 @@ public abstract class ObjectsTestImpl {
         }
 
         var got = txm.run(() -> {
-            return curTx.get(Parent.class, new JObjectKey("Parent2")).orElse(null);
+            return curTx.get(Parent.class, new JObjectKeyImpl("Parent2")).orElse(null);
         });
 
         if (!thread1Failed.get()) {
@@ -263,7 +263,7 @@ public abstract class ObjectsTestImpl {
                     } catch (Throwable e) {
                         throw new RuntimeException(e);
                     }
-                    var parent = curTx.get(Parent.class, new JObjectKey(key), strategy).orElse(null);
+                    var parent = curTx.get(Parent.class, new JObjectKeyImpl(key), strategy).orElse(null);
                     curTx.put(parent.withName("John"));
                     Log.warn("Thread 1 commit");
                 }, 0);
@@ -279,7 +279,7 @@ public abstract class ObjectsTestImpl {
                 Log.warn("Thread 2");
                 barrier.await(); // Ensure thread 2 tx id is larger than thread 1
                 txm.runTries(() -> {
-                    var parent = curTx.get(Parent.class, new JObjectKey(key), strategy).orElse(null);
+                    var parent = curTx.get(Parent.class, new JObjectKeyImpl(key), strategy).orElse(null);
                     curTx.put(parent.withName("John2"));
                     Log.warn("Thread 2 commit");
                 }, 0);
@@ -298,7 +298,7 @@ public abstract class ObjectsTestImpl {
         }
 
         var got = txm.run(() -> {
-            return curTx.get(Parent.class, new JObjectKey(key)).orElse(null);
+            return curTx.get(Parent.class, new JObjectKeyImpl(key)).orElse(null);
         });
 
         if (!thread1Failed.get() && !thread2Failed.get()) {
@@ -344,7 +344,7 @@ public abstract class ObjectsTestImpl {
                     } catch (Throwable e) {
                         throw new RuntimeException(e);
                     }
-                    var parent = curTx.get(Parent.class, new JObjectKey(key), strategy).orElse(null);
+                    var parent = curTx.get(Parent.class, new JObjectKeyImpl(key), strategy).orElse(null);
                     curTx.put(parent.withName("John"));
                     Log.warn("Thread 1 commit");
                 }, 0);
@@ -365,7 +365,7 @@ public abstract class ObjectsTestImpl {
                     } catch (Throwable e) {
                         throw new RuntimeException(e);
                     }
-                    var parent = curTx.get(Parent.class, new JObjectKey(key), strategy).orElse(null);
+                    var parent = curTx.get(Parent.class, new JObjectKeyImpl(key), strategy).orElse(null);
                     curTx.put(parent.withName("John2"));
                     Log.warn("Thread 2 commit");
                 }, 0);
@@ -384,7 +384,7 @@ public abstract class ObjectsTestImpl {
         }
 
         var got = txm.run(() -> {
-            return curTx.get(Parent.class, new JObjectKey(key)).orElse(null);
+            return curTx.get(Parent.class, new JObjectKeyImpl(key)).orElse(null);
         });
 
         Assertions.assertFalse(!thread1Failed.get() && !thread2Failed.get());
@@ -435,7 +435,7 @@ public abstract class ObjectsTestImpl {
                                 throw new RuntimeException(e);
                             }
                             Log.info("Thread 1 reading");
-                            Assertions.assertTrue(curTx.get(Parent.class, new JObjectKey(key)).isEmpty());
+                            Assertions.assertTrue(curTx.get(Parent.class, new JObjectKeyImpl(key)).isEmpty());
                             Log.info("Thread 1 done reading");
                         });
                         Log.info("Thread 1 finished");
@@ -452,9 +452,9 @@ public abstract class ObjectsTestImpl {
             throw new RuntimeException(e);
         }
         txm.run(() -> {
-            Assertions.assertEquals("John", curTx.get(Parent.class, new JObjectKey(key)).orElseThrow().name());
+            Assertions.assertEquals("John", curTx.get(Parent.class, new JObjectKeyImpl(key)).orElseThrow().name());
         });
-        deleteAndCheck(new JObjectKey(key));
+        deleteAndCheck(new JObjectKeyImpl(key));
     }
 
     @RepeatedTest(100)
@@ -494,7 +494,7 @@ public abstract class ObjectsTestImpl {
                                 throw new RuntimeException(e);
                             }
                             Log.info("Thread 1 reading");
-                            Assertions.assertEquals("John", curTx.get(Parent.class, new JObjectKey(key)).orElseThrow().name());
+                            Assertions.assertEquals("John", curTx.get(Parent.class, new JObjectKeyImpl(key)).orElseThrow().name());
                             Log.info("Thread 1 done reading");
                         });
                         Log.info("Thread 1 finished");
@@ -511,9 +511,9 @@ public abstract class ObjectsTestImpl {
             throw new RuntimeException(e);
         }
         txm.run(() -> {
-            Assertions.assertEquals("John2", curTx.get(Parent.class, new JObjectKey(key)).orElseThrow().name());
+            Assertions.assertEquals("John2", curTx.get(Parent.class, new JObjectKeyImpl(key)).orElseThrow().name());
         });
-        deleteAndCheck(new JObjectKey(key));
+        deleteAndCheck(new JObjectKeyImpl(key));
     }
 
     @RepeatedTest(100)
@@ -559,7 +559,7 @@ public abstract class ObjectsTestImpl {
                                 throw new RuntimeException(e);
                             }
                             Log.info("Thread 1 reading");
-                            Assertions.assertEquals("John", curTx.get(Parent.class, new JObjectKey(key)).orElseThrow().name());
+                            Assertions.assertEquals("John", curTx.get(Parent.class, new JObjectKeyImpl(key)).orElseThrow().name());
                             Log.info("Thread 1 done reading");
                         });
                         Log.info("Thread 1 finished");
@@ -576,9 +576,9 @@ public abstract class ObjectsTestImpl {
             throw new RuntimeException(e);
         }
         txm.run(() -> {
-            Assertions.assertEquals("John2", curTx.get(Parent.class, new JObjectKey(key)).orElseThrow().name());
+            Assertions.assertEquals("John2", curTx.get(Parent.class, new JObjectKeyImpl(key)).orElseThrow().name());
         });
-        deleteAndCheck(new JObjectKey(key));
+        deleteAndCheck(new JObjectKeyImpl(key));
     }
 
     @RepeatedTest(100)
@@ -596,7 +596,7 @@ public abstract class ObjectsTestImpl {
             curTx.put(new Parent(JObjectKey.of(key4), "John4"));
         });
         txm.run(() -> {
-            var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key));
+            var iter = curTx.getIterator(IteratorStart.GT, new JObjectKeyImpl(key));
             var got = iter.next();
             Assertions.assertEquals(key1, got.getKey().name());
             got = iter.next();
@@ -624,7 +624,7 @@ public abstract class ObjectsTestImpl {
             curTx.put(new Parent(JObjectKey.of(key4), "John4"));
         });
         txm.run(() -> {
-            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKeyImpl(key))) {
                 var got = iter.next();
                 Assertions.assertEquals(key1, got.getKey().name());
                 got = iter.next();
@@ -636,7 +636,7 @@ public abstract class ObjectsTestImpl {
             }
         });
         txm.run(() -> {
-            try (var iter = curTx.getIterator(IteratorStart.LT, new JObjectKey(key + "_5"))) {
+            try (var iter = curTx.getIterator(IteratorStart.LT, new JObjectKeyImpl(key + "_5"))) {
                 var got = iter.next();
                 Assertions.assertEquals(key4, got.getKey().name());
                 Assertions.assertTrue(iter.hasPrev());
@@ -648,14 +648,14 @@ public abstract class ObjectsTestImpl {
             }
         });
         txm.run(() -> {
-            curTx.delete(new JObjectKey(key));
-            curTx.delete(new JObjectKey(key1));
-            curTx.delete(new JObjectKey(key2));
-            curTx.delete(new JObjectKey(key3));
-            curTx.delete(new JObjectKey(key4));
+            curTx.delete(new JObjectKeyImpl(key));
+            curTx.delete(new JObjectKeyImpl(key1));
+            curTx.delete(new JObjectKeyImpl(key2));
+            curTx.delete(new JObjectKeyImpl(key3));
+            curTx.delete(new JObjectKeyImpl(key4));
         });
         txm.run(() -> {
-            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKeyImpl(key))) {
                 Assertions.assertTrue(!iter.hasNext() || !iter.next().getKey().name().startsWith(key));
             }
         });
@@ -696,7 +696,7 @@ public abstract class ObjectsTestImpl {
                 try {
                     barrier.await();
                     barrier2.await();
-                    try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+                    try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKeyImpl(key))) {
                         var got = iter.next();
                         Assertions.assertEquals(key1, got.getKey().name());
                         got = iter.next();
@@ -711,7 +711,7 @@ public abstract class ObjectsTestImpl {
         });
         Log.info("All threads finished");
         txm.run(() -> {
-            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKeyImpl(key))) {
                 var got = iter.next();
                 Assertions.assertEquals(key1, got.getKey().name());
                 got = iter.next();
@@ -723,14 +723,14 @@ public abstract class ObjectsTestImpl {
             }
         });
         txm.run(() -> {
-            curTx.delete(new JObjectKey(key));
-            curTx.delete(new JObjectKey(key1));
-            curTx.delete(new JObjectKey(key2));
-            curTx.delete(new JObjectKey(key3));
-            curTx.delete(new JObjectKey(key4));
+            curTx.delete(new JObjectKeyImpl(key));
+            curTx.delete(new JObjectKeyImpl(key1));
+            curTx.delete(new JObjectKeyImpl(key2));
+            curTx.delete(new JObjectKeyImpl(key3));
+            curTx.delete(new JObjectKeyImpl(key4));
         });
         txm.run(() -> {
-            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKeyImpl(key))) {
                 Assertions.assertTrue(!iter.hasNext() || !iter.next().getKey().name().startsWith(key));
             }
         });
@@ -772,7 +772,7 @@ public abstract class ObjectsTestImpl {
                 try {
                     barrier.await();
                     barrier2.await();
-                    try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+                    try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKeyImpl(key))) {
                         var got = iter.next();
                         Assertions.assertEquals(key1, got.getKey().name());
                         got = iter.next();
@@ -790,7 +790,7 @@ public abstract class ObjectsTestImpl {
         });
         Log.info("All threads finished");
         txm.run(() -> {
-            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKeyImpl(key))) {
                 var got = iter.next();
                 Assertions.assertEquals(key1, got.getKey().name());
                 got = iter.next();
@@ -803,14 +803,14 @@ public abstract class ObjectsTestImpl {
             }
         });
         txm.run(() -> {
-            curTx.delete(new JObjectKey(key));
-            curTx.delete(new JObjectKey(key1));
-            curTx.delete(new JObjectKey(key2));
-            curTx.delete(new JObjectKey(key3));
-            curTx.delete(new JObjectKey(key4));
+            curTx.delete(new JObjectKeyImpl(key));
+            curTx.delete(new JObjectKeyImpl(key1));
+            curTx.delete(new JObjectKeyImpl(key2));
+            curTx.delete(new JObjectKeyImpl(key3));
+            curTx.delete(new JObjectKeyImpl(key4));
         });
         txm.run(() -> {
-            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKeyImpl(key))) {
                 Assertions.assertTrue(!iter.hasNext() || !iter.next().getKey().name().startsWith(key));
             }
         });
@@ -841,7 +841,7 @@ public abstract class ObjectsTestImpl {
                     throw new RuntimeException(e);
                 }
                 curTx.put(new Parent(JObjectKey.of(key3), "John3"));
-                curTx.delete(new JObjectKey(key2));
+                curTx.delete(new JObjectKeyImpl(key2));
                 Log.info("Thread 1 committing");
             });
             Log.info("Thread 1 commited");
@@ -852,7 +852,7 @@ public abstract class ObjectsTestImpl {
                 try {
                     barrier.await();
                     barrier2.await();
-                    try (var iter = curTx.getIterator(IteratorStart.LE, new JObjectKey(key3))) {
+                    try (var iter = curTx.getIterator(IteratorStart.LE, new JObjectKeyImpl(key3))) {
                         var got = iter.next();
                         Assertions.assertEquals(key2, got.getKey().name());
                         Assertions.assertEquals("John2", ((Parent) got.getValue()).name());
@@ -878,7 +878,7 @@ public abstract class ObjectsTestImpl {
                         got = iter.next();
                         Assertions.assertEquals(key4, got.getKey().name());
                     }
-                    try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+                    try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKeyImpl(key))) {
                         var got = iter.next();
                         Assertions.assertEquals(key1, got.getKey().name());
                         got = iter.next();
@@ -896,7 +896,7 @@ public abstract class ObjectsTestImpl {
         });
         Log.info("All threads finished");
         txm.run(() -> {
-            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKeyImpl(key))) {
                 var got = iter.next();
                 Assertions.assertEquals(key1, got.getKey().name());
                 got = iter.next();
@@ -906,13 +906,13 @@ public abstract class ObjectsTestImpl {
             }
         });
         txm.run(() -> {
-            curTx.delete(new JObjectKey(key));
-            curTx.delete(new JObjectKey(key1));
-            curTx.delete(new JObjectKey(key3));
-            curTx.delete(new JObjectKey(key4));
+            curTx.delete(new JObjectKeyImpl(key));
+            curTx.delete(new JObjectKeyImpl(key1));
+            curTx.delete(new JObjectKeyImpl(key3));
+            curTx.delete(new JObjectKeyImpl(key4));
         });
         txm.run(() -> {
-            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKey(key))) {
+            try (var iter = curTx.getIterator(IteratorStart.GT, new JObjectKeyImpl(key))) {
                 Assertions.assertTrue(!iter.hasNext() || !iter.next().getKey().name().startsWith(key));
             }
         });

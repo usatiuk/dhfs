@@ -2,6 +2,9 @@ package com.usatiuk.objects.stores;
 
 import com.google.protobuf.ByteString;
 import com.usatiuk.objects.JObjectKey;
+import com.usatiuk.objects.JObjectKeyImpl;
+import com.usatiuk.objects.JObjectKeyMax;
+import com.usatiuk.objects.JObjectKeyMin;
 import com.usatiuk.objects.iterators.CloseableKvIterator;
 import com.usatiuk.objects.iterators.IteratorStart;
 import com.usatiuk.objects.iterators.KeyPredicateKvIterator;
@@ -30,9 +33,6 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.Consumer;
 
 import static org.lmdbjava.DbiFlags.MDB_CREATE;
 import static org.lmdbjava.Env.create;
@@ -229,6 +229,16 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             });
 
             verifyReady();
+
+            if (key instanceof JObjectKeyMin) {
+                _hasNext = _cursor.first();
+                return;
+            } else if (key instanceof JObjectKeyMax) {
+                _hasNext = _cursor.last();
+                return;
+            }
+
+
             if (key.toByteBuffer().remaining() == 0) {
                 if (!_cursor.first())
                     return;

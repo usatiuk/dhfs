@@ -33,15 +33,15 @@ public class PreCommitTxHookTest {
         });
 
         txm.run(() -> {
-            var parent = curTx.get(Parent.class, new JObjectKey("ParentCreate2")).orElse(null);
+            var parent = curTx.get(Parent.class, new JObjectKeyImpl("ParentCreate2")).orElse(null);
             Assertions.assertEquals("John", parent.name());
         });
 
         ArgumentCaptor<JData> dataCaptor = ArgumentCaptor.forClass(JData.class);
-        ArgumentCaptor<JObjectKey> keyCaptor = ArgumentCaptor.forClass(JObjectKey.class);
+        ArgumentCaptor<JObjectKey> keyCaptor = ArgumentCaptor.forClass(JObjectKeyImpl.class);
         Mockito.verify(spyHook, Mockito.times(1)).onCreate(keyCaptor.capture(), dataCaptor.capture());
         Assertions.assertEquals("John", ((Parent) dataCaptor.getValue()).name());
-        Assertions.assertEquals(new JObjectKey("ParentCreate2"), keyCaptor.getValue());
+        Assertions.assertEquals(new JObjectKeyImpl("ParentCreate2"), keyCaptor.getValue());
     }
 
     @Test
@@ -52,19 +52,19 @@ public class PreCommitTxHookTest {
         });
 
         txm.run(() -> {
-            var parent = curTx.get(Parent.class, new JObjectKey("ParentDel")).orElse(null);
+            var parent = curTx.get(Parent.class, new JObjectKeyImpl("ParentDel")).orElse(null);
             Assertions.assertEquals("John", parent.name());
         });
 
         txm.run(() -> {
-            curTx.delete(new JObjectKey("ParentDel"));
+            curTx.delete(new JObjectKeyImpl("ParentDel"));
         });
 
         ArgumentCaptor<JData> dataCaptor = ArgumentCaptor.forClass(JData.class);
-        ArgumentCaptor<JObjectKey> keyCaptor = ArgumentCaptor.forClass(JObjectKey.class);
+        ArgumentCaptor<JObjectKey> keyCaptor = ArgumentCaptor.forClass(JObjectKeyImpl.class);
         Mockito.verify(spyHook, Mockito.times(1)).onDelete(keyCaptor.capture(), dataCaptor.capture());
         Assertions.assertEquals("John", ((Parent) dataCaptor.getValue()).name());
-        Assertions.assertEquals(new JObjectKey("ParentDel"), keyCaptor.getValue());
+        Assertions.assertEquals(new JObjectKeyImpl("ParentDel"), keyCaptor.getValue());
     }
 
     @Test
@@ -81,11 +81,11 @@ public class PreCommitTxHookTest {
 
         ArgumentCaptor<JData> dataCaptorOld = ArgumentCaptor.forClass(JData.class);
         ArgumentCaptor<JData> dataCaptorNew = ArgumentCaptor.forClass(JData.class);
-        ArgumentCaptor<JObjectKey> keyCaptor = ArgumentCaptor.forClass(JObjectKey.class);
+        ArgumentCaptor<JObjectKey> keyCaptor = ArgumentCaptor.forClass(JObjectKeyImpl.class);
         Mockito.verify(spyHook, Mockito.times(1)).onChange(keyCaptor.capture(), dataCaptorOld.capture(), dataCaptorNew.capture());
         Assertions.assertEquals("John", ((Parent) dataCaptorOld.getValue()).name());
         Assertions.assertEquals("John changed", ((Parent) dataCaptorNew.getValue()).name());
-        Assertions.assertEquals(new JObjectKey("ParentEdit"), keyCaptor.getValue());
+        Assertions.assertEquals(new JObjectKeyImpl("ParentEdit"), keyCaptor.getValue());
     }
 
     @Test
@@ -96,18 +96,18 @@ public class PreCommitTxHookTest {
         });
 
         txm.run(() -> {
-            var parent = curTx.get(Parent.class, new JObjectKey("ParentEdit2")).orElse(null);
+            var parent = curTx.get(Parent.class, new JObjectKeyImpl("ParentEdit2")).orElse(null);
             Assertions.assertEquals("John", parent.name());
             curTx.put(parent.withName("John changed"));
         });
 
         ArgumentCaptor<JData> dataCaptorOld = ArgumentCaptor.forClass(JData.class);
         ArgumentCaptor<JData> dataCaptorNew = ArgumentCaptor.forClass(JData.class);
-        ArgumentCaptor<JObjectKey> keyCaptor = ArgumentCaptor.forClass(JObjectKey.class);
+        ArgumentCaptor<JObjectKey> keyCaptor = ArgumentCaptor.forClass(JObjectKeyImpl.class);
         Mockito.verify(spyHook, Mockito.times(1)).onChange(keyCaptor.capture(), dataCaptorOld.capture(), dataCaptorNew.capture());
         Assertions.assertEquals("John", ((Parent) dataCaptorOld.getValue()).name());
         Assertions.assertEquals("John changed", ((Parent) dataCaptorNew.getValue()).name());
-        Assertions.assertEquals(new JObjectKey("ParentEdit2"), keyCaptor.getValue());
+        Assertions.assertEquals(new JObjectKeyImpl("ParentEdit2"), keyCaptor.getValue());
     }
 
     @ApplicationScoped
