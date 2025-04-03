@@ -1,5 +1,7 @@
 package com.usatiuk.dhfs.jmap;
 
+import org.apache.commons.lang3.StringUtils;
+
 import javax.annotation.Nonnull;
 import java.io.Serializable;
 
@@ -14,7 +16,7 @@ public record JMapLongKey(long key) implements JMapKey, Comparable<JMapKey>, Ser
 
     @Override
     public String toString() {
-        return String.format("%016d", key);
+        return StringUtils.leftPad(String.valueOf(key), 20, '0');
     }
 
     @Override
