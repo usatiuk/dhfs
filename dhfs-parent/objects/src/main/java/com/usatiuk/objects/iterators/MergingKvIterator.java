@@ -5,6 +5,7 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, V> {
     private final NavigableMap<K, CloseableKvIterator<K, V>> _sortedIterators = new TreeMap<>();
@@ -15,13 +16,11 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
         _goingForward = true;
         _name = name;
 
-        int counter = 0;
-        var iteratorsTmp = new HashMap<CloseableKvIterator<K, V>, Integer>();
-        for (var iteratorFn : iterators) {
-            var iterator = iteratorFn.get(startType, startKey);
-            iteratorsTmp.put(iterator, counter++);
-        }
-        _iterators = Map.copyOf(iteratorsTmp);
+        _iterators = Map.ofEntries(
+                IntStream.range(0, iterators.size())
+                        .mapToObj(i -> Pair.of(iterators.get(i).get(startType, startKey), i))
+                        .toArray(Pair[]::new)
+        );
 
         if (startType == IteratorStart.LT || startType == IteratorStart.LE) {
             // Starting at a greatest key less than/less or equal than:
