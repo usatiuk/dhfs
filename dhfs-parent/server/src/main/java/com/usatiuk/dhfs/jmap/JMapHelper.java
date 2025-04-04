@@ -17,23 +17,27 @@ public class JMapHelper {
     Transaction curTx;
 
     static <K extends JMapKey> JObjectKey makePrefix(JObjectKey holder) {
-        return JObjectKey.of(holder.name() + "/");
+        return JObjectKey.of(holder.name() + "=");
+    }
+
+    static <K extends JMapKey> JObjectKey makeKeyFirst(JObjectKey holder) {
+        return JObjectKey.of(holder.name() + "<");
     }
 
     static <K extends JMapKey> JObjectKey makeKey(JObjectKey holder, K key) {
         return JObjectKey.of(makePrefix(holder).name() + key.toString());
     }
 
+    static <K extends JMapKey> JObjectKey makeKeyLast(JObjectKey holder) {
+        return JObjectKey.of(holder.name() + ">");
+    }
+
     public <K extends JMapKey> CloseableKvIterator<K, JMapEntry<K>> getIterator(JMapHolder<K> holder, IteratorStart start, K key) {
         return new JMapIterator<>(curTx.getIterator(start, makeKey(holder.key(), key)), holder);
     }
 
-    public <K extends JMapKey> CloseableKvIterator<K, JMapEntry<K>> getIterator(JMapHolder<K> holder, K key) {
-        return getIterator(holder, IteratorStart.GE, key);
-    }
-
     public <K extends JMapKey> CloseableKvIterator<K, JMapEntry<K>> getIterator(JMapHolder<K> holder) {
-        return new JMapIterator<>(curTx.getIterator(IteratorStart.GE, makePrefix(holder.key())), holder);
+        return new JMapIterator<>(curTx.getIterator(IteratorStart.GT, makeKeyFirst(holder.key())), holder);
     }
 
     public <K extends JMapKey> void put(JMapHolder<K> holder, K key, JObjectKey ref) {
