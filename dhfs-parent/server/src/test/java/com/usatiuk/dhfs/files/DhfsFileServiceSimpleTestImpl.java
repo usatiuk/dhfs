@@ -1,12 +1,12 @@
 package com.usatiuk.dhfs.files;
 
+import com.usatiuk.dhfs.RemoteTransaction;
 import com.usatiuk.dhfs.TempDataProfile;
 import com.usatiuk.dhfs.files.objects.File;
 import com.usatiuk.dhfs.files.service.DhfsFileService;
-import com.usatiuk.dhfs.RemoteTransaction;
+import com.usatiuk.kleppmanntree.AlreadyExistsException;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;
-import com.usatiuk.kleppmanntree.AlreadyExistsException;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.RepeatedTest;
@@ -27,6 +27,7 @@ class Profiles {
         protected void getConfigOverrides(Map<String, String> ret) {
             ret.put("dhfs.fuse.enabled", "false");
             ret.put("dhfs.files.target_chunk_size", "-1");
+            ret.put("dhfs.files.target_chunk_alignment", "-1");
         }
     }
 
@@ -35,6 +36,7 @@ class Profiles {
         protected void getConfigOverrides(Map<String, String> ret) {
             ret.put("dhfs.fuse.enabled", "false");
             ret.put("dhfs.files.target_chunk_size", "3");
+            ret.put("dhfs.files.target_chunk_alignment", "2");
         }
     }
 }
@@ -150,6 +152,7 @@ public abstract class DhfsFileServiceSimpleTestImpl {
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
 
         fileService.truncate(uuid, 20);
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fileService.read(uuid, 0, 20).get().toByteArray());
         fileService.write(uuid, 5, new byte[]{10, 11, 12, 13, 14, 15, 16, 17});
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 15, 16, 17, 0, 0, 0, 0, 0, 0, 0}, fileService.read(uuid, 0, 20).get().toByteArray());
     }
