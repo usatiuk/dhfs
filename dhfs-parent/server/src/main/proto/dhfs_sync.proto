@@ -1,12 +1,12 @@
 syntax = "proto3";
 
-import "dhfs_objects_serial.proto";
+import "dhfs_serial.proto";
 
 option java_multiple_files = true;
 option java_package = "com.usatiuk.dhfs.repository";
 option java_outer_classname = "DhfsObjectSyncApi";
 
-package dhfs.objects.sync;
+package dhfs.sync;
 
 service DhfsObjectSyncGrpc {
   rpc OpPush (OpPushRequest) returns (OpPushReply) {}
@@ -22,22 +22,22 @@ message PingRequest {}
 message PingReply {}
 
 message GetObjectRequest {
-  dhfs.objects.persistence.JObjectKeyP name = 2;
+  dhfs.persistence.JObjectKeyP name = 2;
 }
 
 message GetObjectReply {
-  dhfs.objects.persistence.ObjectChangelog changelog = 5;
-  dhfs.objects.persistence.JDataRemoteDtoP pushedData = 6;
+  dhfs.persistence.ObjectChangelog changelog = 5;
+  dhfs.persistence.JDataRemoteDtoP pushedData = 6;
 }
 
 message CanDeleteRequest {
-  dhfs.objects.persistence.JObjectKeyP name = 2;
-  repeated dhfs.objects.persistence.JObjectKeyP ourReferrers = 3;
+  dhfs.persistence.JObjectKeyP name = 2;
+  repeated dhfs.persistence.JObjectKeyP ourReferrers = 3;
 }
 
 message CanDeleteReply {
   bool deletionCandidate = 2;
-  repeated dhfs.objects.persistence.JObjectKeyP referrers = 3;
+  repeated dhfs.persistence.JObjectKeyP referrers = 3;
 }
 
 message OpPushRequest {

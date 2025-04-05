@@ -4,7 +4,7 @@ option java_multiple_files = true;
 option java_package = "com.usatiuk.dhfs.repository.peerdiscovery";
 option java_outer_classname = "DhfsObjectPeerDiscoveryApi";
 
-package dhfs.objects.peerdiscovery;
+package dhfs.peerdiscovery;
 
 message PeerDiscoveryInfo {
   string uuid = 1;
