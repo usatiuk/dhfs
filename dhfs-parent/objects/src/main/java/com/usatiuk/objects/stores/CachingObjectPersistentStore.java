@@ -189,7 +189,7 @@ public class CachingObjectPersistentStore {
                         }
                         var read = _backing.readObject(name);
                         maybeCache(name, read);
-                        return _backing.readObject(name);
+                        return read;
                     }
 
                     @Override
