@@ -59,7 +59,7 @@ public class SerializingObjectPersistentStore {
 
     private TxManifestRaw prepareManifest(TxManifestObj<? extends JDataVersionedWrapper> objs) {
         return new TxManifestRaw(
-                objs.written().stream()
+                objs.written().parallelStream()
                         .map(e -> Pair.of(e.getKey(), serializer.serialize(e.getValue())))
                         .toList()
                 , objs.deleted());
