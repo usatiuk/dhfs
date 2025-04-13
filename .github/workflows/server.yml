@@ -57,7 +57,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: DHFS Server Package
-          path: dhfs-parent/server/target/quarkus-app
+          path: dhfs-parent/dhfs-app/target/quarkus-app
 
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}

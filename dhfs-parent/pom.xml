@@ -11,10 +11,12 @@
     <name>dhfs-parent</name>
     <packaging>pom</packaging>
     <modules>
-        <module>server</module>
+        <module>sync-base</module>
+        <module>dhfs-fs</module>
+        <module>dhfs-fuse</module>
+        <module>dhfs-app</module>
         <module>kleppmanntree</module>
         <module>supportlib</module>
-        <module>autoprotomap</module>
         <module>objects</module>
         <module>utils</module>
     </modules>
