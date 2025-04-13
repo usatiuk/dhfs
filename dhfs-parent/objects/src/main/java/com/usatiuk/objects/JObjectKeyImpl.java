@@ -5,12 +5,12 @@ import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
-public record JObjectKeyImpl(String name) implements JObjectKey {
+public record JObjectKeyImpl(String value) implements JObjectKey {
     @Override
     public int compareTo(JObjectKey o) {
         switch (o) {
             case JObjectKeyImpl jObjectKeyImpl -> {
-                return name.compareTo(jObjectKeyImpl.name());
+                return value.compareTo(jObjectKeyImpl.value());
             }
             case JObjectKeyMax jObjectKeyMax -> {
                 return -1;
@@ -23,17 +23,17 @@ public record JObjectKeyImpl(String name) implements JObjectKey {
 
     @Override
     public String toString() {
-        return name;
+        return value;
     }
 
     @Override
     public byte[] bytes() {
-        return name.getBytes(StandardCharsets.UTF_8);
+        return value.getBytes(StandardCharsets.UTF_8);
     }
 
     @Override
     public ByteBuffer toByteBuffer() {
-        var heapBb = StandardCharsets.UTF_8.encode(name);
+        var heapBb = StandardCharsets.UTF_8.encode(value);
         if (heapBb.isDirect()) return heapBb;
         var directBb = UninitializedByteBuffer.allocateUninitialized(heapBb.remaining());
         directBb.put(heapBb);

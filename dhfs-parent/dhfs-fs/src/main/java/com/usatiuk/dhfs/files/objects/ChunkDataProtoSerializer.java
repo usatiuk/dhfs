@@ -19,7 +19,7 @@ public class ChunkDataProtoSerializer implements ProtoSerializer<ChunkDataP, Chu
     @Override
     public ChunkDataP serialize(ChunkData object) {
         return ChunkDataP.newBuilder()
-                .setKey(JObjectKeyP.newBuilder().setName(object.key().name()).build())
+                .setKey(JObjectKeyP.newBuilder().setName(object.key().value()).build())
                 .setData(object.data())
                 .build();
     }

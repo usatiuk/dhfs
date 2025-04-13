@@ -6,7 +6,6 @@ import com.usatiuk.dhfs.jkleppmanntree.structs.*;
 import com.usatiuk.dhfs.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.repository.invalidation.Op;
 import com.usatiuk.dhfs.repository.peersync.PeerInfoService;
-import com.usatiuk.objects.JObjectKeyImpl;
 import com.usatiuk.objects.transaction.LockingStrategy;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;
@@ -50,11 +49,11 @@ public class JKleppmannTreeManager {
                         TreePMap.empty()
                 );
                 curTx.put(data);
-                var rootNode = new JKleppmannTreeNode(JObjectKey.of(name.name() + "_jt_root"), null, new JKleppmannTreeNodeMetaDirectory(""));
+                var rootNode = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_root"), null, new JKleppmannTreeNodeMetaDirectory(""));
                 curTx.put(rootNode);
-                var trashNode = new JKleppmannTreeNode(JObjectKey.of(name.name() + "_jt_trash"), null, new JKleppmannTreeNodeMetaDirectory(""));
+                var trashNode = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_trash"), null, new JKleppmannTreeNodeMetaDirectory(""));
                 curTx.put(trashNode);
-                var lf_node = new JKleppmannTreeNode(JObjectKey.of(name.name() + "_jt_lf"), null, new JKleppmannTreeNodeMetaDirectory(""));
+                var lf_node = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_lf"), null, new JKleppmannTreeNodeMetaDirectory(""));
                 curTx.put(lf_node);
             }
             return new JKleppmannTree(data);
@@ -259,17 +258,17 @@ public class JKleppmannTreeManager {
 
             @Override
             public JObjectKey getRootId() {
-                return JObjectKey.of(_treeName.name() + "_jt_root");
+                return JObjectKey.of(_treeName.value() + "_jt_root");
             }
 
             @Override
             public JObjectKey getTrashId() {
-                return JObjectKey.of(_treeName.name() + "_jt_trash");
+                return JObjectKey.of(_treeName.value() + "_jt_trash");
             }
 
             @Override
             public JObjectKey getLostFoundId() {
-                return JObjectKey.of(_treeName.name() + "_jt_lf");
+                return JObjectKey.of(_treeName.value() + "_jt_lf");
             }
 
             @Override

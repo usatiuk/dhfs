@@ -11,19 +11,19 @@ public class JKleppmannTreeNodeMetaPeer extends JKleppmannTreeNodeMeta {
     private final JObjectKey _peerId;
 
     public JKleppmannTreeNodeMetaPeer(PeerId id) {
-        super(peerIdToNodeId(id).name());
+        super(peerIdToNodeId(id).value());
         _peerId = id.toJObjectKey();
     }
 
     public static JObjectKey peerIdToNodeId(PeerId id) {
-        return JObjectKey.of(id.toJObjectKey().name() + "_tree_node");
+        return JObjectKey.of(id.toJObjectKey().value() + "_tree_node");
     }
 
     public static PeerId nodeIdToPeerId(JObjectKey id) {
-        if (!id.name().endsWith("_tree_node")) {
+        if (!id.value().endsWith("_tree_node")) {
             throw new IllegalArgumentException("Not a tree node key: " + id);
         }
-        return PeerId.of(id.name().substring(0, id.name().length() - "_tree_node".length()));
+        return PeerId.of(id.value().substring(0, id.value().length() - "_tree_node".length()));
     }
 
     public JObjectKey getPeerId() {
@@ -32,7 +32,7 @@ public class JKleppmannTreeNodeMetaPeer extends JKleppmannTreeNodeMeta {
 
     @Override
     public JKleppmannTreeNodeMeta withName(String name) {
-        assert name.equals(peerIdToNodeId(PeerId.of(getPeerId().name())).toString());
+        assert name.equals(peerIdToNodeId(PeerId.of(getPeerId().value())).toString());
         assert getName().equals(name);
         return this;
     }

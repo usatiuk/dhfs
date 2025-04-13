@@ -30,7 +30,7 @@ public class PeerInfoCertUpdateTxHook implements PreCommitTxHook {
         // connecting two other nodes
         // TODO: Can there be a prettier way to do this? (e.g. more general proxying of ops?)
         if (cur instanceof JKleppmannTreeNode n) {
-            if (n.key().name().equals("peers_jt_root")) {
+            if (n.key().value().equals("peers_jt_root")) {
                 // TODO: This is kinda sucky
                 Log.infov("Changed peer tree root: {0} to {1}", key, cur);
 

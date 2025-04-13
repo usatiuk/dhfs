@@ -23,16 +23,16 @@ public class JMapIterator<K extends JMapKey> implements CloseableKvIterator<K, J
             _hasNext = false;
             return;
         }
-        if (!_backing.peekNextKey().name().startsWith(_prefix.name())) {
+        if (!_backing.peekNextKey().value().startsWith(_prefix.value())) {
             _backing.skip();
-            if (!_backing.peekNextKey().name().startsWith(_prefix.name())) {
+            if (!_backing.peekNextKey().value().startsWith(_prefix.value())) {
                 _hasNext = false;
             }
         }
     }
 
     public K keyToKey(JObjectKey key) {
-        var keyPart = key.name().substring(_prefix.name().length());
+        var keyPart = key.value().substring(_prefix.value().length());
         return (K) JMapLongKey.of(Long.parseLong(keyPart));
     }
 
@@ -90,7 +90,7 @@ public class JMapIterator<K extends JMapKey> implements CloseableKvIterator<K, J
             throw new IllegalStateException("No next element");
         }
         var next = _backing.next();
-        assert next.getKey().name().startsWith(_prefix.name());
+        assert next.getKey().value().startsWith(_prefix.value());
         advance();
         return Pair.of(keyToKey(next.getKey()), (JMapEntry<K>) next.getValue());
     }

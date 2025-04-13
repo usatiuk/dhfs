@@ -9,8 +9,8 @@ public sealed interface JObjectKey extends Serializable, Comparable<JObjectKey> 
     JObjectKeyMin MIN = new JObjectKeyMin();
     JObjectKeyMax MAX = new JObjectKeyMax();
 
-    static JObjectKey of(String name) {
-        return new JObjectKeyImpl(name);
+    static JObjectKey of(String value) {
+        return new JObjectKeyImpl(value);
     }
 
     static JObjectKey random() {
@@ -43,5 +43,5 @@ public sealed interface JObjectKey extends Serializable, Comparable<JObjectKey> 
 
     ByteBuffer toByteBuffer();
 
-    String name();
+    String value();
 }

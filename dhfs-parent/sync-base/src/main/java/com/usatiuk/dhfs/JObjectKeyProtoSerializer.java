@@ -13,6 +13,6 @@ public class JObjectKeyProtoSerializer implements ProtoSerializer<JObjectKeyP, J
 
     @Override
     public JObjectKeyP serialize(JObjectKey object) {
-        return JObjectKeyP.newBuilder().setName(object.name()).build();
+        return JObjectKeyP.newBuilder().setName(object.value()).build();
     }
 }

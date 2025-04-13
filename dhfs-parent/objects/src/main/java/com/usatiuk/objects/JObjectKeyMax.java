@@ -29,7 +29,7 @@ public record JObjectKeyMax() implements JObjectKey {
     }
 
     @Override
-    public String name() {
+    public String value() {
         throw new UnsupportedOperationException();
     }
 }

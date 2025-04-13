@@ -2,7 +2,6 @@ package com.usatiuk.objects.stores;
 
 import com.google.protobuf.ByteString;
 import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.objects.JObjectKeyImpl;
 import com.usatiuk.objects.JObjectKeyMax;
 import com.usatiuk.objects.JObjectKeyMin;
 import com.usatiuk.objects.iterators.CloseableKvIterator;
@@ -121,7 +120,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             @Override
             public CloseableKvIterator<JObjectKey, ByteString> getIterator(IteratorStart start, JObjectKey key) {
                 assert !_closed;
-                return new KeyPredicateKvIterator<>(new LmdbKvIterator(_txn.ref(), start, key), start, key, (k) -> !Arrays.equals(k.name().getBytes(StandardCharsets.UTF_8), DB_VER_OBJ_NAME));
+                return new KeyPredicateKvIterator<>(new LmdbKvIterator(_txn.ref(), start, key), start, key, (k) -> !Arrays.equals(k.value().getBytes(StandardCharsets.UTF_8), DB_VER_OBJ_NAME));
             }
 
             @Nonnull
