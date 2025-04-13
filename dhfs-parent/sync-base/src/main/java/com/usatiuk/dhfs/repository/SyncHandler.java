@@ -3,14 +3,18 @@ package com.usatiuk.dhfs.repository;
 import com.usatiuk.dhfs.JDataRemote;
 import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.dhfs.RemoteTransaction;
+import com.usatiuk.dhfs.ShutdownChecker;
+import com.usatiuk.dhfs.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.objects.JData;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.iterators.IteratorStart;
-import com.usatiuk.dhfs.repository.invalidation.InvalidationQueueService;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;
 import io.quarkus.logging.Log;
+import io.quarkus.runtime.StartupEvent;
+import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.pcollections.HashTreePSet;
@@ -40,6 +44,8 @@ public class SyncHandler {
     RemoteTransaction remoteTx;
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
+    @Inject
+    ShutdownChecker shutdownChecker;
 
     public SyncHandler(Instance<ObjSyncHandler<?, ?>> syncHandlers, Instance<InitialSyncProcessor<?>> initialSyncProcessors) {
         HashMap<Class<? extends JDataRemote>, ObjSyncHandler> objToHandlerMap = new HashMap<>();
@@ -110,6 +116,33 @@ public class SyncHandler {
             defaultObjSyncHandler.handleRemoteUpdate(from, key, receivedChangelog, (JDataRemote) receivedData);
         } else {
             got.handleRemoteUpdate(from, key, receivedChangelog, receivedData);
+        }
+    }
+
+
+    public void resyncAfterCrash(@Observes @Priority(100000) StartupEvent event) {
+        if (shutdownChecker.lastShutdownClean())
+            return;
+        List<JObjectKey> objs = new LinkedList<>();
+        txm.run(() -> {
+            try (var it = curTx.getIterator(IteratorStart.GE, JObjectKey.first())) {
+                while (it.hasNext()) {
+                    var key = it.peekNextKey();
+                    objs.add(key);
+                    // TODO: Nested transactions
+                    it.skip();
+                }
+            }
+        });
+
+        for (var obj : objs) {
+            txm.run(() -> {
+                var proc = curTx.get(JData.class, obj).flatMap(o -> Optional.ofNullable(_initialSyncProcessors.get(o.getClass()))).orElse(null);
+                if (proc != null) {
+                    proc.handleCrash(obj);
+                }
+                Log.infov("Handled crash of {0}", obj);
+            });
         }
     }
 
