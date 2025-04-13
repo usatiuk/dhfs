@@ -167,6 +167,26 @@
             <properties>
                 <skipITs>false</skipITs>
                 <quarkus.native.enabled>true</quarkus.native.enabled>
+                <quarkus.native.additional-build-args>
+                    --add-exports java.base/sun.nio.ch=ALL-UNNAMED,
+                    --add-exports java.base/jdk.internal.access=ALL-UNNAMED,
+                    --add-opens=java.base/java.nio=ALL-UNNAMED,
+                    --initialize-at-run-time=org.lmdbjava.ByteBufferProxy,
+                    --initialize-at-run-time=jnr.ffi.util.ref.internal.Finalizer,
+                    --initialize-at-run-time=jnr.ffi.util.ref.internal.Finalizer,
+                    --initialize-at-run-time=com.kenai.jffi.internal.Cleaner,
+                    --initialize-at-run-time=jnr.ffi.provider.jffi.TransientNativeMemory$Magazine,
+                    --initialize-at-run-time=jnr.ffi.provider.jffi.TransientNativeMemory,
+                    --initialize-at-run-time=jnr.ffi.util.ref.FinalizableReferenceQueue,
+                    --initialize-at-run-time=jnr.ffi.provider.jffi.NativeFinalizer,
+                    --initialize-at-run-time=jnr.ffi.provider.jffi.NativeFinalizer$SingletonHolder,
+                    --initialize-at-run-time=com.usatiuk.dhfs.utils.RefcountedCloseable,
+                    --initialize-at-run-time=com.usatiuk.dhfs.utils.DataLocker$Lock,
+                    --initialize-at-run-time=com.usatiuk.objects.stores.LmdbObjectPersistentStore$LmdbKvIterator,
+                    --initialize-at-run-time=com.usatiuk.objects.stores.LmdbObjectPersistentStore,
+                    --initialize-at-run-time=com.usatiuk.dhfs.supportlib.UninitializedByteBuffer,
+                    --initialize-at-run-time=com.google.protobuf.UnsafeUtil
+                </quarkus.native.additional-build-args>
             </properties>
         </profile>
     </profiles>
