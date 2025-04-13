@@ -7,6 +7,7 @@ import com.usatiuk.dhfs.files.service.DirectoryNotEmptyException;
 import com.usatiuk.dhfs.files.service.GetattrRes;
 import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
 import com.usatiuk.kleppmanntree.AlreadyExistsException;
+import com.usatiuk.objects.JObjectKey;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -30,6 +31,8 @@ import ru.serce.jnrfuse.struct.Timespec;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static jnr.posix.FileStat.*;
 
@@ -49,6 +52,24 @@ public class DhfsFuse extends FuseStubFS {
     JnrPtrByteOutputAccessors jnrPtrByteOutputAccessors;
     @Inject
     DhfsFileService fileService;
+
+    private final ConcurrentHashMap<Long, JObjectKey> _openHandles = new ConcurrentHashMap<>();
+    private final AtomicLong _fh = new AtomicLong(1);
+
+    private long allocateHandle(JObjectKey key) {
+        while (true) {
+            var newFh = _fh.getAndIncrement();
+            if (newFh == 0) continue;
+            if (_openHandles.putIfAbsent(newFh, key) == null) {
+                return newFh;
+            }
+        }
+    }
+
+    private JObjectKey getFromHandle(long handle) {
+        assert handle != 0;
+        return _openHandles.get(handle);
+    }
 
     void init(@Observes @Priority(100000) StartupEvent event) {
         if (!enabled) return;
@@ -174,7 +195,9 @@ public class DhfsFuse extends FuseStubFS {
     @Override
     public int open(String path, FuseFileInfo fi) {
         try {
-            if (fileService.open(path).isEmpty()) return -ErrorCodes.ENOENT();
+            var opened = fileService.open(path);
+            if (opened.isEmpty()) return -ErrorCodes.ENOENT();
+            fi.fh.set(allocateHandle(opened.get()));
             return 0;
         } catch (Throwable e) {
             Log.error("When open " + path, e);
@@ -183,14 +206,19 @@ public class DhfsFuse extends FuseStubFS {
     }
 
     @Override
+    public int release(String path, FuseFileInfo fi) {
+        assert fi.fh.get() != 0;
+        _openHandles.remove(fi.fh.get());
+        return 0;
+    }
+
+    @Override
     public int read(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
         if (size < 0) return -ErrorCodes.EINVAL();
         if (offset < 0) return -ErrorCodes.EINVAL();
         try {
-            var fileOpt = fileService.open(path);
-            if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
-            var file = fileOpt.get();
-            var read = fileService.read(fileOpt.get(), offset, (int) size);
+            var fileKey = getFromHandle(fi.fh.get());
+            var read = fileService.read(fileKey, offset, (int) size);
             if (read.isEmpty()) return 0;
             UnsafeByteOperations.unsafeWriteTo(read.get(), new JnrPtrByteOutput(jnrPtrByteOutputAccessors, buf, size));
             return read.get().size();
@@ -204,8 +232,7 @@ public class DhfsFuse extends FuseStubFS {
     public int write(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
         if (offset < 0) return -ErrorCodes.EINVAL();
         try {
-            var fileOpt = fileService.open(path);
-            if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
+            var fileKey = getFromHandle(fi.fh.get());
             var buffer = UninitializedByteBuffer.allocateUninitialized((int) size);
 
             if (buffer.isDirect()) {
@@ -218,7 +245,7 @@ public class DhfsFuse extends FuseStubFS {
                 buf.get(0, buffer.array(), 0, (int) size);
             }
 
-            var written = fileService.write(fileOpt.get(), offset, UnsafeByteOperations.unsafeWrap(buffer));
+            var written = fileService.write(fileKey, offset, UnsafeByteOperations.unsafeWrap(buffer));
             return written.intValue();
         } catch (Throwable e) {
             Log.error("When writing " + path, e);
@@ -231,7 +258,8 @@ public class DhfsFuse extends FuseStubFS {
         try {
             var ret = fileService.create(path, mode);
             if (ret.isEmpty()) return -ErrorCodes.ENOSPC();
-            else return 0;
+            fi.fh.set(allocateHandle(ret.get()));
+            return 0;
         } catch (Throwable e) {
             Log.error("When creating " + path, e);
             return -ErrorCodes.EIO();
