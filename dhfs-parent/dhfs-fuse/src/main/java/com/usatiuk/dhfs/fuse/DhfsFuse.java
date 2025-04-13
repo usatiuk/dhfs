@@ -74,6 +74,10 @@ public class DhfsFuse extends FuseStubFS {
     void init(@Observes @Priority(100000) StartupEvent event) {
         if (!enabled) return;
         Paths.get(root).toFile().mkdirs();
+
+        if (!Paths.get(root).toFile().isDirectory())
+            throw new IllegalStateException("Could not create directory " + root);
+
         Log.info("Mounting with root " + root);
 
         var uid = new UnixSystem().getUid();

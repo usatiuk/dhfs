@@ -50,7 +50,7 @@ public class KillIT {
                 .withPrivilegedMode(true)
                 .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")))
                 .waitingFor(Wait.forLogMessage(".*Listening.*", 1).withStartupTimeout(Duration.ofSeconds(60))).withNetwork(network)
-                .withFileSystemBind(data1.getAbsolutePath(), "/root/dhfs_default/data");
+                .withFileSystemBind(data1.getAbsolutePath(), "/dhfs_test/data");
         if (testcontainersUser != null) {
             container1.withCreateContainerCmdModifier(cmd -> cmd.withUser(testcontainersUser));
         }
@@ -58,7 +58,7 @@ public class KillIT {
                 .withPrivilegedMode(true)
                 .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")))
                 .waitingFor(Wait.forLogMessage(".*Listening.*", 1).withStartupTimeout(Duration.ofSeconds(60))).withNetwork(network)
-                .withFileSystemBind(data2.getAbsolutePath(), "/root/dhfs_default/data");
+                .withFileSystemBind(data2.getAbsolutePath(), "/dhfs_test/data");
         if (testcontainersUser != null) {
             container2.withCreateContainerCmdModifier(cmd -> cmd.withUser(testcontainersUser));
         }
@@ -72,8 +72,8 @@ public class KillIT {
         var loggingConsumer2 = new Slf4jLogConsumer(LoggerFactory.getLogger(KillIT.class)).withPrefix("2-" + testInfo.getDisplayName());
         container2.followOutput(loggingConsumer2.andThen(waitingConsumer2));
 
-        c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/data/stuff/self_uuid").getStdout();
-        c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/data/stuff/self_uuid").getStdout();
+        c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/stuff/self_uuid").getStdout();
+        c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/stuff/self_uuid").getStdout();
 
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c1uuid));
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c2uuid));
@@ -110,7 +110,7 @@ public class KillIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.await();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /root/dhfs_default/fuse/test1; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test1; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -130,10 +130,10 @@ public class KillIT {
 
         await().atMost(45, TimeUnit.SECONDS).until(() -> {
             Log.info("Listing consistency");
-            var ls1 = container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
-            var cat1 = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
-            var ls2 = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
-            var cat2 = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
+            var ls1 = container1.execInContainer("/bin/sh", "-c", "ls /dhfs_test/fuse");
+            var cat1 = container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/*");
+            var ls2 = container2.execInContainer("/bin/sh", "-c", "ls /dhfs_test/fuse");
+            var cat2 = container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/*");
             Log.info(ls1);
             Log.info(cat1);
             Log.info(ls2);
@@ -151,7 +151,7 @@ public class KillIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.await();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /root/dhfs_default/fuse/test$counter; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -171,10 +171,10 @@ public class KillIT {
 
         await().atMost(45, TimeUnit.SECONDS).until(() -> {
             Log.info("Listing consistency");
-            var ls1 = container1.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
-            var cat1 = container1.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
-            var ls2 = container2.execInContainer("/bin/sh", "-c", "ls /root/dhfs_default/fuse");
-            var cat2 = container2.execInContainer("/bin/sh", "-c", "cat /root/dhfs_default/fuse/*");
+            var ls1 = container1.execInContainer("/bin/sh", "-c", "ls /dhfs_test/fuse");
+            var cat1 = container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/*");
+            var ls2 = container2.execInContainer("/bin/sh", "-c", "ls /dhfs_test/fuse");
+            var cat2 = container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/*");
             Log.info(ls1);
             Log.info(cat1);
             Log.info(ls2);

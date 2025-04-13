@@ -21,6 +21,10 @@ public class ShutdownChecker {
 
     void init(@Observes @Priority(2) StartupEvent event) throws IOException {
         Paths.get(dataRoot).toFile().mkdirs();
+
+        if (!Paths.get(dataRoot).toFile().isDirectory())
+            throw new IllegalStateException("Could not create directory " + dataRoot);
+
         Log.info("Initializing with root " + dataRoot);
         if (Paths.get(dataRoot).resolve(dataFileName).toFile().exists()) {
             _cleanShutdown = false;

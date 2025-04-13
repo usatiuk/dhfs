@@ -83,7 +83,11 @@ public class DhfsImage implements Future<String> {
                                         "-Dquarkus.log.category.\"com.usatiuk\".level=TRACE",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
                                         "-Ddhfs.objects.periodic-push-op-interval=5s",
+                                        "-Ddhfs.fuse.root=/dhfs_test/fuse",
+                                        "-Ddhfs.objects.persistence.files.root=/dhfs_test/data",
+                                        "-Ddhfs.objects.persistence.stuff.root=/dhfs_test/data/stuff",
                                         "-jar", "/app/quarkus-run.jar")
+                                .run("mkdir /dhfs_test && chmod 777 /dhfs_test")
                                 .build())
                 .withFileFromPath("/app", Paths.get(buildPath, "quarkus-app"))
                 .withFileFromPath("/libs", Paths.get(nativeLibsDirectory));
