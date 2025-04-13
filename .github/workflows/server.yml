@@ -49,7 +49,7 @@ jobs:
           cache: maven
 
       - name: Test with Maven
-        run: cd dhfs-parent && mvn -T $(nproc) --batch-mode --update-snapshots package verify
+        run: cd dhfs-parent && TESTCONTAINERS_USER="$(id -u):$(id -g)" mvn -T $(nproc) --batch-mode --update-snapshots package verify
 
       # - name: Build with Maven
       #   run: cd dhfs-parent && mvn --batch-mode --update-snapshots package # -Dquarkus.log.category.\"com.usatiuk.dhfs\".min-level=DEBUG

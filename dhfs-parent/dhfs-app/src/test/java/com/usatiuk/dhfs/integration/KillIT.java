@@ -43,16 +43,25 @@ public class KillIT {
     @BeforeEach
     void setup(TestInfo testInfo) throws IOException, InterruptedException, TimeoutException {
         Network network = Network.newNetwork();
+
+        String testcontainersUser = System.getenv("TESTCONTAINERS_USER");
+
         container1 = new GenericContainer<>(DhfsImage.getInstance())
                 .withPrivilegedMode(true)
                 .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")))
                 .waitingFor(Wait.forLogMessage(".*Listening.*", 1).withStartupTimeout(Duration.ofSeconds(60))).withNetwork(network)
                 .withFileSystemBind(data1.getAbsolutePath(), "/root/dhfs_default/data");
+        if (testcontainersUser != null) {
+            container1.withCreateContainerCmdModifier(cmd -> cmd.withUser(testcontainersUser));
+        }
         container2 = new GenericContainer<>(DhfsImage.getInstance())
                 .withPrivilegedMode(true)
                 .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")))
                 .waitingFor(Wait.forLogMessage(".*Listening.*", 1).withStartupTimeout(Duration.ofSeconds(60))).withNetwork(network)
                 .withFileSystemBind(data2.getAbsolutePath(), "/root/dhfs_default/data");
+        if (testcontainersUser != null) {
+            container2.withCreateContainerCmdModifier(cmd -> cmd.withUser(testcontainersUser));
+        }
 
         Stream.of(container1, container2).parallel().forEach(GenericContainer::start);
 
