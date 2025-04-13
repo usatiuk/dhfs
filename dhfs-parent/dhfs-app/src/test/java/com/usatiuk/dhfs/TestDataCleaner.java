@@ -30,11 +30,15 @@ public class TestDataCleaner {
         purgeDirectory(Path.of(tempDirectory).toFile());
     }
 
-    void purgeDirectory(File dir) {
-        for (File file : Objects.requireNonNull(dir.listFiles())) {
-            if (file.isDirectory())
-                purgeDirectory(file);
-            file.delete();
+    public static void purgeDirectory(File dir) {
+        try {
+            for (File file : Objects.requireNonNull(dir.listFiles())) {
+                if (file.isDirectory())
+                    purgeDirectory(file);
+                file.delete();
+            }
+        } catch (Exception e) {
+            Log.error("Couldn't purge directory " + dir, e);
         }
     }
 }

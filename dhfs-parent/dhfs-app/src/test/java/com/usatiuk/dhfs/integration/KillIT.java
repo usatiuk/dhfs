@@ -1,9 +1,9 @@
 package com.usatiuk.dhfs.integration;
 
 import com.github.dockerjava.api.model.Device;
+import com.usatiuk.dhfs.TestDataCleaner;
 import io.quarkus.logging.Log;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
@@ -14,6 +14,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
@@ -35,33 +36,26 @@ public class KillIT {
     String c1uuid;
     String c2uuid;
 
-    @TempDir
     File data1;
-    @TempDir
     File data2;
 
     @BeforeEach
     void setup(TestInfo testInfo) throws IOException, InterruptedException, TimeoutException {
-        Network network = Network.newNetwork();
+        data1 = Files.createTempDirectory("").toFile();
+        data2 = Files.createTempDirectory("").toFile();
 
-        String testcontainersUser = System.getenv("TESTCONTAINERS_USER");
+        Network network = Network.newNetwork();
 
         container1 = new GenericContainer<>(DhfsImage.getInstance())
                 .withPrivilegedMode(true)
                 .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")))
                 .waitingFor(Wait.forLogMessage(".*Listening.*", 1).withStartupTimeout(Duration.ofSeconds(60))).withNetwork(network)
                 .withFileSystemBind(data1.getAbsolutePath(), "/dhfs_test/data");
-        if (testcontainersUser != null) {
-            container1.withCreateContainerCmdModifier(cmd -> cmd.withUser(testcontainersUser));
-        }
         container2 = new GenericContainer<>(DhfsImage.getInstance())
                 .withPrivilegedMode(true)
                 .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")))
                 .waitingFor(Wait.forLogMessage(".*Listening.*", 1).withStartupTimeout(Duration.ofSeconds(60))).withNetwork(network)
                 .withFileSystemBind(data2.getAbsolutePath(), "/dhfs_test/data");
-        if (testcontainersUser != null) {
-            container2.withCreateContainerCmdModifier(cmd -> cmd.withUser(testcontainersUser));
-        }
 
         Stream.of(container1, container2).parallel().forEach(GenericContainer::start);
 
@@ -100,6 +94,8 @@ public class KillIT {
     @AfterEach
     void stop() {
         Stream.of(container1, container2).parallel().forEach(GenericContainer::stop);
+        TestDataCleaner.purgeDirectory(data1);
+        TestDataCleaner.purgeDirectory(data2);
     }
 
     @Test
