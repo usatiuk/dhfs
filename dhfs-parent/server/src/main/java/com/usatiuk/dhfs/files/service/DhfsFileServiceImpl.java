@@ -81,7 +81,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
     private ChunkData createChunk(ByteString bytes) {
         var newChunk = new ChunkData(JObjectKey.of(UUID.randomUUID().toString()), bytes);
-        remoteTx.putData(newChunk);
+        remoteTx.putDataNew(newChunk);
         return newChunk;
     }
 

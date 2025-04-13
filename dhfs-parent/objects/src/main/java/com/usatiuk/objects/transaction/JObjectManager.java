@@ -1,11 +1,11 @@
 package com.usatiuk.objects.transaction;
 
+import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
 import com.usatiuk.objects.JData;
 import com.usatiuk.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.snapshot.Snapshot;
 import com.usatiuk.objects.snapshot.SnapshotManager;
-import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
@@ -16,7 +16,6 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -106,10 +105,17 @@ public class JObjectManager {
 
                         for (var entry : curIteration.entrySet()) {
 //                            Log.trace("Running pre-commit hook " + hook.getClass() + " for" + entry.getKey());
+
+                            if (entry.getValue() instanceof TxRecord.TxObjectRecordNewWrite<?> newWrite) {
+                                lastCurHookSeen.put(entry.getKey(), entry.getValue());
+                                hook.onCreate(newWrite.key(), newWrite.data());
+                                continue;
+                            }
+
                             var oldObj = getPrev.apply(entry.getKey());
                             lastCurHookSeen.put(entry.getKey(), entry.getValue());
                             switch (entry.getValue()) {
-                                case TxRecord.TxObjectRecordWrite<?> write -> {
+                                case TxRecord.TxObjectRecordWriteChecked<?> write -> {
                                     if (oldObj == null) {
                                         hook.onCreate(write.key(), write.data());
                                     } else {
@@ -221,8 +227,10 @@ public class JObjectManager {
                     writes.values().stream()
                             .filter(r -> {
                                 if (!same)
-                                    if (r instanceof TxRecord.TxObjectRecordWrite<?>(JData data)) {
+                                    if (r instanceof TxRecord.TxObjectRecordWriteChecked<?>(JData data)) {
                                         var dep = dependenciesLocked.get(data.key());
+                                        if (dep == null)
+                                            return true;
                                         if (dep.isPresent() && dep.get().version() > snapshotId) {
                                             Log.trace("Skipping write " + data.key() + " - dependency " + dep.get().version() + " vs " + snapshotId);
                                             return false;

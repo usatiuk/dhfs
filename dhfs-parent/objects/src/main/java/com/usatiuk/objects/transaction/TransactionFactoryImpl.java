@@ -57,6 +57,7 @@ public class TransactionFactoryImpl implements TransactionFactory {
     private class TransactionImpl implements TransactionPrivate {
         private final Map<JObjectKey, TransactionObject<?>> _readSet = new HashMap<>();
         private final NavigableMap<JObjectKey, TxRecord.TxObjectRecord<?>> _writes = new TreeMap<>();
+        private final HashSet<JObjectKey> _totallyNew = new HashSet<>();
         private final List<Runnable> _onCommit = new ArrayList<>();
         private final List<Runnable> _onFlush = new ArrayList<>();
         private final Snapshot<JObjectKey, JDataVersionedWrapper> _snapshot;
@@ -97,8 +98,13 @@ public class TransactionFactoryImpl implements TransactionFactory {
             var got = _readSet.get(key);
 
             if (got == null) {
+                if (_totallyNew.contains(key)) {
+                    return Optional.empty();
+                }
+
                 var read = _snapshot.readObject(key);
                 _readSet.put(key, new TransactionObjectNoLock<>(read));
+//                Log.infov("Read object {0} from source, type {1}", key, type);
                 return read.map(JDataVersionedWrapper::data).map(type::cast);
             }
 
@@ -175,8 +181,15 @@ public class TransactionFactoryImpl implements TransactionFactory {
 
         @Override
         public void put(JData obj) {
-            _writes.put(obj.key(), new TxRecord.TxObjectRecordWrite<>(obj));
-            _newWrites.put(obj.key(), new TxRecord.TxObjectRecordWrite<>(obj));
+            _writes.put(obj.key(), new TxRecord.TxObjectRecordWriteChecked<>(obj));
+            _newWrites.put(obj.key(), new TxRecord.TxObjectRecordWriteChecked<>(obj));
+        }
+
+        @Override
+        public <T extends JData> void putNew(JData obj) {
+            _writes.put(obj.key(), new TxRecord.TxObjectRecordNewWrite<>(obj));
+            _newWrites.put(obj.key(), new TxRecord.TxObjectRecordNewWrite<>(obj));
+            _totallyNew.add(obj.key());
         }
 
         @Override

@@ -1,9 +1,9 @@
 package com.usatiuk.dhfs;
 
-import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.repository.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.repository.SyncHandler;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.transaction.LockingStrategy;
 import com.usatiuk.objects.transaction.Transaction;
 import io.quarkus.logging.Log;
@@ -121,6 +121,11 @@ public class RemoteTransaction {
         var newData = curTx.get(RemoteObjectDataWrapper.class, RemoteObjectMeta.ofDataKey(obj.key()))
                 .map(w -> w.withData(obj)).orElse(new RemoteObjectDataWrapper<>(obj));
         curTx.put(newData);
+    }
+
+    public <T extends JDataRemote> void putDataNew(T obj) {
+        curTx.putNew(new RemoteObjectMeta(obj, persistentPeerDataService.getSelfUuid()));
+        curTx.putNew(new RemoteObjectDataWrapper<>(obj));
     }
 
     public Optional<RemoteObjectMeta> getMeta(JObjectKey key) {

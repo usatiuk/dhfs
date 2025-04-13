@@ -14,6 +14,7 @@ public interface Transaction extends TransactionHandle {
     <T extends JData> Optional<T> get(Class<T> type, JObjectKey key, LockingStrategy strategy);
 
     <T extends JData> void put(JData obj);
+    <T extends JData> void putNew(JData obj);
 
     void delete(JObjectKey key);
 

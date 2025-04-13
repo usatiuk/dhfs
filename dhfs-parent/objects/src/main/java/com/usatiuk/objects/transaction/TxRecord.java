@@ -8,7 +8,18 @@ public class TxRecord {
         JObjectKey key();
     }
 
-    public record TxObjectRecordWrite<T extends JData>(JData data) implements TxObjectRecord<T> {
+    public interface TxObjectRecordWrite<T> extends TxObjectRecord<T> {
+        JData data();
+    }
+
+    public record TxObjectRecordWriteChecked<T extends JData>(JData data) implements TxObjectRecordWrite<T> {
+        @Override
+        public JObjectKey key() {
+            return data.key();
+        }
+    }
+
+    public record TxObjectRecordNewWrite<T extends JData>(JData data) implements TxObjectRecordWrite<T> {
         @Override
         public JObjectKey key() {
             return data.key();
@@ -17,4 +28,5 @@ public class TxRecord {
 
     public record TxObjectRecordDeleted(JObjectKey key) implements TxObjectRecord<JData> {
     }
+
 }

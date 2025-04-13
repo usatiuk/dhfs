@@ -42,13 +42,16 @@ public class CachingObjectPersistentStore {
             if (old != null)
                 newSize -= old.size();
 
-            TreePMap<JObjectKey, CacheEntry> newCache = map().plus(key, entry);
+            TreePMap<JObjectKey, CacheEntry> newCache = map();
 
             while (newSize > sizeLimit) {
                 var del = newCache.firstEntry();
                 newCache = newCache.minusFirstEntry();
                 newSize -= del.getValue().size();
             }
+
+            newCache = newCache.plus(key, entry);
+
             return new Cache(
                     newCache,
                     newSize,
