@@ -367,16 +367,12 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                         + offset + " " + data.size());
             }
 
-            if (size(fileUuid) < offset) {
-                truncate(fileUuid, offset);
-                file = remoteTx.getData(File.class, fileUuid).orElse(null);
-            }
-
             NavigableMap<Long, JObjectKey> removedChunks = new TreeMap<>();
 
             long realOffset = targetChunkAlignment >= 0 ? alignDown(offset, targetChunkAlignment) : offset;
             long writeEnd = offset + data.size();
             long start = realOffset;
+            long existingEnd = 0;
             ByteString pendingPrefix = ByteString.empty();
             ByteString pendingSuffix = ByteString.empty();
 
@@ -385,8 +381,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                     var curEntry = it.next();
                     long curChunkStart = curEntry.getKey().key();
                     var curChunkId = curEntry.getValue().ref();
-                    long curChunkEnd = curChunkStart + getChunkSize(curChunkId);
-
+                    long curChunkEnd = it.hasNext() ? it.peekNextKey().key() : curChunkStart + getChunkSize(curChunkId);
+                    existingEnd = curChunkEnd;
                     if (curChunkEnd <= realOffset) break;
 
                     removedChunks.put(curEntry.getKey().key(), curChunkId);
@@ -408,11 +404,22 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 }
             }
 
+
+            NavigableMap<Long, JObjectKey> newChunks = new TreeMap<>();
+
+            if (existingEnd < offset) {
+                if (!pendingPrefix.isEmpty()) {
+                    int diff = Math.toIntExact(offset - existingEnd);
+                    pendingPrefix = pendingPrefix.concat(ByteString.copyFrom(new byte[diff]));
+                } else {
+                    fillZeros(existingEnd, offset, newChunks);
+                    start = offset;
+                }
+            }
+
             ByteString pendingWrites = pendingPrefix.concat(data).concat(pendingSuffix);
 
             int combinedSize = pendingWrites.size();
-
-            NavigableMap<Long, JObjectKey> newChunks = new TreeMap<>();
 
             {
                 int targetChunkSize = 1 << targetChunkAlignment;
@@ -476,38 +483,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             NavigableMap<Long, JObjectKey> newChunks = new TreeMap<>();
 
             if (curSize < length) {
-                long combinedSize = (length - curSize);
-
-                long start = curSize;
-
-                // Hack
-                HashMap<Long, ChunkData> zeroCache = new HashMap<>();
-
-                {
-                    long cur = 0;
-                    while (cur < combinedSize) {
-                        long end;
-
-                        if (targetChunkSize <= 0)
-                            end = combinedSize;
-                        else {
-                            if ((combinedSize - cur) > (targetChunkSize * 1.5)) {
-                                end = cur + targetChunkSize;
-                            } else {
-                                end = combinedSize;
-                            }
-                        }
-
-                        if (!zeroCache.containsKey(end - cur))
-                            zeroCache.put(end - cur, createChunk(UnsafeByteOperations.unsafeWrap(new byte[Math.toIntExact(end - cur)])));
-
-                        ChunkData newChunkData = zeroCache.get(end - cur);
-                        newChunks.put(start, newChunkData.key());
-
-                        start += newChunkData.data().size();
-                        cur = end;
-                    }
-                }
+                fillZeros(curSize, length, newChunks);
             } else {
 //                Pair<JMapLongKey, JMapEntry<JMapLongKey>> first;
                 Pair<JMapLongKey, JMapEntry<JMapLongKey>> last;
@@ -570,6 +546,41 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             remoteTx.putData(file);
             return true;
         });
+    }
+
+    private void fillZeros(long fillStart, long length, NavigableMap<Long, JObjectKey> newChunks) {
+        long combinedSize = (length - fillStart);
+
+        long start = fillStart;
+
+        // Hack
+        HashMap<Long, ChunkData> zeroCache = new HashMap<>();
+
+        {
+            long cur = 0;
+            while (cur < combinedSize) {
+                long end;
+
+                if (targetChunkSize <= 0)
+                    end = combinedSize;
+                else {
+                    if ((combinedSize - cur) > (targetChunkSize * 1.5)) {
+                        end = cur + targetChunkSize;
+                    } else {
+                        end = combinedSize;
+                    }
+                }
+
+                if (!zeroCache.containsKey(end - cur))
+                    zeroCache.put(end - cur, createChunk(UnsafeByteOperations.unsafeWrap(new byte[Math.toIntExact(end - cur)])));
+
+                ChunkData newChunkData = zeroCache.get(end - cur);
+                newChunks.put(start, newChunkData.key());
+
+                start += newChunkData.data().size();
+                cur = end;
+            }
+        }
     }
 
     @Override
