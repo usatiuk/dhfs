@@ -153,11 +153,8 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
         var txn = _env.txnWrite();
         try {
             for (var written : names.written()) {
-                // TODO:
-                var bb = UninitializedByteBuffer.allocateUninitialized(written.getValue().size());
-                bb.put(written.getValue().asReadOnlyByteBuffer());
-                bb.flip();
-                _db.put(txn, written.getKey().toByteBuffer(), bb);
+                var putBb = _db.reserve(txn, written.getKey().toByteBuffer(), written.getValue().size());
+                written.getValue().copyTo(putBb);
             }
             for (JObjectKey key : names.deleted()) {
                 _db.delete(txn, key.toByteBuffer());
