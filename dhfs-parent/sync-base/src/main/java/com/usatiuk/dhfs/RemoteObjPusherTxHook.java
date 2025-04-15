@@ -8,8 +8,9 @@ import com.usatiuk.objects.transaction.PreCommitTxHook;
 import com.usatiuk.objects.transaction.Transaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-@ApplicationScoped
+@Singleton
 public class RemoteObjPusherTxHook implements PreCommitTxHook {
     @Inject
     Transaction curTx;

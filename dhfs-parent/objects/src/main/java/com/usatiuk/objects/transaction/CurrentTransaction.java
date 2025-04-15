@@ -6,10 +6,11 @@ import com.usatiuk.objects.iterators.CloseableKvIterator;
 import com.usatiuk.objects.iterators.IteratorStart;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 import java.util.Optional;
 
-@ApplicationScoped
+@Singleton
 public class CurrentTransaction implements Transaction {
     @Inject
     TransactionManager transactionManager;

@@ -8,9 +8,10 @@ import com.usatiuk.objects.transaction.PreCommitTxHook;
 import com.usatiuk.objects.transaction.Transaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-@ApplicationScoped
+@Singleton
 public class AutosyncTxHook implements PreCommitTxHook {
     @Inject
     Transaction curTx;

@@ -3,11 +3,12 @@ package com.usatiuk.objects.transaction;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.Collection;
 
-@ApplicationScoped
+@Singleton
 public class TransactionManagerImpl implements TransactionManager {
     private static final ThreadLocal<TransactionPrivate> _currentTransaction = new ThreadLocal<>();
     @Inject

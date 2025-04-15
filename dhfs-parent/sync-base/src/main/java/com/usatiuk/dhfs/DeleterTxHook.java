@@ -7,8 +7,9 @@ import com.usatiuk.objects.transaction.Transaction;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
-@ApplicationScoped
+@Singleton
 public class DeleterTxHook implements PreCommitTxHook {
     @Inject
     Transaction curTx;
