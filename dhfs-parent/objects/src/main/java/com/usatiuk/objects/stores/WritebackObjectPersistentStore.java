@@ -129,11 +129,11 @@ public class WritebackObjectPersistentStore {
                 for (var e : bundle._entries.values()) {
                     switch (e) {
                         case TxBundle.CommittedEntry(JObjectKey key, JDataVersionedWrapper data, int size) -> {
-                            Log.trace("Writing new " + key);
+                            Log.tracev("Writing new {0}", key);
                             toWrite.add(Pair.of(key, data));
                         }
                         case TxBundle.DeletedEntry(JObjectKey key) -> {
-                            Log.trace("Deleting from persistent storage " + key);
+                            Log.tracev("Deleting from persistent storage {0}", key);
                             toDelete.add(key);
                         }
                         default -> throw new IllegalStateException("Unexpected value: " + e);
@@ -146,7 +146,7 @@ public class WritebackObjectPersistentStore {
                                 Collections.unmodifiableList(toDelete)
                         ), bundle.id());
 
-                Log.trace("Bundle " + bundle.id() + " committed");
+                Log.tracev("Bundle {0} committed", bundle.id());
 
                 while (true) {
                     var curPw = _pendingWrites.get();
@@ -207,7 +207,7 @@ public class WritebackObjectPersistentStore {
                     long waited = System.currentTimeMillis() - started;
                     _waitedTotal.addAndGet(waited);
                     if (Log.isTraceEnabled())
-                        Log.trace("Thread " + Thread.currentThread().getName() + " waited for tx bundle for " + waited + " ms");
+                        Log.tracev("Thread {0} waited for tx bundle for {1} ms", Thread.currentThread().getName(), waited);
                     wait = false;
                 }
             }
@@ -246,11 +246,11 @@ public class WritebackObjectPersistentStore {
                 for (var action : writes) {
                     switch (action) {
                         case TxRecord.TxObjectRecordWrite<?> write -> {
-                            Log.trace("Flushing object " + write.key());
+                            Log.tracev("Flushing object {0}", write.key());
                             bundle.commit(new JDataVersionedWrapperImpl(write.data(), bundle.id()));
                         }
                         case TxRecord.TxObjectRecordDeleted deleted -> {
-                            Log.trace("Deleting object " + deleted.key());
+                            Log.tracev("Deleting object {0}", deleted.key());
                             bundle.delete(deleted.key());
                         }
                         default -> {

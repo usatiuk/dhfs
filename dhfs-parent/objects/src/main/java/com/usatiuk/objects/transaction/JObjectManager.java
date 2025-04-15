@@ -193,7 +193,7 @@ public class JObjectManager {
                     var dep = dependenciesLocked.get(read.getKey());
 
                     if (dep.isEmpty() != read.getValue().data().isEmpty()) {
-                        Log.trace("Checking read dependency " + read.getKey() + " - not found");
+                        Log.tracev("Checking read dependency {0} - not found", read.getKey());
                         throw new TxCommitException("Serialization hazard: " + dep.isEmpty() + " vs " + read.getValue().data().isEmpty());
                     }
 
@@ -205,11 +205,11 @@ public class JObjectManager {
                     }
 
                     if (dep.get().version() > snapshotId) {
-                        Log.trace("Checking dependency " + read.getKey() + " - newer than");
+                        Log.tracev("Checking dependency {0} - newer than", read.getKey());
                         throw new TxCommitException("Serialization hazard: " + dep.get().data().key() + " " + dep.get().version() + " vs " + snapshotId);
                     }
 
-                    Log.trace("Checking dependency " + read.getKey() + " - ok with read");
+                    Log.tracev("Checking dependency {0} - ok with read", read.getKey());
                 }
             } else {
                 Log.tracev("Skipped dependency checks: no changes");
