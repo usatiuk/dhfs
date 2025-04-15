@@ -1,6 +1,7 @@
 package com.usatiuk.objects.stores;
 
 import com.google.protobuf.ByteString;
+import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.JObjectKeyMax;
 import com.usatiuk.objects.JObjectKeyMin;
@@ -128,7 +129,12 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             public Optional<ByteString> readObject(JObjectKey name) {
                 assert !_closed;
                 var got = _db.get(_txn.get(), name.toByteBuffer());
-                var ret = Optional.ofNullable(got).map(ByteString::copyFrom);
+                var ret = Optional.ofNullable(got).map(read -> {
+                    var uninitBb = UninitializedByteBuffer.allocateUninitialized(got.remaining());
+                    uninitBb.put(got);
+                    uninitBb.flip();
+                    return UnsafeByteOperations.unsafeWrap(uninitBb);
+                });
                 return ret;
             }
 
