@@ -1,11 +1,11 @@
 package com.usatiuk.objects.transaction;
 
+import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
 import com.usatiuk.objects.JData;
 import com.usatiuk.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.snapshot.Snapshot;
 import com.usatiuk.objects.snapshot.SnapshotManager;
-import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
@@ -16,7 +16,6 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -27,6 +26,12 @@ import java.util.stream.Stream;
 @ApplicationScoped
 public class JObjectManager {
     private final List<PreCommitTxHook> _preCommitTxHooks;
+
+    private record CommitHookIterationData(PreCommitTxHook hook,
+                                           Map<JObjectKey, TxRecord.TxObjectRecord<?>> lastWrites,
+                                           Map<JObjectKey, TxRecord.TxObjectRecord<?>> pendingWrites) {
+    }
+
     @Inject
     SnapshotManager snapshotManager;
     @Inject
@@ -66,16 +71,19 @@ public class JObjectManager {
         try {
             try {
                 long pendingCount = 0;
-                Map<PreCommitTxHook, Map<JObjectKey, TxRecord.TxObjectRecord<?>>> pendingWrites = Map.ofEntries(
-                        _preCommitTxHooks.stream().map(p -> Pair.of(p, new HashMap<>())).toArray(Pair[]::new)
-                );
-                Map<PreCommitTxHook, Map<JObjectKey, TxRecord.TxObjectRecord<?>>> lastWrites = Map.ofEntries(
-                        _preCommitTxHooks.stream().map(p -> Pair.of(p, new HashMap<>())).toArray(Pair[]::new)
-                );
+                List<CommitHookIterationData> hookIterationData;
+                {
+                    CommitHookIterationData[] hookIterationDataArray = new CommitHookIterationData[_preCommitTxHooks.size()];
+                    for (int i = 0; i < _preCommitTxHooks.size(); i++) {
+                        var hook = _preCommitTxHooks.get(i);
+                        hookIterationDataArray[i] = new CommitHookIterationData(hook, new HashMap<>(), new HashMap<>());
+                    }
+                    hookIterationData = List.of(hookIterationDataArray);
+                }
 
                 for (var n : tx.drainNewWrites()) {
-                    for (var hookPut : _preCommitTxHooks) {
-                        pendingWrites.get(hookPut).put(n.key(), n);
+                    for (var hookPut : hookIterationData) {
+                        hookPut.pendingWrites().put(n.key(), n);
                         pendingCount++;
                     }
                     writes.put(n.key(), n);
@@ -88,8 +96,9 @@ public class JObjectManager {
                 // on the next iteration, the first hook should receive the version of the object it had created
                 // as the "old" version, and the new version with all the changes after it.
                 do {
-                    for (var hook : _preCommitTxHooks) {
-                        var lastCurHookSeen = lastWrites.get(hook);
+                    for (var hookId : hookIterationData) {
+                        var hook = hookId.hook();
+                        var lastCurHookSeen = hookId.lastWrites();
                         Function<JObjectKey, JData> getPrev =
                                 key -> switch (lastCurHookSeen.get(key)) {
                                     case TxRecord.TxObjectRecordWrite<?> write -> write.data();
@@ -100,7 +109,7 @@ public class JObjectManager {
                                     }
                                 };
 
-                        var curIteration = pendingWrites.get(hook);
+                        var curIteration = hookId.pendingWrites();
 
 //                        Log.trace("Commit iteration with " + curIteration.size() + " records for hook " + hook.getClass());
 
@@ -127,12 +136,12 @@ public class JObjectManager {
                         curIteration.clear();
 
                         for (var n : tx.drainNewWrites()) {
-                            for (var hookPut : _preCommitTxHooks) {
-                                if (hookPut == hook) {
+                            for (var hookPut : hookIterationData) {
+                                if (hookPut == hookId) {
                                     lastCurHookSeen.put(n.key(), n);
                                     continue;
                                 }
-                                var before = pendingWrites.get(hookPut).put(n.key(), n);
+                                var before = hookPut.pendingWrites().put(n.key(), n);
                                 if (before == null)
                                     pendingCount++;
                             }
