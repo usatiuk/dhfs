@@ -1,6 +1,7 @@
 package com.usatiuk.objects.iterators;
 
 import io.quarkus.logging.Log;
+import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.List;
@@ -106,23 +107,34 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
             K key = iteratorEntry.iterator().peekNextKey();
             Log.tracev("{0} Advance peeked: {1}-{2}", _name, iteratorEntry, key);
 
-            var them = _sortedIterators.get(key);
-            if (them == null) {
-                _sortedIterators.put(key, iteratorEntry);
-                return;
-            }
+            MutableObject<IteratorEntry<K, V>> mutableBoolean = new MutableObject<>(null);
 
-            // Expects that reversed iterator returns itself when reversed again
-            var oursPrio = iteratorEntry.priority();
-            var theirsPrio = them.priority();
-            if (oursPrio < theirsPrio) {
-                _sortedIterators.put(key, iteratorEntry);
-                advanceIterator(them);
-                return;
-            } else {
+            var newVal = _sortedIterators.merge(key, iteratorEntry, (theirsEntry, oldValOurs) -> {
+                var oursPrio = oldValOurs.priority();
+                var theirsPrio = theirsEntry.priority();
+
+                if (oursPrio < theirsPrio) {
+                    mutableBoolean.setValue(theirsEntry);
+                    return oldValOurs;
+                    // advance them
+                    // return
+                } else {
+                    return theirsEntry;
+                    // skip, continue
+                }
+            });
+
+            if (newVal != iteratorEntry) {
                 Log.tracev("{0} Skipped: {1}", _name, iteratorEntry.iterator().peekNextKey());
                 iteratorEntry.iterator().skip();
+                continue;
             }
+
+            if (mutableBoolean.getValue() != null) {
+                advanceIterator(mutableBoolean.getValue());
+                return;
+            }
+            return;
         }
     }
 
