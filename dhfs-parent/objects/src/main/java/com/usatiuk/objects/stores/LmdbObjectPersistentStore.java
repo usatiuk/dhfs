@@ -2,6 +2,8 @@ package com.usatiuk.objects.stores;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
+import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
+import com.usatiuk.dhfs.utils.RefcountedCloseable;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.JObjectKeyMax;
 import com.usatiuk.objects.JObjectKeyMin;
@@ -10,8 +12,6 @@ import com.usatiuk.objects.iterators.IteratorStart;
 import com.usatiuk.objects.iterators.KeyPredicateKvIterator;
 import com.usatiuk.objects.iterators.ReversibleKvIterator;
 import com.usatiuk.objects.snapshot.Snapshot;
-import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
-import com.usatiuk.dhfs.utils.RefcountedCloseable;
 import io.quarkus.arc.properties.IfBuildProperty;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
@@ -30,7 +30,6 @@ import java.lang.ref.Cleaner;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
@@ -41,10 +40,11 @@ import static org.lmdbjava.Env.create;
 @IfBuildProperty(name = "dhfs.objects.persistence", stringValue = "lmdb")
 public class LmdbObjectPersistentStore implements ObjectPersistentStore {
     private static final String DB_NAME = "objects";
+    private static final String DB_VER_OBJ_NAME_STR = "__DB_VER_OBJ";
     private static final ByteBuffer DB_VER_OBJ_NAME;
 
     static {
-        byte[] tmp = "__DB_VER_OBJ".getBytes(StandardCharsets.UTF_8);
+        byte[] tmp = DB_VER_OBJ_NAME_STR.getBytes(StandardCharsets.ISO_8859_1);
         var bb = ByteBuffer.allocateDirect(tmp.length);
         bb.put(tmp);
         bb.flip();
@@ -124,7 +124,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             @Override
             public CloseableKvIterator<JObjectKey, ByteString> getIterator(IteratorStart start, JObjectKey key) {
                 assert !_closed;
-                return new KeyPredicateKvIterator<>(new LmdbKvIterator(_txn.ref(), start, key), start, key, (k) -> !StandardCharsets.UTF_8.encode(k.value()).equals(DB_VER_OBJ_NAME.asReadOnlyBuffer()));
+                return new KeyPredicateKvIterator<>(new LmdbKvIterator(_txn.ref(), start, key), start, key, (k) -> !k.value().equals(DB_VER_OBJ_NAME_STR));
             }
 
             @Nonnull

@@ -26,11 +26,11 @@ public sealed interface JObjectKey extends Serializable, Comparable<JObjectKey> 
     }
 
     static JObjectKey fromBytes(byte[] bytes) {
-        return new JObjectKeyImpl(new String(bytes, StandardCharsets.UTF_8));
+        return new JObjectKeyImpl(new String(bytes, StandardCharsets.ISO_8859_1));
     }
 
     static JObjectKey fromByteBuffer(ByteBuffer buff) {
-        return new JObjectKeyImpl(StandardCharsets.UTF_8.decode(buff).toString());
+        return new JObjectKeyImpl(StandardCharsets.ISO_8859_1.decode(buff).toString());
     }
 
     @Override

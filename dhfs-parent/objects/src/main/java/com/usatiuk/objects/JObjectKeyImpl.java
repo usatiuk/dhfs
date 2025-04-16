@@ -28,12 +28,12 @@ public record JObjectKeyImpl(String value) implements JObjectKey {
 
     @Override
     public byte[] bytes() {
-        return value.getBytes(StandardCharsets.UTF_8);
+        return value.getBytes(StandardCharsets.ISO_8859_1);
     }
 
     @Override
     public ByteBuffer toByteBuffer() {
-        var heapBb = StandardCharsets.UTF_8.encode(value);
+        var heapBb = StandardCharsets.ISO_8859_1.encode(value);
         if (heapBb.isDirect()) return heapBb;
         var directBb = UninitializedByteBuffer.allocateUninitialized(heapBb.remaining());
         directBb.put(heapBb);
