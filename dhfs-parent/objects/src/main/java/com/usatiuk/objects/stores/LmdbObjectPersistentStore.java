@@ -41,7 +41,16 @@ import static org.lmdbjava.Env.create;
 @IfBuildProperty(name = "dhfs.objects.persistence", stringValue = "lmdb")
 public class LmdbObjectPersistentStore implements ObjectPersistentStore {
     private static final String DB_NAME = "objects";
-    private static final byte[] DB_VER_OBJ_NAME = "__DB_VER_OBJ".getBytes(StandardCharsets.UTF_8);
+    private static final ByteBuffer DB_VER_OBJ_NAME;
+
+    static {
+        byte[] tmp = "__DB_VER_OBJ".getBytes(StandardCharsets.UTF_8);
+        var bb = ByteBuffer.allocateDirect(tmp.length);
+        bb.put(tmp);
+        bb.flip();
+        DB_VER_OBJ_NAME = bb.asReadOnlyBuffer();
+    }
+
     private final Path _root;
     private Env<ByteBuffer> _env;
     private Dbi<ByteBuffer> _db;
@@ -67,13 +76,10 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             if (read.isPresent()) {
                 Log.infov("Read tx id {0}", read.get());
             } else {
-                var bb = ByteBuffer.allocateDirect(DB_VER_OBJ_NAME.length);
-                bb.put(DB_VER_OBJ_NAME);
-                bb.flip();
                 var bbData = ByteBuffer.allocateDirect(8);
                 bbData.putLong(0);
                 bbData.flip();
-                _db.put(txn, bb, bbData);
+                _db.put(txn, DB_VER_OBJ_NAME.asReadOnlyBuffer(), bbData);
                 txn.commit();
             }
         }
@@ -82,10 +88,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
     }
 
     private Optional<Long> readTxId(Txn<ByteBuffer> txn) {
-        var bb = ByteBuffer.allocateDirect(DB_VER_OBJ_NAME.length);
-        bb.put(DB_VER_OBJ_NAME);
-        bb.flip();
-        var value = _db.get(txn, bb);
+        var value = _db.get(txn, DB_VER_OBJ_NAME.asReadOnlyBuffer());
         return Optional.ofNullable(value).map(ByteBuffer::getLong);
     }
 
@@ -121,7 +124,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             @Override
             public CloseableKvIterator<JObjectKey, ByteString> getIterator(IteratorStart start, JObjectKey key) {
                 assert !_closed;
-                return new KeyPredicateKvIterator<>(new LmdbKvIterator(_txn.ref(), start, key), start, key, (k) -> !Arrays.equals(k.value().getBytes(StandardCharsets.UTF_8), DB_VER_OBJ_NAME));
+                return new KeyPredicateKvIterator<>(new LmdbKvIterator(_txn.ref(), start, key), start, key, (k) -> !StandardCharsets.UTF_8.encode(k.value()).equals(DB_VER_OBJ_NAME.asReadOnlyBuffer()));
             }
 
             @Nonnull
@@ -168,13 +171,10 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
 
             assert txId > readTxId(txn).orElseThrow();
 
-            var bb = ByteBuffer.allocateDirect(DB_VER_OBJ_NAME.length);
-            bb.put(DB_VER_OBJ_NAME);
-            bb.flip();
             var bbData = ByteBuffer.allocateDirect(8);
             bbData.putLong(txId);
             bbData.flip();
-            _db.put(txn, bb, bbData);
+            _db.put(txn, DB_VER_OBJ_NAME.asReadOnlyBuffer(), bbData);
         } catch (Throwable t) {
             txn.close();
             throw t;
