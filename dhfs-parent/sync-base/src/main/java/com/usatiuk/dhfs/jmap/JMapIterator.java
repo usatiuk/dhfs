@@ -32,8 +32,8 @@ public class JMapIterator<K extends JMapKey> implements CloseableKvIterator<K, J
     }
 
     public K keyToKey(JObjectKey key) {
-        var keyPart = key.value().substring(_prefix.value().length());
-        return (K) JMapLongKey.of(Long.parseLong(keyPart));
+        var keyPart = key.value().substring(_prefix.value().size());
+        return (K) JMapLongKey.of(keyPart.asReadOnlyByteBuffer().getLong());
     }
 
     @Override

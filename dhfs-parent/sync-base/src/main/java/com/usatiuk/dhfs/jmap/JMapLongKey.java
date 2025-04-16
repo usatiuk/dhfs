@@ -1,9 +1,13 @@
 package com.usatiuk.dhfs.jmap;
 
+import com.google.protobuf.ByteString;
+import com.google.protobuf.UnsafeByteOperations;
+import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
 import org.apache.commons.lang3.StringUtils;
 
 import javax.annotation.Nonnull;
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 
 public record JMapLongKey(long key) implements JMapKey, Comparable<JMapKey>, Serializable {
     public static JMapLongKey of(long key) {
@@ -14,9 +18,11 @@ public record JMapLongKey(long key) implements JMapKey, Comparable<JMapKey>, Ser
         return new JMapLongKey(Long.MAX_VALUE);
     }
 
-    @Override
-    public String toString() {
-        return StringUtils.leftPad(String.valueOf(key), 20, '0');
+    public ByteString value() {
+        var newByteBuffer = ByteBuffer.allocate(Long.BYTES);
+        newByteBuffer.putLong(key);
+        newByteBuffer.flip();
+        return UnsafeByteOperations.unsafeWrap(newByteBuffer);
     }
 
     @Override

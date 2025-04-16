@@ -88,7 +88,7 @@ public class RemoteObjectServiceServerImpl {
 
             if (!builder.getDeletionCandidate()) {
                 for (var r : obj.refsFrom()) {
-                    builder.addReferrers(JObjectKeyP.newBuilder().setName(r.obj().toString()).build());
+                    builder.addReferrers(JObjectKeyP.newBuilder().setName(r.obj().value()).build());
                     curTx.onCommit(() -> autosyncProcessor.add(r.obj()));
                 }
             }

@@ -6,6 +6,7 @@ import com.usatiuk.dhfs.ReceivedObject;
 import com.usatiuk.dhfs.persistence.JDataRemoteDtoP;
 import com.usatiuk.dhfs.persistence.JObjectKeyP;
 import com.usatiuk.dhfs.persistence.PeerIdP;
+import com.usatiuk.objects.JObjectKey;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.pcollections.HashTreePMap;
@@ -20,7 +21,7 @@ public class TemporaryReceivedObjectSerializer implements ProtoSerializer<GetObj
     public ReceivedObject deserialize(GetObjectReply message) {
         PMap<PeerId, Long> changelog = HashTreePMap.empty();
         for (var entry : message.getChangelog().getEntriesList()) {
-            changelog = changelog.plus(PeerId.of(entry.getKey().getId().getName()), entry.getValue());
+            changelog = changelog.plus(PeerId.of(JObjectKey.of(entry.getKey().getId().getName())), entry.getValue());
         }
         var data = remoteObjectSerializer.deserialize(message.getPushedData());
         return new ReceivedObject(changelog, data);
@@ -32,7 +33,7 @@ public class TemporaryReceivedObjectSerializer implements ProtoSerializer<GetObj
         var changelogBuilder = builder.getChangelogBuilder();
         object.changelog().forEach((peer, version) -> {
             changelogBuilder.addEntriesBuilder()
-                    .setKey(PeerIdP.newBuilder().setId(JObjectKeyP.newBuilder().setName(peer.id().toString()).build()).build())
+                    .setKey(PeerIdP.newBuilder().setId(JObjectKeyP.newBuilder().setName(peer.id().value()).build()).build())
                     .setValue(version);
         });
         builder.setPushedData(remoteObjectSerializer.serialize(object.data()));

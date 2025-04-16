@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs;
 
+import com.google.protobuf.ByteString;
 import com.usatiuk.objects.JObjectKey;
 import org.pcollections.*;
 
@@ -14,6 +15,9 @@ public record RemoteObjectMeta(PCollection<JDataRef> refsFrom, boolean frozen,
                                boolean seen,
                                PMap<PeerId, Long> changelog,
                                boolean hasLocalData) implements JDataRefcounted {
+
+    public static final ByteString DATA_SUFFIX = ByteString.copyFromUtf8(".data");
+
     // Self put
     public RemoteObjectMeta(JDataRemote data, PeerId initialPeer) {
         this(HashTreePSet.empty(), false,
@@ -41,7 +45,7 @@ public record RemoteObjectMeta(PCollection<JDataRef> refsFrom, boolean frozen,
     }
 
     public static JObjectKey ofDataKey(JObjectKey key) {
-        return JObjectKey.of("data_" + key.value());
+        return JObjectKey.of(key.value().concat(DATA_SUFFIX));
     }
 
     @Override

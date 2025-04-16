@@ -7,7 +7,7 @@ option java_outer_classname = "DhfsObjectPersistence";
 package dhfs.persistence;
 
 message JObjectKeyP {
-  string name = 1;
+  bytes name = 1;
 }
 
 message PeerIdP {

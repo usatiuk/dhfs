@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.jmap;
 
+import com.google.protobuf.ByteString;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.iterators.CloseableKvIterator;
 import com.usatiuk.objects.iterators.IteratorStart;
@@ -16,20 +17,24 @@ public class JMapHelper {
     @Inject
     Transaction curTx;
 
+    public static final ByteString DATA_SUFFIX = ByteString.copyFromUtf8("=");
+    public static final ByteString FIRST_SUFFIX = ByteString.copyFromUtf8("<");
+    public static final ByteString LAST_SUFFIX = ByteString.copyFromUtf8(">");
+
     static <K extends JMapKey> JObjectKey makePrefix(JObjectKey holder) {
-        return JObjectKey.of(holder.value() + "=");
+        return JObjectKey.of(holder.value().concat(DATA_SUFFIX));
     }
 
     static <K extends JMapKey> JObjectKey makeKeyFirst(JObjectKey holder) {
-        return JObjectKey.of(holder.value() + "<");
+        return JObjectKey.of(holder.value().concat(FIRST_SUFFIX));
     }
 
     static <K extends JMapKey> JObjectKey makeKey(JObjectKey holder, K key) {
-        return JObjectKey.of(makePrefix(holder).value() + key.toString());
+        return JObjectKey.of(makePrefix(holder).value().concat(key.value()));
     }
 
     static <K extends JMapKey> JObjectKey makeKeyLast(JObjectKey holder) {
-        return JObjectKey.of(holder.value() + ">");
+        return JObjectKey.of(holder.value().concat(LAST_SUFFIX));
     }
 
     public <K extends JMapKey> CloseableKvIterator<K, JMapEntry<K>> getIterator(JMapHolder<K> holder, IteratorStart start, K key) {

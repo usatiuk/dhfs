@@ -1,5 +1,7 @@
 package com.usatiuk.objects;
 
+import com.google.protobuf.ByteString;
+
 import java.nio.ByteBuffer;
 
 public record JObjectKeyMin() implements JObjectKey {
@@ -19,17 +21,12 @@ public record JObjectKeyMin() implements JObjectKey {
     }
 
     @Override
-    public byte[] bytes() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
     public ByteBuffer toByteBuffer() {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public String value() {
+    public ByteString value() {
         throw new UnsupportedOperationException();
     }
 }

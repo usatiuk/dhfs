@@ -1,5 +1,8 @@
 package com.usatiuk.objects;
 
+import com.google.protobuf.ByteString;
+import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
+
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -10,11 +13,19 @@ public sealed interface JObjectKey extends Serializable, Comparable<JObjectKey> 
     JObjectKeyMax MAX = new JObjectKeyMax();
 
     static JObjectKey of(String value) {
-        return new JObjectKeyImpl(value);
+        var heapBb = StandardCharsets.UTF_8.encode(value);
+        if (heapBb.isDirect()) return new JObjectKeyImpl(heapBb);
+        return fromByteBuffer(heapBb);
+    }
+
+    static JObjectKey of(ByteString value) {
+        var heapBb = value.asReadOnlyByteBuffer();
+        if (heapBb.isDirect()) return new JObjectKeyImpl(heapBb);
+        return fromByteBuffer(heapBb);
     }
 
     static JObjectKey random() {
-        return new JObjectKeyImpl(UUID.randomUUID().toString());
+        return JObjectKey.of(UUID.randomUUID().toString());
     }
 
     static JObjectKey first() {
@@ -25,12 +36,11 @@ public sealed interface JObjectKey extends Serializable, Comparable<JObjectKey> 
         return MAX;
     }
 
-    static JObjectKey fromBytes(byte[] bytes) {
-        return new JObjectKeyImpl(new String(bytes, StandardCharsets.UTF_8));
-    }
-
     static JObjectKey fromByteBuffer(ByteBuffer buff) {
-        return new JObjectKeyImpl(StandardCharsets.UTF_8.decode(buff).toString());
+        var directBb = UninitializedByteBuffer.allocateUninitialized(buff.remaining());
+        directBb.put(buff);
+        directBb.flip();
+        return new JObjectKeyImpl(directBb);
     }
 
     @Override
@@ -39,9 +49,7 @@ public sealed interface JObjectKey extends Serializable, Comparable<JObjectKey> 
     @Override
     String toString();
 
-    byte[] bytes();
-
     ByteBuffer toByteBuffer();
 
-    String value();
+    ByteString value();
 }

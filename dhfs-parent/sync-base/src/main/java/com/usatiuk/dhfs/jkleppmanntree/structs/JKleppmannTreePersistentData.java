@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.jkleppmanntree.structs;
 
 import com.usatiuk.dhfs.JDataRef;
 import com.usatiuk.dhfs.JDataRefcounted;
+import com.usatiuk.dhfs.jkleppmanntree.JKleppmannTreeManager;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
@@ -49,6 +50,6 @@ public record JKleppmannTreePersistentData(
 
     @Override
     public Collection<JObjectKey> collectRefsTo() {
-        return List.of(JObjectKey.of(key().value() + "_jt_trash"), JObjectKey.of(key().value() + "_jt_root"), JObjectKey.of(key().value() + "_jt_lf"));
+        return List.of(JObjectKey.of(key().value().concat(JKleppmannTreeManager.ROOT_SUFFIX)), JObjectKey.of(key().value().concat(JKleppmannTreeManager.TRASH_SUFFIX)), JObjectKey.of(key().value().concat(JKleppmannTreeManager.LF_SUFFIX)));
     }
 }

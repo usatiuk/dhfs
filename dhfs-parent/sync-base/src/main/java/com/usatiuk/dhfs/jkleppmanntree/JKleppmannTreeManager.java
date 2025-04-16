@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.jkleppmanntree;
 
+import com.google.protobuf.ByteString;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.dhfs.jkleppmanntree.structs.*;
@@ -35,6 +36,10 @@ public class JKleppmannTreeManager {
     @Inject
     PersistentPeerDataService persistentPeerDataService;
 
+    public static final ByteString ROOT_SUFFIX = ByteString.copyFromUtf8("_jt_root");
+    public static final ByteString TRASH_SUFFIX = ByteString.copyFromUtf8("_jt_trash");
+    public static final ByteString LF_SUFFIX = ByteString.copyFromUtf8("_jt_lf");
+
     public JKleppmannTree getTree(JObjectKey name, LockingStrategy lockingStrategy) {
         return txManager.executeTx(() -> {
             var data = curTx.get(JKleppmannTreePersistentData.class, name, lockingStrategy).orElse(null);
@@ -49,11 +54,11 @@ public class JKleppmannTreeManager {
                         TreePMap.empty()
                 );
                 curTx.put(data);
-                var rootNode = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_root"), null, new JKleppmannTreeNodeMetaDirectory(""));
+                var rootNode = new JKleppmannTreeNode(JObjectKey.of(name.value().concat(ROOT_SUFFIX)), null, new JKleppmannTreeNodeMetaDirectory(""));
                 curTx.put(rootNode);
-                var trashNode = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_trash"), null, new JKleppmannTreeNodeMetaDirectory(""));
+                var trashNode = new JKleppmannTreeNode(JObjectKey.of(name.value().concat(TRASH_SUFFIX)), null, new JKleppmannTreeNodeMetaDirectory(""));
                 curTx.put(trashNode);
-                var lf_node = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_lf"), null, new JKleppmannTreeNodeMetaDirectory(""));
+                var lf_node = new JKleppmannTreeNode(JObjectKey.of(name.value().concat(LF_SUFFIX)), null, new JKleppmannTreeNodeMetaDirectory(""));
                 curTx.put(lf_node);
             }
             return new JKleppmannTree(data);
@@ -258,17 +263,17 @@ public class JKleppmannTreeManager {
 
             @Override
             public JObjectKey getRootId() {
-                return JObjectKey.of(_treeName.value() + "_jt_root");
+                return JObjectKey.of(_treeName.value().concat(ROOT_SUFFIX));
             }
 
             @Override
             public JObjectKey getTrashId() {
-                return JObjectKey.of(_treeName.value() + "_jt_trash");
+                return JObjectKey.of(_treeName.value().concat(TRASH_SUFFIX));
             }
 
             @Override
             public JObjectKey getLostFoundId() {
-                return JObjectKey.of(_treeName.value() + "_jt_lf");
+                return JObjectKey.of(_treeName.value().concat(LF_SUFFIX));
             }
 
             @Override

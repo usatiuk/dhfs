@@ -51,7 +51,7 @@ public class RemoteObjectServiceClient {
 
     public Pair<PeerId, ReceivedObject> getSpecificObject(JObjectKey key, PeerId peerId) {
         return rpcClientFactory.withObjSyncClient(peerId, (peer, client) -> {
-            var reply = client.getObject(GetObjectRequest.newBuilder().setName(JObjectKeyP.newBuilder().setName(key.toString()).build()).build());
+            var reply = client.getObject(GetObjectRequest.newBuilder().setName(JObjectKeyP.newBuilder().setName(key.value()).build()).build());
             var deserialized = receivedObjectProtoSerializer.deserialize(reply);
             return Pair.of(peer, deserialized);
         });
@@ -77,7 +77,7 @@ public class RemoteObjectServiceClient {
         Log.info("Downloading object " + key + " from " + targets);
 
         rpcClientFactory.withObjSyncClient(targets, (peer, client) -> {
-            var reply = client.getObject(GetObjectRequest.newBuilder().setName(JObjectKeyP.newBuilder().setName(key.toString()).build()).build());
+            var reply = client.getObject(GetObjectRequest.newBuilder().setName(JObjectKeyP.newBuilder().setName(key.value()).build()).build());
 
             var deserialized = receivedObjectProtoSerializer.deserialize(reply);
 
@@ -110,9 +110,9 @@ public class RemoteObjectServiceClient {
         Log.trace("Asking canDelete for " + objKey + " from " + targets.stream().map(PeerId::toString).collect(Collectors.joining(", ")));
         try {
             return _batchExecutor.invokeAll(targets.stream().<Callable<Pair<PeerId, CanDeleteReply>>>map(h -> () -> {
-                var req = CanDeleteRequest.newBuilder().setName(JObjectKeyP.newBuilder().setName(objKey.toString()).build());
+                var req = CanDeleteRequest.newBuilder().setName(JObjectKeyP.newBuilder().setName(objKey.value()).build());
                 for (var ref : ourReferrers) {
-                    req.addOurReferrers(JObjectKeyP.newBuilder().setName(ref.obj().toString()).build());
+                    req.addOurReferrers(JObjectKeyP.newBuilder().setName(ref.obj().value()).build());
                 }
                 return Pair.of(h, rpcClientFactory.withObjSyncClient(h, (p, client) -> client.canDelete(req.build())));
             }).toList()).stream().map(f -> {

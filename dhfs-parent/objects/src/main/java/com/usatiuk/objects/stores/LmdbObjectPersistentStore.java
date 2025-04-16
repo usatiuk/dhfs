@@ -30,7 +30,6 @@ import java.lang.ref.Cleaner;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
@@ -118,10 +117,19 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             private final long _id = commitId;
             private boolean _closed = false;
 
+            private final boolean byteStringAndByteArrEquals(ByteString bs, byte[] arr) {
+                if (bs.size() != arr.length) return false;
+                for (int i = 0; i < arr.length; i++) {
+                    if (bs.byteAt(i) != arr[i]) return false;
+                }
+                return true;
+            }
+
             @Override
             public CloseableKvIterator<JObjectKey, ByteString> getIterator(IteratorStart start, JObjectKey key) {
                 assert !_closed;
-                return new KeyPredicateKvIterator<>(new LmdbKvIterator(_txn.ref(), start, key), start, key, (k) -> !Arrays.equals(k.value().getBytes(StandardCharsets.UTF_8), DB_VER_OBJ_NAME));
+                return new KeyPredicateKvIterator<>(new LmdbKvIterator(_txn.ref(), start, key), start, key,
+                        (k) -> !byteStringAndByteArrEquals(k.value(), DB_VER_OBJ_NAME));
             }
 
             @Nonnull

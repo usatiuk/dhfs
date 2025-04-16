@@ -10,13 +10,17 @@ public record PeerId(JObjectKey id) implements Serializable, Comparable<PeerId> 
         return new PeerId(JObjectKey.of(id));
     }
 
+    public static PeerId of(JObjectKey id) {
+        return new PeerId(id);
+    }
+
     @Override
     public String toString() {
         return id.toString();
     }
 
     public JObjectKey toJObjectKey() {
-        return JObjectKey.of(id.toString());
+        return id();
     }
 
     @Override

@@ -153,7 +153,7 @@ public class JObjectManager {
 
             if (!writes.isEmpty()) {
                 Stream.concat(readSet.keySet().stream(), writes.keySet().stream())
-                        .sorted(Comparator.comparing(JObjectKey::toString))
+                        .sorted()
                         .forEach(k -> {
                             var lock = lockManager.lockObject(k);
                             toUnlock.add(lock);
