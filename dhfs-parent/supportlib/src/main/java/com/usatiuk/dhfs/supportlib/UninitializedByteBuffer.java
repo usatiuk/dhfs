@@ -9,6 +9,9 @@ public class UninitializedByteBuffer {
     private static final Logger LOGGER = Logger.getLogger(UninitializedByteBuffer.class.getName());
 
     public static ByteBuffer allocateUninitialized(int size) {
+        if (size < DhfsSupport.PAGE_SIZE)
+            return ByteBuffer.allocateDirect(size);
+
         var bb = new ByteBuffer[1];
         long token = DhfsSupport.allocateUninitializedByteBuffer(bb, size);
         var ret = bb[0];
