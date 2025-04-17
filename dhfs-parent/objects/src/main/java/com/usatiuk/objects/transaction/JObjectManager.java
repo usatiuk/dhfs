@@ -13,6 +13,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
@@ -162,7 +163,7 @@ public class JObjectManager {
 
             if (!writes.isEmpty()) {
                 Stream.concat(readSet.keySet().stream(), writes.keySet().stream())
-                        .sorted(Comparator.comparing(JObjectKey::toString))
+                        .sorted()
                         .forEach(k -> {
                             var lock = lockManager.lockObject(k);
                             toUnlock.add(lock);

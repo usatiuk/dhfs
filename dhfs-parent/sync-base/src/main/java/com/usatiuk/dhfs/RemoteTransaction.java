@@ -9,12 +9,13 @@ import com.usatiuk.objects.transaction.Transaction;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.pcollections.HashTreePSet;
 
 import java.util.Optional;
 
-@ApplicationScoped
+@Singleton
 public class RemoteTransaction {
     @Inject
     Transaction curTx;

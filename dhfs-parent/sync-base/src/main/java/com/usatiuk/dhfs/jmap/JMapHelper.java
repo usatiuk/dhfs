@@ -7,11 +7,12 @@ import com.usatiuk.objects.transaction.Transaction;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 import java.util.ArrayList;
 import java.util.Optional;
 
-@ApplicationScoped
+@Singleton
 public class JMapHelper {
     @Inject
     Transaction curTx;

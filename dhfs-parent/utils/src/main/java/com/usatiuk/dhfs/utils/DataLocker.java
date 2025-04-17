@@ -15,32 +15,27 @@ public class DataLocker {
     @Nonnull
     public AutoCloseableNoThrow lock(Object data) {
         while (true) {
+            var newTag = new LockTag();
+            var oldTag = _locks.putIfAbsent(data, newTag);
+            if (oldTag == null) {
+                return new Lock(data, newTag);
+            }
             try {
-                var tag = _locks.get(data);
-                if (tag != null) {
-                    synchronized (tag) {
-                        while (!tag.released) {
-                            if (tag.owner == Thread.currentThread()) {
-                                return DUMMY_LOCK;
-                            }
-                            tag.wait();
+                synchronized (oldTag) {
+                    while (!oldTag.released) {
+                        if (oldTag.owner == Thread.currentThread()) {
+                            return DUMMY_LOCK;
+                        }
+                        oldTag.wait();
 //                            tag.wait(4000L);
 //                            if (!tag.released) {
 //                                System.out.println("Timeout waiting for lock: " + data);
 //                                System.exit(1);
 //                                throw new InterruptedException();
 //                            }
-                        }
-                        continue;
                     }
                 }
             } catch (InterruptedException ignored) {
-            }
-
-            var newTag = new LockTag();
-            var oldTag = _locks.putIfAbsent(data, newTag);
-            if (oldTag == null) {
-                return new Lock(data, newTag);
             }
         }
     }
@@ -48,23 +43,18 @@ public class DataLocker {
     @Nullable
     public AutoCloseableNoThrow tryLock(Object data) {
         while (true) {
-            var tag = _locks.get(data);
-            if (tag != null) {
-                synchronized (tag) {
-                    if (!tag.released) {
-                        if (tag.owner == Thread.currentThread()) {
-                            return DUMMY_LOCK;
-                        }
-                        return null;
-                    }
-                    continue;
-                }
-            }
-
             var newTag = new LockTag();
             var oldTag = _locks.putIfAbsent(data, newTag);
             if (oldTag == null) {
                 return new Lock(data, newTag);
+            }
+            synchronized (oldTag) {
+                if (!oldTag.released) {
+                    if (oldTag.owner == Thread.currentThread()) {
+                        return DUMMY_LOCK;
+                    }
+                    return null;
+                }
             }
         }
     }
@@ -83,11 +73,11 @@ public class DataLocker {
         public Lock(Object key, LockTag tag) {
             _key = key;
             _tag = tag;
-            CLEANER.register(this, () -> {
-                if (!tag.released) {
-                    Log.error("Lock collected without release: " + key);
-                }
-            });
+//            CLEANER.register(this, () -> {
+//                if (!tag.released) {
+//                    Log.error("Lock collected without release: " + key);
+//                }
+//            });
         }
 
         @Override

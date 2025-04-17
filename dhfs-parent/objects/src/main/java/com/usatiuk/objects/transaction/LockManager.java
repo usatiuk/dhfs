@@ -6,8 +6,9 @@ import com.usatiuk.dhfs.utils.DataLocker;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Singleton;
 
-@ApplicationScoped
+@Singleton
 public class LockManager {
     private final DataLocker _objLocker = new DataLocker();
 

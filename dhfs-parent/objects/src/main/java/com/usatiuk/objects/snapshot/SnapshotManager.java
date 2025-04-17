@@ -6,13 +6,14 @@ import com.usatiuk.objects.stores.WritebackObjectPersistentStore;
 import com.usatiuk.objects.transaction.TxRecord;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 import javax.annotation.Nonnull;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.function.Consumer;
 
-@ApplicationScoped
+@Singleton
 public class SnapshotManager {
     @Inject
     WritebackObjectPersistentStore writebackStore;
