@@ -33,6 +33,7 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
@@ -410,7 +411,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             if (existingEnd < offset) {
                 if (!pendingPrefix.isEmpty()) {
                     int diff = Math.toIntExact(offset - existingEnd);
-                    pendingPrefix = pendingPrefix.concat(ByteString.copyFrom(new byte[diff]));
+                    pendingPrefix = pendingPrefix.concat(UnsafeByteOperations.unsafeWrap(ByteBuffer.allocateDirect(diff)));
                 } else {
                     fillZeros(existingEnd, offset, newChunks);
                     start = offset;
@@ -572,7 +573,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 }
 
                 if (!zeroCache.containsKey(end - cur))
-                    zeroCache.put(end - cur, createChunk(UnsafeByteOperations.unsafeWrap(new byte[Math.toIntExact(end - cur)])));
+                    zeroCache.put(end - cur, createChunk(UnsafeByteOperations.unsafeWrap(ByteBuffer.allocateDirect(Math.toIntExact(end - cur)))));
 
                 ChunkData newChunkData = zeroCache.get(end - cur);
                 newChunks.put(start, newChunkData.key());
