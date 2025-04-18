@@ -41,7 +41,7 @@ public record RemoteObjectMeta(PCollection<JDataRef> refsFrom, boolean frozen,
     }
 
     public static JObjectKey ofDataKey(JObjectKey key) {
-        return JObjectKey.of("data_" + key.value());
+        return JObjectKey.of(key.value() + "_data");
     }
 
     @Override
