@@ -1,11 +1,13 @@
 package com.usatiuk.dhfs.repository;
 
+import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.dhfs.ShutdownChecker;
 import com.usatiuk.dhfs.repository.peerdiscovery.IpPeerAddress;
 import com.usatiuk.dhfs.repository.peerdiscovery.PeerAddressType;
 import com.usatiuk.dhfs.repository.peersync.PeerInfoService;
 import com.usatiuk.dhfs.repository.peertrust.PeerTrustManager;
+import com.usatiuk.dhfs.utils.SerializationHelper;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;
 import io.quarkus.logging.Log;
@@ -64,8 +66,8 @@ public class PersistentPeerDataService {
             var selfData = curTx.get(PersistentRemoteHostsData.class, PersistentRemoteHostsData.KEY).orElse(null);
             if (selfData != null) {
                 _selfUuid = selfData.selfUuid();
-                _selfCertificate = selfData.selfCertificate();
-                _selfKeyPair = selfData.selfKeyPair();
+                _selfCertificate = CertificateTools.certFromBytes(selfData.selfCertificate().toByteArray());
+                _selfKeyPair = SerializationHelper.deserialize(selfData.selfKeyPair().toByteArray());
                 return;
             } else {
                 try {
@@ -74,7 +76,7 @@ public class PersistentPeerDataService {
                     _selfKeyPair = CertificateTools.generateKeyPair();
                     _selfCertificate = CertificateTools.generateCertificate(_selfKeyPair, _selfUuid.toString());
 
-                    curTx.put(new PersistentRemoteHostsData(_selfUuid, _selfCertificate, _selfKeyPair, HashTreePSet.empty(), HashTreePMap.empty()));
+                    curTx.put(new PersistentRemoteHostsData(_selfUuid, ByteString.copyFrom(_selfCertificate.getEncoded()), SerializationHelper.serialize(_selfKeyPair), HashTreePSet.empty(), HashTreePMap.empty()));
                     peerInfoService.putPeer(_selfUuid, _selfCertificate.getEncoded());
                 } catch (CertificateEncodingException e) {
                     throw new RuntimeException(e);

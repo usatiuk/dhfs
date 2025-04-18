@@ -1,5 +1,6 @@
 package com.usatiuk.dhfs.repository;
 
+import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.dhfs.repository.peerdiscovery.IpPeerAddress;
 import com.usatiuk.objects.JData;
@@ -12,8 +13,8 @@ import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 
 public record PersistentRemoteHostsData(PeerId selfUuid,
-                                        X509Certificate selfCertificate,
-                                        KeyPair selfKeyPair,
+                                        ByteString selfCertificate,
+                                        ByteString selfKeyPair,
                                         PSet<PeerId> initialSyncDone,
                                         PMap<PeerId, IpPeerAddress> persistentPeerAddress) implements JData, Serializable {
     public static final JObjectKey KEY = JObjectKey.of("self_peer_data");
