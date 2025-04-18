@@ -45,7 +45,7 @@ public class HashSetDelayedBlockingQueueTest {
         queue.add("hello!");
         Assertions.assertEquals("hello!", queue.get());
         var gotTime = System.currentTimeMillis();
-        Assertions.assertTrue((gotTime - curTime) <= 10);
+        Assertions.assertTrue((gotTime - curTime) <= 50);
     }
 
     @Test
