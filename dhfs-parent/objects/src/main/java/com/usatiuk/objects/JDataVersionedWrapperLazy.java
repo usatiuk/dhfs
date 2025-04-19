@@ -3,11 +3,10 @@ package com.usatiuk.objects;
 import java.util.function.Supplier;
 
 public class JDataVersionedWrapperLazy implements JDataVersionedWrapper {
+    private JData _data;
     private final long _version;
     private final int _estimatedSize;
     private Supplier<JData> _producer;
-    private Runnable _cacheCallback;
-    private JData _data;
 
     public JDataVersionedWrapperLazy(long version, int estimatedSize, Supplier<JData> producer) {
         _version = version;
@@ -19,8 +18,12 @@ public class JDataVersionedWrapperLazy implements JDataVersionedWrapper {
         if (_data != null) {
             throw new IllegalStateException("Cache callback can be set only before data is loaded");
         }
-
-        _cacheCallback = cacheCallback;
+        var oldProducer = _producer;
+        _producer = () -> {
+            var ret = oldProducer.get();
+            cacheCallback.run();
+            return ret;
+        };
     }
 
     public JData data() {
@@ -32,10 +35,6 @@ public class JDataVersionedWrapperLazy implements JDataVersionedWrapper {
                 return _data;
 
             _data = _producer.get();
-            if (_cacheCallback != null) {
-                _cacheCallback.run();
-                _cacheCallback = null;
-            }
             _producer = null;
             return _data;
         }
