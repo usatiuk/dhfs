@@ -34,10 +34,9 @@ public class CachingObjectPersistentStore {
                          long version,
                          int sizeLimit) {
         public Cache withPut(JObjectKey key, Optional<JDataVersionedWrapper> obj) {
-            int objSize = obj.map(JDataVersionedWrapper::estimateSize).orElse(16);
+            var entry = obj.<CacheEntry>map(o -> new CacheEntryPresent(o, o.estimateSize())).orElse(new CacheEntryMiss());
 
-            int newSize = size() + objSize;
-            var entry = new CacheEntry(obj.<MaybeTombstone<JDataVersionedWrapper>>map(Data::new).orElse(new Tombstone<>()), objSize);
+            int newSize = size() + entry.size();
 
             var old = map.get(key);
             if (old != null)
@@ -188,15 +187,8 @@ public class CachingObjectPersistentStore {
                     @Override
                     public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
                         return new TombstoneMergingKvIterator<>("cache", start, key,
-                                (mS, mK)
-                                        -> new MappingKvIterator<>(
-                                        new NavigableMapKvIterator<>(_curCache.map(), mS, mK),
-                                        e -> {
-//                                        Log.tracev("Taken from cache: {0}", e);
-                                            return e.object();
-                                        }
-                                ),
-                                (mS, mK) -> new MappingKvIterator<>(new CachingKvIterator(_backing.getIterator(start, key)), Data::new));
+                                (mS, mK) -> new NavigableMapKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>(_curCache.map(), mS, mK),
+                                (mS, mK) -> new CachingKvIterator(_backing.getIterator(start, key)));
                     }
 
                     @Nonnull
@@ -204,12 +196,12 @@ public class CachingObjectPersistentStore {
                     public Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
                         var cached = _curCache.map().get(name);
                         if (cached != null) {
-                            return switch (cached.object()) {
-                                case Data<JDataVersionedWrapper> data -> Optional.of(data.value());
-                                case Tombstone<JDataVersionedWrapper> tombstone -> {
+                            return switch (cached) {
+                                case CacheEntryPresent data -> Optional.of(data.value());
+                                case CacheEntryMiss tombstone -> {
                                     yield Optional.empty();
                                 }
-                                default -> throw new IllegalStateException("Unexpected value: " + cached.object());
+                                default -> throw new IllegalStateException("Unexpected value: " + cached);
                             };
                         }
                         var read = _backing.readObject(name);
@@ -228,7 +220,7 @@ public class CachingObjectPersistentStore {
                         _backing.close();
                     }
 
-                    private class CachingKvIterator implements CloseableKvIterator<JObjectKey, JDataVersionedWrapper> {
+                    private class CachingKvIterator implements CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>> {
                         private final CloseableKvIterator<JObjectKey, JDataVersionedWrapper> _delegate;
 
                         private CachingKvIterator(CloseableKvIterator<JObjectKey, JDataVersionedWrapper> delegate) {
@@ -261,10 +253,10 @@ public class CachingObjectPersistentStore {
                         }
 
                         @Override
-                        public Pair<JObjectKey, JDataVersionedWrapper> prev() {
+                        public Pair<JObjectKey, MaybeTombstone<JDataVersionedWrapper>> prev() {
                             var prev = _delegate.prev();
                             maybeCache(prev.getKey(), Optional.of(prev.getValue()));
-                            return prev;
+                            return (Pair<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>) (Pair<JObjectKey, ?>) prev;
                         }
 
                         @Override
@@ -278,10 +270,10 @@ public class CachingObjectPersistentStore {
                         }
 
                         @Override
-                        public Pair<JObjectKey, JDataVersionedWrapper> next() {
+                        public Pair<JObjectKey, MaybeTombstone<JDataVersionedWrapper>> next() {
                             var next = _delegate.next();
                             maybeCache(next.getKey(), Optional.of(next.getValue()));
-                            return next;
+                            return (Pair<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>) (Pair<JObjectKey, ?>) next;
                         }
                     }
                 };
@@ -294,6 +286,18 @@ public class CachingObjectPersistentStore {
         }
     }
 
-    private record CacheEntry(MaybeTombstone<JDataVersionedWrapper> object, int size) {
+    private interface CacheEntry extends MaybeTombstone<JDataVersionedWrapper> {
+        int size();
+    }
+
+    private record CacheEntryPresent(JDataVersionedWrapper value,
+                                     int size) implements CacheEntry, Data<JDataVersionedWrapper> {
+    }
+
+    private record CacheEntryMiss() implements CacheEntry, Tombstone<JDataVersionedWrapper> {
+        @Override
+        public int size() {
+            return 64;
+        }
     }
 }

@@ -9,22 +9,22 @@ public class NavigableMapKvIterator<K extends Comparable<K>, V> extends Reversib
     private Iterator<Map.Entry<K, V>> _iterator;
     private Map.Entry<K, V> _next;
 
-    public NavigableMapKvIterator(NavigableMap<K, V> map, IteratorStart start, K key) {
-        _map = map;
+    public NavigableMapKvIterator(NavigableMap<K, ? extends V> map, IteratorStart start, K key) {
+        _map = (NavigableMap<K, V>) map;
         SortedMap<K, V> _view;
         _goingForward = true;
         switch (start) {
-            case GE -> _view = map.tailMap(key, true);
-            case GT -> _view = map.tailMap(key, false);
+            case GE -> _view = _map.tailMap(key, true);
+            case GT -> _view = _map.tailMap(key, false);
             case LE -> {
-                var floorKey = map.floorKey(key);
+                var floorKey = _map.floorKey(key);
                 if (floorKey == null) _view = _map;
-                else _view = map.tailMap(floorKey, true);
+                else _view = _map.tailMap(floorKey, true);
             }
             case LT -> {
                 var lowerKey = map.lowerKey(key);
                 if (lowerKey == null) _view = _map;
-                else _view = map.tailMap(lowerKey, true);
+                else _view = _map.tailMap(lowerKey, true);
             }
             default -> throw new IllegalArgumentException("Unknown start type");
         }

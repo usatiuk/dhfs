@@ -350,15 +350,9 @@ public class WritebackObjectPersistentStore {
 
                 @Override
                 public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-                    return new TombstoneMergingKvIterator<>("writeback-ps", start, key,
-                            (tS, tK) -> new MappingKvIterator<>(
-                                    new NavigableMapKvIterator<>(_pendingWrites, tS, tK),
-                                    e -> switch (e) {
-                                        case PendingWrite pw -> new Data<>(pw.data());
-                                        case PendingDelete d -> new Tombstone<>();
-                                        default -> throw new IllegalStateException("Unexpected value: " + e);
-                                    }),
-                            (tS, tK) -> new MappingKvIterator<>(_cache.getIterator(tS, tK), Data::new));
+                    return new TombstoneMergingKvIterator<JObjectKey, JDataVersionedWrapper>("writeback-ps", start, key,
+                            (tS, tK) -> new NavigableMapKvIterator<>(_pendingWrites, tS, tK),
+                            (tS, tK) -> (CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>) (CloseableKvIterator<JObjectKey, ?>) _cache.getIterator(tS, tK));
                 }
 
                 @Nonnull
@@ -367,7 +361,7 @@ public class WritebackObjectPersistentStore {
                     var cached = _pendingWrites.get(name);
                     if (cached != null) {
                         return switch (cached) {
-                            case PendingWrite c -> Optional.of(c.data());
+                            case PendingWrite c -> Optional.of(c.value());
                             case PendingDelete d -> {
                                 yield Optional.empty();
                             }

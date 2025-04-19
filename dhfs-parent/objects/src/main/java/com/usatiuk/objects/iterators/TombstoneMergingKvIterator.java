@@ -16,7 +16,7 @@ public class TombstoneMergingKvIterator<K extends Comparable<K>, V> implements C
                 startType, startKey,
                 pair -> {
                     Log.tracev("{0} - Processing pair {1}", _name, pair);
-                    if (pair instanceof Tombstone) {
+                    if (pair instanceof Tombstone<V>) {
                         return null;
                     }
                     return ((Data<V>) pair).value();

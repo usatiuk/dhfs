@@ -7,7 +7,6 @@ import com.usatiuk.objects.iterators.*;
 import com.usatiuk.objects.snapshot.Snapshot;
 import com.usatiuk.objects.snapshot.SnapshotManager;
 import io.quarkus.logging.Log;
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.apache.commons.lang3.tuple.Pair;
@@ -166,12 +165,12 @@ public class TransactionFactoryImpl implements TransactionFactory {
                     (tS, tK) -> new MappingKvIterator<>(new NavigableMapKvIterator<>(_writes, tS, tK),
                             t -> switch (t) {
                                 case TxRecord.TxObjectRecordWrite<?> write ->
-                                        new Data<>(new ReadTrackingInternalCrapTx(write.data()));
-                                case TxRecord.TxObjectRecordDeleted deleted -> new Tombstone<>();
+                                        new DataWrapper<>(new ReadTrackingInternalCrapTx(write.data()));
+                                case TxRecord.TxObjectRecordDeleted deleted -> new TombstoneImpl<>();
                                 case null, default -> null;
                             }),
                     (tS, tK) -> new MappingKvIterator<>(_snapshot.getIterator(tS, tK),
-                            d -> new Data<ReadTrackingInternalCrap>(new ReadTrackingInternalCrapSource(d)))));
+                            d -> new DataWrapper<ReadTrackingInternalCrap>(new ReadTrackingInternalCrapSource(d)))));
         }
 
         @Override

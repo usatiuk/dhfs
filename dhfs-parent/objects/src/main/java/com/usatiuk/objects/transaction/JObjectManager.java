@@ -21,10 +21,6 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
-// Manages all access to com.usatiuk.objects.JData objects.
-// In particular, it serves as a source of truth for what is committed to the backing storage.
-// All data goes through it, it is responsible for transaction atomicity
-// TODO: persistent tx id
 @ApplicationScoped
 public class JObjectManager {
     private final List<PreCommitTxHook> _preCommitTxHooks;
@@ -219,7 +215,7 @@ public class JObjectManager {
                         // TODO: Every write gets a dependency due to hooks
                         continue;
 //                    assert false;
-//                    throw new TxCommitException("Serialization hazard: " + dep.isEmpty() + " vs " + read.getValue().data().isEmpty());
+//                    throw new TxCommitException("Serialization hazard: " + dep.isEmpty() + " vs " + read.getValue().value().isEmpty());
                     }
 
                     if (current.get().version() > snapshotId) {
@@ -270,31 +266,4 @@ public class JObjectManager {
         });
         tx.close();
     }
-
-    //    private class TransactionObjectSourceImpl implements TransactionObjectSource {
-//        private final long _txId;
-//
-//        private TransactionObjectSourceImpl(long txId) {
-//            _txId = txId;
-//        }
-//
-//        @Override
-//        public <T extends JData> TransactionObject<T> get(Class<T> type, JObjectKey key) {
-//            var got = getObj(type, key);
-//            if (got.data().isPresent() && got.data().get().version() > _txId) {
-//                throw new TxCommitException("Serialization race for " + key + ": " + got.data().get().version() + " vs " + _txId);
-//            }
-//            return got;
-//        }
-//
-//        @Override
-//        public <T extends JData> TransactionObject<T> getWriteLocked(Class<T> type, JObjectKey key) {
-//            var got = getObjLock(type, key);
-//            if (got.data().isPresent() && got.data().get().version() > _txId) {
-//                got.lock().close();
-//                throw new TxCommitException("Serialization race for " + key + ": " + got.data().get().version() + " vs " + _txId);
-//            }
-//            return got;
-//        }
-//    }
 }
