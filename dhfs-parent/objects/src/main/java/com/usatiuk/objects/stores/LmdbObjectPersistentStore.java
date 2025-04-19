@@ -2,7 +2,6 @@ package com.usatiuk.objects.stores;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
-import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
 import com.usatiuk.dhfs.utils.RefcountedCloseable;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.JObjectKeyMax;
@@ -132,12 +131,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             public Optional<ByteString> readObject(JObjectKey name) {
                 assert !_closed;
                 var got = _db.get(_txn.get(), name.toByteBuffer());
-                var ret = Optional.ofNullable(got).map(read -> {
-                    var uninitBb = UninitializedByteBuffer.allocateUninitialized(got.remaining());
-                    uninitBb.put(got);
-                    uninitBb.flip();
-                    return UnsafeByteOperations.unsafeWrap(uninitBb);
-                });
+                var ret = Optional.ofNullable(got).map(UnsafeByteOperations::unsafeWrap);
                 return ret;
             }
 
@@ -361,10 +355,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             }
             // TODO: Right now with java serialization it doesn't matter, it's all copied to arrays anyway
             var val = _cursor.val();
-            var bbDirect = UninitializedByteBuffer.allocateUninitialized(val.remaining());
-            bbDirect.put(val);
-            bbDirect.flip();
-            var bs = UnsafeByteOperations.unsafeWrap(bbDirect);
+            var bs = UnsafeByteOperations.unsafeWrap(val);
             var ret = Pair.of(JObjectKey.fromByteBuffer(_cursor.key()), bs);
             if (_goingForward)
                 _hasNext = _cursor.next();

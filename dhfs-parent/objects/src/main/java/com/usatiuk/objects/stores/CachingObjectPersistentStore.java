@@ -1,6 +1,7 @@
 package com.usatiuk.objects.stores;
 
 import com.usatiuk.objects.JDataVersionedWrapper;
+import com.usatiuk.objects.JDataVersionedWrapperLazy;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.iterators.*;
 import com.usatiuk.objects.snapshot.Snapshot;
@@ -141,10 +142,11 @@ public class CachingObjectPersistentStore {
                 Cache finalCurCache = curCache;
                 return new Snapshot<JObjectKey, JDataVersionedWrapper>() {
                     private boolean _invalid = false;
+                    private boolean _closed = false;
                     private final Cache _curCache = finalCurCache;
                     private final Snapshot<JObjectKey, JDataVersionedWrapper> _backing = finalBacking;
 
-                    private void maybeCache(JObjectKey key, Optional<JDataVersionedWrapper> obj) {
+                    private void doCache(JObjectKey key, Optional<JDataVersionedWrapper> obj) {
                         _cacheTries.incrementAndGet();
                         if (_invalid)
                             return;
@@ -158,6 +160,29 @@ public class CachingObjectPersistentStore {
                         var newCache = globalCache.withPut(key, obj);
                         if (_cache.compareAndSet(globalCache, newCache))
                             _cached.incrementAndGet();
+                    }
+
+                    private void maybeCache(JObjectKey key, Optional<JDataVersionedWrapper> obj) {
+                        if (obj.isEmpty()) {
+                            doCache(key, obj);
+                            return;
+                        }
+
+                        var wrapper = obj.get();
+
+                        if (!(wrapper instanceof JDataVersionedWrapperLazy lazy)) {
+                            doCache(key, obj);
+                            return;
+                        }
+
+                        lazy.setCacheCallback(() -> {
+                            if (_closed) {
+                                Log.error("Cache callback called after close");
+                                System.exit(-1);
+                            }
+                            doCache(key, obj);
+                        });
+                        return;
                     }
 
                     @Override
@@ -199,6 +224,7 @@ public class CachingObjectPersistentStore {
 
                     @Override
                     public void close() {
+                        _closed = true;
                         _backing.close();
                     }
 

@@ -2,12 +2,12 @@ package com.usatiuk.objects;
 
 
 import com.google.protobuf.ByteString;
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 import java.nio.ByteBuffer;
 
-@ApplicationScoped
+@Singleton
 public class JDataVersionedWrapperSerializer implements ObjectSerializer<JDataVersionedWrapper> {
     @Inject
     ObjectSerializer<JData> dataSerializer;

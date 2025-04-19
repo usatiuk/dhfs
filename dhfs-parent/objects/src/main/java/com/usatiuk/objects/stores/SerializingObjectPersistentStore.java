@@ -3,7 +3,6 @@ package com.usatiuk.objects.stores;
 import com.google.protobuf.ByteString;
 import com.usatiuk.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.objects.JObjectKeyImpl;
 import com.usatiuk.objects.ObjectSerializer;
 import com.usatiuk.objects.iterators.CloseableKvIterator;
 import com.usatiuk.objects.iterators.IteratorStart;
