@@ -9,7 +9,7 @@ public class TombstoneMergingKvIterator<K extends Comparable<K>, V> implements C
     private final CloseableKvIterator<K, V> _backing;
     private final String _name;
 
-    public TombstoneMergingKvIterator(String name, IteratorStart startType, K startKey, List<IterProdFn<K, MaybeTombstone<V>>> iterators) {
+    public TombstoneMergingKvIterator(String name, IteratorStart startType, K startKey, List<IterProdFn<K, V>> iterators) {
         _name = name;
         _backing = new PredicateKvIterator<>(
                 new MergingKvIterator<>(name + "-merging", startType, startKey, iterators),
@@ -24,7 +24,7 @@ public class TombstoneMergingKvIterator<K extends Comparable<K>, V> implements C
     }
 
     @SafeVarargs
-    public TombstoneMergingKvIterator(String name, IteratorStart startType, K startKey, IterProdFn<K, MaybeTombstone<V>>... iterators) {
+    public TombstoneMergingKvIterator(String name, IteratorStart startType, K startKey, IterProdFn<K, V>... iterators) {
         this(name, startType, startKey, List.of(iterators));
     }
 

@@ -1,16 +1,15 @@
 package com.usatiuk.objects.iterators;
 
 import io.quarkus.logging.Log;
+import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.tuple.Pair;
 
-import java.util.List;
-import java.util.NavigableMap;
-import java.util.NoSuchElementException;
-import java.util.TreeMap;
+import java.util.*;
 
-public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, V> {
-    private record IteratorEntry<K extends Comparable<K>, V>(int priority, CloseableKvIterator<K, V> iterator) {
+public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, MaybeTombstone<V>> {
+    private record IteratorEntry<K extends Comparable<K>, V>(int priority,
+                                                             CloseableKvIterator<K, MaybeTombstone<V>> iterator) {
         public IteratorEntry<K, V> reversed() {
             return new IteratorEntry<>(priority, iterator.reversed());
         }
@@ -26,11 +25,13 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
 
         // Why streams are so slow?
         {
-            IteratorEntry<K, V>[] iteratorEntries = new IteratorEntry[iterators.size()];
-            for (int i = 0; i < iterators.size(); i++) {
-                iteratorEntries[i] = new IteratorEntry<>(i, iterators.get(i).get(startType, startKey));
-            }
-            _iterators = List.of(iteratorEntries);
+            var iteratorsTmp = iterators.stream().flatMap(i -> i.getFlat(startType, startKey));
+            MutableInt i = new MutableInt(0);
+            ArrayList<IteratorEntry<K, V>> tmp = new ArrayList<>(16);
+            iteratorsTmp.forEach(i2 -> {
+                tmp.add(new IteratorEntry<>(i.getAndIncrement(), i2));
+            });
+            _iterators = List.copyOf(tmp);
         }
 
         if (startType == IteratorStart.LT || startType == IteratorStart.LE) {
@@ -185,7 +186,7 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
     }
 
     @Override
-    protected Pair<K, V> nextImpl() {
+    protected Pair<K, MaybeTombstone<V>> nextImpl() {
         var cur = _goingForward ? _sortedIterators.pollFirstEntry() : _sortedIterators.pollLastEntry();
         if (cur == null) {
             throw new NoSuchElementException();

@@ -27,6 +27,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 @ApplicationScoped
 public class WritebackObjectPersistentStore {
@@ -349,16 +350,37 @@ public class WritebackObjectPersistentStore {
                 private final long txId = finalPw.lastCommittedId();
 
                 @Override
-                public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-                    return new TombstoneMergingKvIterator<>("writeback-ps", start, key,
-                            (tS, tK) -> new MappingKvIterator<>(
-                                    new NavigableMapKvIterator<>(_pendingWrites, tS, tK),
+                public IterProdFn<JObjectKey, JDataVersionedWrapper> getIterator() {
+                    IterProdFn<JObjectKey, JDataVersionedWrapper> cacheItProdFn = new IterProdFn<JObjectKey, JDataVersionedWrapper>() {
+                        @Override
+                        public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> get(IteratorStart start, JObjectKey key) {
+                            throw new UnsupportedOperationException("Not supported yet.");
+                        }
+
+                        @Override
+                        public Stream<CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>> getFlat(IteratorStart start, JObjectKey key) {
+                            return Stream.of(new MappingKvIterator<>(
+                                    new NavigableMapKvIterator<>(_pendingWrites, start, key),
                                     e -> switch (e) {
                                         case PendingWrite pw -> new Data<>(pw.data());
                                         case PendingDelete d -> new Tombstone<>();
                                         default -> throw new IllegalStateException("Unexpected value: " + e);
-                                    }),
-                            (tS, tK) -> new MappingKvIterator<>(_cache.getIterator(tS, tK), Data::new));
+                                    }));
+                        }
+                    };
+
+                    return new IterProdFn<JObjectKey, JDataVersionedWrapper>() {
+                        @Override
+                        public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> get(IteratorStart start, JObjectKey key) {
+                            return new TombstoneMergingKvIterator<>("writeback-ps", start, key,
+                                    cacheItProdFn, _cache.getIterator());
+                        }
+
+                        @Override
+                        public Stream<CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>> getFlat(IteratorStart start, JObjectKey key) {
+                            return Stream.concat(cacheItProdFn.getFlat(start, key), _cache.getIterator().getFlat(start, key));
+                        }
+                    };
                 }
 
                 @Nonnull

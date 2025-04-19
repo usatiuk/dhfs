@@ -21,6 +21,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 
 @ApplicationScoped
 public class CachingObjectPersistentStore {
@@ -186,17 +187,43 @@ public class CachingObjectPersistentStore {
                     }
 
                     @Override
-                    public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-                        return new TombstoneMergingKvIterator<>("cache", start, key,
-                                (mS, mK)
-                                        -> new MappingKvIterator<>(
-                                        new NavigableMapKvIterator<>(_curCache.map(), mS, mK),
-                                        e -> {
+                    public IterProdFn<JObjectKey, JDataVersionedWrapper> getIterator() {
+                        IterProdFn<JObjectKey, JDataVersionedWrapper> cacheItProdFn = new IterProdFn<JObjectKey, JDataVersionedWrapper>() {
+                            @Override
+                            public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> get(IteratorStart start, JObjectKey key) {
+                                throw new UnsupportedOperationException("Not implemented");
+                            }
+
+                            @Override
+                            public Stream<CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>> getFlat(IteratorStart start, JObjectKey key) {
+                                return Stream.of(
+                                        new MappingKvIterator<>(
+                                                new NavigableMapKvIterator<>(_curCache.map(), start, key),
+                                                e -> {
 //                                        Log.tracev("Taken from cache: {0}", e);
-                                            return e.object();
-                                        }
-                                ),
-                                (mS, mK) -> new MappingKvIterator<>(new CachingKvIterator(_backing.getIterator(start, key)), Data::new));
+                                                    return e.object();
+                                                }
+                                        )
+                                );
+                            }
+                        };
+
+                        IterProdFn<JObjectKey, JDataVersionedWrapper> backingItProdFn = (mS, mK) -> new CachingKvIterator(_backing.getIterator(mS, mK));
+
+                        return new IterProdFn<JObjectKey, JDataVersionedWrapper>() {
+                            @Override
+                            public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> get(IteratorStart start, JObjectKey key) {
+                                return new TombstoneMergingKvIterator<>("cache", start, key, cacheItProdFn, backingItProdFn);
+                            }
+
+                            @Override
+                            public Stream<CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>> getFlat(IteratorStart start, JObjectKey key) {
+                                return Stream.concat(
+                                        cacheItProdFn.getFlat(start, key),
+                                        backingItProdFn.getFlat(start, key)
+                                );
+                            }
+                        };
                     }
 
                     @Nonnull

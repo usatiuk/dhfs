@@ -4,8 +4,7 @@ import com.google.protobuf.ByteString;
 import com.usatiuk.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.ObjectSerializer;
-import com.usatiuk.objects.iterators.CloseableKvIterator;
-import com.usatiuk.objects.iterators.IteratorStart;
+import com.usatiuk.objects.iterators.IterProdFn;
 import com.usatiuk.objects.iterators.MappingKvIterator;
 import com.usatiuk.objects.snapshot.Snapshot;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -33,8 +32,8 @@ public class SerializingObjectPersistentStore {
             private final Snapshot<JObjectKey, ByteString> _backing = delegateStore.getSnapshot();
 
             @Override
-            public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-                return new MappingKvIterator<>(_backing.getIterator(start, key), d -> serializer.deserialize(d));
+            public IterProdFn<JObjectKey, JDataVersionedWrapper> getIterator() {
+                return (start, key) -> new MappingKvIterator<>(_backing.getIterator(start, key), d -> serializer.deserialize(d));
             }
 
             @Nonnull

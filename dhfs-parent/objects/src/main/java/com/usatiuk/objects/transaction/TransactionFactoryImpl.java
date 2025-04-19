@@ -7,13 +7,13 @@ import com.usatiuk.objects.iterators.*;
 import com.usatiuk.objects.snapshot.Snapshot;
 import com.usatiuk.objects.snapshot.SnapshotManager;
 import io.quarkus.logging.Log;
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.*;
+import java.util.stream.Stream;
 
 @Singleton
 public class TransactionFactoryImpl implements TransactionFactory {
@@ -161,17 +161,48 @@ public class TransactionFactoryImpl implements TransactionFactory {
 
         @Override
         public CloseableKvIterator<JObjectKey, JData> getIterator(IteratorStart start, JObjectKey key) {
+
             Log.tracev("Getting tx iterator with start={0}, key={1}", start, key);
             return new ReadTrackingIterator(new TombstoneMergingKvIterator<>("tx", start, key,
-                    (tS, tK) -> new MappingKvIterator<>(new NavigableMapKvIterator<>(_writes, tS, tK),
-                            t -> switch (t) {
-                                case TxRecord.TxObjectRecordWrite<?> write ->
-                                        new Data<>(new ReadTrackingInternalCrapTx(write.data()));
-                                case TxRecord.TxObjectRecordDeleted deleted -> new Tombstone<>();
-                                case null, default -> null;
-                            }),
-                    (tS, tK) -> new MappingKvIterator<>(_snapshot.getIterator(tS, tK),
-                            d -> new Data<ReadTrackingInternalCrap>(new ReadTrackingInternalCrapSource(d)))));
+                    new IterProdFn<JObjectKey, ReadTrackingInternalCrap>() {
+                        @Override
+                        public CloseableKvIterator<JObjectKey, ReadTrackingInternalCrap> get(IteratorStart start, JObjectKey key) {
+                            throw new UnsupportedOperationException("Not implemented");
+                        }
+
+                        @Override
+                        public Stream<CloseableKvIterator<JObjectKey, MaybeTombstone<ReadTrackingInternalCrap>>> getFlat(IteratorStart start, JObjectKey key) {
+                            return Stream.of(new MappingKvIterator<>(new NavigableMapKvIterator<>(_writes, start, key),
+                                    t -> switch (t) {
+                                        case TxRecord.TxObjectRecordWrite<?> write ->
+                                                new Data<>(new ReadTrackingInternalCrapTx(write.data()));
+                                        case TxRecord.TxObjectRecordDeleted deleted -> new Tombstone<>();
+                                        case null, default -> null;
+                                    }));
+                        }
+                    },
+                    new IterProdFn<JObjectKey, ReadTrackingInternalCrap>() {
+                        @Override
+                        public CloseableKvIterator<JObjectKey, ReadTrackingInternalCrap> get(IteratorStart start, JObjectKey key) {
+                            throw new UnsupportedOperationException("Not implemented");
+                        }
+
+                        @Override
+                        public Stream<CloseableKvIterator<JObjectKey, MaybeTombstone<ReadTrackingInternalCrap>>> getFlat(IteratorStart start, JObjectKey key) {
+                            return _snapshot.getIterator().getFlat(start, key).<CloseableKvIterator<JObjectKey, MaybeTombstone<ReadTrackingInternalCrap>>>map(
+                                    i -> new MappingKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>, MaybeTombstone<ReadTrackingInternalCrap>>(i,
+                                            d ->
+                                                    switch (d) {
+                                                        case Data<JDataVersionedWrapper> data ->
+                                                                new Data<ReadTrackingInternalCrap>(new ReadTrackingInternalCrapSource(data.value()));
+                                                        case Tombstone<JDataVersionedWrapper> tombstone ->
+                                                                new Tombstone<ReadTrackingInternalCrap>();
+                                                        default ->
+                                                                throw new IllegalStateException("Unexpected value: " + d);
+                                                    })
+                            );
+                        }
+                    }));
         }
 
         @Override

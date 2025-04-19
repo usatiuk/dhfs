@@ -6,7 +6,7 @@ import com.usatiuk.dhfs.utils.RefcountedCloseable;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.JObjectKeyMax;
 import com.usatiuk.objects.JObjectKeyMin;
-import com.usatiuk.objects.iterators.CloseableKvIterator;
+import com.usatiuk.objects.iterators.IterProdFn;
 import com.usatiuk.objects.iterators.IteratorStart;
 import com.usatiuk.objects.iterators.KeyPredicateKvIterator;
 import com.usatiuk.objects.iterators.ReversibleKvIterator;
@@ -121,9 +121,9 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             private boolean _closed = false;
 
             @Override
-            public CloseableKvIterator<JObjectKey, ByteString> getIterator(IteratorStart start, JObjectKey key) {
+            public IterProdFn<JObjectKey, ByteString> getIterator() {
                 assert !_closed;
-                return new KeyPredicateKvIterator<>(new LmdbKvIterator(_txn.ref(), start, key), start, key, (k) -> !k.value().equals(DB_VER_OBJ_NAME_STR));
+                return (start, key) -> new KeyPredicateKvIterator<>(new LmdbKvIterator(_txn.ref(), start, key), start, key, (k) -> !k.value().equals(DB_VER_OBJ_NAME_STR));
             }
 
             @Nonnull

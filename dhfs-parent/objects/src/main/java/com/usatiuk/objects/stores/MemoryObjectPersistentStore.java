@@ -2,9 +2,7 @@ package com.usatiuk.objects.stores;
 
 import com.google.protobuf.ByteString;
 import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.objects.JObjectKeyImpl;
-import com.usatiuk.objects.iterators.CloseableKvIterator;
-import com.usatiuk.objects.iterators.IteratorStart;
+import com.usatiuk.objects.iterators.IterProdFn;
 import com.usatiuk.objects.iterators.NavigableMapKvIterator;
 import com.usatiuk.objects.snapshot.Snapshot;
 import io.quarkus.arc.properties.IfBuildProperty;
@@ -38,8 +36,8 @@ public class MemoryObjectPersistentStore implements ObjectPersistentStore {
                 private final long _lastCommitId = MemoryObjectPersistentStore.this._lastCommitId;
 
                 @Override
-                public CloseableKvIterator<JObjectKey, ByteString> getIterator(IteratorStart start, JObjectKey key) {
-                    return new NavigableMapKvIterator<>(_objects, start, key);
+                public IterProdFn<JObjectKey, ByteString> getIterator() {
+                    return (start, key) -> new NavigableMapKvIterator<>(_objects, start, key);
                 }
 
                 @Nonnull
