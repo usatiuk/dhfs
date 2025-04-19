@@ -2,7 +2,7 @@ package com.usatiuk.objects;
 
 import java.util.function.Supplier;
 
-public class JDataVersionedWrapperLazy implements JDataVersionedWrapper {
+public final class JDataVersionedWrapperLazy implements JDataVersionedWrapper {
     private JData _data;
     private final long _version;
     private final int _estimatedSize;

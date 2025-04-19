@@ -1,6 +1,6 @@
 package com.usatiuk.objects;
 
-public interface JDataVersionedWrapper {
+public sealed interface JDataVersionedWrapper permits JDataVersionedWrapperLazy, JDataVersionedWrapperImpl {
     JData data();
 
     long version();
