@@ -1,7 +1,5 @@
 package com.usatiuk.objects;
 
-import com.usatiuk.dhfs.supportlib.UninitializedByteBuffer;
-
 import java.io.Serial;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -48,7 +46,7 @@ public final class JObjectKeyImpl implements JObjectKey {
         synchronized (this) {
             if (_bb != null) return _bb;
             var bytes = value.getBytes(StandardCharsets.ISO_8859_1);
-            var directBb = UninitializedByteBuffer.allocateUninitialized(bytes.length);
+            var directBb = ByteBuffer.allocateDirect(bytes.length);
             directBb.put(bytes);
             directBb.flip();
             _bb = directBb;

@@ -9,8 +9,6 @@ COPY ./dhfs-package-downloaded/*.jar .
 COPY ./dhfs-package-downloaded/app .
 COPY ./dhfs-package-downloaded/quarkus .
 
-WORKDIR /usr/src/app/native-libs
-COPY ./dhfs-native-downloaded/. .
 WORKDIR /usr/src/app/webui
 COPY ./webui-dist-downloaded/. .
 

@@ -89,102 +89,6 @@ jobs:
           name: Webui
           path: webui/dist
 
-  build-native-libs:
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            cross: "linux/amd64"
-          - os: ubuntu-latest
-            cross: "linux/arm64"
-          - os: macos-latest
-
-    runs-on: ${{ matrix.os }}
-    env:
-      DO_LOCAL_BUILD: ${{ matrix.os == 'macos-latest' }}
-      DOCKER_PLATFORM: ${{ matrix.cross || 'NATIVE' }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set SANITIZED_DOCKER_PLATFORM
-        run: echo "SANITIZED_DOCKER_PLATFORM=$(echo $DOCKER_PLATFORM | tr / _ )" >> $GITHUB_ENV
-
-      - name: Set DOCKER_BUILDER_IMAGE
-        run: echo "DOCKER_BUILDER_IMAGE=dhfs_lib_builder-${{matrix.os}}-$SANITIZED_DOCKER_PLATFORM" >> $GITHUB_ENV
-
-      - name: Build config
-        run: |
-          echo DO_LOCAL_BUILD: $DO_LOCAL_BUILD
-          echo DOCKER_PLATFORM: $DOCKER_PLATFORM
-          echo SANITIZED_DOCKER_PLATFORM: $SANITIZED_DOCKER_PLATFORM
-          echo DOCKER_BUILDER_IMAGE: $DOCKER_BUILDER_IMAGE
-
-      - name: Set up JDK 21
-        if: ${{ env.DO_LOCAL_BUILD == 'TRUE' }}
-        uses: actions/setup-java@v4
-        with:
-          java-version: "21"
-          distribution: "zulu"
-          cache: maven
-
-      - name: Set up Docker Buildx
-        if: ${{ env.DO_LOCAL_BUILD != 'TRUE' }}
-        uses: docker/setup-buildx-action@v3
-
-      - name: Set up QEMU
-        if: ${{ env.DO_LOCAL_BUILD != 'TRUE' }}
-        uses: docker/setup-qemu-action@v3
-
-      - name: Build Docker builder image
-        if: ${{ env.DO_LOCAL_BUILD != 'TRUE' }}
-        uses: docker/build-push-action@v5
-        with:
-          context: ./libdhfs_support/builder
-          file: ./libdhfs_support/builder/Dockerfile
-          push: false
-          platforms: ${{ env.DOCKER_PLATFORM }}
-          tags: ${{ env.DOCKER_BUILDER_IMAGE }}
-          cache-from: type=gha,scope=build-${{ env.DOCKER_BUILDER_IMAGE }}
-          cache-to: type=gha,mode=max,scope=build-${{ env.DOCKER_BUILDER_IMAGE }}
-          load: true
-
-      - name: Build the library
-        run: |
-          CMAKE_ARGS="-DCMAKE_BUILD_TYPE=Release" libdhfs_support/builder/cross-build.sh both build "$(pwd)/result"
-
-      - name: Upload build
-        uses: actions/upload-artifact@v4
-        with:
-          name: NativeLib-${{ matrix.os }}-${{ env.SANITIZED_DOCKER_PLATFORM }}
-          path: result
-
-  merge-native-libs:
-    runs-on: ubuntu-latest
-    needs: [build-native-libs]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: downloaded-libs
-
-      - name: Merge all
-        run: rsync -av downloaded-libs/NativeLib*/* result/
-
-      - name: Check that libs exists
-        run: |
-          test -f "result/Linux-x86_64/libdhfs_support.so" || exit 1
-
-      - name: Upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: NativeLibs
-          path: result
-
   publish-docker:
     runs-on: ubuntu-latest
     permissions:
@@ -194,7 +98,7 @@ jobs:
       # with sigstore/fulcio when running outside of PRs.
       id-token: write
 
-    needs: [build-webui, merge-native-libs, build-dhfs]
+    needs: [build-webui, build-dhfs]
 
     steps:
       - name: Checkout repository
@@ -211,12 +115,6 @@ jobs:
         with:
           name: Webui
           path: webui-dist-downloaded
-
-      - name: Download native libs
-        uses: actions/download-artifact@v4
-        with:
-          name: NativeLibs
-          path: dhfs-native-downloaded
 
       - name: Show all the files
         run: find .
@@ -293,7 +191,7 @@ jobs:
       # with sigstore/fulcio when running outside of PRs.
       id-token: write
 
-    needs: [build-webui, merge-native-libs, build-dhfs]
+    needs: [build-webui, build-dhfs]
 
     steps:
       - name: Checkout repository
@@ -309,11 +207,6 @@ jobs:
           name: Webui
           path: webui-dist-downloaded
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: NativeLibs
-          path: dhfs-native-downloaded
-
       - name: Show all the files
         run: find .
 
@@ -325,9 +218,6 @@ jobs:
 
       - name: Copy Webui
         run: cp -r ./webui-dist-downloaded "run-wrapper-out/dhfs/app/Webui"
-
-      - name: Copy Webui
-        run: cp -r ./dhfs-native-downloaded "run-wrapper-out/dhfs/app/NativeLibs"
 
       - name: Copy run wrapper
         run: cp -r ./run-wrapper/* "run-wrapper-out/dhfs/app/"

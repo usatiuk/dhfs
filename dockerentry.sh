@@ -14,7 +14,6 @@ exec java \
     -Ddhfs.fuse.root=/dhfs_root_fuse \
     -Dquarkus.http.host=0.0.0.0 \
     -Ddhfs.objects.ref_verification=false \
-    -Dcom.usatiuk.dhfs.supportlib.native-path=/usr/src/app/native-libs \
     -Dquarkus.log.category.\"com.usatiuk.dhfs\".level=$DHFS_LOGLEVEL \
     "$@" \
     -jar quarkus-run.jar

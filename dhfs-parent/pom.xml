@@ -16,7 +16,6 @@
         <module>dhfs-fuse</module>
         <module>dhfs-app</module>
         <module>kleppmanntree</module>
-        <module>supportlib</module>
         <module>objects</module>
         <module>utils</module>
     </modules>
@@ -122,9 +121,6 @@
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         <maven.home>${maven.home}</maven.home>
-                        <com.usatiuk.dhfs.supportlib.native-path>
-                            ${dhfs.native-libs-dir}
-                        </com.usatiuk.dhfs.supportlib.native-path>
                     </systemPropertyVariables>
                     <argLine>
                         --add-exports java.base/sun.nio.ch=ALL-UNNAMED
@@ -192,7 +188,6 @@
                     --initialize-at-run-time=com.usatiuk.dhfs.utils.DataLocker$Lock,
                     --initialize-at-run-time=com.usatiuk.objects.stores.LmdbObjectPersistentStore$LmdbKvIterator,
                     --initialize-at-run-time=com.usatiuk.objects.stores.LmdbObjectPersistentStore,
-                    --initialize-at-run-time=com.usatiuk.dhfs.supportlib.UninitializedByteBuffer,
                     --initialize-at-run-time=com.google.protobuf.UnsafeUtil
                 </quarkus.native.additional-build-args>
             </properties>

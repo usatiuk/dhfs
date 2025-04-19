@@ -36,7 +36,6 @@ java \
     -Dquarkus.http.host=0.0.0.0 \
     -Dquarkus.log.category.\"com.usatiuk\".level=INFO \
     -Dquarkus.log.category.\"com.usatiuk.dhfs\".level=INFO \
-    -Dcom.usatiuk.dhfs.supportlib.native-path="$SCRIPT_DIR"/NativeLibs \
     -Ddhfs.webui.root="$SCRIPT_DIR"/Webui $EXTRAOPTS_PARSED \
     -jar "$SCRIPT_DIR"/"DHFS Package"/quarkus-run.jar >quarkus.log 2>&1 &
 
