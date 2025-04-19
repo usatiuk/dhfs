@@ -30,7 +30,9 @@ public sealed interface JObjectKey extends Serializable, Comparable<JObjectKey> 
     }
 
     static JObjectKey fromByteBuffer(ByteBuffer buff) {
-        return new JObjectKeyImpl(StandardCharsets.ISO_8859_1.decode(buff).toString());
+        byte[] bytes = new byte[buff.remaining()];
+        buff.get(bytes);
+        return new JObjectKeyImpl(bytes);
     }
 
     @Override
@@ -38,8 +40,6 @@ public sealed interface JObjectKey extends Serializable, Comparable<JObjectKey> 
 
     @Override
     String toString();
-
-    byte[] bytes();
 
     ByteBuffer toByteBuffer();
 

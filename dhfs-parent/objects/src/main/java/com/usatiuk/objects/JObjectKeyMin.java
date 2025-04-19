@@ -19,11 +19,6 @@ public record JObjectKeyMin() implements JObjectKey {
     }
 
     @Override
-    public byte[] bytes() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
     public ByteBuffer toByteBuffer() {
         throw new UnsupportedOperationException();
     }
