@@ -17,30 +17,27 @@ public interface TransactionManager {
             return supplier.get();
         }
 
-        begin();
-        T ret;
-        try {
-            ret = supplier.get();
-        } catch (TxCommitException txCommitException) {
-            rollback();
-            if (tries == 0) {
-                Log.error("Transaction commit failed", txCommitException);
-                throw txCommitException;
+        while (true) {
+            begin();
+            boolean commit = false;
+            try {
+                var ret = supplier.get();
+                commit = true;
+                commit();
+                return ret;
+            } catch (TxCommitException txCommitException) {
+                if (!commit)
+                    rollback();
+                if (tries == 0) {
+                    Log.error("Transaction commit failed", txCommitException);
+                    throw txCommitException;
+                }
+                tries--;
+            } catch (Throwable e) {
+                if (!commit)
+                    rollback();
+                throw e;
             }
-            return runTries(supplier, tries - 1);
-        } catch (Throwable e) {
-            rollback();
-            throw e;
-        }
-        try {
-            commit();
-            return ret;
-        } catch (TxCommitException txCommitException) {
-            if (tries == 0) {
-                Log.error("Transaction commit failed", txCommitException);
-                throw txCommitException;
-            }
-            return runTries(supplier, tries - 1);
         }
     }
 
@@ -55,29 +52,29 @@ public interface TransactionManager {
             };
         }
 
-        begin();
-        try {
-            fn.apply();
-        } catch (TxCommitException txCommitException) {
-            rollback();
-            if (tries == 0) {
-                Log.error("Transaction commit failed", txCommitException);
-                throw txCommitException;
+        while (true) {
+            begin();
+            boolean commit = false;
+            try {
+                fn.apply();
+                commit = true;
+                var ret = commit();
+                return ret;
+            } catch (TxCommitException txCommitException) {
+                if (!commit)
+                    rollback();
+                if (tries == 0) {
+                    Log.error("Transaction commit failed", txCommitException);
+                    throw txCommitException;
+                }
+                tries--;
+            } catch (Throwable e) {
+                if (!commit)
+                    rollback();
+                throw e;
             }
-            return runTries(fn, tries - 1);
-        } catch (Throwable e) {
-            rollback();
-            throw e;
         }
-        try {
-            return commit();
-        } catch (TxCommitException txCommitException) {
-            if (tries == 0) {
-                Log.error("Transaction commit failed", txCommitException);
-                throw txCommitException;
-            }
-            return runTries(fn, tries - 1);
-        }
+
     }
 
     default TransactionHandle run(VoidFn fn) {
