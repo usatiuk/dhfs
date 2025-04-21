@@ -247,7 +247,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             } else if (dent instanceof RemoteObjectMeta) {
                 var remote = remoteTx.getData(JDataRemote.class, uuid).orElse(null);
                 if (remote instanceof File f) {
-                    remoteTx.putData(f.withMode(mode).withMTime(System.currentTimeMillis()));
+                    remoteTx.putData(f.withMode(mode).withCurrentMTime());
                     return true;
                 } else {
                     throw new IllegalArgumentException(uuid + " is not a file");
@@ -453,7 +453,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 jMapHelper.put(file, JMapLongKey.of(e.getKey()), e.getValue());
             }
 
-            remoteTx.putData(file);
+            remoteTx.putData(file.withCurrentMTime());
 
             return (long) data.size();
         });
@@ -544,7 +544,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 jMapHelper.put(file, JMapLongKey.of(e.getKey()), e.getValue());
             }
 
-            remoteTx.putData(file);
+            remoteTx.putData(file.withCurrentMTime());
             return true;
         });
     }

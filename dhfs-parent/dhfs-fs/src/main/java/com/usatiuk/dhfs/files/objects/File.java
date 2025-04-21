@@ -1,10 +1,10 @@
 package com.usatiuk.dhfs.files.objects;
 
 import com.usatiuk.dhfs.JDataRemote;
-import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.jmap.JMapHolder;
 import com.usatiuk.dhfs.jmap.JMapLongKey;
 import com.usatiuk.dhfs.repository.JDataRemoteDto;
+import com.usatiuk.objects.JObjectKey;
 
 import java.util.Collection;
 import java.util.Set;
@@ -26,6 +26,10 @@ public record File(JObjectKey key, long mode, long cTime, long mTime,
 
     public File withMTime(long mTime) {
         return new File(key, mode, cTime, mTime, symlink);
+    }
+
+    public File withCurrentMTime() {
+        return new File(key, mode, cTime, System.currentTimeMillis(), symlink);
     }
 
     @Override

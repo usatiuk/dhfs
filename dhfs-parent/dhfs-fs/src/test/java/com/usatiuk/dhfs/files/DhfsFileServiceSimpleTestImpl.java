@@ -111,6 +111,7 @@ public abstract class DhfsFileServiceSimpleTestImpl {
 
         var uuid = ret.get();
 
+        var curMtime = fileService.getattr(uuid).get().mtime();
         fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
         Assertions.assertArrayEquals(new byte[]{2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 2, 8).get().toByteArray());
@@ -123,6 +124,9 @@ public abstract class DhfsFileServiceSimpleTestImpl {
         fileService.write(uuid, 3, new byte[]{17, 18});
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 17, 18, 11, 15, 16, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).get().toByteArray());
 
+        var newMtime = fileService.getattr(uuid).get().mtime();
+        Assertions.assertTrue(newMtime > curMtime);
+        
         fileService.unlink("/writeTest");
         Assertions.assertFalse(fileService.open("/writeTest").isPresent());
     }
