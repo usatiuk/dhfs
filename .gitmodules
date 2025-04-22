@@ -1,0 +1,3 @@
+[submodule "thirdparty/lazyfs/lazyfs"]
+	path = thirdparty/lazyfs/lazyfs
+	url = git@github.com:dsrhaslab/lazyfs.git

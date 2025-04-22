@@ -144,6 +144,7 @@
                         </native.image.path>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                         <buildDirectory>${project.build.directory}</buildDirectory>
+                        <lazyFsPath>${project.basedir}/../../thirdparty/lazyfs/lazyfs/lazyfs</lazyFsPath>
                         <nativeLibsDirectory>${dhfs.native-libs-dir}</nativeLibsDirectory>
                         <maven.home>${maven.home}</maven.home>
                     </systemPropertyVariables>

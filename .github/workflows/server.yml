@@ -20,26 +20,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
 
       - name: Install sudo for ACT
         run: apt-get update && apt-get install -y sudo
         if: env.ACT=='true'
 
-      - name: Install fuse and maven
-        run: sudo apt-get update && sudo apt-get install -y libfuse2
+      - name: Install FUSE
+        run: sudo apt-get update && sudo apt-get install -y libfuse2 libfuse3-dev libfuse3-3 fuse3
 
-      - name: Download maven
-        run: |
-          cd "$HOME"
-          mkdir maven-bin
-          curl -s -L https://dlcdn.apache.org/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz | tar xvz --strip-components=1 -C maven-bin
-          echo "$HOME"/maven-bin/bin >> $GITHUB_PATH
-
-      - name: Maven info
-        run: |
-          echo $GITHUB_PATH
-          echo $PATH
-          mvn -v
+      - name: User allow other for fuse
+        run: echo "user_allow_other" | sudo tee -a /etc/fuse.conf
+      
+      - name: Dump fuse.conf
+        run: cat /etc/fuse.conf
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -47,6 +42,9 @@ jobs:
           java-version: "21"
           distribution: "zulu"
           cache: maven
+
+      - name: Build LazyFS
+        run: cd thirdparty/lazyfs/ && ./build.sh
 
       - name: Test with Maven
         run: cd dhfs-parent && mvn -T $(nproc) --batch-mode --update-snapshots package verify
