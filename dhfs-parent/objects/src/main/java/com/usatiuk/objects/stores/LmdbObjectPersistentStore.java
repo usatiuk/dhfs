@@ -208,6 +208,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
         //        private final Exception _allocationStacktrace = new Exception();
         private final Exception _allocationStacktrace = null;
         private boolean _hasNext = false;
+        private JObjectKey _peekedNextKey = null;
 
         LmdbKvIterator(RefcountedCloseable<Txn<ByteBuffer>> txn, IteratorStart start, JObjectKey key) {
             _txn = txn;
@@ -277,24 +278,24 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
                 }
             }
 
-            var realGot = JObjectKey.fromByteBuffer(_cursor.key());
-            _cursor.key().flip();
-
-            switch (start) {
-                case LT -> {
-//                    assert !_hasNext || realGot.compareTo(key) < 0;
-                }
-                case LE -> {
-//                    assert !_hasNext || realGot.compareTo(key) <= 0;
-                }
-                case GT -> {
-                    assert !_hasNext || realGot.compareTo(key) > 0;
-                }
-                case GE -> {
-                    assert !_hasNext || realGot.compareTo(key) >= 0;
-                }
-            }
-            Log.tracev("got: {0}, hasNext: {1}", realGot, _hasNext);
+//            var realGot = JObjectKey.fromByteBuffer(_cursor.key());
+//            _cursor.key().flip();
+//
+//            switch (start) {
+//                case LT -> {
+////                    assert !_hasNext || realGot.compareTo(key) < 0;
+//                }
+//                case LE -> {
+////                    assert !_hasNext || realGot.compareTo(key) <= 0;
+//                }
+//                case GT -> {
+//                    assert !_hasNext || realGot.compareTo(key) > 0;
+//                }
+//                case GE -> {
+//                    assert !_hasNext || realGot.compareTo(key) >= 0;
+//                }
+//            }
+//            Log.tracev("got: {0}, hasNext: {1}", realGot, _hasNext);
         }
 
         @Override
@@ -323,6 +324,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
                 }
             }
             _goingForward = !_goingForward;
+            _peekedNextKey = null;
         }
 
         @Override
@@ -330,8 +332,12 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             if (!_hasNext) {
                 throw new NoSuchElementException("No more elements");
             }
+            if (_peekedNextKey != null) {
+                return _peekedNextKey;
+            }
             var ret = JObjectKey.fromByteBuffer(_cursor.key());
             _cursor.key().flip();
+            _peekedNextKey = ret;
             return ret;
         }
 
@@ -341,6 +347,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
                 _hasNext = _cursor.next();
             else
                 _hasNext = _cursor.prev();
+            _peekedNextKey = null;
         }
 
         @Override
@@ -362,6 +369,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             else
                 _hasNext = _cursor.prev();
             Log.tracev("Read: {0}, hasNext: {1}", ret, _hasNext);
+            _peekedNextKey = null;
             return ret;
         }
     }
