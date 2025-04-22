@@ -161,7 +161,7 @@ public class TransactionFactoryImpl implements TransactionFactory {
         @Override
         public CloseableKvIterator<JObjectKey, JData> getIterator(IteratorStart start, JObjectKey key) {
             Log.tracev("Getting tx iterator with start={0}, key={1}", start, key);
-            return new ReadTrackingIterator(new TombstoneMergingKvIterator<>("tx", start, key,
+            return new ReadTrackingIterator(TombstoneMergingKvIterator.<JObjectKey, ReadTrackingInternalCrap>of("tx", start, key,
                     (tS, tK) -> new MappingKvIterator<>(new NavigableMapKvIterator<>(_writes, tS, tK),
                             t -> switch (t) {
                                 case TxRecord.TxObjectRecordWrite<?> write ->
@@ -175,6 +175,11 @@ public class TransactionFactoryImpl implements TransactionFactory {
 
         @Override
         public void put(JData obj) {
+            var read = _readSet.get(obj.key());
+            if (read != null && (read.data().map(JDataVersionedWrapper::data).orElse(null) == obj)) {
+                return;
+            }
+
             _writes.put(obj.key(), new TxRecord.TxObjectRecordWrite<>(obj));
             _newWrites.put(obj.key(), new TxRecord.TxObjectRecordWrite<>(obj));
         }

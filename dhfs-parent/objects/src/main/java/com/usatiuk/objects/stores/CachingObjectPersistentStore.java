@@ -186,7 +186,7 @@ public class CachingObjectPersistentStore {
 
                     @Override
                     public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-                        return new TombstoneMergingKvIterator<>("cache", start, key,
+                        return TombstoneMergingKvIterator.<JObjectKey, JDataVersionedWrapper>of("cache", start, key,
                                 (mS, mK) -> new NavigableMapKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>(_curCache.map(), mS, mK),
                                 (mS, mK) -> new CachingKvIterator(_backing.getIterator(start, key)));
                     }

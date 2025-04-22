@@ -24,6 +24,8 @@ public class JDataVersionedWrapperSerializer implements ObjectSerializer<JDataVe
     public JDataVersionedWrapper deserialize(ByteString data) {
         var version = data.substring(0, Long.BYTES).asReadOnlyByteBuffer().getLong();
         var rawData = data.substring(Long.BYTES);
-        return new JDataVersionedWrapperLazy(version, rawData.size(), () -> dataSerializer.deserialize(rawData));
+        return new JDataVersionedWrapperLazy(version, rawData.size(),
+                () -> dataSerializer.deserialize(rawData)
+        );
     }
 }

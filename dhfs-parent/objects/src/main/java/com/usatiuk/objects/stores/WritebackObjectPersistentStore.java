@@ -350,7 +350,7 @@ public class WritebackObjectPersistentStore {
 
                 @Override
                 public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-                    return new TombstoneMergingKvIterator<JObjectKey, JDataVersionedWrapper>("writeback-ps", start, key,
+                    return  TombstoneMergingKvIterator.<JObjectKey, JDataVersionedWrapper>of("writeback-ps", start, key,
                             (tS, tK) -> new NavigableMapKvIterator<>(_pendingWrites, tS, tK),
                             (tS, tK) -> (CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>) (CloseableKvIterator<JObjectKey, ?>) _cache.getIterator(tS, tK));
                 }
