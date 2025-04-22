@@ -36,7 +36,11 @@ public class DeferredInvalidationQueueService implements PeerConnectedEventListe
         Log.info("Initializing with root " + dataRoot);
         if (Paths.get(dataRoot).resolve(dataFileName).toFile().exists()) {
             Log.info("Reading invalidation queue");
-            _persistentData = SerializationHelper.deserialize(Files.readAllBytes(Paths.get(dataRoot).resolve(dataFileName)));
+            try {
+                _persistentData = SerializationHelper.deserialize(Files.readAllBytes(Paths.get(dataRoot).resolve(dataFileName)));
+            } catch (Exception e) {
+                Log.error("Error reading invalidation queue", e);
+            }
         }
     }
 
