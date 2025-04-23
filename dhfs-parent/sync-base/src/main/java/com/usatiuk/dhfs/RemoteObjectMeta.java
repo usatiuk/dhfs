@@ -6,8 +6,7 @@ import org.pcollections.*;
 import java.util.Collection;
 import java.util.List;
 
-public record RemoteObjectMeta(PCollection<JDataRef> refsFrom, boolean frozen,
-                               JObjectKey key,
+public record RemoteObjectMeta(JObjectKey key, PCollection<JDataRef> refsFrom, boolean frozen,
                                PMap<PeerId, Long> knownRemoteVersions,
                                Class<? extends JDataRemote> knownType,
                                PSet<PeerId> confirmedDeletes,
@@ -16,22 +15,22 @@ public record RemoteObjectMeta(PCollection<JDataRef> refsFrom, boolean frozen,
                                boolean hasLocalData) implements JDataRefcounted {
     // Self put
     public RemoteObjectMeta(JDataRemote data, PeerId initialPeer) {
-        this(HashTreePSet.empty(), false,
-                data.key(), HashTreePMap.empty(), data.getClass(), HashTreePSet.empty(), false,
+        this(data.key(), HashTreePSet.empty(), false,
+                HashTreePMap.empty(), data.getClass(), HashTreePSet.empty(), false,
                 HashTreePMap.<PeerId, Long>empty().plus(initialPeer, 1L),
                 true);
     }
 
     public RemoteObjectMeta(JObjectKey key, PMap<PeerId, Long> remoteChangelog) {
-        this(HashTreePSet.empty(), false,
-                key, HashTreePMap.empty(), JDataRemote.class, HashTreePSet.empty(), true,
+        this(key, HashTreePSet.empty(), false,
+                HashTreePMap.empty(), JDataRemote.class, HashTreePSet.empty(), true,
                 remoteChangelog,
                 false);
     }
 
     public RemoteObjectMeta(JObjectKey key) {
-        this(HashTreePSet.empty(), false,
-                key, HashTreePMap.empty(), JDataRemote.class, HashTreePSet.empty(), true,
+        this(key, HashTreePSet.empty(), false,
+                HashTreePMap.empty(), JDataRemote.class, HashTreePSet.empty(), true,
                 TreePMap.empty(),
                 false);
     }
@@ -44,47 +43,42 @@ public record RemoteObjectMeta(PCollection<JDataRef> refsFrom, boolean frozen,
         return JObjectKey.of(key.value() + "_data");
     }
 
-    @Override
-    public JObjectKey key() {
-        return ofMetaKey(key);
-    }
-
     public JObjectKey dataKey() {
         return ofDataKey(key);
     }
 
     @Override
     public RemoteObjectMeta withRefsFrom(PCollection<JDataRef> refs) {
-        return new RemoteObjectMeta(refs, frozen, key, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, hasLocalData);
+        return new RemoteObjectMeta(key, refs, frozen, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, hasLocalData);
     }
 
     @Override
     public RemoteObjectMeta withFrozen(boolean frozen) {
-        return new RemoteObjectMeta(refsFrom, frozen, key, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, hasLocalData);
+        return new RemoteObjectMeta(key, refsFrom, frozen, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, hasLocalData);
     }
 
     public RemoteObjectMeta withKnownRemoteVersions(PMap<PeerId, Long> knownRemoteVersions) {
-        return new RemoteObjectMeta(refsFrom, frozen, key, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, hasLocalData);
+        return new RemoteObjectMeta(key, refsFrom, frozen, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, hasLocalData);
     }
 
     public RemoteObjectMeta withKnownType(Class<? extends JDataRemote> knownType) {
-        return new RemoteObjectMeta(refsFrom, frozen, key, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, hasLocalData);
+        return new RemoteObjectMeta(key, refsFrom, frozen, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, hasLocalData);
     }
 
     public RemoteObjectMeta withConfirmedDeletes(PSet<PeerId> confirmedDeletes) {
-        return new RemoteObjectMeta(refsFrom, frozen, key, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, hasLocalData);
+        return new RemoteObjectMeta(key, refsFrom, frozen, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, hasLocalData);
     }
 
     public RemoteObjectMeta withSeen(boolean seen) {
-        return new RemoteObjectMeta(refsFrom, frozen, key, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, hasLocalData);
+        return new RemoteObjectMeta(key, refsFrom, frozen, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, hasLocalData);
     }
 
     public RemoteObjectMeta withChangelog(PMap<PeerId, Long> changelog) {
-        return new RemoteObjectMeta(refsFrom, frozen, key, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, hasLocalData);
+        return new RemoteObjectMeta(key, refsFrom, frozen, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, hasLocalData);
     }
 
     public RemoteObjectMeta withHaveLocal(boolean haveLocal) {
-        return new RemoteObjectMeta(refsFrom, frozen, key, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, haveLocal);
+        return new RemoteObjectMeta(key, refsFrom, frozen, knownRemoteVersions, knownType, confirmedDeletes, seen, changelog, haveLocal);
     }
 
     public long versionSum() {

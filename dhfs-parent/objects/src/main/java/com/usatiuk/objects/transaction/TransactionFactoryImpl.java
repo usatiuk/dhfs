@@ -94,15 +94,12 @@ public class TransactionFactoryImpl implements TransactionFactory {
 
         @Override
         public <T extends JData> Optional<T> getFromSource(Class<T> type, JObjectKey key) {
-            var got = _readSet.get(key);
-
-            if (got == null) {
-                var read = _snapshot.readObject(key);
-                _readSet.put(key, new TransactionObjectNoLock<>(read));
-                return read.map(JDataVersionedWrapper::data).map(type::cast);
-            }
-
-            return got.data().map(JDataVersionedWrapper::data).map(type::cast);
+            return _readSet.computeIfAbsent(key, k -> {
+                        var read = _snapshot.readObject(k);
+                        return new TransactionObjectNoLock<>(read);
+                    })
+                    .data()
+                    .map(w -> type.cast(w.data()));
         }
 
         public <T extends JData> Optional<T> getWriteLockedFromSource(Class<T> type, JObjectKey key) {
