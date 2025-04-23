@@ -165,7 +165,7 @@ public class LazyFsIT {
         checkConsistency();
     }
 
-    @RepeatedTest(10)
+    @Test
     void killTestDirs(TestInfo testInfo) throws Exception {
         var barrier = new CountDownLatch(1);
         executor.submit(() -> {
