@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.repository.webapi;
 
 import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.dhfs.repository.PeerManager;
+import com.usatiuk.dhfs.repository.PersistentPeerDataService;
 import com.usatiuk.dhfs.repository.peersync.PeerInfoService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.DELETE;
@@ -11,6 +12,8 @@ import jakarta.ws.rs.Path;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 @Path("/peers-manage")
 public class PeerManagementApi {
@@ -18,11 +21,15 @@ public class PeerManagementApi {
     PeerInfoService peerInfoService;
     @Inject
     PeerManager peerManager;
+    @Inject
+    PersistentPeerDataService persistentPeerDataService;
 
     @Path("known-peers")
     @GET
-    public List<KnownPeerInfo> knownPeers() {
-        return peerInfoService.getPeers().stream().map(peerInfo -> new KnownPeerInfo(peerInfo.id().toString())).toList();
+    public KnownPeers knownPeers() {
+        return new KnownPeers(peerInfoService.getPeers().stream().map(peerInfo -> new KnownPeerInfo(peerInfo.id().toString(),
+                Optional.ofNullable(peerManager.getAddress(peerInfo.id())).map(Objects::toString).orElse(null))).toList(),
+                persistentPeerDataService.getSelfUuid().toString());
     }
 
     @Path("known-peers")
@@ -40,7 +47,10 @@ public class PeerManagementApi {
     @Path("available-peers")
     @GET
     public Collection<KnownPeerInfo> availablePeers() {
-        return peerManager.getSeenButNotAddedHosts().stream().map(p -> new KnownPeerInfo(p.toString())).toList();
+        return peerManager.getSeenButNotAddedHosts().stream()
+                .map(p -> new KnownPeerInfo(p.toString(),
+                        peerManager.selectBestAddress(p).map(Objects::toString).orElse(null)))
+                .toList();
     }
 
     @Path("peer-state")

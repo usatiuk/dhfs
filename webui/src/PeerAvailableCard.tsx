@@ -12,8 +12,14 @@ export function PeerAvailableCard({ peerInfo }: TPeerAvailableCardProps) {
     return (
         <div className="peerAvailableCard">
             <div className={"peerInfo"}>
-                <span>UUID: </span>
-                <span>{peerInfo.uuid}</span>
+                <div>
+                    <span>UUID: </span>
+                    <span>{peerInfo.uuid}</span>
+                </div>
+                <div>
+                    <span>Address: </span>
+                    <span>{peerInfo.knownAddress}</span>
+                </div>
             </div>
             <fetcher.Form
                 className="actions"

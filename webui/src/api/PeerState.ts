@@ -1,13 +1,13 @@
 import { fetchJSON, fetchJSON_throws } from "./utils";
 import {
     AvailablePeerInfoToResp,
-    KnownPeerInfoToResp,
+    KnownPeersToResp,
     NoContentToResp,
     PeerAddressInfoToResp,
     TAvailablePeerInfoArrTo,
     TAvailablePeerInfoToResp,
-    TKnownPeerInfoArrTo,
-    TKnownPeerInfoToResp,
+    TKnownPeerInfoArrTo, TKnownPeersTo,
+    TKnownPeersToResp,
     TNoContentToResp,
     TPeerAddressInfoArrTo,
     TPeerAddressInfoToResp,
@@ -20,11 +20,11 @@ export async function getAvailablePeers(): Promise<TAvailablePeerInfoArrTo> {
     >("/peers-manage/available-peers", "GET", AvailablePeerInfoToResp);
 }
 
-export async function getKnownPeers(): Promise<TKnownPeerInfoArrTo> {
-    return fetchJSON_throws<TKnownPeerInfoToResp, typeof KnownPeerInfoToResp>(
+export async function getKnownPeers(): Promise<TKnownPeersTo> {
+    return fetchJSON_throws<TKnownPeersToResp, typeof KnownPeersToResp>(
         "/peers-manage/known-peers",
         "GET",
-        KnownPeerInfoToResp,
+        KnownPeersToResp,
     );
 }
 

@@ -180,7 +180,7 @@ public class PeerManager {
         });
     }
 
-    private Optional<PeerAddress> selectBestAddress(PeerId host) {
+    public Optional<PeerAddress> selectBestAddress(PeerId host) {
         return peerDiscoveryDirectory.getForPeer(host).stream().min(Comparator.comparing(PeerAddress::type));
     }
 
