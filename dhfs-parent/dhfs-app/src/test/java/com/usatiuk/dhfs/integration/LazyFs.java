@@ -172,7 +172,7 @@ public class LazyFs {
         try {
             var cmd = "echo \"lazyfs::crash::timing=after::op=write::from_rgx=*\" > " + fifoPath();
             Log.info("Running command: " + cmd);
-            Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", cmd});
+            Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", cmd}).waitFor();
             stop();
         } catch (Exception e) {
             throw new RuntimeException(e);
