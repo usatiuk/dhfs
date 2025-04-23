@@ -5,44 +5,51 @@ import io.quarkus.logging.Log;
 import java.io.*;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 public class LazyFs {
     private static final String lazyFsPath;
 
+    private final String mountRoot;
     private final String dataRoot;
-    private final String lazyFsDataPath;
     private final String name;
-    private final File tmpConfigFile;
-    private final File fifoPath;
+
+    private final File configFile;
+    private final File fifoFile;
 
     static {
         lazyFsPath = System.getProperty("lazyFsPath");
         System.out.println("LazyFs Path: " + lazyFsPath);
     }
 
-    public LazyFs(String name, String dataRoot, String lazyFsDataPath) {
+    public LazyFs(String name, String mountRoot, String dataRoot) {
         this.name = name;
+        this.mountRoot = mountRoot;
         this.dataRoot = dataRoot;
-        this.lazyFsDataPath = lazyFsDataPath;
 
         try {
-            tmpConfigFile = File.createTempFile("lazyfs", ".conf");
-            tmpConfigFile.deleteOnExit();
+            configFile = File.createTempFile("lazyfs", ".conf");
+            configFile.deleteOnExit();
 
-            fifoPath = new File("/tmp/" + ThreadLocalRandom.current().nextLong() + ".faultsfifo");
-            fifoPath.deleteOnExit();
+            fifoFile = new File("/tmp/" + ThreadLocalRandom.current().nextLong() + ".faultsfifo");
+            fifoFile.deleteOnExit();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+
+        Runtime.getRuntime().addShutdownHook(new Thread(this::stop));
     }
 
-    private Thread outputPiper;
+    private Thread errPiper;
+    private Thread outPiper;
+    private CountDownLatch startLatch;
     private Process fs;
 
     private String fifoPath() {
-        return fifoPath.getAbsolutePath();
+        return fifoFile.getAbsolutePath();
     }
 
     public void start() {
@@ -52,7 +59,7 @@ public class LazyFs {
         if (!lfsPath.toFile().canExecute())
             throw new IllegalStateException("LazyFs binary is not executable: " + lfsPath.toAbsolutePath());
 
-        try (var rwFile = new RandomAccessFile(tmpConfigFile, "rw");
+        try (var rwFile = new RandomAccessFile(configFile, "rw");
              var channel = rwFile.getChannel()) {
             channel.truncate(0);
             var config = "[faults]\n" +
@@ -74,38 +81,42 @@ public class LazyFs {
         var argList = new ArrayList<String>();
 
         argList.add(lfsPath.toString());
-        argList.add(Path.of(dataRoot).toString());
+        argList.add(Path.of(mountRoot).toString());
         argList.add("--config-path");
-        argList.add(tmpConfigFile.getAbsolutePath());
+        argList.add(configFile.getAbsolutePath());
         argList.add("-o");
         argList.add("allow_other");
         argList.add("-o");
         argList.add("modules=subdir");
         argList.add("-o");
-        argList.add("subdir=" + Path.of(lazyFsDataPath).toAbsolutePath().toString());
+        argList.add("subdir=" + Path.of(dataRoot).toAbsolutePath().toString());
         try {
             Log.info("Starting LazyFs " + argList);
             fs = Runtime.getRuntime().exec(argList.toArray(String[]::new));
-            Thread.sleep(1000);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
 
-        outputPiper = new Thread(() -> {
+        startLatch = new CountDownLatch(1);
+
+        outPiper = new Thread(() -> {
             try {
                 try (BufferedReader input = new BufferedReader(new InputStreamReader(fs.getInputStream()))) {
                     String line;
 
                     while ((line = input.readLine()) != null) {
+                        if (line.contains("running LazyFS"))
+                            startLatch.countDown();
                         System.out.println(line);
                     }
                 }
             } catch (Exception e) {
                 Log.info("Exception in LazyFs piper", e);
             }
+            Log.info("LazyFs out piper finished");
         });
-        outputPiper.start();
-        outputPiper = new Thread(() -> {
+        outPiper.start();
+        errPiper = new Thread(() -> {
             try {
                 try (BufferedReader input = new BufferedReader(new InputStreamReader(fs.getErrorStream()))) {
                     String line;
@@ -117,14 +128,23 @@ public class LazyFs {
             } catch (Exception e) {
                 Log.info("Exception in LazyFs piper", e);
             }
+            Log.info("LazyFs err piper finished");
         });
-        outputPiper.start();
+        errPiper.start();
+
+        try {
+            if (!startLatch.await(5, TimeUnit.SECONDS))
+                throw new RuntimeException("StartLatch timed out");
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        Log.info("LazyFs started");
     }
 
     public void crash() {
         try {
             var cmd = "echo \"lazyfs::crash::timing=after::op=write::from_rgx=*\" > " + fifoPath();
-            System.out.println("Running command: " + cmd);
+            Log.info("Running command: " + cmd);
             Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", cmd});
             stop();
         } catch (Exception e) {
@@ -134,13 +154,13 @@ public class LazyFs {
 
     public void stop() {
         try {
-            if (fs == null) {
-                return;
+            synchronized (this) {
+                if (fs == null) {
+                    return;
+                }
+                Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", "fusermount3 -u " + mountRoot});
+                fs = null;
             }
-            Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", "fusermount3 -u " + dataRoot});
-            if (!fs.waitFor(1, TimeUnit.SECONDS))
-                throw new RuntimeException("LazyFs process did not stop in time");
-            fs = null;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

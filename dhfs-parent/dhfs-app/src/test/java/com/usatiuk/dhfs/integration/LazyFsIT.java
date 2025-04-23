@@ -125,9 +125,7 @@ public class LazyFsIT {
         Thread.sleep(1000);
         Log.info("Killing");
         lazyFs1.crash();
-
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 5, TimeUnit.SECONDS);
-        Thread.sleep(1000);
         var client = DockerClientFactory.instance().client();
         client.killContainerCmd(container1.getContainerId()).exec();
         container1.stop();
