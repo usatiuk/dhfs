@@ -1,12 +1,11 @@
 package com.usatiuk.objects.transaction;
 
-import com.google.common.collect.Streams;
 import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
 import com.usatiuk.objects.JData;
 import com.usatiuk.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.snapshot.Snapshot;
-import com.usatiuk.objects.snapshot.SnapshotManager;
+import com.usatiuk.objects.stores.WritebackObjectPersistentStore;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
@@ -14,10 +13,10 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -31,7 +30,7 @@ public class JObjectManager {
     }
 
     @Inject
-    SnapshotManager snapshotManager;
+    WritebackObjectPersistentStore writebackObjectPersistentStore;
     @Inject
     TransactionFactory transactionFactory;
     @Inject
@@ -176,25 +175,36 @@ public class JObjectManager {
                     toUnlock.add(lock);
                 }
 
-                commitSnapshot = snapshotManager.createSnapshot();
+                commitSnapshot = writebackObjectPersistentStore.getSnapshot();
             } else {
                 Log.trace("Committing transaction - no changes");
 
+                long version = 0L;
+
                 for (var read : readSet.values()) {
+                    version = Math.max(version, read.data().map(JDataVersionedWrapper::version).orElse(0L));
                     if (read instanceof TransactionObjectLocked<?> locked) {
                         locked.lock().close();
                     }
                 }
 
+                long finalVersion = version;
+                Consumer<Runnable> fenceFn = r -> {
+                    writebackObjectPersistentStore.asyncFence(finalVersion, r);
+                };
+
                 return Pair.of(
                         Stream.concat(
                                 tx.getOnCommit().stream(),
-                                tx.getOnFlush().stream()
+                                Stream.<Runnable>of(() -> {
+                                    for (var f : tx.getOnFlush())
+                                        fenceFn.accept(f);
+                                })
                         ).toList(),
                         new TransactionHandle() {
                             @Override
                             public void onFlush(Runnable runnable) {
-                                runnable.run();
+                                fenceFn.accept(runnable);
                             }
                         });
             }
@@ -229,8 +239,9 @@ public class JObjectManager {
                 Log.tracev("Skipped dependency checks: no changes");
             }
 
-            var addFlushCallback = snapshotManager.commitTx(writes.values());
+            var addFlushCallback = writebackObjectPersistentStore.commitTx(writes.values());
 
+            // TODO: is it ok to possibly run it inside transaction?
             for (var callback : tx.getOnFlush()) {
                 addFlushCallback.accept(callback);
             }

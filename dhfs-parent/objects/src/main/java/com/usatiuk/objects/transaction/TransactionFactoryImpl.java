@@ -5,7 +5,7 @@ import com.usatiuk.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.iterators.*;
 import com.usatiuk.objects.snapshot.Snapshot;
-import com.usatiuk.objects.snapshot.SnapshotManager;
+import com.usatiuk.objects.stores.WritebackObjectPersistentStore;
 import io.quarkus.logging.Log;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -17,7 +17,7 @@ import java.util.*;
 @Singleton
 public class TransactionFactoryImpl implements TransactionFactory {
     @Inject
-    SnapshotManager snapshotManager;
+    WritebackObjectPersistentStore writebackObjectPersistentStore;
     @Inject
     LockManager lockManager;
     @ConfigProperty(name = "dhfs.objects.transaction.never-lock")
@@ -64,7 +64,7 @@ public class TransactionFactoryImpl implements TransactionFactory {
         private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _newWrites = new HashMap<>();
 
         private TransactionImpl() {
-            _snapshot = snapshotManager.createSnapshot();
+            _snapshot = writebackObjectPersistentStore.getSnapshot();
         }
 
         @Override
