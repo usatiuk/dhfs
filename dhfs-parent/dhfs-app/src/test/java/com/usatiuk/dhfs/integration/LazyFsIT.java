@@ -197,4 +197,120 @@ public class LazyFsIT {
 
         checkConsistency();
     }
+
+    @Test
+    void killTestDirs2(TestInfo testInfo) throws Exception {
+        var barrier = new CountDownLatch(1);
+        executor.submit(() -> {
+            try {
+                Log.info("Writing to container 1");
+                barrier.countDown();
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; done");
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        barrier.await();
+        Log.info("Killing");
+        lazyFs1.crash();
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 5, TimeUnit.SECONDS);
+        var client = DockerClientFactory.instance().client();
+        client.killContainerCmd(container1.getContainerId()).exec();
+        container1.stop();
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS);
+        Log.info("Restart");
+        lazyFs1.startTornOp();
+        container1.start();
+
+        waitingConsumer1 = new WaitingConsumer();
+        var loggingConsumer1 = new Slf4jLogConsumer(LoggerFactory.getLogger(LazyFsIT.class)).withPrefix("1-" + testInfo.getDisplayName());
+        container1.followOutput(loggingConsumer1.andThen(waitingConsumer1));
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+
+        executor.submit(() -> {
+            try {
+                Log.info("Writing to container 1");
+                barrier.countDown();
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/2test$counter; done");
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        Log.info("Killing");
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 5, TimeUnit.SECONDS);
+        client.killContainerCmd(container1.getContainerId()).exec();
+        container1.stop();
+        lazyFs1.stop();
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS);
+        Log.info("Restart");
+        lazyFs1.start();
+        container1.start();
+
+        waitingConsumer1 = new WaitingConsumer();
+        loggingConsumer1 = new Slf4jLogConsumer(LoggerFactory.getLogger(LazyFsIT.class)).withPrefix("1-" + testInfo.getDisplayName());
+        container1.followOutput(loggingConsumer1.andThen(waitingConsumer1));
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+
+        checkConsistency();
+    }
+
+    @Test
+    void killTestDirs3(TestInfo testInfo) throws Exception {
+        var barrier = new CountDownLatch(1);
+        executor.submit(() -> {
+            try {
+                Log.info("Writing to container 1");
+                barrier.countDown();
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; done");
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        barrier.await();
+        Log.info("Killing");
+        lazyFs1.crash();
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 5, TimeUnit.SECONDS);
+        var client = DockerClientFactory.instance().client();
+        client.killContainerCmd(container1.getContainerId()).exec();
+        container1.stop();
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS);
+        Log.info("Restart");
+        lazyFs1.startTornSeq();
+        container1.start();
+
+        waitingConsumer1 = new WaitingConsumer();
+        var loggingConsumer1 = new Slf4jLogConsumer(LoggerFactory.getLogger(LazyFsIT.class)).withPrefix("1-" + testInfo.getDisplayName());
+        container1.followOutput(loggingConsumer1.andThen(waitingConsumer1));
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+
+        executor.submit(() -> {
+            try {
+                Log.info("Writing to container 1");
+                barrier.countDown();
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/2test$counter; done");
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        Log.info("Killing");
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 5, TimeUnit.SECONDS);
+        client.killContainerCmd(container1.getContainerId()).exec();
+        container1.stop();
+        lazyFs1.stop();
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS);
+        Log.info("Restart");
+        lazyFs1.start();
+        container1.start();
+
+        waitingConsumer1 = new WaitingConsumer();
+        loggingConsumer1 = new Slf4jLogConsumer(LoggerFactory.getLogger(LazyFsIT.class)).withPrefix("1-" + testInfo.getDisplayName());
+        container1.followOutput(loggingConsumer1.andThen(waitingConsumer1));
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+
+        checkConsistency();
+    }
 }

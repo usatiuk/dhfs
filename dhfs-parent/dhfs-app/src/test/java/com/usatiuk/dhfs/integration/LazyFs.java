@@ -52,7 +52,7 @@ public class LazyFs {
         return fifoFile.getAbsolutePath();
     }
 
-    public void start() {
+    public void start(String extraOpts) {
         var lfsPath = Path.of(lazyFsPath).resolve("build").resolve("lazyfs");
         if (!lfsPath.toFile().isFile())
             throw new IllegalStateException("LazyFs binary does not exist: " + lfsPath.toAbsolutePath());
@@ -71,7 +71,7 @@ public class LazyFs {
                     "blocks_per_page=1\n" +
                     "[filesystem]\n" +
                     "log_all_operations=false\n" +
-                    "logfile=\"\"";
+                    "logfile=\"\"\n" + extraOpts;
             rwFile.write(config.getBytes());
             Log.info("LazyFs config: \n" + config);
         } catch (Exception e) {
@@ -141,6 +141,33 @@ public class LazyFs {
         Log.info("LazyFs started");
     }
 
+    public void start() {
+        start("");
+    }
+
+    private String mdbPath() {
+        return Path.of(dataRoot).resolve("objects").resolve("data.mdb").toAbsolutePath().toString();
+    }
+
+    public void startTornOp() {
+        start("\n" +
+                "[[injection]]\n" +
+                "type=\"torn-seq\"\n" +
+                "op=\"write\"\n" +
+                "file=\"" + mdbPath() + "\"\n" +
+                "persist=[1,4]\n" +
+                "occurrence=2");
+    }
+
+    public void startTornSeq() {
+        start("[[injection]]\n" +
+                "type=\"torn-op\"\n" +
+                "file=\"" + mdbPath() + "\"\n" +
+                "occurrence=5\n" +
+                "parts=3 #or parts_bytes=[4096,3600,1260]\n" +
+                "persist=[1,3]");
+    }
+
     public void crash() {
         try {
             var cmd = "echo \"lazyfs::crash::timing=after::op=write::from_rgx=*\" > " + fifoPath();
@@ -158,7 +185,7 @@ public class LazyFs {
                 if (fs == null) {
                     return;
                 }
-                Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", "fusermount3 -u " + mountRoot});
+                Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", "fusermount3 -u " + mountRoot}).waitFor();
                 fs = null;
             }
         } catch (Exception e) {
