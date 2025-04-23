@@ -10,7 +10,7 @@ public abstract class TombstoneMergingKvIterator {
                 new MergingKvIterator<K, MaybeTombstone<V>>(name + "-merging", startType, startKey, iterators),
                 startType, startKey,
                 pair -> {
-                    Log.tracev("{0} - Processing pair {1}", name, pair);
+//                    Log.tracev("{0} - Processing pair {1}", name, pair);
                     if (pair instanceof Tombstone<V>) {
                         return null;
                     }

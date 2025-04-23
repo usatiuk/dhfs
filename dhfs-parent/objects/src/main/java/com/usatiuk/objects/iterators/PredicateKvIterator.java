@@ -44,20 +44,20 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends Revers
         }
 
 
-        switch (start) {
-            case LT -> {
-//                assert _next == null || _next.getKey().compareTo(startKey) < 0;
-            }
-            case LE -> {
-//                assert _next == null || _next.getKey().compareTo(startKey) <= 0;
-            }
-            case GT -> {
-                assert _next == null || _next.getKey().compareTo(startKey) > 0;
-            }
-            case GE -> {
-                assert _next == null || _next.getKey().compareTo(startKey) >= 0;
-            }
-        }
+//        switch (start) {
+//            case LT -> {
+////                assert _next == null || _next.getKey().compareTo(startKey) < 0;
+//            }
+//            case LE -> {
+////                assert _next == null || _next.getKey().compareTo(startKey) <= 0;
+//            }
+//            case GT -> {
+//                assert _next == null || _next.getKey().compareTo(startKey) > 0;
+//            }
+//            case GE -> {
+//                assert _next == null || _next.getKey().compareTo(startKey) >= 0;
+//            }
+//        }
     }
 
     private void fillNext() {
@@ -81,8 +81,8 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends Revers
         else if (!_goingForward && !wasAtEnd)
             _backing.skipPrev();
 
-        if (!wasAtEnd)
-            Log.tracev("Skipped in reverse: {0}", _next);
+//        if (!wasAtEnd)
+//            Log.tracev("Skipped in reverse: {0}", _next);
 
         _next = null;
         _checkedNext = false;

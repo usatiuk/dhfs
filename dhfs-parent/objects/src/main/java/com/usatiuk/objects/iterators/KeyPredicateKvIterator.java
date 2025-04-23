@@ -39,20 +39,20 @@ public class KeyPredicateKvIterator<K extends Comparable<K>, V> extends Reversib
         }
 
 
-        switch (start) {
-            case LT -> {
-//                assert _next == null || _next.getKey().compareTo(startKey) < 0;
-            }
-            case LE -> {
-//                assert _next == null || _next.getKey().compareTo(startKey) <= 0;
-            }
-            case GT -> {
-                assert _next == null || _next.compareTo(startKey) > 0;
-            }
-            case GE -> {
-                assert _next == null || _next.compareTo(startKey) >= 0;
-            }
-        }
+//        switch (start) {
+//            case LT -> {
+////                assert _next == null || _next.getKey().compareTo(startKey) < 0;
+//            }
+//            case LE -> {
+////                assert _next == null || _next.getKey().compareTo(startKey) <= 0;
+//            }
+//            case GT -> {
+//                assert _next == null || _next.compareTo(startKey) > 0;
+//            }
+//            case GE -> {
+//                assert _next == null || _next.compareTo(startKey) >= 0;
+//            }
+//        }
     }
 
     private void fillNext() {

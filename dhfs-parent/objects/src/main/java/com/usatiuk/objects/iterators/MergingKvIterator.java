@@ -80,21 +80,21 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
             advanceIterator(iterator);
         }
 
-        Log.tracev("{0} Initialized: {1}", _name, _sortedIterators);
-        switch (startType) {
-//            case LT -> {
-//                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(initialStartKey) < 0;
+//        Log.tracev("{0} Initialized: {1}", _name, _sortedIterators);
+//        switch (startType) {
+////            case LT -> {
+////                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(initialStartKey) < 0;
+////            }
+////            case LE -> {
+////                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(initialStartKey) <= 0;
+////            }
+//            case GT -> {
+//                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(startKey) > 0;
 //            }
-//            case LE -> {
-//                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(initialStartKey) <= 0;
+//            case GE -> {
+//                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(startKey) >= 0;
 //            }
-            case GT -> {
-                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(startKey) > 0;
-            }
-            case GE -> {
-                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(startKey) >= 0;
-            }
-        }
+//        }
     }
 
     @SafeVarargs
@@ -105,7 +105,7 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
     private void advanceIterator(IteratorEntry<K, V> iteratorEntry) {
         while (iteratorEntry.iterator().hasNext()) {
             K key = iteratorEntry.iterator().peekNextKey();
-            Log.tracev("{0} Advance peeked: {1}-{2}", _name, iteratorEntry, key);
+//            Log.tracev("{0} Advance peeked: {1}-{2}", _name, iteratorEntry, key);
 
             MutableObject<IteratorEntry<K, V>> mutableBoolean = new MutableObject<>(null);
 
@@ -125,7 +125,7 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
             });
 
             if (newVal != iteratorEntry) {
-                Log.tracev("{0} Skipped: {1}", _name, iteratorEntry.iterator().peekNextKey());
+//                Log.tracev("{0} Skipped: {1}", _name, iteratorEntry.iterator().peekNextKey());
                 iteratorEntry.iterator().skip();
                 continue;
             }
@@ -141,7 +141,7 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
     @Override
     protected void reverse() {
         var cur = _goingForward ? _sortedIterators.pollFirstEntry() : _sortedIterators.pollLastEntry();
-        Log.tracev("{0} Reversing from {1}", _name, cur);
+//        Log.tracev("{0} Reversing from {1}", _name, cur);
         _goingForward = !_goingForward;
         _sortedIterators.clear();
         for (IteratorEntry<K, V> iterator : _iterators) {
@@ -176,7 +176,7 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
         }
         cur.getValue().iterator().skip();
         advanceIterator(cur.getValue());
-        Log.tracev("{0} Skip: {1}, next: {2}", _name, cur, _sortedIterators);
+//        Log.tracev("{0} Skip: {1}, next: {2}", _name, cur, _sortedIterators);
     }
 
     @Override

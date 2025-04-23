@@ -368,7 +368,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
                 _hasNext = _cursor.next();
             else
                 _hasNext = _cursor.prev();
-            Log.tracev("Read: {0}, hasNext: {1}", ret, _hasNext);
+//            Log.tracev("Read: {0}, hasNext: {1}", ret, _hasNext);
             _peekedNextKey = null;
             return ret;
         }
