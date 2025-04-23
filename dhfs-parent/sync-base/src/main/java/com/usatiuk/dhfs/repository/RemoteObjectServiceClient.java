@@ -18,10 +18,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -90,18 +87,24 @@ public class RemoteObjectServiceClient {
     }
 
     public OpPushReply pushOps(PeerId target, List<Op> ops) {
+        var barrier = new CountDownLatch(ops.size());
         for (Op op : ops) {
             txm.run(() -> {
                 for (var ref : op.getEscapedRefs()) {
                     curTx.get(RemoteObjectMeta.class, ref).map(m -> m.withSeen(true)).ifPresent(curTx::put);
                 }
-            });
+            }).onFlush(barrier::countDown);
         }
         var builder = OpPushRequest.newBuilder();
         for (Op op : ops) {
             builder.addMsg(opProtoSerializer.serialize(op));
         }
         var built = builder.build();
+        try {
+            barrier.await();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         rpcClientFactory.withObjSyncClient(target, (tgt, client) -> client.opPush(built));
         return OpPushReply.getDefaultInstance();
     }

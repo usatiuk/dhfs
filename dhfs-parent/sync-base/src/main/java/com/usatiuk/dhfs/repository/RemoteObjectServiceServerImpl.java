@@ -8,6 +8,7 @@ import com.usatiuk.dhfs.repository.invalidation.OpHandler;
 import com.usatiuk.dhfs.repository.syncmap.DtoMapperService;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.transaction.Transaction;
+import com.usatiuk.objects.transaction.TransactionHandle;
 import com.usatiuk.objects.transaction.TransactionManager;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -16,6 +17,9 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
+
+import java.util.ArrayList;
+import java.util.concurrent.atomic.AtomicLong;
 
 // Note: RunOnVirtualThread hangs somehow
 @ApplicationScoped
@@ -101,19 +105,30 @@ public class RemoteObjectServiceServerImpl {
     }
 
     public Uni<OpPushReply> opPush(PeerId from, OpPushRequest request) {
+        var handles = new ArrayList<TransactionHandle>();
         try {
             var ops = request.getMsgList().stream().map(opProtoSerializer::deserialize).toList();
             for (var op : ops) {
                 Log.infov("<-- opPush: {0} from {1}", op, from);
-                txm.run(() -> {
+                var handle = txm.run(() -> {
                     opHandler.handleOp(from, op);
                 });
+                handles.add(handle);
             }
         } catch (Exception e) {
             Log.error("Error handling ops", e);
             throw e;
         }
-        return Uni.createFrom().item(OpPushReply.getDefaultInstance());
+        return Uni.createFrom().emitter(e -> {
+            var counter = new AtomicLong(handles.size());
+            for (var handle : handles) {
+                handle.onFlush(() -> {
+                    if (counter.decrementAndGet() == 0) {
+                        e.complete(OpPushReply.getDefaultInstance());
+                    }
+                });
+            }
+        });
     }
 
     public Uni<PingReply> ping(PeerId from, PingRequest request) {
