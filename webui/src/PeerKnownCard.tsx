@@ -27,16 +27,15 @@ export function PeerKnownCard({ peerInfo }: TPeerKnownCardProps) {
                     <span>{peerInfo.uuid}</span>
                     </div>
                     <div>
-                        <span>Address: </span>
-                        <span>{peerInfo.knownAddress || "not connected"}</span>
+                        <span>{peerInfo.knownAddress ? "connected" : "not connected"}</span>
                     </div>
                 </div>
                 <div>
                     <fetcher.Form
-                        className="actions"
                         method="put"
                         action={"/home/peers"}
                     >
+                        <span>Manual address: </span>
                         <input
                             name="intent"
                             hidden={true}
@@ -50,6 +49,7 @@ export function PeerKnownCard({ peerInfo }: TPeerKnownCardProps) {
                         <input
                             name="address"
                             defaultValue={addr?.address || ""}
+                            placeholder={"ip:port:secure port"}
                         />
                         <button type="submit">save</button>
                     </fetcher.Form>

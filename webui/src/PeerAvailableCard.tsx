@@ -16,10 +16,6 @@ export function PeerAvailableCard({ peerInfo }: TPeerAvailableCardProps) {
                     <span>UUID: </span>
                     <span>{peerInfo.uuid}</span>
                 </div>
-                <div>
-                    <span>Address: </span>
-                    <span>{peerInfo.knownAddress}</span>
-                </div>
             </div>
             <fetcher.Form
                 className="actions"
