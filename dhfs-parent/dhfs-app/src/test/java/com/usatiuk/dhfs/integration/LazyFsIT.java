@@ -47,6 +47,7 @@ public class LazyFsIT {
     LazyFs lazyFs2;
 
     ExecutorService executor;
+    Network network;
 
     @BeforeEach
     void setup(TestInfo testInfo) throws IOException, InterruptedException, TimeoutException {
@@ -56,7 +57,7 @@ public class LazyFsIT {
         data1Lazy = Files.createTempDirectory("lazyfsroot").toFile();
         data2Lazy = Files.createTempDirectory("lazyfsroot").toFile();
 
-        Network network = Network.newNetwork();
+         network = Network.newNetwork();
 
         lazyFs1 = new LazyFs(testInfo.getDisplayName(), data1.toString(), data1Lazy.toString());
         lazyFs1.start();
@@ -120,6 +121,7 @@ public class LazyFsIT {
         TestDataCleaner.purgeDirectory(data2Lazy);
 
         executor.close();
+        network.close();
     }
 
     private void checkConsistency() {

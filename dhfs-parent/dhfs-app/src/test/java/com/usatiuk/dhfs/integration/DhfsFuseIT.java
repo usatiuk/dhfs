@@ -32,9 +32,11 @@ public class DhfsFuseIT {
     String c1uuid;
     String c2uuid;
 
+    Network network;
+
     @BeforeEach
     void setup(TestInfo testInfo) throws IOException, InterruptedException, TimeoutException {
-        Network network = Network.newNetwork();
+        network = Network.newNetwork();
         container1 = new GenericContainer<>(DhfsImage.getInstance())
                 .withPrivilegedMode(true)
                 .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")))
@@ -81,6 +83,7 @@ public class DhfsFuseIT {
     @AfterEach
     void stop() {
         Stream.of(container1, container2).parallel().forEach(GenericContainer::stop);
+        network.close();
     }
 
     @Test

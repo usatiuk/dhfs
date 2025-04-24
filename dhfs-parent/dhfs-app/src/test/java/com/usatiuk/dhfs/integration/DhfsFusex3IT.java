@@ -133,6 +133,7 @@ public class DhfsFusex3IT {
     @AfterEach
     void stop() {
         Stream.of(container1, container2, container3).parallel().forEach(GenericContainer::stop);
+        network.close();
     }
 
     @Test

@@ -100,6 +100,7 @@ public class KillIT {
         TestDataCleaner.purgeDirectory(data1);
         TestDataCleaner.purgeDirectory(data2);
         executor.close();
+        network.close();
     }
 
     private void checkConsistency() {
