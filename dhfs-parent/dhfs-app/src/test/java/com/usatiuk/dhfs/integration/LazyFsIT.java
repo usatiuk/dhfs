@@ -57,7 +57,7 @@ public class LazyFsIT {
         data1Lazy = Files.createTempDirectory("lazyfsroot").toFile();
         data2Lazy = Files.createTempDirectory("lazyfsroot").toFile();
 
-         network = Network.newNetwork();
+        network = Network.newNetwork();
 
         lazyFs1 = new LazyFs(testInfo.getDisplayName(), data1.toString(), data1Lazy.toString());
         lazyFs1.start();
@@ -124,17 +124,17 @@ public class LazyFsIT {
         network.close();
     }
 
-    private void checkConsistency() {
+    private void checkConsistency(String testName) {
         await().atMost(45, TimeUnit.SECONDS).until(() -> {
-            Log.info("Listing consistency");
             var ls1 = container1.execInContainer("/bin/sh", "-c", "ls /dhfs_test/fuse");
             var cat1 = container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/*");
             var ls2 = container2.execInContainer("/bin/sh", "-c", "ls /dhfs_test/fuse");
             var cat2 = container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/*");
-            Log.info(ls1);
-            Log.info(cat1);
-            Log.info(ls2);
-            Log.info(cat2);
+            Log.info("Listing consistency " + testName + "\n"
+                    + ls1 + "\n"
+                    + cat1 + "\n"
+                    + ls2 + "\n"
+                    + cat2 + "\n");
 
             return ls1.equals(ls2) && cat1.equals(cat2);
         });
@@ -211,7 +211,7 @@ public class LazyFsIT {
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
 
-        checkConsistency();
+        checkConsistency(testInfo.getDisplayName());
     }
 
 
@@ -280,7 +280,7 @@ public class LazyFsIT {
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
 
-        checkConsistency();
+        checkConsistency(testInfo.getDisplayName());
     }
 
     @ParameterizedTest
@@ -351,7 +351,7 @@ public class LazyFsIT {
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
 
-        checkConsistency();
+        checkConsistency(testInfo.getDisplayName());
     }
 
 
@@ -424,7 +424,7 @@ public class LazyFsIT {
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
 
-        checkConsistency();
+        checkConsistency(testInfo.getDisplayName());
     }
 
 
