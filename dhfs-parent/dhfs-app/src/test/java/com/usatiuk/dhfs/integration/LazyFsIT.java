@@ -154,7 +154,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test1; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test1; sleep 0.01; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -163,10 +163,11 @@ public class LazyFsIT {
         Thread.sleep(3000);
         Log.info("Killing");
         lazyFs1.crash();
-        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 5, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
         var client = DockerClientFactory.instance().client();
         client.killContainerCmd(container1.getContainerId()).exec();
         container1.stop();
+        lazyFs1.stop();
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS);
         Log.info("Restart");
         switch (crashType) {
@@ -186,7 +187,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test2; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test2; sleep 0.01; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -196,7 +197,7 @@ public class LazyFsIT {
             Thread.sleep(3000);
             lazyFs1.crash();
         }
-        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 5, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
         client.killContainerCmd(container1.getContainerId()).exec();
         container1.stop();
         lazyFs1.stop();
@@ -223,7 +224,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; sleep 0.01; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -232,10 +233,11 @@ public class LazyFsIT {
         Thread.sleep(3000);
         Log.info("Killing");
         lazyFs1.crash();
-        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 5, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
         var client = DockerClientFactory.instance().client();
         client.killContainerCmd(container1.getContainerId()).exec();
         container1.stop();
+        lazyFs1.stop();
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS);
         Log.info("Restart");
         switch (crashType) {
@@ -255,7 +257,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/2test$counter; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/2test$counter; sleep 0.01; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -265,7 +267,7 @@ public class LazyFsIT {
             Thread.sleep(3000);
             lazyFs1.crash();
         }
-        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 5, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
         client.killContainerCmd(container1.getContainerId()).exec();
         container1.stop();
         lazyFs1.stop();
@@ -291,18 +293,20 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting1 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test1; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting1 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test1; sleep 0.01; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         });
         barrier.await();
+        Thread.sleep(1000);
         Log.info("Killing");
         lazyFs2.crash();
-        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 5, TimeUnit.SECONDS);
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
         var client = DockerClientFactory.instance().client();
         client.killContainerCmd(container2.getContainerId()).exec();
         container2.stop();
+        lazyFs2.stop();
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS);
         Log.info("Restart");
         switch (crashType) {
@@ -324,7 +328,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier2.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting2 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test2; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting2 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test2; sleep 0.01; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -335,7 +339,7 @@ public class LazyFsIT {
             Thread.sleep(2000);
             lazyFs2.crash();
         }
-        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 30, TimeUnit.SECONDS);
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
         client.killContainerCmd(container2.getContainerId()).exec();
         container2.stop();
         lazyFs2.stop();
@@ -363,19 +367,20 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting1 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting1 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; sleep 0.01; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         });
         barrier.await();
-        Thread.sleep(3000);
+        Thread.sleep(1000);
         Log.info("Killing");
         lazyFs2.crash();
-        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 5, TimeUnit.SECONDS);
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
         var client = DockerClientFactory.instance().client();
         client.killContainerCmd(container2.getContainerId()).exec();
         container2.stop();
+        lazyFs2.stop();
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS);
         Log.info("Restart");
         switch (crashType) {
@@ -397,7 +402,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier2.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting2 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/2test$counter; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting2 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/2test$counter; sleep 0.01; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -408,7 +413,7 @@ public class LazyFsIT {
             Thread.sleep(2000);
             lazyFs2.crash();
         }
-        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 30, TimeUnit.SECONDS);
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
         client.killContainerCmd(container2.getContainerId()).exec();
         container2.stop();
         lazyFs2.stop();

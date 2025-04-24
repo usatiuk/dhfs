@@ -173,7 +173,6 @@ public class LazyFs {
             var cmd = "echo \"lazyfs::crash::timing=after::op=write::from_rgx=*\" > " + fifoPath();
             Log.info("Running command: " + cmd);
             Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", cmd}).waitFor();
-            stop();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -182,11 +181,7 @@ public class LazyFs {
     public void stop() {
         try {
             synchronized (this) {
-                if (fs == null) {
-                    return;
-                }
                 Runtime.getRuntime().exec(new String[]{"/bin/sh", "-c", "fusermount3 -u " + mountRoot}).waitFor();
-                fs = null;
             }
         } catch (Exception e) {
             throw new RuntimeException(e);

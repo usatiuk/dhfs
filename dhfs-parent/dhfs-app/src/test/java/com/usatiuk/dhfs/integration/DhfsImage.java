@@ -66,7 +66,7 @@ public class DhfsImage implements Future<String> {
                                 .run("apt update && apt install -y libfuse2 curl gcc")
                                 .copy("/app", "/app")
                                 .copy("/libs", "/libs")
-                                .cmd("java", "-ea", "-Xmx256M", "-XX:TieredStopAtLevel=1",
+                                .cmd("java", "-ea", "-Xmx256M", "-XX:TieredStopAtLevel=1","-XX:+UseParallelGC",
                                         "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
                                         "--add-exports", "java.base/jdk.internal.access=ALL-UNNAMED",
                                         "--add-opens=java.base/java.nio=ALL-UNNAMED",
@@ -75,7 +75,6 @@ public class DhfsImage implements Future<String> {
                                         "-Ddhfs.objects.deletion.delay=0",
                                         "-Ddhfs.objects.deletion.can-delete-retry-delay=1000",
                                         "-Ddhfs.objects.ref_verification=true",
-                                        "-Ddhfs.objects.write_log=true",
                                         "-Ddhfs.objects.sync.timeout=10",
                                         "-Ddhfs.objects.sync.ping.timeout=5",
                                         "-Ddhfs.objects.reconnect_interval=1s",
