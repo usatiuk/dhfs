@@ -162,7 +162,7 @@ public class InvalidationQueueService {
                             commits.get(p).forEach(Runnable::run);
                         }
                     } catch (Exception e) {
-                        Log.warnv("Failed to send invalidations, will retry", e);
+                        Log.warn("Failed to send invalidations, will retry", e);
                         for (var inv : data) {
                             pushInvalidationToOne(inv);
                         }
