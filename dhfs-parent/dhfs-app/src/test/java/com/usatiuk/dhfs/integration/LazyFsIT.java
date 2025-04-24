@@ -184,6 +184,7 @@ public class LazyFsIT {
             waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
             waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
+            Log.info("Failed to connect: " + testInfo.getDisplayName());
             if (crashType.equals(CrashType.CRASH))
                 throw e;
             // LazyFs can crash too early
@@ -261,6 +262,7 @@ public class LazyFsIT {
             waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
             waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
+            Log.info("Failed to connect: " + testInfo.getDisplayName());
             if (crashType.equals(CrashType.CRASH))
                 throw e;
             // LazyFs can crash too early
@@ -339,6 +341,7 @@ public class LazyFsIT {
             waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
             waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
+            Log.info("Failed to connect: " + testInfo.getDisplayName());
             if (crashType.equals(CrashType.CRASH))
                 throw e;
             // LazyFs can crash too early
@@ -420,6 +423,7 @@ public class LazyFsIT {
             waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
             waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
+            Log.info("Failed to connect: " + testInfo.getDisplayName());
             if (crashType.equals(CrashType.CRASH))
                 throw e;
             // LazyFs can crash too early
