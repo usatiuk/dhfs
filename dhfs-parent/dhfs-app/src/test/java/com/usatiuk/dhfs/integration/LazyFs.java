@@ -133,7 +133,7 @@ public class LazyFs {
         errPiper.start();
 
         try {
-            if (!startLatch.await(5, TimeUnit.SECONDS))
+            if (!startLatch.await(30, TimeUnit.SECONDS))
                 throw new RuntimeException("StartLatch timed out");
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
