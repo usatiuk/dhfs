@@ -81,6 +81,7 @@ public class DhfsImage implements Future<String> {
                                         "-Ddhfs.objects.reconnect_interval=1s",
                                         "-Dquarkus.log.category.\"com.usatiuk\".level=TRACE",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
+                                        "-Dquarkus.log.category.\"com.usatiuk.objects.transaction\".level=INFO",
                                         "-Ddhfs.objects.periodic-push-op-interval=5s",
                                         "-Ddhfs.fuse.root=/dhfs_test/fuse",
                                         "-Ddhfs.objects.persistence.files.root=/dhfs_test/data",

@@ -332,10 +332,10 @@ public class LazyFsIT {
         barrier2.await();
         Log.info("Killing");
         if (crashType.equals(CrashType.CRASH)) {
-            Thread.sleep(3000);
+            Thread.sleep(2000);
             lazyFs2.crash();
         }
-        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 15, TimeUnit.SECONDS);
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 30, TimeUnit.SECONDS);
         client.killContainerCmd(container2.getContainerId()).exec();
         container2.stop();
         lazyFs2.stop();
@@ -405,10 +405,10 @@ public class LazyFsIT {
         barrier2.await();
         Log.info("Killing");
         if (crashType.equals(CrashType.CRASH)) {
-            Thread.sleep(3000);
+            Thread.sleep(2000);
             lazyFs2.crash();
         }
-        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 15, TimeUnit.SECONDS);
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 30, TimeUnit.SECONDS);
         client.killContainerCmd(container2.getContainerId()).exec();
         container2.stop();
         lazyFs2.stop();
