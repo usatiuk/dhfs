@@ -320,9 +320,13 @@ public class LazyFsIT {
         waitingConsumer2 = new WaitingConsumer();
         var loggingConsumer2 = new Slf4jLogConsumer(LoggerFactory.getLogger(LazyFsIT.class)).withPrefix("2-" + testInfo.getDisplayName());
         container2.followOutput(loggingConsumer2.andThen(waitingConsumer2));
-        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
-        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
-
+        try {
+            waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+            waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            // LazyFs can crash too early
+            Assumptions.assumeTrue(false);
+        }
         var barrier2 = new CountDownLatch(1);
         executor.submit(() -> {
             try {
@@ -394,8 +398,13 @@ public class LazyFsIT {
         waitingConsumer2 = new WaitingConsumer();
         var loggingConsumer2 = new Slf4jLogConsumer(LoggerFactory.getLogger(LazyFsIT.class)).withPrefix("2-" + testInfo.getDisplayName());
         container2.followOutput(loggingConsumer2.andThen(waitingConsumer2));
-        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
-        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+        try {
+            waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+            waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            // LazyFs can crash too early
+            Assumptions.assumeTrue(false);
+        }
 
         var barrier2 = new CountDownLatch(1);
         executor.submit(() -> {
