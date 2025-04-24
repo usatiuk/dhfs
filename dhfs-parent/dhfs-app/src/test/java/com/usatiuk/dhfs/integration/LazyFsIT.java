@@ -41,10 +41,11 @@ public class LazyFsIT {
     LazyFs lazyFs1;
     LazyFs lazyFs2;
 
-    private final ExecutorService executor = Executors.newCachedThreadPool();
+    ExecutorService executor;
 
     @BeforeEach
     void setup(TestInfo testInfo) throws IOException, InterruptedException, TimeoutException {
+        executor = Executors.newCachedThreadPool();
         data1 = Files.createTempDirectory("dhfsdata").toFile();
         data2 = Files.createTempDirectory("dhfsdata").toFile();
         data1Lazy = Files.createTempDirectory("lazyfsroot").toFile();
