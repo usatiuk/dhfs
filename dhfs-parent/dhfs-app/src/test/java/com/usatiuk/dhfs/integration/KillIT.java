@@ -195,7 +195,7 @@ public class KillIT {
         container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting");
         container2.start();
         waitingConsumer2 = new WaitingConsumer();
-        var loggingConsumer2 = new Slf4jLogConsumer(LoggerFactory.getLogger(KillIT.class)).withPrefix("1-" + testInfo.getDisplayName());
+        var loggingConsumer2 = new Slf4jLogConsumer(LoggerFactory.getLogger(KillIT.class)).withPrefix("2-" + testInfo.getDisplayName());
         container2.followOutput(loggingConsumer2.andThen(waitingConsumer2));
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
@@ -224,7 +224,7 @@ public class KillIT {
         container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting");
         container2.start();
         waitingConsumer2 = new WaitingConsumer();
-        var loggingConsumer2 = new Slf4jLogConsumer(LoggerFactory.getLogger(KillIT.class)).withPrefix("1-" + testInfo.getDisplayName());
+        var loggingConsumer2 = new Slf4jLogConsumer(LoggerFactory.getLogger(KillIT.class)).withPrefix("2-" + testInfo.getDisplayName());
         container2.followOutput(loggingConsumer2.andThen(waitingConsumer2));
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
