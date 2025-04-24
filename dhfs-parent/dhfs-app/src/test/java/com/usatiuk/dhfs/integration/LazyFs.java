@@ -156,14 +156,14 @@ public class LazyFs {
                 "op=\"write\"\n" +
                 "file=\"" + mdbPath() + "\"\n" +
                 "persist=[1,4]\n" +
-                "occurrence=2");
+                "occurrence=10");
     }
 
     public void startTornSeq() {
         start("[[injection]]\n" +
                 "type=\"torn-op\"\n" +
                 "file=\"" + mdbPath() + "\"\n" +
-                "occurrence=5\n" +
+                "occurrence=10\n" +
                 "parts=3 #or parts_bytes=[4096,3600,1260]\n" +
                 "persist=[1,3]");
     }
