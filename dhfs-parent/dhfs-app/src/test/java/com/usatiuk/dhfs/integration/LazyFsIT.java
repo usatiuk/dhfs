@@ -154,7 +154,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test1; sleep 0.03; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test1; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -187,7 +187,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test2; sleep 0.03; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test2; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -224,7 +224,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; sleep 0.03; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -257,7 +257,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/2test$counter; sleep 0.03; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/2test$counter; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -293,13 +293,14 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting1 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test1; sleep 0.03; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting1 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test1; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         });
         barrier.await();
-        Thread.sleep(1000);
+        Thread.sleep(3000);
+        container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting1");
         Log.info("Killing");
         lazyFs2.crash();
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
@@ -314,7 +315,6 @@ public class LazyFsIT {
             case TORN_OP -> lazyFs2.startTornOp();
             case TORN_SEQ -> lazyFs2.startTornSeq();
         }
-        container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting1");
         container2.start();
 
         waitingConsumer2 = new WaitingConsumer();
@@ -328,12 +328,14 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier2.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting2 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test2; sleep 0.03; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting2 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test2; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         });
         barrier2.await();
+        Thread.sleep(3000);
+        container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting2");
         Log.info("Killing");
         if (crashType.equals(CrashType.CRASH)) {
             Thread.sleep(2000);
@@ -345,7 +347,6 @@ public class LazyFsIT {
         lazyFs2.stop();
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS);
         Log.info("Restart");
-        container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting2");
         lazyFs2.start();
         container2.start();
 
@@ -367,13 +368,14 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting1 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; sleep 0.03; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting1 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         });
         barrier.await();
-        Thread.sleep(1000);
+        Thread.sleep(3000);
+        container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting1");
         Log.info("Killing");
         lazyFs2.crash();
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
@@ -388,7 +390,6 @@ public class LazyFsIT {
             case TORN_OP -> lazyFs2.startTornOp();
             case TORN_SEQ -> lazyFs2.startTornSeq();
         }
-        container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting1");
         container2.start();
 
         waitingConsumer2 = new WaitingConsumer();
@@ -402,12 +403,14 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier2.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting2 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/2test$counter; sleep 0.03; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting2 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/2test$counter; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         });
         barrier2.await();
+        Thread.sleep(3000);
+        container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting2");
         Log.info("Killing");
         if (crashType.equals(CrashType.CRASH)) {
             Thread.sleep(2000);
@@ -418,7 +421,6 @@ public class LazyFsIT {
         container2.stop();
         lazyFs2.stop();
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS);
-        container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting2");
         Log.info("Restart");
         lazyFs2.start();
         container2.start();

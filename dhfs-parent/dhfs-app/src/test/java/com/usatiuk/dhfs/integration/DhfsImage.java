@@ -66,7 +66,7 @@ public class DhfsImage implements Future<String> {
                                 .run("apt update && apt install -y libfuse2 curl gcc")
                                 .copy("/app", "/app")
                                 .copy("/libs", "/libs")
-                                .cmd("java", "-ea", "-Xmx256M", "-XX:+UseParallelGC",
+                                .cmd("java", "-ea", "-Xmx256M", "-XX:TieredStopAtLevel=1","-XX:+UseParallelGC",
                                         "--add-exports", "java.base/sun.nio.ch=ALL-UNNAMED",
                                         "--add-exports", "java.base/jdk.internal.access=ALL-UNNAMED",
                                         "--add-opens=java.base/java.nio=ALL-UNNAMED",
