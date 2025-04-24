@@ -81,6 +81,7 @@ public class WritebackObjectPersistentStore {
             lastTxId = s.id();
         }
         _lastCommittedId.set(lastTxId);
+        _lastWrittenId.set(lastTxId);
         _pendingWrites.set(new PendingWriteData(TreePMap.empty(), lastTxId, lastTxId));
         _ready = true;
     }
