@@ -444,12 +444,12 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
 
             for (var e : removedChunks.entrySet()) {
-                Log.tracev("Removing chunk {0}-{1}", e.getKey(), e.getValue());
+//                Log.tracev("Removing chunk {0}-{1}", e.getKey(), e.getValue());
                 jMapHelper.delete(file, JMapLongKey.of(e.getKey()));
             }
 
             for (var e : newChunks.entrySet()) {
-                Log.tracev("Adding chunk {0}-{1}", e.getKey(), e.getValue());
+//                Log.tracev("Adding chunk {0}-{1}", e.getKey(), e.getValue());
                 jMapHelper.put(file, JMapLongKey.of(e.getKey()), e.getValue());
             }
 
@@ -535,12 +535,12 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 //            file = file.withChunks(file.chunks().minusAll(removedChunks.keySet()).plusAll(newChunks)).withMTime(System.currentTimeMillis());
 
             for (var e : removedChunks.entrySet()) {
-                Log.tracev("Removing chunk {0}-{1}", e.getKey(), e.getValue());
+//                Log.tracev("Removing chunk {0}-{1}", e.getKey(), e.getValue());
                 jMapHelper.delete(file, JMapLongKey.of(e.getKey()));
             }
 
             for (var e : newChunks.entrySet()) {
-                Log.tracev("Adding chunk {0}-{1}", e.getKey(), e.getValue());
+//                Log.tracev("Adding chunk {0}-{1}", e.getKey(), e.getValue());
                 jMapHelper.put(file, JMapLongKey.of(e.getKey()), e.getValue());
             }
 
