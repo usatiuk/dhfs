@@ -154,7 +154,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test1; sleep 0.01; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test1; sleep 0.03; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -187,7 +187,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test2; sleep 0.01; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test2; sleep 0.03; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -224,7 +224,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; sleep 0.01; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; sleep 0.03; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -257,7 +257,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/2test$counter; sleep 0.01; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/2test$counter; sleep 0.03; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -293,7 +293,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting1 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test1; sleep 0.01; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting1 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test1; sleep 0.03; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -328,7 +328,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier2.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting2 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test2; sleep 0.01; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting2 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test2; sleep 0.03; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -367,7 +367,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting1 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; sleep 0.01; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting1 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; sleep 0.03; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -402,7 +402,7 @@ public class LazyFsIT {
             try {
                 Log.info("Writing to container 1");
                 barrier2.countDown();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting2 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/2test$counter; sleep 0.01; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting2 ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/2test$counter; sleep 0.03; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

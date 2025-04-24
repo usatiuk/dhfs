@@ -126,7 +126,7 @@ public class KillIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.await();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test1; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test1; sleep 0.03; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -154,7 +154,7 @@ public class KillIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.await();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while true; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; sleep 0.03; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -182,7 +182,7 @@ public class KillIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.await();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test1; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while  [ ! -f /tmp/stopprinting ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test1; sleep 0.03; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -211,7 +211,7 @@ public class KillIT {
             try {
                 Log.info("Writing to container 1");
                 barrier.await();
-                container1.execInContainer("/bin/sh", "-c", "counter=0; while [ ! -f /tmp/stopprinting ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; done");
+                container1.execInContainer("/bin/sh", "-c", "counter=0; while [ ! -f /tmp/stopprinting ]; do counter=`expr $counter + 1`; echo $counter >> /dhfs_test/fuse/test$counter; sleep 0.03; done");
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
