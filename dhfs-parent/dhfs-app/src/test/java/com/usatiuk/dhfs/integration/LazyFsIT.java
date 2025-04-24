@@ -300,9 +300,9 @@ public class LazyFsIT {
         });
         barrier.await();
         Thread.sleep(3000);
-        container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting1");
         Log.info("Killing");
         lazyFs2.crash();
+        container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting1");
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
         var client = DockerClientFactory.instance().client();
         client.killContainerCmd(container2.getContainerId()).exec();
@@ -334,13 +334,12 @@ public class LazyFsIT {
             }
         });
         barrier2.await();
-        Thread.sleep(3000);
-        container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting2");
         Log.info("Killing");
+        Thread.sleep(3000);
         if (crashType.equals(CrashType.CRASH)) {
-            Thread.sleep(2000);
             lazyFs2.crash();
         }
+        container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting2");
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
         client.killContainerCmd(container2.getContainerId()).exec();
         container2.stop();
@@ -375,9 +374,9 @@ public class LazyFsIT {
         });
         barrier.await();
         Thread.sleep(3000);
-        container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting1");
         Log.info("Killing");
         lazyFs2.crash();
+        container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting1");
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
         var client = DockerClientFactory.instance().client();
         client.killContainerCmd(container2.getContainerId()).exec();
@@ -410,12 +409,11 @@ public class LazyFsIT {
         });
         barrier2.await();
         Thread.sleep(3000);
-        container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting2");
         Log.info("Killing");
         if (crashType.equals(CrashType.CRASH)) {
-            Thread.sleep(2000);
             lazyFs2.crash();
         }
+        container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting2");
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
         client.killContainerCmd(container2.getContainerId()).exec();
         container2.stop();
