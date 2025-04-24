@@ -1,6 +1,5 @@
 package com.usatiuk.dhfs.repository;
 
-import com.usatiuk.dhfs.ProtoSerializer;
 import com.usatiuk.dhfs.*;
 import com.usatiuk.dhfs.persistence.JObjectKeyP;
 import com.usatiuk.dhfs.repository.invalidation.Op;
@@ -105,6 +104,11 @@ public class RemoteObjectServiceServerImpl {
     }
 
     public Uni<OpPushReply> opPush(PeerId from, OpPushRequest request) {
+        if (request.getMsgCount() == 0) {
+            Log.infov("<-- opPush: empty from {0}", from);
+            return Uni.createFrom().item(OpPushReply.getDefaultInstance());
+        }
+
         var handles = new ArrayList<TransactionHandle>();
         try {
             var ops = request.getMsgList().stream().map(opProtoSerializer::deserialize).toList();
