@@ -4,6 +4,7 @@ import "./PeerKnownCard.scss";
 import { useFetcher, useLoaderData } from "react-router-dom";
 import { LoaderToType } from "./commonPlumbing";
 import { peerStateLoader } from "./PeerStatePlumbing";
+import { hashCert } from "./hash";
 
 export interface TPeerKnownCardProps {
     peerInfo: TKnownPeerInfoTo;
@@ -31,6 +32,9 @@ export function PeerKnownCard({ peerInfo }: TPeerKnownCardProps) {
                                 ? "connected"
                                 : "not connected"}
                         </span>
+                    </div>
+                    <div>
+                        <span>Cert: {hashCert(peerInfo.cert)}</span>
                     </div>
                 </div>
                 <div>

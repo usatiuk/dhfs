@@ -36,13 +36,28 @@ export type TTokenTo = z.infer<typeof TokenTo>;
 export const TokenToResp = CreateAPIResponse(TokenTo);
 export type TTokenToResp = z.infer<typeof TokenToResp>;
 
-//  AvailablePeerInfo
-export const AvailablePeerInfoTo = z.object({
+// SelfInfo
+
+export const SelfInfoTo = z.object({
+    selfUuid: z.string(),
+    cert: z.string(),
+});
+export type TSelfInfoTo = z.infer<typeof SelfInfoTo>;
+
+export const SelfInfoToResp = CreateAPIResponse(SelfInfoTo);
+export type TSelfInfoToResp = z.infer<typeof SelfInfoToResp>;
+
+// PeerInfo
+
+export const PeerInfoTo = z.object({
     uuid: z.string(),
     knownAddress: z.string().optional(),
-    // addr: z.string(),
-    // port: z.number(),
+    cert: z.string(),
 });
+export type TPeerInfoTo = z.infer<typeof PeerInfoTo>;
+
+//  AvailablePeerInfo
+export const AvailablePeerInfoTo = PeerInfoTo;
 export type TAvailablePeerInfoTo = z.infer<typeof AvailablePeerInfoTo>;
 
 export const AvailablePeerInfoArrTo = z.array(AvailablePeerInfoTo);
@@ -54,19 +69,13 @@ export const AvailablePeerInfoToResp = CreateAPIResponse(
 export type TAvailablePeerInfoToResp = z.infer<typeof AvailablePeerInfoToResp>;
 
 // KnownPeerInfo
-export const KnownPeerInfoTo = z.object({
-    uuid: z.string(),
-    knownAddress: z.string().optional(),
-});
+export const KnownPeerInfoTo = PeerInfoTo;
 export type TKnownPeerInfoTo = z.infer<typeof KnownPeerInfoTo>;
 
 export const KnownPeerInfoArrTo = z.array(KnownPeerInfoTo);
 export type TKnownPeerInfoArrTo = z.infer<typeof KnownPeerInfoArrTo>;
 
-export const KnownPeersTo = z.object({
-    selfUuid: z.string(),
-    peers: KnownPeerInfoArrTo,
-});
+export const KnownPeersTo = KnownPeerInfoArrTo;
 export type TKnownPeersTo = z.infer<typeof KnownPeersTo>;
 
 export const KnownPeersToResp = CreateAPIResponse(KnownPeersTo);
@@ -86,9 +95,9 @@ export const PeerAddressInfoToResp = CreateAPIResponse(PeerAddressInfoArrTo);
 export type TPeerAddressInfoToResp = z.infer<typeof PeerAddressInfoToResp>;
 
 // KnownPeerPut
-export const KnownPeerPutTo = z.object({ uuid: z.string() });
+export const KnownPeerPutTo = z.object({ cert: z.string() });
 export type TKnownPeerPutTo = z.infer<typeof KnownPeerPutTo>;
 
 // KnownPeerDelete
-export const KnownPeerDeleteTo = z.object({ uuid: z.string() });
+export const KnownPeerDeleteTo = NoContentTo;
 export type TKnownPeerDeleteTo = z.infer<typeof KnownPeerDeleteTo>;

@@ -1,4 +1,6 @@
 package com.usatiuk.dhfs.webapi;
 
-public record PeerInfo(String uuid, String address) {
+import jakarta.annotation.Nullable;
+
+public record PeerInfo(String uuid, String cert, @Nullable String knownAddress) {
 }

@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.peersync;
 
 import com.usatiuk.dhfs.peerdiscovery.PeerAddress;
 import com.usatiuk.dhfs.peerdiscovery.PeerDiscoveryDirectory;
+import com.usatiuk.dhfs.peersync.api.ApiPeerInfo;
 import com.usatiuk.dhfs.peersync.api.PeerSyncApiClientDynamic;
 import com.usatiuk.dhfs.peertrust.PeerTrustManager;
 import com.usatiuk.dhfs.remoteobj.SyncHandler;
@@ -13,11 +14,13 @@ import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 import io.smallrye.common.annotation.Blocking;
+import jakarta.annotation.Nullable;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
@@ -47,6 +50,8 @@ public class PeerManager {
     PeerTrustManager peerTrustManager;
     @ConfigProperty(name = "dhfs.objects.sync.ping.timeout")
     long pingTimeout;
+    @ConfigProperty(name = "dhfs.sync.cert-check", defaultValue = "true")
+    boolean certCheck;
     @Inject
     PeerDiscoveryDirectory peerDiscoveryDirectory;
     @Inject
@@ -185,24 +190,39 @@ public class PeerManager {
         return peerDiscoveryDirectory.getForPeer(host).stream().min(Comparator.comparing(PeerAddress::type));
     }
 
-    public void addRemoteHost(PeerId host) {
-        transactionManager.run(() -> {
+    private ApiPeerInfo getInfo(PeerId host) {
+        return transactionManager.run(() -> {
             if (peerInfoService.getPeerInfo(host).isPresent())
                 throw new IllegalStateException("Host " + host + " is already added");
 
             var addr = selectBestAddress(host).orElseThrow(() -> new IllegalStateException("Host " + host + " is unreachable"));
             var info = peerSyncApiClient.getSelfInfo(addr);
 
-            var cert = Base64.getDecoder().decode(info.cert());
-            peerInfoService.putPeer(host, cert);
+            return info;
+        });
+    }
+
+    public void addRemoteHost(PeerId host, @Nullable String cert) {
+        transactionManager.run(() -> {
+            var info = getInfo(host);
+
+            var certGot = Base64.getDecoder().decode(info.cert());
+            if (certCheck) {
+                var certApi = Base64.getDecoder().decode(cert);
+                if (!Arrays.equals(certGot, certApi))
+                    throw new IllegalStateException("Host " + host + " has different cert");
+            }
+            peerInfoService.putPeer(host, certGot);
         });
 
         peerTrustManager.reloadTrustManagerHosts(transactionManager.run(() -> peerInfoService.getPeers().stream().toList())); //FIXME:
     }
 
-    public Collection<PeerId> getSeenButNotAddedHosts() {
+
+    public Collection<Pair<PeerId, ApiPeerInfo>> getSeenButNotAddedHosts() {
         return transactionManager.run(() -> {
-            return peerDiscoveryDirectory.getReachablePeers().stream().filter(p -> !peerInfoService.getPeerInfo(p).isPresent()).toList();
+            return peerDiscoveryDirectory.getReachablePeers().stream().filter(p -> !peerInfoService.getPeerInfo(p).isPresent())
+                    .map(p -> Pair.of(p, getInfo(p))).toList();
         });
     }
 

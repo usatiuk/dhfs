@@ -78,6 +78,7 @@ public class DhfsImage implements Future<String> {
                                         "-Ddhfs.objects.sync.timeout=30",
                                         "-Ddhfs.objects.sync.ping.timeout=5",
                                         "-Ddhfs.objects.reconnect_interval=1s",
+                                        "-Ddhfs.sync.cert-check=false",
                                         "-Dquarkus.log.category.\"com.usatiuk\".level=TRACE",
                                         "-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=TRACE",
                                         "-Dquarkus.log.category.\"com.usatiuk.objects.transaction\".level=INFO",

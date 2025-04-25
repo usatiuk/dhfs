@@ -93,26 +93,26 @@ public class DhfsFusex3IT {
         var c1curl = container1.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
-                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
-                        "  http://localhost:8080/peers-manage/known-peers");
+                        "  --data '{}' " +
+                        "  http://localhost:8080/peers-manage/known-peers/" + c2uuid);
 
         var c2curl1 = container2.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
-                        "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
-                        "  http://localhost:8080/peers-manage/known-peers");
+                        "  --data '{}' " +
+                        "  http://localhost:8080/peers-manage/known-peers/" + c1uuid);
 
         var c2curl3 = container2.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
-                        "  --data '{\"uuid\":\"" + c3uuid + "\"}' " +
-                        "  http://localhost:8080/peers-manage/known-peers");
+                        "  --data '{}' " +
+                        "  http://localhost:8080/peers-manage/known-peers/" + c3uuid);
 
         var c3curl = container3.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
-                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
-                        "  http://localhost:8080/peers-manage/known-peers");
+                        "  --data '{}' " +
+                        "  http://localhost:8080/peers-manage/known-peers/" + c2uuid);
 
         waitingConsumer3.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);

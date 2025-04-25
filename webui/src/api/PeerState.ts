@@ -4,14 +4,25 @@ import {
     KnownPeersToResp,
     NoContentToResp,
     PeerAddressInfoToResp,
+    SelfInfoToResp,
     TAvailablePeerInfoArrTo,
     TAvailablePeerInfoToResp,
-    TKnownPeerInfoArrTo, TKnownPeersTo,
+    TKnownPeersTo,
     TKnownPeersToResp,
     TNoContentToResp,
     TPeerAddressInfoArrTo,
     TPeerAddressInfoToResp,
+    TSelfInfoTo,
+    TSelfInfoToResp,
 } from "./dto";
+
+export async function getSelfInfo(): Promise<TSelfInfoTo> {
+    return fetchJSON_throws<TSelfInfoToResp, typeof SelfInfoToResp>(
+        "/peer-info/self",
+        "GET",
+        SelfInfoToResp,
+    );
+}
 
 export async function getAvailablePeers(): Promise<TAvailablePeerInfoArrTo> {
     return fetchJSON_throws<
@@ -28,16 +39,27 @@ export async function getKnownPeers(): Promise<TKnownPeersTo> {
     );
 }
 
-export async function putKnownPeer(uuid: string): Promise<TNoContentToResp> {
-    return fetchJSON("/peers-manage/known-peers", "PUT", NoContentToResp, {
-        uuid,
-    });
+export async function putKnownPeer(
+    uuid: string,
+    cert: string,
+): Promise<TNoContentToResp> {
+    return fetchJSON(
+        `/peers-manage/known-peers/${uuid}`,
+        "PUT",
+        NoContentToResp,
+        {
+            cert,
+        },
+    );
 }
 
 export async function removeKnownPeer(uuid: string): Promise<TNoContentToResp> {
-    return fetchJSON("/peers-manage/known-peers", "DELETE", NoContentToResp, {
-        uuid,
-    });
+    return fetchJSON(
+        `/peers-manage/known-peers/${uuid}`,
+        "DELETE",
+        NoContentToResp,
+        {},
+    );
 }
 
 export async function getPeerAddresses(): Promise<TPeerAddressInfoArrTo> {

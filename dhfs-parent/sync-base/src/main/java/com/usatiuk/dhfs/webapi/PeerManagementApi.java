@@ -5,14 +5,9 @@ import com.usatiuk.dhfs.peersync.PeerInfoService;
 import com.usatiuk.dhfs.peersync.PeerManager;
 import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.DELETE;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.PUT;
-import jakarta.ws.rs.Path;
+import jakarta.ws.rs.*;
 
-import java.util.Collection;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 @Path("/peers-manage")
 public class PeerManagementApi {
@@ -25,43 +20,30 @@ public class PeerManagementApi {
 
     @Path("known-peers")
     @GET
-    public KnownPeers knownPeers() {
-        return new KnownPeers(peerInfoService.getPeers().stream().map(peerInfo -> new KnownPeerInfo(peerInfo.id().toString(),
-                Optional.ofNullable(peerManager.getAddress(peerInfo.id())).map(Objects::toString).orElse(null))).toList(),
-                persistentPeerDataService.getSelfUuid().toString());
+    public List<PeerInfo> knownPeers() {
+        return peerInfoService.getPeers().stream().map(
+                peerInfo -> new PeerInfo(peerInfo.id().toString(), Base64.getEncoder().encodeToString(peerInfo.cert().toByteArray()),
+                        Optional.ofNullable(peerManager.getAddress(peerInfo.id())).map(Objects::toString).orElse(null))).toList();
     }
 
-    @Path("known-peers")
+    @Path("known-peers/{peerId}")
     @PUT
-    public void addPeer(KnownPeerPut knownPeerPut) {
-        peerManager.addRemoteHost(PeerId.of(knownPeerPut.uuid()));
+    public void addPeer(@PathParam("peerId") String peerId, KnownPeerPut knownPeerPut) {
+        peerManager.addRemoteHost(PeerId.of(peerId), knownPeerPut.cert());
     }
 
-    @Path("known-peers")
+    @Path("known-peers/{peerId}")
     @DELETE
-    public void deletePeer(KnownPeerDelete knownPeerDelete) {
-        peerManager.removeRemoteHost(PeerId.of(knownPeerDelete.uuid()));
+    public void deletePeer(@PathParam("peerId") String peerId) {
+        peerManager.removeRemoteHost(PeerId.of(peerId));
     }
 
     @Path("available-peers")
     @GET
-    public Collection<KnownPeerInfo> availablePeers() {
+    public Collection<PeerInfo> availablePeers() {
         return peerManager.getSeenButNotAddedHosts().stream()
-                .map(p -> new KnownPeerInfo(p.toString(),
-                        peerManager.selectBestAddress(p).map(Objects::toString).orElse(null)))
+                .map(p -> new PeerInfo(p.getLeft().toString(), p.getRight().cert(),
+                        peerManager.selectBestAddress(p.getLeft()).map(Objects::toString).orElse(null)))
                 .toList();
-    }
-
-    @Path("peer-state")
-    @GET
-    public Collection<PeerInfo> peerInfos(Collection<String> peerIdStrings) {
-        return peerIdStrings.stream().map(PeerId::of).map(
-                peerId -> {
-                    return new PeerInfo(
-                            peerId.toString(),
-                            peerManager.getAddress(peerId).toString()
-                    );
-                }
-        ).toList();
     }
 }

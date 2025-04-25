@@ -2,6 +2,7 @@ import {
     getAvailablePeers,
     getKnownPeers,
     getPeerAddresses,
+    getSelfInfo,
     putKnownPeer,
     putPeerAddress,
     removeKnownPeer,
@@ -10,6 +11,7 @@ import { ActionFunctionArgs } from "react-router-dom";
 
 export async function peerStateLoader() {
     return {
+        selfInfo: await getSelfInfo(),
         availablePeers: await getAvailablePeers(),
         knownPeers: await getKnownPeers(),
         peerAddresses: await getPeerAddresses(),
@@ -26,7 +28,10 @@ export async function peerStateAction({ request }: ActionFunctionArgs) {
     const formData = await request.formData();
     const intent = formData.get("intent") as PeerStateActionType;
     if (intent === "add_peer") {
-        return await putKnownPeer(formData.get("uuid") as string);
+        return await putKnownPeer(
+            formData.get("uuid") as string,
+            formData.get("cert") as string,
+        );
     } else if (intent === "remove_peer") {
         return await removeKnownPeer(formData.get("uuid") as string);
     } else if (intent === "save_addr") {

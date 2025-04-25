@@ -4,12 +4,13 @@ import { LoaderToType } from "./commonPlumbing";
 import { peerStateLoader } from "./PeerStatePlumbing";
 import { PeerAvailableCard } from "./PeerAvailableCard";
 import { PeerKnownCard } from "./PeerKnownCard";
+import { hashCert } from "./hash";
 
 export function PeerState() {
     const loaderData = useLoaderData() as LoaderToType<typeof peerStateLoader>;
 
-    const knownPeers = loaderData.knownPeers.peers
-        ?.filter((p) => p.uuid !== loaderData.knownPeers.selfUuid)
+    const knownPeers = loaderData.knownPeers
+        ?.filter((p) => p.uuid !== loaderData.selfInfo.selfUuid)
         ?.map((p) => <PeerKnownCard peerInfo={p} key={p.uuid} />);
 
     const availablePeers = loaderData.availablePeers.map((p) => (
@@ -18,7 +19,8 @@ export function PeerState() {
 
     return (
         <div id={"PeerState"}>
-            <div>Self UUID: {loaderData.knownPeers.selfUuid}</div>
+            <div>UUID: {loaderData.selfInfo.selfUuid}</div>
+            <div>Certificate: {hashCert(loaderData.selfInfo.cert)} </div>
             <div>
                 <div>Known peers</div>
                 <div>{knownPeers}</div>
