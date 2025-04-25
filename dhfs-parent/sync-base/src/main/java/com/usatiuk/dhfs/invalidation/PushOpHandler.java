@@ -17,6 +17,6 @@ public class PushOpHandler {
     RemoteTransaction remoteTransaction;
 
     public void handlePush(PeerId peer, IndexUpdateOp obj) {
-        syncHandler.handleRemoteUpdate(peer, obj.key(), obj.changelog(), obj.data());
+        syncHandler.handleRemoteUpdate(peer, obj.key(), obj.changelog(), null);
     }
 }
