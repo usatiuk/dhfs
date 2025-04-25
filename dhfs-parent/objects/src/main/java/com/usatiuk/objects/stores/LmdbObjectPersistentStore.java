@@ -42,6 +42,9 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
     private static final String DB_VER_OBJ_NAME_STR = "__DB_VER_OBJ";
     private static final ByteBuffer DB_VER_OBJ_NAME;
 
+    @ConfigProperty(name = "dhfs.objects.persistence.lmdb.size", defaultValue = "1000000000000")
+    long lmdbSize;
+
     static {
         byte[] tmp = DB_VER_OBJ_NAME_STR.getBytes(StandardCharsets.ISO_8859_1);
         var bb = ByteBuffer.allocateDirect(tmp.length);
@@ -65,7 +68,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             _root.toFile().mkdirs();
         }
         _env = create()
-                .setMapSize(1_000_000_000_000L)
+                .setMapSize(lmdbSize)
                 .setMaxDbs(1)
                 .open(_root.toFile(), EnvFlags.MDB_NOTLS);
         _db = _env.openDbi(DB_NAME, MDB_CREATE);
