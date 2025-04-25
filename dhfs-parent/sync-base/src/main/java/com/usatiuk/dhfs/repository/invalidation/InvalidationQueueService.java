@@ -1,14 +1,17 @@
 package com.usatiuk.dhfs.repository.invalidation;
 
-import com.usatiuk.dhfs.repository.RemoteObjectServiceClient;
-import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
-import com.usatiuk.dhfs.utils.DataLocker;
-import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.PeerId;
 import com.usatiuk.dhfs.repository.PeerManager;
 import com.usatiuk.dhfs.repository.PersistentPeerDataService;
+import com.usatiuk.dhfs.repository.RemoteObjectServiceClient;
 import com.usatiuk.dhfs.repository.peersync.PeerInfoService;
+import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
+import com.usatiuk.dhfs.utils.DataLocker;
 import com.usatiuk.dhfs.utils.HashSetDelayedBlockingQueue;
+import com.usatiuk.objects.JData;
+import com.usatiuk.objects.JObjectKey;
+import com.usatiuk.objects.transaction.Transaction;
+import com.usatiuk.objects.transaction.TransactionManager;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -17,7 +20,6 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.core.Link;
 import org.apache.commons.collections4.multimap.ArrayListValuedHashMap;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -40,7 +42,10 @@ public class InvalidationQueueService {
     @Inject
     PeerInfoService peerInfoService;
     @Inject
-    OpPusher opPusher;
+    TransactionManager txm;
+    @Inject
+    Transaction curTx;
+
     @ConfigProperty(name = "dhfs.objects.invalidation.threads")
     int threads;
     @Inject
@@ -49,6 +54,8 @@ public class InvalidationQueueService {
     private final DataLocker _locker = new DataLocker();
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
+    @Inject
+    OpExtractorService opExtractorService;
     private ExecutorService _executor;
     private volatile boolean _shutdown = false;
 
@@ -141,9 +148,15 @@ public class InvalidationQueueService {
                             }
                             locks.add(lock);
                             try {
-                                var prepared = opPusher.preparePush(e);
-                                ops.get(e.peer()).addAll(prepared.getLeft());
-                                commits.get(e.peer()).addAll(prepared.getRight());
+                                txm.run(() -> {
+                                    var obj = curTx.get(JData.class, e.key()).orElse(null);
+                                    if (obj == null) return;
+
+                                    var extracted = opExtractorService.extractOps(obj, e.peer());
+                                    if (extracted == null) return;
+                                    ops.get(e.peer()).addAll(extracted.getLeft());
+                                    commits.get(e.peer()).add(extracted.getRight());
+                                });
                                 success++;
                             } catch (Exception ex) {
                                 Log.warnv("Failed to prepare invalidation to {0}, will retry: {1}", e, ex);
