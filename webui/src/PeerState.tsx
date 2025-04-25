@@ -4,7 +4,6 @@ import { LoaderToType } from "./commonPlumbing";
 import { peerStateLoader } from "./PeerStatePlumbing";
 import { PeerAvailableCard } from "./PeerAvailableCard";
 import { PeerKnownCard } from "./PeerKnownCard";
-import { hashCert } from "./hash";
 
 export function PeerState() {
     const loaderData = useLoaderData() as LoaderToType<typeof peerStateLoader>;
@@ -20,7 +19,7 @@ export function PeerState() {
     return (
         <div id={"PeerState"}>
             <div>UUID: {loaderData.selfInfo.selfUuid}</div>
-            <div>Certificate: {hashCert(loaderData.selfInfo.cert)} </div>
+            <div>Certificate: {loaderData.selfInfo.certHash} </div>
             <div>
                 <div>Known peers</div>
                 <div>{knownPeers}</div>

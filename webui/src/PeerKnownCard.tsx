@@ -4,10 +4,13 @@ import "./PeerKnownCard.scss";
 import { useFetcher, useLoaderData } from "react-router-dom";
 import { LoaderToType } from "./commonPlumbing";
 import { peerStateLoader } from "./PeerStatePlumbing";
-import { hashCert } from "./hash";
+
+interface TKnownPeerInfoToWithHash extends TKnownPeerInfoTo {
+    certHash: string;
+}
 
 export interface TPeerKnownCardProps {
-    peerInfo: TKnownPeerInfoTo;
+    peerInfo: TKnownPeerInfoToWithHash;
 }
 
 export function PeerKnownCard({ peerInfo }: TPeerKnownCardProps) {
@@ -34,7 +37,7 @@ export function PeerKnownCard({ peerInfo }: TPeerKnownCardProps) {
                         </span>
                     </div>
                     <div>
-                        <span>Cert: {hashCert(peerInfo.cert)}</span>
+                        <span>Cert: {peerInfo.certHash}</span>
                     </div>
                 </div>
                 <div>

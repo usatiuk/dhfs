@@ -2,10 +2,13 @@ import { TAvailablePeerInfoTo } from "./api/dto";
 import { useFetcher } from "react-router-dom";
 
 import "./PeerAvailableCard.scss";
-import { hashCert } from "./hash";
+
+interface TAvailablePeerInfoToWithHash extends TAvailablePeerInfoTo {
+    certHash: string;
+}
 
 export interface TPeerAvailableCardProps {
-    peerInfo: TAvailablePeerInfoTo;
+    peerInfo: TAvailablePeerInfoToWithHash;
 }
 
 export function PeerAvailableCard({ peerInfo }: TPeerAvailableCardProps) {
@@ -18,7 +21,7 @@ export function PeerAvailableCard({ peerInfo }: TPeerAvailableCardProps) {
                     <span>{peerInfo.uuid}</span>
                 </div>
                 <div>
-                    <span>Cert: {hashCert(peerInfo.cert)}</span>
+                    <span>Cert: {peerInfo.certHash}</span>
                 </div>
             </div>
             <fetcher.Form

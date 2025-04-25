@@ -8,13 +8,38 @@ import {
     removeKnownPeer,
 } from "./api/PeerState";
 import { ActionFunctionArgs } from "react-router-dom";
+import { hashCert } from "./hash";
 
 export async function peerStateLoader() {
+    const selfInfoApi = await getSelfInfo();
+    const selfInfo = {
+        ...selfInfoApi,
+        certHash: await hashCert(selfInfoApi.cert),
+    };
+    const availablePeersApi = await getAvailablePeers();
+    const availablePeers = await Promise.all(
+        availablePeersApi.map(async (peerInfo) => {
+            return {
+                ...peerInfo,
+                certHash: await hashCert(peerInfo.cert),
+            };
+        }),
+    );
+    const knownPeersApi = await getKnownPeers();
+    const knownPeers = await Promise.all(
+        knownPeersApi.map(async (peerInfo) => {
+            return {
+                ...peerInfo,
+                certHash: await hashCert(peerInfo.cert),
+            };
+        }),
+    );
+    const peerAddresses = await getPeerAddresses();
     return {
-        selfInfo: await getSelfInfo(),
-        availablePeers: await getAvailablePeers(),
-        knownPeers: await getKnownPeers(),
-        peerAddresses: await getPeerAddresses(),
+        selfInfo,
+        availablePeers,
+        knownPeers,
+        peerAddresses,
     };
 }
 
