@@ -54,7 +54,9 @@ export function PeerKnownCard({ peerInfo }: TPeerKnownCardProps) {
                 </div>
                 <div>
                     <span>
-                        {peerInfo.knownAddress ? "connected" : "not connected"}
+                        {peerInfo.knownAddress
+                            ? "connected: " + peerInfo.knownAddress
+                            : "not connected"}
                     </span>
                 </div>
             </div>

@@ -9,4 +9,12 @@ public record IpPeerAddress(PeerId peer, PeerAddressType type,
     public IpPeerAddress withType(PeerAddressType type) {
         return new IpPeerAddress(peer, type, address, port, securePort);
     }
+
+    @Override
+    public String toString() {
+        return "IP: " + address.getHostAddress() +
+                ":" + port +
+                ":" + securePort +
+                ", type: " + type;
+    }
 }

@@ -22,6 +22,9 @@ export function PeerAvailableCard({ peerInfo }: TPeerAvailableCardProps) {
                 </div>
                 <div>
                     <span>Certificate: {peerInfo.certHash}</span>
+                </div>{
+                <div>
+                    <span>Address: {peerInfo.knownAddress}</span>
                 </div>
             </div>
             <fetcher.Form
