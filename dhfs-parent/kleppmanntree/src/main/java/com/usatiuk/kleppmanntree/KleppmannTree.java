@@ -334,11 +334,6 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 var conflictNode = _storage.getById(conflictNodeId);
                 MetaT conflictNodeMeta = conflictNode.meta();
 
-                if (Objects.equals(conflictNodeMeta, op.newMeta())) {
-                    LOGGER.finer(() -> "Node creation conflict (the same): " + conflictNode);
-                    return new LogRecord<>(op, null);
-                }
-
                 LOGGER.finer(() -> "Node creation conflict: " + conflictNode);
 
                 String newConflictNodeName = op.newName() + ".conflict." + conflictNode.key();
@@ -370,10 +365,6 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         if (replaceNodeId != null) {
             var replaceNode = _storage.getById(replaceNodeId);
             var replaceNodeMeta = replaceNode.meta();
-
-            if (Objects.equals(replaceNodeMeta, op.newMeta())) {
-                return new LogRecord<>(op, null);
-            }
 
             LOGGER.finer(() -> "Node replacement: " + replaceNode);
 

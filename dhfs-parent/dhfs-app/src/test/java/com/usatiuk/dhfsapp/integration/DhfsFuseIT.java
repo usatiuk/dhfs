@@ -80,6 +80,22 @@ public class DhfsFuseIT {
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
     }
 
+    private void checkConsistency() {
+        await().atMost(45, TimeUnit.SECONDS).until(() -> {
+            Log.info("Listing consistency");
+            var cat1 = container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/*/*");
+            var cat2 = container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/*/*");
+            var ls1 = container1.execInContainer("/bin/sh", "-c", "ls /dhfs_test/fuse/*/*");
+            var ls2 = container2.execInContainer("/bin/sh", "-c", "ls /dhfs_test/fuse/*/*");
+            Log.info(ls1);
+            Log.info(cat1);
+            Log.info(ls2);
+            Log.info(cat2);
+
+            return ls1.equals(ls2) && cat1.equals(cat2);
+        });
+    }
+
     @AfterEach
     void stop() {
         Stream.of(container1, container2).parallel().forEach(GenericContainer::stop);
@@ -249,7 +265,7 @@ public class DhfsFuseIT {
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request DELETE " +
                         "  --data '{}' " +
-                        "  http://localhost:8080/peers-manage/known-peers/"+c1uuid);
+                        "  http://localhost:8080/peers-manage/known-peers/" + c1uuid);
 
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "echo rewritten > /dhfs_test/fuse/testf1").getExitCode());
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "echo jioadsd > /dhfs_test/fuse/newfile1").getExitCode());
@@ -265,7 +281,7 @@ public class DhfsFuseIT {
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
                         "  --data '{}' " +
-                        "  http://localhost:8080/peers-manage/known-peers/"+c1uuid);
+                        "  http://localhost:8080/peers-manage/known-peers/" + c1uuid);
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
 
@@ -307,6 +323,33 @@ public class DhfsFuseIT {
             Log.info(cat);
             return cat.getStdout().contains("test1") && cat.getStdout().contains("test2");
         });
+    }
+
+    @Test
+    void dirConflictTest2() throws IOException, InterruptedException, TimeoutException {
+        var client = DockerClientFactory.instance().client();
+        client.disconnectFromNetworkCmd().withContainerId(container1.getContainerId()).withNetworkId(network.getId()).exec();
+        client.disconnectFromNetworkCmd().withContainerId(container2.getContainerId()).withNetworkId(network.getId()).exec();
+
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS, 1);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS, 1);
+
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "mkdir /dhfs_test/fuse/a && echo fdsaio >> /dhfs_test/fuse/a/testf").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "mkdir /dhfs_test/fuse/a && echo exgrg >> /dhfs_test/fuse/a/testf").getExitCode());
+
+        client.connectToNetworkCmd().withContainerId(container1.getContainerId()).withNetworkId(network.getId()).exec();
+        client.connectToNetworkCmd().withContainerId(container2.getContainerId()).withNetworkId(network.getId()).exec();
+
+        Log.warn("Waiting for connections");
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 1);
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 1);
+        Log.warn("Connected");
+
+        checkConsistency();
+
+        var ls1 = container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/a*/*");
+        Assertions.assertTrue(ls1.getStdout().contains("fdsaio"));
+        Assertions.assertTrue(ls1.getStdout().contains("exgrg"));
     }
 
     @Test
