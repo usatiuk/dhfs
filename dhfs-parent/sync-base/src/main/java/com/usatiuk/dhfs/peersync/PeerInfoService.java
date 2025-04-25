@@ -41,7 +41,7 @@ public class PeerInfoService {
         return jObjectTxManager.run(() -> {
             return curTx.get(JKleppmannTreeNode.class, key).flatMap(node -> {
                 var meta = (JKleppmannTreeNodeMetaPeer) node.meta();
-                return remoteTx.getData(PeerInfo.class, meta.getPeerId());
+                return remoteTx.getData(PeerInfo.class, meta.peerId());
             });
         });
 
@@ -65,7 +65,7 @@ public class PeerInfoService {
             }
             return curTx.get(JKleppmannTreeNode.class, gotKey).flatMap(node -> {
                 var meta = (JKleppmannTreeNodeMetaPeer) node.meta();
-                return remoteTx.getData(PeerInfo.class, meta.getPeerId());
+                return remoteTx.getData(PeerInfo.class, meta.peerId());
             });
         });
     }

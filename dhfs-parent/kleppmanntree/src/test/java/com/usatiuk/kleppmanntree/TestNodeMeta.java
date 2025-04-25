@@ -8,7 +8,7 @@ public abstract class TestNodeMeta implements NodeMeta {
     }
 
     @Override
-    public String getName() {
+    public String name() {
         return _name;
     }
 

@@ -7,7 +7,7 @@ public record OpMove<TimestampT extends Comparable<TimestampT>, PeerIdT extends 
          NodeIdT childId) implements Serializable {
     public String newName() {
         if (newMeta != null)
-            return newMeta.getName();
+            return newMeta.name();
         return childId.toString();
     }
 }

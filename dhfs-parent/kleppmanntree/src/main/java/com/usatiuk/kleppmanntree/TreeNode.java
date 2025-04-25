@@ -17,7 +17,7 @@ public interface TreeNode<TimestampT extends Comparable<TimestampT>, PeerIdT ext
 
     default String name() {
         var meta = meta();
-        if (meta != null) return meta.getName();
+        if (meta != null) return meta.name();
         return key().toString();
     }
 

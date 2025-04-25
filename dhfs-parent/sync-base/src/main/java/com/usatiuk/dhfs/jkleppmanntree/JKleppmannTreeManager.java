@@ -168,7 +168,7 @@ public class JKleppmannTreeManager {
 //            }
 
             if (Log.isTraceEnabled())
-                Log.trace("Received op from " + from + ": " + jop.op().timestamp().timestamp() + " " + jop.op().childId() + "->" + jop.op().newParentId() + " as " + jop.op().newMeta().getName());
+                Log.trace("Received op from " + from + ": " + jop.op().timestamp().timestamp() + " " + jop.op().childId() + "->" + jop.op().newParentId() + " as " + jop.op().newMeta().name());
 
             try {
                 _tree.applyExternalOp(from, jop.op());

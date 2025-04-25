@@ -6,15 +6,11 @@ import com.usatiuk.objects.JObjectKey;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 
 //@ProtoMirror(JKleppmannTreeNodeMetaFileP.class)
-public class JKleppmannTreeNodeMetaPeer extends JKleppmannTreeNodeMeta {
-    private final JObjectKey _peerId;
-
+public record JKleppmannTreeNodeMetaPeer(String name, JObjectKey peerId) implements JKleppmannTreeNodeMeta {
     public JKleppmannTreeNodeMetaPeer(PeerId id) {
-        super(peerIdToNodeId(id).value());
-        _peerId = id.toJObjectKey();
+        this(peerIdToNodeId(id).value(), id.id());
     }
 
     public static JObjectKey peerIdToNodeId(PeerId id) {
@@ -28,33 +24,15 @@ public class JKleppmannTreeNodeMetaPeer extends JKleppmannTreeNodeMeta {
         return PeerId.of(id.value().substring(0, id.value().length() - "_tree_node".length()));
     }
 
-    public JObjectKey getPeerId() {
-        return _peerId;
-    }
-
     @Override
     public JKleppmannTreeNodeMeta withName(String name) {
-        assert name.equals(peerIdToNodeId(PeerId.of(getPeerId().value())).toString());
-        assert getName().equals(name);
+        assert name.equals(peerIdToNodeId(PeerId.of(peerId().value())).toString());
+        assert name().equals(name);
         return this;
     }
 
     @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-        JKleppmannTreeNodeMetaPeer that = (JKleppmannTreeNodeMetaPeer) o;
-        return Objects.equals(_peerId, that._peerId);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(super.hashCode(), _peerId);
-    }
-
-    @Override
     public Collection<JObjectKey> collectRefsTo() {
-        return List.of(_peerId);
+        return List.of(peerId);
     }
 }

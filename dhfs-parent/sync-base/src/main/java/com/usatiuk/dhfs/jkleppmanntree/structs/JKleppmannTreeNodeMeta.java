@@ -4,42 +4,10 @@ import com.usatiuk.kleppmanntree.NodeMeta;
 import com.usatiuk.objects.JObjectKey;
 
 import java.util.Collection;
-import java.util.Objects;
 
 //@ProtoMirror(JKleppmannTreeNodeMetaP.class)
-public abstract class JKleppmannTreeNodeMeta implements NodeMeta {
-    private final String _name;
+public interface JKleppmannTreeNodeMeta extends NodeMeta {
+    JKleppmannTreeNodeMeta withName(String name);
 
-    public JKleppmannTreeNodeMeta(String name) {
-        _name = name;
-    }
-
-    public String getName() {
-        return _name;
-    }
-
-    public abstract JKleppmannTreeNodeMeta withName(String name);
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        JKleppmannTreeNodeMeta that = (JKleppmannTreeNodeMeta) o;
-        return Objects.equals(_name, that._name);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hashCode(_name);
-    }
-
-    @Override
-    public String toString() {
-        return "JKleppmannTreeNodeMeta{" +
-                "class=" + this.getClass().getSimpleName() + " " +
-                "_name='" + _name + '\'' +
-                '}';
-    }
-
-    abstract public Collection<JObjectKey> collectRefsTo();
+    Collection<JObjectKey> collectRefsTo();
 }

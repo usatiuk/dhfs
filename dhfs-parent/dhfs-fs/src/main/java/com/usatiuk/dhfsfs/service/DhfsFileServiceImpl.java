@@ -140,7 +140,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             try {
                 var ret = getDirEntryR(name);
                 return switch (ret.meta()) {
-                    case JKleppmannTreeNodeMetaFile f -> Optional.of(f.getFileIno());
+                    case JKleppmannTreeNodeMetaFile f -> Optional.of(f.fileIno());
                     case JKleppmannTreeNodeMetaDirectory f -> Optional.of(ret.key());
                     default -> Optional.empty();
                 };
@@ -189,7 +189,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         return jObjectTxManager.executeTx(() -> {
             return getTreeW().findParent(w -> {
                 if (w.meta() instanceof JKleppmannTreeNodeMetaFile f)
-                    return f.getFileIno().equals(ino);
+                    return f.fileIno().equals(ino);
                 return false;
             });
         });
