@@ -23,11 +23,11 @@ public class OpHandler {
         if (op instanceof IndexUpdateOp iu) {
             pushOpHandler.handlePush(from, iu);
         } else if (op instanceof JKleppmannTreeOpWrapper jk) {
-            var tree = jKleppmannTreeManager.getTree(jk.treeName());
+            var tree = jKleppmannTreeManager.getTree(jk.treeName()).orElseThrow();
             tree.acceptExternalOp(from, jk);
             curTx.onCommit(() -> invalidationQueueService.pushInvalidationToOne(from, jk.treeName()));
         } else if (op instanceof JKleppmannTreePeriodicPushOp pop) {
-            var tree = jKleppmannTreeManager.getTree(pop.treeName());
+            var tree = jKleppmannTreeManager.getTree(pop.treeName()).orElseThrow();
             tree.acceptExternalOp(from, pop);
         }
     }

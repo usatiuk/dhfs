@@ -1,15 +1,17 @@
 package com.usatiuk.dhfs.jkleppmanntree;
 
-import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.dhfs.peersync.PeerId;
-import com.usatiuk.dhfs.jkleppmanntree.structs.*;
-import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
 import com.usatiuk.dhfs.invalidation.Op;
+import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNode;
+import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
+import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreePersistentData;
+import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.peersync.PeerInfoService;
+import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
+import com.usatiuk.kleppmanntree.*;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.transaction.LockingStrategy;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;
-import com.usatiuk.kleppmanntree.*;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -20,6 +22,7 @@ import org.pcollections.TreePSet;
 
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 @ApplicationScoped
 public class JKleppmannTreeManager {
@@ -35,7 +38,7 @@ public class JKleppmannTreeManager {
     @Inject
     PersistentPeerDataService persistentPeerDataService;
 
-    public JKleppmannTree getTree(JObjectKey name, LockingStrategy lockingStrategy) {
+    public JKleppmannTree getTree(JObjectKey name, LockingStrategy lockingStrategy, Supplier<JKleppmannTreeNodeMeta> rootNodeSupplier) {
         return txManager.executeTx(() -> {
             var data = curTx.get(JKleppmannTreePersistentData.class, name, lockingStrategy).orElse(null);
             if (data == null) {
@@ -49,11 +52,11 @@ public class JKleppmannTreeManager {
                         TreePMap.empty()
                 );
                 curTx.put(data);
-                var rootNode = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_root"), null, new JKleppmannTreeNodeMetaDirectory(""));
+                var rootNode = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_root"), null, rootNodeSupplier.get());
                 curTx.put(rootNode);
-                var trashNode = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_trash"), null, new JKleppmannTreeNodeMetaDirectory(""));
+                var trashNode = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_trash"), null, rootNodeSupplier.get());
                 curTx.put(trashNode);
-                var lf_node = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_lf"), null, new JKleppmannTreeNodeMetaDirectory(""));
+                var lf_node = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_lf"), null, rootNodeSupplier.get());
                 curTx.put(lf_node);
             }
             return new JKleppmannTree(data);
@@ -61,8 +64,18 @@ public class JKleppmannTreeManager {
         });
     }
 
-    public JKleppmannTree getTree(JObjectKey name) {
+    public Optional<JKleppmannTree> getTree(JObjectKey name) {
         return getTree(name, LockingStrategy.WRITE);
+    }
+
+    public Optional<JKleppmannTree> getTree(JObjectKey name, LockingStrategy lockingStrategy) {
+        return txManager.executeTx(() -> {
+            return curTx.get(JKleppmannTreePersistentData.class, name, lockingStrategy).map(JKleppmannTree::new);
+        });
+    }
+
+    public JKleppmannTree getTree(JObjectKey name, Supplier<JKleppmannTreeNodeMeta> rootNodeSupplier) {
+        return getTree(name, LockingStrategy.WRITE, rootNodeSupplier);
     }
 
     public class JKleppmannTree {

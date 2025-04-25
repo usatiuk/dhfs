@@ -1,7 +1,10 @@
-package com.usatiuk.dhfs.jkleppmanntree.structs;
+package com.usatiuk.dhfsfs.objects;
 
+import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.objects.JObjectKey;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 
 public class JKleppmannTreeNodeMetaFile extends JKleppmannTreeNodeMeta {
@@ -41,5 +44,10 @@ public class JKleppmannTreeNodeMetaFile extends JKleppmannTreeNodeMeta {
                 "_name=" + getName() + ", " +
                 "_fileIno=" + _fileIno +
                 '}';
+    }
+
+    @Override
+    public Collection<JObjectKey> collectRefsTo() {
+        return List.of(_fileIno);
     }
 }

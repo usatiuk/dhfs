@@ -4,6 +4,8 @@ import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 
 //@ProtoMirror(JKleppmannTreeNodeMetaFileP.class)
@@ -49,5 +51,10 @@ public class JKleppmannTreeNodeMetaPeer extends JKleppmannTreeNodeMeta {
     @Override
     public int hashCode() {
         return Objects.hash(super.hashCode(), _peerId);
+    }
+
+    @Override
+    public Collection<JObjectKey> collectRefsTo() {
+        return List.of(_peerId);
     }
 }

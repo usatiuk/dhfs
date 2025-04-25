@@ -1,7 +1,9 @@
 package com.usatiuk.dhfs.jkleppmanntree.structs;
 
 import com.usatiuk.kleppmanntree.NodeMeta;
+import com.usatiuk.objects.JObjectKey;
 
+import java.util.Collection;
 import java.util.Objects;
 
 //@ProtoMirror(JKleppmannTreeNodeMetaP.class)
@@ -38,4 +40,6 @@ public abstract class JKleppmannTreeNodeMeta implements NodeMeta {
                 "_name='" + _name + '\'' +
                 '}';
     }
+
+    abstract public Collection<JObjectKey> collectRefsTo();
 }

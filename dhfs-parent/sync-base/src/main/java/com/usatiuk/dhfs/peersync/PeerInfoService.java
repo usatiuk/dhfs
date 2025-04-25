@@ -1,10 +1,10 @@
 package com.usatiuk.dhfs.peersync;
 
-import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.dhfs.remoteobj.RemoteTransaction;
 import com.usatiuk.dhfs.jkleppmanntree.JKleppmannTreeManager;
 import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.peersync.structs.JKleppmannTreeNodeMetaPeer;
+import com.usatiuk.dhfs.remoteobj.RemoteTransaction;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.transaction.LockingStrategy;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;
@@ -30,11 +30,11 @@ public class PeerInfoService {
     RemoteTransaction remoteTx;
 
     private JKleppmannTreeManager.JKleppmannTree getTreeW() {
-        return jKleppmannTreeManager.getTree(TREE_KEY);
+        return jKleppmannTreeManager.getTree(TREE_KEY, () -> null);
     }
 
     private JKleppmannTreeManager.JKleppmannTree getTreeR() {
-        return jKleppmannTreeManager.getTree(TREE_KEY, LockingStrategy.OPTIMISTIC);
+        return jKleppmannTreeManager.getTree(TREE_KEY, LockingStrategy.OPTIMISTIC, () -> null);
     }
 
     public Optional<PeerInfo> getPeerInfoImpl(JObjectKey key) {

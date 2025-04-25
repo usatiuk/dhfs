@@ -1,12 +1,12 @@
 package com.usatiuk.dhfs.jkleppmanntree.structs;
 
+import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.refcount.JDataRef;
 import com.usatiuk.dhfs.refcount.JDataRefcounted;
-import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.dhfs.peersync.PeerId;
-import com.usatiuk.dhfs.peersync.structs.JKleppmannTreeNodeMetaPeer;
 import com.usatiuk.kleppmanntree.OpMove;
 import com.usatiuk.kleppmanntree.TreeNode;
+import com.usatiuk.objects.JObjectKey;
+import jakarta.annotation.Nullable;
 import org.pcollections.HashTreePMap;
 import org.pcollections.PCollection;
 import org.pcollections.PMap;
@@ -14,13 +14,14 @@ import org.pcollections.TreePSet;
 
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 // FIXME: Ideally this is two classes?
 public record JKleppmannTreeNode(JObjectKey key, PCollection<JDataRef> refsFrom, boolean frozen, JObjectKey parent,
                                  OpMove<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> lastEffectiveOp,
-                                 JKleppmannTreeNodeMeta meta,
+                                 @Nullable JKleppmannTreeNodeMeta meta,
                                  PMap<String, JObjectKey> children) implements TreeNode<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>, JDataRefcounted, Serializable {
 
     public JKleppmannTreeNode(JObjectKey id, JObjectKey parent, JKleppmannTreeNodeMeta meta) {
@@ -60,13 +61,9 @@ public record JKleppmannTreeNode(JObjectKey key, PCollection<JDataRef> refsFrom,
     @Override
     public Collection<JObjectKey> collectRefsTo() {
         return Stream.<JObjectKey>concat(children().values().stream(),
-                switch (meta()) {
-                    case JKleppmannTreeNodeMetaDirectory dir -> Stream.<JObjectKey>empty();
-                    case JKleppmannTreeNodeMetaFile file -> Stream.of(file.getFileIno());
-                    case JKleppmannTreeNodeMetaPeer peer -> Stream.of(peer.getPeerId());
-                    case null -> Stream.<JObjectKey>empty();
-                    default -> throw new IllegalStateException("Unexpected value: " + meta());
-                }
-        ).collect(Collectors.toUnmodifiableSet());
+                        Optional.ofNullable(meta)
+                                .<Stream<JObjectKey>>map(o -> o.collectRefsTo().stream())
+                                .orElse(Stream.empty()))
+                .collect(Collectors.toUnmodifiableSet());
     }
 }

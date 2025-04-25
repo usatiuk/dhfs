@@ -2,26 +2,26 @@ package com.usatiuk.dhfsfs.service;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
+import com.usatiuk.dhfs.jkleppmanntree.JKleppmannTreeManager;
+import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNode;
+import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
+import com.usatiuk.dhfs.jmap.JMapEntry;
+import com.usatiuk.dhfs.jmap.JMapHelper;
+import com.usatiuk.dhfs.jmap.JMapLongKey;
 import com.usatiuk.dhfs.remoteobj.JDataRemote;
 import com.usatiuk.dhfs.remoteobj.RemoteObjectMeta;
 import com.usatiuk.dhfs.remoteobj.RemoteTransaction;
 import com.usatiuk.dhfsfs.objects.ChunkData;
 import com.usatiuk.dhfsfs.objects.File;
-import com.usatiuk.dhfs.jkleppmanntree.JKleppmannTreeManager;
-import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNode;
-import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
-import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeMetaDirectory;
-import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeMetaFile;
-import com.usatiuk.dhfs.jmap.JMapEntry;
-import com.usatiuk.dhfs.jmap.JMapHelper;
-import com.usatiuk.dhfs.jmap.JMapLongKey;
-import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
+import com.usatiuk.dhfsfs.objects.JKleppmannTreeNodeMetaDirectory;
+import com.usatiuk.dhfsfs.objects.JKleppmannTreeNodeMetaFile;
 import com.usatiuk.objects.JData;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.iterators.IteratorStart;
 import com.usatiuk.objects.transaction.LockingStrategy;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;
+import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -73,11 +73,11 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     JMapHelper jMapHelper;
 
     private JKleppmannTreeManager.JKleppmannTree getTreeW() {
-        return jKleppmannTreeManager.getTree(JObjectKey.of("fs"));
+        return jKleppmannTreeManager.getTree(JObjectKey.of("fs"), () -> new JKleppmannTreeNodeMetaDirectory(""));
     }
 
     private JKleppmannTreeManager.JKleppmannTree getTreeR() {
-        return jKleppmannTreeManager.getTree(JObjectKey.of("fs"), LockingStrategy.OPTIMISTIC);
+        return jKleppmannTreeManager.getTree(JObjectKey.of("fs"), LockingStrategy.OPTIMISTIC, () -> new JKleppmannTreeNodeMetaDirectory(""));
     }
 
     private ChunkData createChunk(ByteString bytes) {

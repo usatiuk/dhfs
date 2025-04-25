@@ -1,20 +1,15 @@
 package com.usatiuk.dhfsfs.objects;
 
-import com.usatiuk.dhfs.peersync.PeerId;
-import com.usatiuk.dhfs.remoteobj.RemoteObjectDataWrapper;
-import com.usatiuk.dhfs.remoteobj.RemoteObjectMeta;
-import com.usatiuk.dhfs.remoteobj.RemoteTransaction;
-import com.usatiuk.dhfsfs.service.DhfsFileService;
 import com.usatiuk.dhfs.jkleppmanntree.JKleppmannTreeManager;
-import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeMetaFile;
 import com.usatiuk.dhfs.jmap.JMapHelper;
-import com.usatiuk.dhfs.remoteobj.ObjSyncHandler;
+import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
-import com.usatiuk.dhfs.remoteobj.SyncHelper;
+import com.usatiuk.dhfs.remoteobj.*;
+import com.usatiuk.dhfsfs.service.DhfsFileService;
+import com.usatiuk.kleppmanntree.AlreadyExistsException;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.transaction.LockingStrategy;
 import com.usatiuk.objects.transaction.Transaction;
-import com.usatiuk.kleppmanntree.AlreadyExistsException;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
@@ -48,11 +43,11 @@ public class FileSyncHandler implements ObjSyncHandler<File, FileDto> {
     DhfsFileService fileService;
 
     private JKleppmannTreeManager.JKleppmannTree getTreeW() {
-        return jKleppmannTreeManager.getTree(JObjectKey.of("fs"));
+        return jKleppmannTreeManager.getTree(JObjectKey.of("fs")).orElseThrow();
     }
 
     private JKleppmannTreeManager.JKleppmannTree getTreeR() {
-        return jKleppmannTreeManager.getTree(JObjectKey.of("fs"), LockingStrategy.OPTIMISTIC);
+        return jKleppmannTreeManager.getTree(JObjectKey.of("fs"), LockingStrategy.OPTIMISTIC).orElseThrow();
     }
 
     private void resolveConflict(PeerId from, JObjectKey key, PMap<PeerId, Long> receivedChangelog,
