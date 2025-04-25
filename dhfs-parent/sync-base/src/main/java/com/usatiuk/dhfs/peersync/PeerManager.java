@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @ApplicationScoped
 public class PeerManager {
@@ -222,7 +223,14 @@ public class PeerManager {
     public Collection<Pair<PeerId, ApiPeerInfo>> getSeenButNotAddedHosts() {
         return transactionManager.run(() -> {
             return peerDiscoveryDirectory.getReachablePeers().stream().filter(p -> !peerInfoService.getPeerInfo(p).isPresent())
-                    .map(p -> Pair.of(p, getInfo(p))).toList();
+                    .flatMap(p -> {
+                        try {
+                            return Stream.of(Pair.of(p, getInfo(p)));
+                        } catch (Exception e) {
+                            Log.warn("Error getting peer info for " + p, e);
+                            return Stream.empty();
+                        }
+                    }).toList();
         });
     }
 
