@@ -72,40 +72,48 @@ public class DhfsFuse extends FuseStubFS {
 
     void init(@Observes @Priority(100000) StartupEvent event) {
         if (!enabled) return;
-        Paths.get(root).toFile().mkdirs();
-
-        if (!Paths.get(root).toFile().isDirectory())
-            throw new IllegalStateException("Could not create directory " + root);
 
         Log.info("Mounting with root " + root);
-
-        var uid = new UnixSystem().getUid();
-        var gid = new UnixSystem().getGid();
-
         var opts = new ArrayList<String>();
 
-        // Assuming macFuse
-        if (SystemUtils.IS_OS_MAC) {
+        if (SystemUtils.IS_OS_WINDOWS) {
             opts.add("-o");
-            opts.add("iosize=" + iosize);
-        } else if (SystemUtils.IS_OS_LINUX) {
-            // FIXME: There's something else missing: the writes still seem to be 32k max
+            opts.add("auto_cache");
+            opts.add("-o");
+            opts.add("uid=-1");
+            opts.add("-o");
+            opts.add("gid=-1");
+        } else {
+            Paths.get(root).toFile().mkdirs();
+
+            if (!Paths.get(root).toFile().isDirectory())
+                throw new IllegalStateException("Could not create directory " + root);
+
+            var uid = new UnixSystem().getUid();
+            var gid = new UnixSystem().getGid();
+
+            // Assuming macFuse
+            if (SystemUtils.IS_OS_MAC) {
+                opts.add("-o");
+                opts.add("iosize=" + iosize);
+            } else if (SystemUtils.IS_OS_LINUX) {
+                // FIXME: There's something else missing: the writes still seem to be 32k max
 //            opts.add("-o");
 //            opts.add("large_read");
+                opts.add("-o");
+                opts.add("big_writes");
+                opts.add("-o");
+                opts.add("max_read=" + iosize);
+                opts.add("-o");
+                opts.add("max_write=" + iosize);
+            }
             opts.add("-o");
-            opts.add("big_writes");
+            opts.add("auto_cache");
             opts.add("-o");
-            opts.add("max_read=" + iosize);
+            opts.add("uid=" + uid);
             opts.add("-o");
-            opts.add("max_write=" + iosize);
+            opts.add("gid=" + gid);
         }
-        opts.add("-o");
-        opts.add("auto_cache");
-        opts.add("-o");
-        opts.add("uid=" + uid);
-        opts.add("-o");
-        opts.add("gid=" + gid);
-
         mount(Paths.get(root), false, debug, opts.toArray(String[]::new));
     }
 
