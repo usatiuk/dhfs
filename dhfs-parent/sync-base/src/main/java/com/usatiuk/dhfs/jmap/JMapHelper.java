@@ -11,6 +11,7 @@ import jakarta.inject.Singleton;
 import java.util.ArrayList;
 import java.util.Optional;
 
+// TODO: It's not actually generic right now, only longs are supported essentially
 @Singleton
 public class JMapHelper {
     @Inject
@@ -45,7 +46,6 @@ public class JMapHelper {
     }
 
     public <K extends JMapKey> Optional<JMapEntry<K>> get(JMapHolder<K> holder, K key) {
-        // TODO:
         return curTx.get(JMapEntry.class, makeKey(holder.key(), key)).map(e -> (JMapEntry<K>) e);
     }
 

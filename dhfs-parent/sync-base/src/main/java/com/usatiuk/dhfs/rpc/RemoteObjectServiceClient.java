@@ -122,6 +122,7 @@ public class RemoteObjectServiceClient {
         try {
             return _batchExecutor.invokeAll(targets.stream().<Callable<Pair<PeerId, CanDeleteReply>>>map(h -> () -> {
                 var req = CanDeleteRequest.newBuilder().setName(JObjectKeyP.newBuilder().setName(objKey.toString()).build());
+                assert ourReferrers.isEmpty();
                 for (var ref : ourReferrers) {
                     req.addOurReferrers(JObjectKeyP.newBuilder().setName(ref.obj().toString()).build());
                 }

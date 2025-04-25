@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.peersync;
 
 import com.usatiuk.dhfs.jkleppmanntree.JKleppmannTreeManager;
-import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNode;
+import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeHolder;
 import com.usatiuk.dhfs.peersync.structs.JKleppmannTreeNodeMetaPeer;
 import com.usatiuk.dhfs.remoteobj.RemoteTransaction;
 import com.usatiuk.objects.JObjectKey;
@@ -39,7 +39,7 @@ public class PeerInfoService {
 
     public Optional<PeerInfo> getPeerInfoImpl(JObjectKey key) {
         return jObjectTxManager.run(() -> {
-            return curTx.get(JKleppmannTreeNode.class, key).flatMap(node -> {
+            return curTx.get(JKleppmannTreeNodeHolder.class, key).map(JKleppmannTreeNodeHolder::node).flatMap(node -> {
                 var meta = (JKleppmannTreeNodeMetaPeer) node.meta();
                 return remoteTx.getData(PeerInfo.class, meta.peerId());
             });
@@ -63,7 +63,7 @@ public class PeerInfoService {
             if (gotKey == null) {
                 return Optional.empty();
             }
-            return curTx.get(JKleppmannTreeNode.class, gotKey).flatMap(node -> {
+            return curTx.get(JKleppmannTreeNodeHolder.class, gotKey).map(JKleppmannTreeNodeHolder::node).flatMap(node -> {
                 var meta = (JKleppmannTreeNodeMetaPeer) node.meta();
                 return remoteTx.getData(PeerInfo.class, meta.peerId());
             });
@@ -73,7 +73,7 @@ public class PeerInfoService {
     public List<PeerInfo> getPeers() {
         return jObjectTxManager.run(() -> {
             var gotKey = getTreeR().traverse(List.of());
-            return curTx.get(JKleppmannTreeNode.class, gotKey).map(
+            return curTx.get(JKleppmannTreeNodeHolder.class, gotKey).map(JKleppmannTreeNodeHolder::node).map(
                             node -> node.children().keySet().stream()
                                     .map(JObjectKey::of).map(this::getPeerInfoImpl)
                                     .filter(o -> {
@@ -88,7 +88,7 @@ public class PeerInfoService {
     public List<PeerInfo> getPeersNoSelf() {
         return jObjectTxManager.run(() -> {
             var gotKey = getTreeR().traverse(List.of());
-            return curTx.get(JKleppmannTreeNode.class, gotKey).map(
+            return curTx.get(JKleppmannTreeNodeHolder.class, gotKey).map(JKleppmannTreeNodeHolder::node).map(
                             node -> node.children().keySet().stream()
                                     .map(JObjectKey::of).map(this::getPeerInfoImpl)
                                     .filter(o -> {
@@ -116,7 +116,7 @@ public class PeerInfoService {
             if (gotKey == null) {
                 return;
             }
-            var node = curTx.get(JKleppmannTreeNode.class, gotKey).orElse(null);
+            var node = curTx.get(JKleppmannTreeNodeHolder.class, gotKey).map(JKleppmannTreeNodeHolder::node).orElse(null);
             if (node == null) {
                 Log.warn("Peer " + id + " not found in the tree");
                 return;

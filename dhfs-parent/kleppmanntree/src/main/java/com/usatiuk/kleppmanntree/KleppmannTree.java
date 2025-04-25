@@ -15,7 +15,6 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     private final PeerInterface<PeerIdT> _peers;
     private final Clock<TimestampT> _clock;
     private final OpRecorder<TimestampT, PeerIdT, MetaT, NodeIdT> _opRecorder;
-    private HashMap<NodeIdT, TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT>> _undoCtx = null;
 
     public KleppmannTree(StorageInterface<TimestampT, PeerIdT, MetaT, NodeIdT> storage,
                          PeerInterface<PeerIdT> peers,
@@ -87,7 +86,6 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                     node.withParent(null)
                             .withLastEffectiveOp(null)
             );
-            _undoCtx.put(node.key(), node);
         }
     }
 
@@ -217,7 +215,6 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         if (cmp < 0) {
             if (log.containsKey(op.timestamp())) return;
             var toUndo = log.newestSlice(op.timestamp(), false);
-            _undoCtx = new HashMap<>();
             for (var entry : toUndo.reversed()) {
                 undoOp(entry.getValue());
             }
@@ -225,13 +222,6 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
             for (var entry : toUndo) {
                 redoOp(entry);
             }
-            if (!_undoCtx.isEmpty()) {
-                for (var e : _undoCtx.entrySet()) {
-                    LOGGER.log(Level.FINE, "Dropping node " + e.getKey());
-                    _storage.removeNode(e.getKey());
-                }
-            }
-            _undoCtx = null;
             tryTrimLog();
         } else {
             doAndPut(op, failCreatingIfExists);
@@ -264,24 +254,6 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     }
 
     private TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> getNewNode(NodeIdT key, NodeIdT parent, MetaT meta) {
-        if (_undoCtx != null) {
-            var node = _undoCtx.get(key);
-            if (node != null) {
-                try {
-                    if (!node.children().isEmpty()) {
-                        LOGGER.log(Level.WARNING, "Not empty children for undone node " + key);
-                    }
-                    node = node.withParent(parent).withMeta(meta);
-                } catch (Exception e) {
-                    LOGGER.log(Level.SEVERE, "Error while fixing up node " + key, e);
-                    node = null;
-                }
-            }
-            if (node != null) {
-                _undoCtx.remove(key);
-                return node;
-            }
-        }
         return _storage.createNewNode(key, parent, meta);
     }
 

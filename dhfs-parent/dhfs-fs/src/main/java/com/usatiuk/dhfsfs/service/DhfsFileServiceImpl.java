@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.dhfs.jkleppmanntree.JKleppmannTreeManager;
 import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNode;
+import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeHolder;
 import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.jmap.JMapEntry;
 import com.usatiuk.dhfs.jmap.JMapHelper;
@@ -94,21 +95,21 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     private JKleppmannTreeNode getDirEntryW(String name) {
         var res = getTreeW().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
         if (res == null) throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
-        var ret = curTx.get(JKleppmannTreeNode.class, res).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
+        var ret = curTx.get(JKleppmannTreeNodeHolder.class, res).map(JKleppmannTreeNodeHolder::node).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
         return ret;
     }
 
     private JKleppmannTreeNode getDirEntryR(String name) {
         var res = getTreeR().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
         if (res == null) throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
-        var ret = curTx.get(JKleppmannTreeNode.class, res).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
+        var ret = curTx.get(JKleppmannTreeNodeHolder.class, res).map(JKleppmannTreeNodeHolder::node).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
         return ret;
     }
 
     private Optional<JKleppmannTreeNode> getDirEntryOpt(String name) {
         var res = getTreeW().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
         if (res == null) return Optional.empty();
-        var ret = curTx.get(JKleppmannTreeNode.class, res);
+        var ret = curTx.get(JKleppmannTreeNodeHolder.class, res).map(JKleppmannTreeNodeHolder::node);
         return ret;
     }
 
@@ -125,7 +126,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                 } else {
                     throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + ref.key()));
                 }
-            } else if (ref instanceof JKleppmannTreeNode) {
+            } else if (ref instanceof JKleppmannTreeNodeHolder) {
                 ret = new GetattrRes(100, 100, 0700, GetattrType.DIRECTORY);
             } else {
                 throw new StatusRuntimeException(Status.DATA_LOSS.withDescription("FsNode is not an FsNode: " + ref.key()));
@@ -242,7 +243,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         return jObjectTxManager.executeTx(() -> {
             var dent = curTx.get(JData.class, uuid).orElseThrow(() -> new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND));
 
-            if (dent instanceof JKleppmannTreeNode) {
+            if (dent instanceof JKleppmannTreeNodeHolder) {
                 return true;
             } else if (dent instanceof RemoteObjectMeta) {
                 var remote = remoteTx.getData(JDataRemote.class, uuid).orElse(null);
@@ -628,7 +629,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             var dent = curTx.get(JData.class, fileUuid).orElseThrow(() -> new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND));
 
             // FIXME:
-            if (dent instanceof JKleppmannTreeNode) {
+            if (dent instanceof JKleppmannTreeNodeHolder) {
                 return true;
             } else if (dent instanceof RemoteObjectMeta) {
                 var remote = remoteTx.getData(JDataRemote.class, fileUuid).orElse(null);

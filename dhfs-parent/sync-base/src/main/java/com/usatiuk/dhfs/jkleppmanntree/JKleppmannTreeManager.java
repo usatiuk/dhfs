@@ -2,6 +2,7 @@ package com.usatiuk.dhfs.jkleppmanntree;
 
 import com.usatiuk.dhfs.invalidation.Op;
 import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNode;
+import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeHolder;
 import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreePersistentData;
 import com.usatiuk.dhfs.peersync.PeerId;
@@ -53,11 +54,11 @@ public class JKleppmannTreeManager {
                 );
                 curTx.put(data);
                 var rootNode = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_root"), null, rootNodeSupplier.get());
-                curTx.put(rootNode);
+                curTx.put(new JKleppmannTreeNodeHolder(rootNode));
                 var trashNode = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_trash"), null, rootNodeSupplier.get());
-                curTx.put(trashNode);
+                curTx.put(new JKleppmannTreeNodeHolder(trashNode));
                 var lf_node = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_lf"), null, rootNodeSupplier.get());
-                curTx.put(lf_node);
+                curTx.put(new JKleppmannTreeNodeHolder(lf_node));
             }
             return new JKleppmannTree(data);
 //            opObjectRegistry.registerObject(tree);
@@ -170,59 +171,12 @@ public class JKleppmannTreeManager {
             if (Log.isTraceEnabled())
                 Log.trace("Received op from " + from + ": " + jop.op().timestamp().timestamp() + " " + jop.op().childId() + "->" + jop.op().newParentId() + " as " + jop.op().newMeta().name());
 
-            try {
-                _tree.applyExternalOp(from, jop.op());
-            } catch (Exception e) {
-                Log.error("Error applying external op", e);
-                throw e;
-            } finally {
-                // FIXME:
-                // Fixup the ref if it didn't really get applied
-
-//                if ((fileRef == null) && (jop.getOp().newMeta() instanceof JKleppmannTreeNodeMetaFile))
-//                    Log.error("Could not create child of pushed op: " + jop.getOp());
-
-//                if (jop.getOp().newMeta() instanceof JKleppmannTreeNodeMetaFile f) {
-//                    if (fileRef != null) {
-//                        var got = jObjectManager.get(jop.getOp().childId()).orElse(null);
-//
-//                        VoidFn remove = () -> {
-//                            fileRef.runWriteLockedVoid(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d, b, v) -> {
-//                                m.removeRef(jop.getOp().childId());
-//                            });
-//                        };
-//
-//                        if (got == null) {
-//                            remove.apply();
-//                        } else {
-//                            try {
-//                                got.rLock();
-//                                try {
-//                                    got.tryResolve(JObjectManager.ResolutionStrategy.LOCAL_ONLY);
-//                                    if (got.getData() == null || !got.getData().extractRefs().contains(f.getFileIno()))
-//                                        remove.apply();
-//                                } finally {
-//                                    got.rUnlock();
-//                                }
-//                            } catch (DeletedObjectAccessException dex) {
-//                                remove.apply();
-//                            }
-//                        }
-//                    }
-//                }
-            }
+            _tree.applyExternalOp(from, jop.op());
         }
 
         public Op getPeriodicPushOp() {
             return new JKleppmannTreePeriodicPushOp(_treeName, persistentPeerDataService.getSelfUuid(), _clock.peekTimestamp());
         }
-
-//        @Override
-//        public void addToTx() {
-//            // FIXME: a hack
-//            _persistentData.get().rwLockNoCopy();
-//            _persistentData.get().rwUnlock();
-//        }
 
         private class JOpRecorder implements OpRecorder<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> {
             @Override
@@ -291,8 +245,8 @@ public class JKleppmannTreeManager {
 
             @Override
             public JKleppmannTreeNode getById(JObjectKey id) {
-                var got = curTx.get(JKleppmannTreeNode.class, id);
-                return got.orElse(null);
+                var got = curTx.get(JKleppmannTreeNodeHolder.class, id);
+                return got.map(JKleppmannTreeNodeHolder::node).orElse(null);
             }
 
             @Override
@@ -302,12 +256,14 @@ public class JKleppmannTreeManager {
 
             @Override
             public void putNode(TreeNode<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> node) {
-                curTx.put(((JKleppmannTreeNode) node));
+                curTx.put(curTx.get(JKleppmannTreeNodeHolder.class, node.key())
+                        .map(n -> n.withNode((JKleppmannTreeNode) node))
+                        .orElse(new JKleppmannTreeNodeHolder((JKleppmannTreeNode) node)));
             }
 
             @Override
             public void removeNode(JObjectKey id) {
-                // TODO
+                // GC
             }
 
             @Override
