@@ -1,7 +1,5 @@
 package com.usatiuk.kleppmanntree;
 
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
@@ -217,31 +215,24 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         }
         assert cmp != 0;
         if (cmp < 0) {
-            try {
-                if (log.containsKey(op.timestamp())) return;
-                var toUndo = log.newestSlice(op.timestamp(), false);
-                _undoCtx = new HashMap<>();
-                for (var entry : toUndo.reversed()) {
-                    undoOp(entry.getValue());
-                }
-                try {
-                    doAndPut(op, failCreatingIfExists);
-                } finally {
-                    for (var entry : toUndo) {
-                        redoOp(entry);
-                    }
-
-                    if (!_undoCtx.isEmpty()) {
-                        for (var e : _undoCtx.entrySet()) {
-                            LOGGER.log(Level.FINE, "Dropping node " + e.getKey());
-                            _storage.removeNode(e.getKey());
-                        }
-                    }
-                    _undoCtx = null;
-                }
-            } finally {
-                tryTrimLog();
+            if (log.containsKey(op.timestamp())) return;
+            var toUndo = log.newestSlice(op.timestamp(), false);
+            _undoCtx = new HashMap<>();
+            for (var entry : toUndo.reversed()) {
+                undoOp(entry.getValue());
             }
+            doAndPut(op, failCreatingIfExists);
+            for (var entry : toUndo) {
+                redoOp(entry);
+            }
+            if (!_undoCtx.isEmpty()) {
+                for (var e : _undoCtx.entrySet()) {
+                    LOGGER.log(Level.FINE, "Dropping node " + e.getKey());
+                    _storage.removeNode(e.getKey());
+                }
+            }
+            _undoCtx = null;
+            tryTrimLog();
         } else {
             doAndPut(op, failCreatingIfExists);
             tryTrimLog();
@@ -264,8 +255,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         } catch (AlreadyExistsException aex) {
             throw aex;
         } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Error computing effects for op" + op.toString(), e);
-            computed = new LogRecord<>(op, null);
+            throw new RuntimeException("Error computing effects for op " + op.toString(), e);
         }
 
         if (computed.effects() != null)
@@ -373,6 +363,7 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 MetaT conflictNodeMeta = conflictNode.meta();
 
                 if (Objects.equals(conflictNodeMeta, op.newMeta())) {
+                    LOGGER.finer(() -> "Node creation conflict (the same): " + conflictNode);
                     return new LogRecord<>(op, null);
                 }
 
@@ -400,9 +391,9 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         if (oldMeta != null
                 && op.newMeta() != null
                 && !oldMeta.getClass().equals(op.newMeta().getClass())) {
-            LOGGER.log(Level.SEVERE, "Class mismatch for meta for node " + node.key());
-            return new LogRecord<>(op, null);
+            throw new RuntimeException("Class mismatch for meta for node " + node.key());
         }
+
         var replaceNodeId = newParent.children().get(op.newName());
         if (replaceNodeId != null) {
             var replaceNode = _storage.getById(replaceNodeId);
