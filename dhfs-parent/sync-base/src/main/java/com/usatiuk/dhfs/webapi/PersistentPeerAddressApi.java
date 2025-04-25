@@ -1,10 +1,10 @@
 package com.usatiuk.dhfs.webapi;
 
+import com.usatiuk.dhfs.peerdiscovery.PeerAddrStringHelper;
 import com.usatiuk.dhfs.peersync.PeerId;
+import com.usatiuk.dhfs.peersync.PeerInfoService;
 import com.usatiuk.dhfs.peersync.PeerManager;
 import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
-import com.usatiuk.dhfs.peerdiscovery.PeerAddrStringHelper;
-import com.usatiuk.dhfs.peersync.PeerInfoService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 

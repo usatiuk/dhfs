@@ -10,16 +10,9 @@ import java.util.NoSuchElementException;
 import java.util.TreeMap;
 
 public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, V> {
-    private record IteratorEntry<K extends Comparable<K>, V>(int priority, CloseableKvIterator<K, V> iterator) {
-        public IteratorEntry<K, V> reversed() {
-            return new IteratorEntry<>(priority, iterator.reversed());
-        }
-    }
-
     private final NavigableMap<K, IteratorEntry<K, V>> _sortedIterators = new TreeMap<>();
     private final String _name;
     private final List<IteratorEntry<K, V>> _iterators;
-
     public MergingKvIterator(String name, IteratorStart startType, K startKey, List<IterProdFn<K, V>> iterators) {
         _goingForward = true;
         _name = name;
@@ -213,6 +206,12 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
     }
 
     private interface FirstMatchState<K extends Comparable<K>, V> {
+    }
+
+    private record IteratorEntry<K extends Comparable<K>, V>(int priority, CloseableKvIterator<K, V> iterator) {
+        public IteratorEntry<K, V> reversed() {
+            return new IteratorEntry<>(priority, iterator.reversed());
+        }
     }
 
     private record FirstMatchNone<K extends Comparable<K>, V>() implements FirstMatchState<K, V> {

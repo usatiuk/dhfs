@@ -1,12 +1,12 @@
 package com.usatiuk.dhfs.remoteobj;
 
-import com.usatiuk.dhfs.refcount.JDataRefcounted;
-import com.usatiuk.dhfs.peersync.PeerId;
-import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.autosync.AutosyncProcessor;
-import com.usatiuk.dhfs.rpc.RemoteObjectServiceClient;
+import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.peersync.PeerInfo;
 import com.usatiuk.dhfs.peersync.PeerInfoService;
+import com.usatiuk.dhfs.refcount.JDataRefcounted;
+import com.usatiuk.dhfs.rpc.RemoteObjectServiceClient;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;
 import com.usatiuk.utils.HashSetDelayedBlockingQueue;

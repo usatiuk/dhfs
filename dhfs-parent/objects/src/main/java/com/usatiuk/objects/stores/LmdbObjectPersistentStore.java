@@ -2,7 +2,6 @@ package com.usatiuk.objects.stores;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
-import com.usatiuk.utils.RefcountedCloseable;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.JObjectKeyMax;
 import com.usatiuk.objects.JObjectKeyMin;
@@ -11,6 +10,7 @@ import com.usatiuk.objects.iterators.IteratorStart;
 import com.usatiuk.objects.iterators.KeyPredicateKvIterator;
 import com.usatiuk.objects.iterators.ReversibleKvIterator;
 import com.usatiuk.objects.snapshot.Snapshot;
+import com.usatiuk.utils.RefcountedCloseable;
 import io.quarkus.arc.properties.IfBuildProperty;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;

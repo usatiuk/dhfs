@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.remoteobj;
 
-import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.peersync.PeerId;
+import com.usatiuk.objects.JObjectKey;
 import org.pcollections.PMap;
 
 import javax.annotation.Nullable;

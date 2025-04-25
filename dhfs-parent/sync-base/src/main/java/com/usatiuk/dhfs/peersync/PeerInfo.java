@@ -1,11 +1,11 @@
 package com.usatiuk.dhfs.peersync;
 
 import com.google.protobuf.ByteString;
-import com.usatiuk.dhfs.remoteobj.JDataRemote;
-import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.peertrust.CertificateTools;
+import com.usatiuk.dhfs.remoteobj.JDataRemote;
 import com.usatiuk.dhfs.remoteobj.JDataRemoteDto;
 import com.usatiuk.dhfs.remoteobj.JDataRemotePush;
+import com.usatiuk.objects.JObjectKey;
 
 import java.security.cert.X509Certificate;
 

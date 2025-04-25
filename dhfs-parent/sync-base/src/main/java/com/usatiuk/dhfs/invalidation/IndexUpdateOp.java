@@ -1,8 +1,8 @@
 package com.usatiuk.dhfs.invalidation;
 
-import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.remoteobj.JDataRemoteDto;
+import com.usatiuk.objects.JObjectKey;
 import org.pcollections.PMap;
 
 import java.util.Collection;

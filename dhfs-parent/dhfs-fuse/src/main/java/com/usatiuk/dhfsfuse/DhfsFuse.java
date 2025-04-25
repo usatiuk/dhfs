@@ -40,6 +40,8 @@ import static jnr.posix.FileStat.*;
 public class DhfsFuse extends FuseStubFS {
     private static final int blksize = 1048576;
     private static final int iosize = 1048576;
+    private final ConcurrentHashMap<Long, JObjectKey> _openHandles = new ConcurrentHashMap<>();
+    private final AtomicLong _fh = new AtomicLong(1);
     @ConfigProperty(name = "dhfs.fuse.root")
     String root;
     @ConfigProperty(name = "dhfs.fuse.enabled")
@@ -52,9 +54,6 @@ public class DhfsFuse extends FuseStubFS {
     JnrPtrByteOutputAccessors jnrPtrByteOutputAccessors;
     @Inject
     DhfsFileService fileService;
-
-    private final ConcurrentHashMap<Long, JObjectKey> _openHandles = new ConcurrentHashMap<>();
-    private final AtomicLong _fh = new AtomicLong(1);
 
     private long allocateHandle(JObjectKey key) {
         while (true) {

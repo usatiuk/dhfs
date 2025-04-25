@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs;
 
-import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.persistence.JObjectKeyP;
+import com.usatiuk.objects.JObjectKey;
 import jakarta.inject.Singleton;
 
 @Singleton

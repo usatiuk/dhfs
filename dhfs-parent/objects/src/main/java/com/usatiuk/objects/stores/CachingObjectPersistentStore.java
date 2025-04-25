@@ -24,52 +24,15 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @ApplicationScoped
 public class CachingObjectPersistentStore {
+    private final AtomicReference<Cache> _cache;
     @Inject
     SerializingObjectPersistentStore delegate;
     @ConfigProperty(name = "dhfs.objects.lru.print-stats")
     boolean printStats;
-
-    private record Cache(TreePMap<JObjectKey, CacheEntry> map,
-                         int size,
-                         long version,
-                         int sizeLimit) {
-        public Cache withPut(JObjectKey key, Optional<JDataVersionedWrapper> obj) {
-            var entry = obj.<CacheEntry>map(o -> new CacheEntryPresent(o, o.estimateSize())).orElse(new CacheEntryMiss());
-
-            int newSize = size() + entry.size();
-
-            var old = map.get(key);
-            if (old != null)
-                newSize -= old.size();
-
-            TreePMap<JObjectKey, CacheEntry> newCache = map();
-
-            while (newSize > sizeLimit) {
-                var del = newCache.firstEntry();
-                newCache = newCache.minusFirstEntry();
-                newSize -= del.getValue().size();
-            }
-
-            newCache = newCache.plus(key, entry);
-            return new Cache(
-                    newCache,
-                    newSize,
-                    version,
-                    sizeLimit
-            );
-        }
-
-        public Cache withVersion(long version) {
-            return new Cache(map, size, version, sizeLimit);
-        }
-    }
-
-    private final AtomicReference<Cache> _cache;
     private ExecutorService _commitExecutor;
     private ExecutorService _statusExecutor;
     private AtomicLong _cached = new AtomicLong();
     private AtomicLong _cacheTries = new AtomicLong();
-
     public CachingObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.lru.limit") int sizeLimit) {
         _cache = new AtomicReference<>(
                 new Cache(TreePMap.empty(), 0, -1, sizeLimit)
@@ -142,10 +105,10 @@ public class CachingObjectPersistentStore {
                 Snapshot<JObjectKey, JDataVersionedWrapper> finalBacking = backing;
                 Cache finalCurCache = curCache;
                 return new Snapshot<JObjectKey, JDataVersionedWrapper>() {
-                    private boolean _invalid = false;
-                    private boolean _closed = false;
                     private final Cache _curCache = finalCurCache;
                     private final Snapshot<JObjectKey, JDataVersionedWrapper> _backing = finalBacking;
+                    private boolean _invalid = false;
+                    private boolean _closed = false;
 
                     private void doCache(JObjectKey key, Optional<JDataVersionedWrapper> obj) {
                         _cacheTries.incrementAndGet();
@@ -290,6 +253,41 @@ public class CachingObjectPersistentStore {
 
     private interface CacheEntry extends MaybeTombstone<JDataVersionedWrapper> {
         int size();
+    }
+
+    private record Cache(TreePMap<JObjectKey, CacheEntry> map,
+                         int size,
+                         long version,
+                         int sizeLimit) {
+        public Cache withPut(JObjectKey key, Optional<JDataVersionedWrapper> obj) {
+            var entry = obj.<CacheEntry>map(o -> new CacheEntryPresent(o, o.estimateSize())).orElse(new CacheEntryMiss());
+
+            int newSize = size() + entry.size();
+
+            var old = map.get(key);
+            if (old != null)
+                newSize -= old.size();
+
+            TreePMap<JObjectKey, CacheEntry> newCache = map();
+
+            while (newSize > sizeLimit) {
+                var del = newCache.firstEntry();
+                newCache = newCache.minusFirstEntry();
+                newSize -= del.getValue().size();
+            }
+
+            newCache = newCache.plus(key, entry);
+            return new Cache(
+                    newCache,
+                    newSize,
+                    version,
+                    sizeLimit
+            );
+        }
+
+        public Cache withVersion(long version) {
+            return new Cache(map, size, version, sizeLimit);
+        }
     }
 
     private record CacheEntryPresent(JDataVersionedWrapper value,

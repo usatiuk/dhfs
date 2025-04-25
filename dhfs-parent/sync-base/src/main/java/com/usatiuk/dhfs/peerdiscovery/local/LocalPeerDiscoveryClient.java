@@ -1,11 +1,11 @@
 package com.usatiuk.dhfs.peerdiscovery.local;
 
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.peerdiscovery.IpPeerAddress;
 import com.usatiuk.dhfs.peerdiscovery.PeerAddressType;
 import com.usatiuk.dhfs.peerdiscovery.PeerDiscoveryDirectory;
 import com.usatiuk.dhfs.peerdiscovery.PeerDiscoveryInfo;
+import com.usatiuk.dhfs.peersync.PeerId;
 import io.quarkus.arc.properties.IfBuildProperty;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;

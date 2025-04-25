@@ -1,6 +1,5 @@
 package com.usatiuk.objects.iterators;
 
-import io.quarkus.logging.Log;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.NoSuchElementException;

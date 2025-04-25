@@ -32,19 +32,10 @@ import java.util.function.Consumer;
 public class WritebackObjectPersistentStore {
     private final LinkedList<TxBundle> _pendingBundles = new LinkedList<>();
     private final LinkedHashMap<Long, TxBundle> _notFlushedBundles = new LinkedHashMap<>();
-
-    private record PendingWriteData(TreePMap<JObjectKey, PendingWriteEntry> pendingWrites,
-                                    long lastFlushedId,
-                                    long lastCommittedId) {
-    }
-
     private final AtomicReference<PendingWriteData> _pendingWrites = new AtomicReference<>(null);
-
     private final Object _flushWaitSynchronizer = new Object();
-
     private final AtomicLong _lastWrittenId = new AtomicLong(-1);
     private final AtomicLong _lastCommittedId = new AtomicLong();
-
     private final AtomicLong _waitedTotal = new AtomicLong(0);
     @Inject
     CachingObjectPersistentStore cachedStore;
@@ -351,7 +342,7 @@ public class WritebackObjectPersistentStore {
 
                 @Override
                 public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-                    return  TombstoneMergingKvIterator.<JObjectKey, JDataVersionedWrapper>of("writeback-ps", start, key,
+                    return TombstoneMergingKvIterator.<JObjectKey, JDataVersionedWrapper>of("writeback-ps", start, key,
                             (tS, tK) -> new NavigableMapKvIterator<>(_pendingWrites, tS, tK),
                             (tS, tK) -> (CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>) (CloseableKvIterator<JObjectKey, ?>) _cache.getIterator(tS, tK));
                 }
@@ -391,6 +382,11 @@ public class WritebackObjectPersistentStore {
     }
 
     public interface VerboseReadResult {
+    }
+
+    private record PendingWriteData(TreePMap<JObjectKey, PendingWriteEntry> pendingWrites,
+                                    long lastFlushedId,
+                                    long lastCommittedId) {
     }
 
     private static class TxBundle {

@@ -4,8 +4,8 @@ import com.github.dockerjava.api.model.Device;
 import com.usatiuk.dhfsapp.TestDataCleaner;
 import io.quarkus.logging.Log;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
@@ -137,12 +137,6 @@ public class LazyFsIT {
         });
     }
 
-    private static enum CrashType {
-        CRASH,
-        TORN_OP,
-        TORN_SEQ
-    }
-
     @ParameterizedTest
     @EnumSource(CrashType.class)
     void killTest(CrashType crashType, TestInfo testInfo) throws Exception {
@@ -219,7 +213,6 @@ public class LazyFsIT {
 
         checkConsistency(testInfo.getDisplayName());
     }
-
 
     @ParameterizedTest
     @EnumSource(CrashType.class)
@@ -380,7 +373,6 @@ public class LazyFsIT {
         checkConsistency(testInfo.getDisplayName());
     }
 
-
     @ParameterizedTest
     @EnumSource(CrashType.class)
     void killTestDirs2(CrashType crashType, TestInfo testInfo) throws Exception {
@@ -461,6 +453,13 @@ public class LazyFsIT {
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
 
         checkConsistency(testInfo.getDisplayName());
+    }
+
+
+    private static enum CrashType {
+        CRASH,
+        TORN_OP,
+        TORN_SEQ
     }
 
 

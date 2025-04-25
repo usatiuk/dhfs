@@ -1,7 +1,5 @@
 package com.usatiuk.objects.iterators;
 
-import io.quarkus.logging.Log;
-
 import java.util.List;
 
 public abstract class TombstoneMergingKvIterator {

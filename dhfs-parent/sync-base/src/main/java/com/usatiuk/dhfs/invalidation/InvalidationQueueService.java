@@ -1,17 +1,17 @@
 package com.usatiuk.dhfs.invalidation;
 
 import com.usatiuk.dhfs.peersync.PeerId;
+import com.usatiuk.dhfs.peersync.PeerInfoService;
 import com.usatiuk.dhfs.peersync.PeerManager;
 import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
 import com.usatiuk.dhfs.rpc.RemoteObjectServiceClient;
-import com.usatiuk.dhfs.peersync.PeerInfoService;
-import com.usatiuk.utils.AutoCloseableNoThrow;
-import com.usatiuk.utils.DataLocker;
-import com.usatiuk.utils.HashSetDelayedBlockingQueue;
 import com.usatiuk.objects.JData;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;
+import com.usatiuk.utils.AutoCloseableNoThrow;
+import com.usatiuk.utils.DataLocker;
+import com.usatiuk.utils.HashSetDelayedBlockingQueue;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class InvalidationQueueService {
     private final HashSetDelayedBlockingQueue<InvalidationQueueEntry> _queue;
     private final AtomicReference<ConcurrentHashSet<JObjectKey>> _toAllQueue = new AtomicReference<>(new ConcurrentHashSet<>());
+    private final DataLocker _locker = new DataLocker();
     @Inject
     PeerManager remoteHostManager;
     @Inject
@@ -45,13 +46,10 @@ public class InvalidationQueueService {
     TransactionManager txm;
     @Inject
     Transaction curTx;
-
     @ConfigProperty(name = "dhfs.objects.invalidation.threads")
     int threads;
     @Inject
     PersistentPeerDataService persistentPeerDataService;
-
-    private final DataLocker _locker = new DataLocker();
     @Inject
     RemoteObjectServiceClient remoteObjectServiceClient;
     @Inject

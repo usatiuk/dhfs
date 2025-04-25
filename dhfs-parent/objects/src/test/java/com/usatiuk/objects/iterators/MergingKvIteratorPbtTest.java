@@ -6,9 +6,42 @@ import net.jqwik.api.state.ActionChain;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Assertions;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 public class MergingKvIteratorPbtTest {
+    @Property
+    public void checkMergingIterator(@ForAll("actions") ActionChain<MergingIteratorModel> actions) {
+        actions.run();
+    }
+
+    @Provide
+    Arbitrary<ActionChain<MergingIteratorModel>> actions(@ForAll("lists") List<List<Map.Entry<Integer, Integer>>> list,
+                                                         @ForAll IteratorStart iteratorStart, @ForAll("startKey") Integer startKey) {
+        return ActionChain.startWith(() -> new MergingIteratorModel(list, iteratorStart, startKey))
+                .withAction(new NextAction())
+                .withAction(new PeekNextKeyAction())
+                .withAction(new SkipAction())
+                .withAction(new PeekPrevKeyAction())
+                .withAction(new SkipPrevAction())
+                .withAction(new PrevAction())
+                .withAction(new HasNextAction())
+                .withAction(new HasPrevAction());
+    }
+
+    @Provide
+    Arbitrary<List<List<Map.Entry<Integer, Integer>>>> lists() {
+        return Arbitraries.entries(Arbitraries.integers().between(-50, 50), Arbitraries.integers().between(-50, 50))
+                .list().uniqueElements(Map.Entry::getKey).ofMinSize(0).ofMaxSize(20)
+                .list().ofMinSize(1).ofMaxSize(5);
+    }
+
+    @Provide
+    Arbitrary<Integer> startKey() {
+        return Arbitraries.integers().between(-51, 51);
+    }
+
     static class MergingIteratorModel implements CloseableKvIterator<Integer, Integer> {
         private final CloseableKvIterator<Integer, Integer> mergedIterator;
         private final CloseableKvIterator<Integer, Integer> mergingIterator;
@@ -227,36 +260,5 @@ public class MergingKvIteratorPbtTest {
         public String description() {
             return "Has prev key";
         }
-    }
-
-    @Property
-    public void checkMergingIterator(@ForAll("actions") ActionChain<MergingIteratorModel> actions) {
-        actions.run();
-    }
-
-    @Provide
-    Arbitrary<ActionChain<MergingIteratorModel>> actions(@ForAll("lists") List<List<Map.Entry<Integer, Integer>>> list,
-                                                         @ForAll IteratorStart iteratorStart, @ForAll("startKey") Integer startKey) {
-        return ActionChain.startWith(() -> new MergingIteratorModel(list, iteratorStart, startKey))
-                .withAction(new NextAction())
-                .withAction(new PeekNextKeyAction())
-                .withAction(new SkipAction())
-                .withAction(new PeekPrevKeyAction())
-                .withAction(new SkipPrevAction())
-                .withAction(new PrevAction())
-                .withAction(new HasNextAction())
-                .withAction(new HasPrevAction());
-    }
-
-    @Provide
-    Arbitrary<List<List<Map.Entry<Integer, Integer>>>> lists() {
-        return Arbitraries.entries(Arbitraries.integers().between(-50, 50), Arbitraries.integers().between(-50, 50))
-                .list().uniqueElements(Map.Entry::getKey).ofMinSize(0).ofMaxSize(20)
-                .list().ofMinSize(1).ofMaxSize(5);
-    }
-
-    @Provide
-    Arbitrary<Integer> startKey() {
-        return Arbitraries.integers().between(-51, 51);
     }
 }

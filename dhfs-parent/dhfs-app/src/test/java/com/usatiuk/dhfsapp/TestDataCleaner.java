@@ -18,18 +18,6 @@ public class TestDataCleaner {
     @ConfigProperty(name = "dhfs.objects.persistence.files.root")
     String tempDirectory;
 
-    void init(@Observes @Priority(1) StartupEvent event) throws IOException {
-        try {
-            purgeDirectory(Path.of(tempDirectory).toFile());
-        } catch (Exception ignored) {
-            Log.warn("Couldn't cleanup test data on init");
-        }
-    }
-
-    void shutdown(@Observes @Priority(1000000000) ShutdownEvent event) throws IOException {
-        purgeDirectory(Path.of(tempDirectory).toFile());
-    }
-
     public static void purgeDirectory(File dir) {
         try {
             for (File file : Objects.requireNonNull(dir.listFiles())) {
@@ -40,5 +28,17 @@ public class TestDataCleaner {
         } catch (Exception e) {
             Log.error("Couldn't purge directory " + dir, e);
         }
+    }
+
+    void init(@Observes @Priority(1) StartupEvent event) throws IOException {
+        try {
+            purgeDirectory(Path.of(tempDirectory).toFile());
+        } catch (Exception ignored) {
+            Log.warn("Couldn't cleanup test data on init");
+        }
+    }
+
+    void shutdown(@Observes @Priority(1000000000) ShutdownEvent event) throws IOException {
+        purgeDirectory(Path.of(tempDirectory).toFile());
     }
 }

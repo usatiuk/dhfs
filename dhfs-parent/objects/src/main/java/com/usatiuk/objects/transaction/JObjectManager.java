@@ -1,11 +1,11 @@
 package com.usatiuk.objects.transaction;
 
-import com.usatiuk.utils.AutoCloseableNoThrow;
 import com.usatiuk.objects.JData;
 import com.usatiuk.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.snapshot.Snapshot;
 import com.usatiuk.objects.stores.WritebackObjectPersistentStore;
+import com.usatiuk.utils.AutoCloseableNoThrow;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
@@ -23,12 +23,6 @@ import java.util.stream.Stream;
 @ApplicationScoped
 public class JObjectManager {
     private final List<PreCommitTxHook> _preCommitTxHooks;
-
-    private record CommitHookIterationData(PreCommitTxHook hook,
-                                           Map<JObjectKey, TxRecord.TxObjectRecord<?>> lastWrites,
-                                           Map<JObjectKey, TxRecord.TxObjectRecord<?>> pendingWrites) {
-    }
-
     @Inject
     WritebackObjectPersistentStore writebackObjectPersistentStore;
     @Inject
@@ -36,7 +30,6 @@ public class JObjectManager {
     @Inject
     LockManager lockManager;
     private boolean _ready = false;
-
     JObjectManager(Instance<PreCommitTxHook> preCommitTxHooks) {
         _preCommitTxHooks = List.copyOf(preCommitTxHooks.stream().sorted(Comparator.comparingInt(PreCommitTxHook::getPriority)).toList());
         Log.debugv("Pre-commit hooks: {0}", String.join("->", _preCommitTxHooks.stream().map(Objects::toString).toList()));
@@ -276,5 +269,10 @@ public class JObjectManager {
             }
         });
         tx.close();
+    }
+
+    private record CommitHookIterationData(PreCommitTxHook hook,
+                                           Map<JObjectKey, TxRecord.TxObjectRecord<?>> lastWrites,
+                                           Map<JObjectKey, TxRecord.TxObjectRecord<?>> pendingWrites) {
     }
 }

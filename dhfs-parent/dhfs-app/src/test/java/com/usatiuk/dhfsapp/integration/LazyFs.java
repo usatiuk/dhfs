@@ -6,25 +6,26 @@ import java.io.*;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 public class LazyFs {
     private static final String lazyFsPath;
 
-    private final String mountRoot;
-    private final String dataRoot;
-    private final String name;
-
-    private final File configFile;
-    private final File fifoFile;
-
     static {
         lazyFsPath = System.getProperty("lazyFsPath");
         System.out.println("LazyFs Path: " + lazyFsPath);
     }
 
+    private final String mountRoot;
+    private final String dataRoot;
+    private final String name;
+    private final File configFile;
+    private final File fifoFile;
+    private Thread errPiper;
+    private Thread outPiper;
+    private CountDownLatch startLatch;
+    private Process fs;
     public LazyFs(String name, String mountRoot, String dataRoot) {
         this.name = name;
         this.mountRoot = mountRoot;
@@ -42,11 +43,6 @@ public class LazyFs {
 
         Runtime.getRuntime().addShutdownHook(new Thread(this::stop));
     }
-
-    private Thread errPiper;
-    private Thread outPiper;
-    private CountDownLatch startLatch;
-    private Process fs;
 
     private String fifoPath() {
         return fifoFile.getAbsolutePath();

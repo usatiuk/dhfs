@@ -1,9 +1,9 @@
 package com.usatiuk.dhfs.rpc;
 
-import com.usatiuk.dhfs.peersync.PeerId;
-import com.usatiuk.dhfs.peersync.PeerDisconnectedEventListener;
 import com.usatiuk.dhfs.peerdiscovery.IpPeerAddress;
 import com.usatiuk.dhfs.peerdiscovery.PeerAddress;
+import com.usatiuk.dhfs.peersync.PeerDisconnectedEventListener;
+import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.peersync.PeerManager;
 import com.usatiuk.dhfs.repository.DhfsObjectSyncGrpcGrpc;
 import io.grpc.ManagedChannel;

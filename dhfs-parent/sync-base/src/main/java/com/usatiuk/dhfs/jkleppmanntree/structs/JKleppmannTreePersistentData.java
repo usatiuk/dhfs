@@ -1,12 +1,12 @@
 package com.usatiuk.dhfs.jkleppmanntree.structs;
 
+import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.refcount.JDataRef;
 import com.usatiuk.dhfs.refcount.JDataRefcounted;
-import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
 import com.usatiuk.kleppmanntree.LogRecord;
 import com.usatiuk.kleppmanntree.OpMove;
+import com.usatiuk.objects.JObjectKey;
 import org.pcollections.PCollection;
 import org.pcollections.PMap;
 import org.pcollections.PSortedMap;

@@ -1,8 +1,8 @@
 package com.usatiuk.dhfs.remoteobj;
 
+import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.refcount.JDataRef;
 import com.usatiuk.dhfs.refcount.JDataRefcounted;
-import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.objects.JObjectKey;
 import org.pcollections.*;
 

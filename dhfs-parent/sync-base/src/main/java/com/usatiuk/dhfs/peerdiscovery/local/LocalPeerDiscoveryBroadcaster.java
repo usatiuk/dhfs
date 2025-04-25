@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.peerdiscovery.local;
 
-import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
 import com.usatiuk.dhfs.peerdiscovery.PeerDiscoveryInfo;
+import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
 import io.quarkus.arc.properties.IfBuildProperty;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;

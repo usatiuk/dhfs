@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs;
 
-import com.usatiuk.dhfs.repository.OpP;
 import com.usatiuk.dhfs.invalidation.Op;
+import com.usatiuk.dhfs.repository.OpP;
 import com.usatiuk.utils.SerializationHelper;
 import jakarta.inject.Singleton;
 

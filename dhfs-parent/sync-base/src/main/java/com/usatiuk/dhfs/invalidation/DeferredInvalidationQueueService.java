@@ -1,7 +1,7 @@
 package com.usatiuk.dhfs.invalidation;
 
-import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.peersync.PeerConnectedEventListener;
+import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.peersync.PeerManager;
 import com.usatiuk.utils.SerializationHelper;
 import io.quarkus.logging.Log;

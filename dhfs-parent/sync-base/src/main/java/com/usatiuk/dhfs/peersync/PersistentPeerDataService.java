@@ -2,14 +2,14 @@ package com.usatiuk.dhfs.peersync;
 
 import com.google.protobuf.ByteString;
 import com.usatiuk.dhfs.ShutdownChecker;
-import com.usatiuk.dhfs.peertrust.CertificateTools;
 import com.usatiuk.dhfs.peerdiscovery.IpPeerAddress;
 import com.usatiuk.dhfs.peerdiscovery.PeerAddressType;
+import com.usatiuk.dhfs.peertrust.CertificateTools;
 import com.usatiuk.dhfs.peertrust.PeerTrustManager;
 import com.usatiuk.dhfs.rpc.RpcClientFactory;
-import com.usatiuk.utils.SerializationHelper;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;
+import com.usatiuk.utils.SerializationHelper;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;

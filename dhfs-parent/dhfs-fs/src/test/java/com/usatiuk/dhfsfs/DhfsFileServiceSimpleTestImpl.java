@@ -125,7 +125,7 @@ public abstract class DhfsFileServiceSimpleTestImpl {
 
         var newMtime = fileService.getattr(uuid).get().mtime();
         Assertions.assertTrue(newMtime > curMtime);
-        
+
         fileService.unlink("/writeTest");
         Assertions.assertFalse(fileService.open("/writeTest").isPresent());
     }

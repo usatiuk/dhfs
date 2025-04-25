@@ -1,8 +1,8 @@
 package com.usatiuk.dhfs.remoteobj;
 
-import com.usatiuk.dhfs.peersync.PeerId;
-import com.usatiuk.dhfs.peersync.InitialSyncProcessor;
 import com.usatiuk.dhfs.invalidation.InvalidationQueueService;
+import com.usatiuk.dhfs.peersync.InitialSyncProcessor;
+import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.peersync.PeerInfoService;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.transaction.Transaction;

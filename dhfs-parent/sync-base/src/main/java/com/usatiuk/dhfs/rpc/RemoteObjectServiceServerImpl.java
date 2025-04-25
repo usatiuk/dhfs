@@ -1,13 +1,13 @@
 package com.usatiuk.dhfs.rpc;
 
-import com.usatiuk.dhfs.*;
+import com.usatiuk.dhfs.ProtoSerializer;
 import com.usatiuk.dhfs.autosync.AutosyncProcessor;
+import com.usatiuk.dhfs.invalidation.Op;
+import com.usatiuk.dhfs.invalidation.OpHandler;
 import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.peersync.PeerManager;
 import com.usatiuk.dhfs.persistence.JObjectKeyP;
 import com.usatiuk.dhfs.remoteobj.*;
-import com.usatiuk.dhfs.invalidation.Op;
-import com.usatiuk.dhfs.invalidation.OpHandler;
 import com.usatiuk.dhfs.repository.*;
 import com.usatiuk.dhfs.syncmap.DtoMapperService;
 import com.usatiuk.objects.JObjectKey;

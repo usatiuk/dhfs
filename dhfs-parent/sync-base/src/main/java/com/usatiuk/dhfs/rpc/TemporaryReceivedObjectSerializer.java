@@ -2,11 +2,11 @@ package com.usatiuk.dhfs.rpc;
 
 import com.usatiuk.dhfs.ProtoSerializer;
 import com.usatiuk.dhfs.peersync.PeerId;
-import com.usatiuk.dhfs.remoteobj.JDataRemoteDto;
-import com.usatiuk.dhfs.remoteobj.ReceivedObject;
 import com.usatiuk.dhfs.persistence.JDataRemoteDtoP;
 import com.usatiuk.dhfs.persistence.JObjectKeyP;
 import com.usatiuk.dhfs.persistence.PeerIdP;
+import com.usatiuk.dhfs.remoteobj.JDataRemoteDto;
+import com.usatiuk.dhfs.remoteobj.ReceivedObject;
 import com.usatiuk.dhfs.repository.GetObjectReply;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

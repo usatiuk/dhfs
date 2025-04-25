@@ -1,14 +1,14 @@
 package com.usatiuk.dhfs.peertrust;
 
-import com.usatiuk.objects.JData;
-import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.dhfs.remoteobj.RemoteObjectDataWrapper;
-import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNode;
-import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
 import com.usatiuk.dhfs.invalidation.InvalidationQueueService;
+import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.peersync.PeerInfo;
 import com.usatiuk.dhfs.peersync.PeerInfoService;
+import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
 import com.usatiuk.dhfs.peersync.structs.JKleppmannTreeNodeMetaPeer;
+import com.usatiuk.dhfs.remoteobj.RemoteObjectDataWrapper;
+import com.usatiuk.objects.JData;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.transaction.PreCommitTxHook;
 import com.usatiuk.objects.transaction.Transaction;
 import io.quarkus.logging.Log;

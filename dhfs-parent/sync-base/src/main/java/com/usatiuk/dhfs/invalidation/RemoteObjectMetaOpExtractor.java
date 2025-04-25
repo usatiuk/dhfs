@@ -1,10 +1,10 @@
 package com.usatiuk.dhfs.invalidation;
 
 import com.usatiuk.dhfs.peersync.PeerId;
-import com.usatiuk.dhfs.remoteobj.RemoteObjectMeta;
-import com.usatiuk.dhfs.remoteobj.RemoteTransaction;
 import com.usatiuk.dhfs.remoteobj.JDataRemoteDto;
 import com.usatiuk.dhfs.remoteobj.JDataRemotePush;
+import com.usatiuk.dhfs.remoteobj.RemoteObjectMeta;
+import com.usatiuk.dhfs.remoteobj.RemoteTransaction;
 import com.usatiuk.dhfs.syncmap.DtoMapperService;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;

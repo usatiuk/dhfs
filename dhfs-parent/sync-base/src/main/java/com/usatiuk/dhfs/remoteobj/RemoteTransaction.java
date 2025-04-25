@@ -1,8 +1,8 @@
 package com.usatiuk.dhfs.remoteobj;
 
-import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
 import com.usatiuk.dhfs.rpc.RemoteObjectServiceClient;
+import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.transaction.LockingStrategy;
 import com.usatiuk.objects.transaction.Transaction;
 import io.quarkus.logging.Log;

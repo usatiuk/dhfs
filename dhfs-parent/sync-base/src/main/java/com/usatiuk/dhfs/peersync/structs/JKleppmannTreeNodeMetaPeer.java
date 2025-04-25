@@ -1,8 +1,8 @@
 package com.usatiuk.dhfs.peersync.structs;
 
-import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
+import com.usatiuk.dhfs.peersync.PeerId;
+import com.usatiuk.objects.JObjectKey;
 
 import java.util.Collection;
 import java.util.List;

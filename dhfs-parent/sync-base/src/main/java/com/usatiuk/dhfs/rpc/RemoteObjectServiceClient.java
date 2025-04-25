@@ -1,6 +1,8 @@
 package com.usatiuk.dhfs.rpc;
 
 import com.usatiuk.dhfs.ProtoSerializer;
+import com.usatiuk.dhfs.invalidation.InvalidationQueueService;
+import com.usatiuk.dhfs.invalidation.Op;
 import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.peersync.PeerManager;
 import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
@@ -9,8 +11,6 @@ import com.usatiuk.dhfs.refcount.JDataRef;
 import com.usatiuk.dhfs.remoteobj.ReceivedObject;
 import com.usatiuk.dhfs.remoteobj.RemoteObjectMeta;
 import com.usatiuk.dhfs.remoteobj.RemoteTransaction;
-import com.usatiuk.dhfs.invalidation.InvalidationQueueService;
-import com.usatiuk.dhfs.invalidation.Op;
 import com.usatiuk.dhfs.remoteobj.SyncHandler;
 import com.usatiuk.dhfs.repository.*;
 import com.usatiuk.objects.JObjectKey;

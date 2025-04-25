@@ -1,9 +1,9 @@
 package com.usatiuk.dhfs.invalidation;
 
-import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.jkleppmanntree.JKleppmannTreeManager;
 import com.usatiuk.dhfs.jkleppmanntree.JKleppmannTreeOpWrapper;
 import com.usatiuk.dhfs.jkleppmanntree.JKleppmannTreePeriodicPushOp;
+import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.objects.transaction.Transaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

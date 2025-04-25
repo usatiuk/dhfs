@@ -4,7 +4,6 @@ import com.usatiuk.objects.JData;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.iterators.CloseableKvIterator;
 import com.usatiuk.objects.iterators.IteratorStart;
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 

@@ -1,10 +1,10 @@
 package com.usatiuk.dhfs.remoteobj;
 
-import com.usatiuk.dhfs.peersync.InitialSyncProcessor;
-import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
-import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.ShutdownChecker;
 import com.usatiuk.dhfs.invalidation.InvalidationQueueService;
+import com.usatiuk.dhfs.peersync.InitialSyncProcessor;
+import com.usatiuk.dhfs.peersync.PeerId;
+import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
 import com.usatiuk.dhfs.rpc.RemoteObjectServiceClient;
 import com.usatiuk.objects.JData;
 import com.usatiuk.objects.JObjectKey;
