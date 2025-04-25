@@ -2,7 +2,7 @@ package com.usatiuk.objects.transaction;
 
 import com.usatiuk.objects.JData;
 import com.usatiuk.objects.JDataVersionedWrapper;
-import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
+import com.usatiuk.utils.AutoCloseableNoThrow;
 
 import java.util.Optional;
 

@@ -1,10 +1,10 @@
 package com.usatiuk.dhfs.jkleppmanntree;
 
 import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.dhfs.PeerId;
+import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeMeta;
 import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeMetaFile;
-import com.usatiuk.dhfs.repository.invalidation.Op;
+import com.usatiuk.dhfs.invalidation.Op;
 import com.usatiuk.kleppmanntree.OpMove;
 
 import java.io.Serializable;

@@ -1,9 +1,9 @@
 package com.usatiuk.dhfs.jkleppmanntree;
 
-import com.usatiuk.dhfs.PeerId;
-import com.usatiuk.dhfs.repository.PersistentPeerDataService;
-import com.usatiuk.dhfs.repository.peersync.PeerInfo;
-import com.usatiuk.dhfs.repository.peersync.PeerInfoService;
+import com.usatiuk.dhfs.peersync.PeerId;
+import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
+import com.usatiuk.dhfs.peersync.PeerInfo;
+import com.usatiuk.dhfs.peersync.PeerInfoService;
 import com.usatiuk.kleppmanntree.PeerInterface;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;

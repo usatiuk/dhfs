@@ -1,6 +1,6 @@
 package com.usatiuk.objects.iterators;
 
-import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
+import com.usatiuk.utils.AutoCloseableNoThrow;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.Iterator;

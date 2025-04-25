@@ -22,19 +22,19 @@ export function PeerKnownCard({ peerInfo }: TPeerKnownCardProps) {
             <div className={"peerInfo"}>
                 <div>
                     <div>
-
-                    <span>UUID: </span>
-                    <span>{peerInfo.uuid}</span>
+                        <span>UUID: </span>
+                        <span>{peerInfo.uuid}</span>
                     </div>
                     <div>
-                        <span>{peerInfo.knownAddress ? "connected" : "not connected"}</span>
+                        <span>
+                            {peerInfo.knownAddress
+                                ? "connected"
+                                : "not connected"}
+                        </span>
                     </div>
                 </div>
                 <div>
-                    <fetcher.Form
-                        method="put"
-                        action={"/home/peers"}
-                    >
+                    <fetcher.Form method="put" action={"/home/peers"}>
                         <span>Manual address: </span>
                         <input
                             name="intent"

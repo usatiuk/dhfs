@@ -1,6 +1,6 @@
 package com.usatiuk.objects.transaction;
 
-import com.usatiuk.dhfs.utils.VoidFn;
+import com.usatiuk.utils.VoidFn;
 import io.quarkus.logging.Log;
 
 import java.util.function.Supplier;

@@ -1,8 +1,8 @@
 package com.usatiuk.dhfs.jkleppmanntree;
 
 import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.dhfs.PeerId;
-import com.usatiuk.dhfs.repository.invalidation.Op;
+import com.usatiuk.dhfs.peersync.PeerId;
+import com.usatiuk.dhfs.invalidation.Op;
 
 import java.io.Serializable;
 import java.util.Collection;

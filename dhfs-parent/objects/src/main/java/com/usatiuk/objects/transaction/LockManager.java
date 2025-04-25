@@ -1,11 +1,10 @@
 package com.usatiuk.objects.transaction;
 
 import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
-import com.usatiuk.dhfs.utils.DataLocker;
+import com.usatiuk.utils.AutoCloseableNoThrow;
+import com.usatiuk.utils.DataLocker;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
-import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Singleton;
 
 @Singleton

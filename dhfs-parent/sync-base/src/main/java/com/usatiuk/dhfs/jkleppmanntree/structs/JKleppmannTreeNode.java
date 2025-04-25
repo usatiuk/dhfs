@@ -1,13 +1,12 @@
 package com.usatiuk.dhfs.jkleppmanntree.structs;
 
-import com.usatiuk.dhfs.JDataRef;
-import com.usatiuk.dhfs.JDataRefcounted;
+import com.usatiuk.dhfs.refcount.JDataRef;
+import com.usatiuk.dhfs.refcount.JDataRefcounted;
 import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.dhfs.PeerId;
-import com.usatiuk.dhfs.repository.peersync.structs.JKleppmannTreeNodeMetaPeer;
+import com.usatiuk.dhfs.peersync.PeerId;
+import com.usatiuk.dhfs.peersync.structs.JKleppmannTreeNodeMetaPeer;
 import com.usatiuk.kleppmanntree.OpMove;
 import com.usatiuk.kleppmanntree.TreeNode;
-import com.usatiuk.objects.JObjectKeyImpl;
 import org.pcollections.HashTreePMap;
 import org.pcollections.PCollection;
 import org.pcollections.PMap;

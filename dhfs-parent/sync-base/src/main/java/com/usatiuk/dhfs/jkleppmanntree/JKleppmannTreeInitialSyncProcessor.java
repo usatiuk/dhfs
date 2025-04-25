@@ -1,9 +1,9 @@
 package com.usatiuk.dhfs.jkleppmanntree;
 
-import com.usatiuk.dhfs.PeerId;
+import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreePersistentData;
-import com.usatiuk.dhfs.repository.InitialSyncProcessor;
-import com.usatiuk.dhfs.repository.invalidation.InvalidationQueueService;
+import com.usatiuk.dhfs.peersync.InitialSyncProcessor;
+import com.usatiuk.dhfs.invalidation.InvalidationQueueService;
 import com.usatiuk.objects.JObjectKey;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;

@@ -9,8 +9,8 @@ export function PeerState() {
     const loaderData = useLoaderData() as LoaderToType<typeof peerStateLoader>;
 
     const knownPeers = loaderData.knownPeers.peers
-        .filter((p) => p.uuid !== loaderData.knownPeers.selfUuid)
-        .map((p) => <PeerKnownCard peerInfo={p} key={p.uuid} />);
+        ?.filter((p) => p.uuid !== loaderData.knownPeers.selfUuid)
+        ?.map((p) => <PeerKnownCard peerInfo={p} key={p.uuid} />);
 
     const availablePeers = loaderData.availablePeers.map((p) => (
         <PeerAvailableCard peerInfo={p} key={p.uuid} />

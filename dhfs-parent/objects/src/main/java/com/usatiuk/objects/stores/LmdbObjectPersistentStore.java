@@ -2,7 +2,7 @@ package com.usatiuk.objects.stores;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
-import com.usatiuk.dhfs.utils.RefcountedCloseable;
+import com.usatiuk.utils.RefcountedCloseable;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.JObjectKeyMax;
 import com.usatiuk.objects.JObjectKeyMin;

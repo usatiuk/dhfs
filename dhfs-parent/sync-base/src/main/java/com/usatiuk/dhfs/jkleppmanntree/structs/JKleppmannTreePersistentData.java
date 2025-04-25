@@ -1,9 +1,9 @@
 package com.usatiuk.dhfs.jkleppmanntree.structs;
 
-import com.usatiuk.dhfs.JDataRef;
-import com.usatiuk.dhfs.JDataRefcounted;
+import com.usatiuk.dhfs.refcount.JDataRef;
+import com.usatiuk.dhfs.refcount.JDataRefcounted;
 import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.dhfs.PeerId;
+import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.kleppmanntree.CombinedTimestamp;
 import com.usatiuk.kleppmanntree.LogRecord;
 import com.usatiuk.kleppmanntree.OpMove;

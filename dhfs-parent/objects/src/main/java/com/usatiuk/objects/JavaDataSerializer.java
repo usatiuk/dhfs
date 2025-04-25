@@ -2,7 +2,7 @@ package com.usatiuk.objects;
 
 
 import com.google.protobuf.ByteString;
-import com.usatiuk.dhfs.utils.SerializationHelper;
+import com.usatiuk.utils.SerializationHelper;
 import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
 

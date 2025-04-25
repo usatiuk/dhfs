@@ -1,12 +1,12 @@
 package com.usatiuk.dhfs.jkleppmanntree;
 
-import com.usatiuk.dhfs.PeerId;
-import com.usatiuk.dhfs.RemoteTransaction;
+import com.usatiuk.dhfs.peersync.PeerId;
+import com.usatiuk.dhfs.remoteobj.RemoteTransaction;
 import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreePersistentData;
-import com.usatiuk.dhfs.repository.invalidation.InvalidationQueueService;
-import com.usatiuk.dhfs.repository.invalidation.Op;
-import com.usatiuk.dhfs.repository.invalidation.OpExtractor;
-import com.usatiuk.dhfs.repository.syncmap.DtoMapperService;
+import com.usatiuk.dhfs.invalidation.InvalidationQueueService;
+import com.usatiuk.dhfs.invalidation.Op;
+import com.usatiuk.dhfs.invalidation.OpExtractor;
+import com.usatiuk.dhfs.syncmap.DtoMapperService;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;
 import jakarta.enterprise.context.ApplicationScoped;

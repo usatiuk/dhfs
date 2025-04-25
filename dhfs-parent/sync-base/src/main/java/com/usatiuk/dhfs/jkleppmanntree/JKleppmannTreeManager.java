@@ -1,11 +1,11 @@
 package com.usatiuk.dhfs.jkleppmanntree;
 
 import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.dhfs.PeerId;
+import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.jkleppmanntree.structs.*;
-import com.usatiuk.dhfs.repository.PersistentPeerDataService;
-import com.usatiuk.dhfs.repository.invalidation.Op;
-import com.usatiuk.dhfs.repository.peersync.PeerInfoService;
+import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
+import com.usatiuk.dhfs.invalidation.Op;
+import com.usatiuk.dhfs.peersync.PeerInfoService;
 import com.usatiuk.objects.transaction.LockingStrategy;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;

@@ -4,7 +4,7 @@ import com.usatiuk.objects.JData;
 import com.usatiuk.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.snapshot.Snapshot;
-import com.usatiuk.dhfs.utils.AutoCloseableNoThrow;
+import com.usatiuk.utils.AutoCloseableNoThrow;
 
 import java.util.Collection;
 import java.util.Map;
