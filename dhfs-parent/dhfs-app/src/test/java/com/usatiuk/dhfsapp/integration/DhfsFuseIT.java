@@ -248,8 +248,8 @@ public class DhfsFuseIT {
         var c2curl = container2.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request DELETE " +
-                        "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
-                        "  http://localhost:8080/peers-manage/known-peers");
+                        "  --data '{}' " +
+                        "  http://localhost:8080/peers-manage/known-peers/"+c1uuid);
 
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "echo rewritten > /dhfs_test/fuse/testf1").getExitCode());
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "echo jioadsd > /dhfs_test/fuse/newfile1").getExitCode());
@@ -264,8 +264,8 @@ public class DhfsFuseIT {
         container2.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request PUT " +
-                        "  --data '{\"uuid\":\"" + c1uuid + "\"}' " +
-                        "  http://localhost:8080/peers-manage/known-peers");
+                        "  --data '{}' " +
+                        "  http://localhost:8080/peers-manage/known-peers/"+c1uuid);
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
 

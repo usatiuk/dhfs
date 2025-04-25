@@ -193,8 +193,8 @@ public class DhfsFusex3IT {
         var c3curl = container3.execInContainer("/bin/sh", "-c",
                 "curl --header \"Content-Type: application/json\" " +
                         "  --request DELETE " +
-                        "  --data '{\"uuid\":\"" + c2uuid + "\"}' " +
-                        "  http://localhost:8080/peers-manage/known-peers");
+                        "  --data '{}' " +
+                        "  http://localhost:8080/peers-manage/known-peers/" + c2uuid);
 
         Thread.sleep(10000);
 
