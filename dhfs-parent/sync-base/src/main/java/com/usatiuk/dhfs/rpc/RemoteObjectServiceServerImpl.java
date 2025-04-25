@@ -3,7 +3,7 @@ package com.usatiuk.dhfs.rpc;
 import com.usatiuk.dhfs.ProtoSerializer;
 import com.usatiuk.dhfs.autosync.AutosyncProcessor;
 import com.usatiuk.dhfs.invalidation.Op;
-import com.usatiuk.dhfs.invalidation.OpHandler;
+import com.usatiuk.dhfs.invalidation.OpHandlerService;
 import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.peersync.PeerManager;
 import com.usatiuk.dhfs.persistence.JObjectKeyP;
@@ -42,7 +42,7 @@ public class RemoteObjectServiceServerImpl {
     @Inject
     RemoteTransaction remoteTx;
     @Inject
-    OpHandler opHandler;
+    OpHandlerService opHandlerService;
     @Inject
     DtoMapperService dtoMapperService;
     @Inject
@@ -120,7 +120,7 @@ public class RemoteObjectServiceServerImpl {
             for (var op : ops) {
                 Log.infov("<-- opPush: {0} from {1}", op, from);
                 var handle = txm.run(() -> {
-                    opHandler.handleOp(from, op);
+                    opHandlerService.handleOp(from, op);
                 });
                 handles.add(handle);
             }
