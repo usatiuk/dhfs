@@ -89,7 +89,7 @@ public abstract class DhfsFileServiceSimpleTestImpl {
 //            for (int start = 0; start < all.length(); start++) {
 //                for (int end = start; end <= all.length(); end++) {
 //                    var read = fileService.read(fuuid.toString(), start, end - start);
-//                    Assertions.assertArrayEquals(all.substring(start, end).getBytes(), read.get().toByteArray());
+//                    Assertions.assertArrayEquals(all.substring(start, end).getBytes(), read.toByteArray());
 //                }
 //            }
 //        }
@@ -112,16 +112,16 @@ public abstract class DhfsFileServiceSimpleTestImpl {
 
         var curMtime = fileService.getattr(uuid).get().mtime();
         fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
-        Assertions.assertArrayEquals(new byte[]{2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 2, 8).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).toByteArray());
+        Assertions.assertArrayEquals(new byte[]{2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 2, 8).toByteArray());
         fileService.write(uuid, 4, new byte[]{10, 11, 12});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 12, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 12, 7, 8, 9}, fileService.read(uuid, 0, 10).toByteArray());
         fileService.write(uuid, 10, new byte[]{13, 14});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 12, 7, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 12, 7, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).toByteArray());
         fileService.write(uuid, 6, new byte[]{15, 16});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 15, 16, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 10, 11, 15, 16, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).toByteArray());
         fileService.write(uuid, 3, new byte[]{17, 18});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 17, 18, 11, 15, 16, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 17, 18, 11, 15, 16, 8, 9, 13, 14}, fileService.read(uuid, 0, 12).toByteArray());
 
         var newMtime = fileService.getattr(uuid).get().mtime();
         Assertions.assertTrue(newMtime > curMtime);
@@ -138,7 +138,7 @@ public abstract class DhfsFileServiceSimpleTestImpl {
         var uuid = ret.get();
 
         fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).toByteArray());
 
         fileService.unlink("/removeTest");
         Assertions.assertFalse(fileService.open("/removeTest").isPresent());
@@ -152,12 +152,12 @@ public abstract class DhfsFileServiceSimpleTestImpl {
         var uuid = ret.get();
 
         fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).toByteArray());
 
         fileService.truncate(uuid, 20);
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fileService.read(uuid, 0, 20).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fileService.read(uuid, 0, 20).toByteArray());
         fileService.write(uuid, 5, new byte[]{10, 11, 12, 13, 14, 15, 16, 17});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 15, 16, 17, 0, 0, 0, 0, 0, 0, 0}, fileService.read(uuid, 0, 20).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 15, 16, 17, 0, 0, 0, 0, 0, 0, 0}, fileService.read(uuid, 0, 20).toByteArray());
     }
 
     @RepeatedTest(100)
@@ -169,12 +169,12 @@ public abstract class DhfsFileServiceSimpleTestImpl {
             var uuid = ret.get();
 
             fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
-            Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+            Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).toByteArray());
 
             fileService.truncate(uuid, 20);
-            Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fileService.read(uuid, 0, 20).get().toByteArray());
+            Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fileService.read(uuid, 0, 20).toByteArray());
             fileService.write(uuid, 10, new byte[]{11, 12, 13, 14, 15, 16, 17, 18, 19, 20});
-            Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}, fileService.read(uuid, 0, 20).get().toByteArray());
+            Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}, fileService.read(uuid, 0, 20).toByteArray());
         } finally {
             fileService.unlink("/truncateTest2");
         }
@@ -188,10 +188,10 @@ public abstract class DhfsFileServiceSimpleTestImpl {
         var uuid = ret.get();
 
         fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).toByteArray());
 
         fileService.truncate(uuid, 7);
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6,}, fileService.read(uuid, 0, 20).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6,}, fileService.read(uuid, 0, 20).toByteArray());
     }
 
     @Test
@@ -201,14 +201,14 @@ public abstract class DhfsFileServiceSimpleTestImpl {
         var uuid = ret.get();
 
         fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).toByteArray());
 
         Assertions.assertTrue(fileService.rename("/moveTest", "/movedTest"));
         Assertions.assertFalse(fileService.open("/moveTest").isPresent());
         Assertions.assertTrue(fileService.open("/movedTest").isPresent());
 
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-                fileService.read(fileService.open("/movedTest").get(), 0, 10).get().toByteArray());
+                fileService.read(fileService.open("/movedTest").get(), 0, 10).toByteArray());
     }
 
     @Test
@@ -221,9 +221,9 @@ public abstract class DhfsFileServiceSimpleTestImpl {
         var uuid2 = ret2.get();
 
         fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).toByteArray());
         fileService.write(uuid2, 0, new byte[]{11, 12, 13, 14, 15, 16, 17, 18, 19, 29});
-        Assertions.assertArrayEquals(new byte[]{11, 12, 13, 14, 15, 16, 17, 18, 19, 29}, fileService.read(uuid2, 0, 10).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{11, 12, 13, 14, 15, 16, 17, 18, 19, 29}, fileService.read(uuid2, 0, 10).toByteArray());
 
 
         jObjectTxManager.run(() -> {
@@ -237,7 +237,7 @@ public abstract class DhfsFileServiceSimpleTestImpl {
         Assertions.assertTrue(fileService.open("/moveOverTest2").isPresent());
 
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-                fileService.read(fileService.open("/moveOverTest2").get(), 0, 10).get().toByteArray());
+                fileService.read(fileService.open("/moveOverTest2").get(), 0, 10).toByteArray());
 
 //        await().atMost(5, TimeUnit.SECONDS).until(() -> {
 //                jObjectTxManager.run(() -> {
@@ -255,8 +255,8 @@ public abstract class DhfsFileServiceSimpleTestImpl {
         var uuid = ret.get();
 
         fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
-        Assertions.assertArrayEquals(new byte[]{}, fileService.read(uuid, 20, 10).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).toByteArray());
+        Assertions.assertArrayEquals(new byte[]{}, fileService.read(uuid, 20, 10).toByteArray());
     }
 
     @Test
@@ -266,13 +266,13 @@ public abstract class DhfsFileServiceSimpleTestImpl {
         var uuid = ret.get();
 
         fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).toByteArray());
         fileService.write(uuid, 20, new byte[]{10, 11, 12, 13, 14, 15, 16, 17, 18, 19});
         Assertions.assertArrayEquals(new byte[]{
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 10, 11, 12, 13, 14, 15, 16, 17, 18, 19
-        }, fileService.read(uuid, 0, 30).get().toByteArray());
+        }, fileService.read(uuid, 0, 30).toByteArray());
     }
 
     @Test
@@ -282,7 +282,7 @@ public abstract class DhfsFileServiceSimpleTestImpl {
         var uuid = ret.get();
 
         fileService.write(uuid, 0, new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9});
-        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).get().toByteArray());
+        Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, fileService.read(uuid, 0, 10).toByteArray());
 
 //        var oldfile = jObjectManager.get(uuid).orElseThrow(IllegalStateException::new);
 //        var chunk = oldfile.runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.extractRefs()).stream().toList().get(0);
@@ -297,6 +297,6 @@ public abstract class DhfsFileServiceSimpleTestImpl {
         Assertions.assertTrue(fileService.open("/movedTest2").isPresent());
 
         Assertions.assertArrayEquals(new byte[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-                fileService.read(fileService.open("/movedTest2").get(), 0, 10).get().toByteArray());
+                fileService.read(fileService.open("/movedTest2").get(), 0, 10).toByteArray());
     }
 }

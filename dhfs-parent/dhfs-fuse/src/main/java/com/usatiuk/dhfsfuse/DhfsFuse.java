@@ -223,8 +223,8 @@ public class DhfsFuse extends FuseStubFS {
             var fileKey = getFromHandle(fi.fh.get());
             var read = fileService.read(fileKey, offset, (int) size);
             if (read.isEmpty()) return 0;
-            UnsafeByteOperations.unsafeWriteTo(read.get(), new JnrPtrByteOutput(jnrPtrByteOutputAccessors, buf, size));
-            return read.get().size();
+            UnsafeByteOperations.unsafeWriteTo(read, new JnrPtrByteOutput(jnrPtrByteOutputAccessors, buf, size));
+            return read.size();
         } catch (Throwable e) {
             Log.error("When reading " + path, e);
             return -ErrorCodes.EIO();

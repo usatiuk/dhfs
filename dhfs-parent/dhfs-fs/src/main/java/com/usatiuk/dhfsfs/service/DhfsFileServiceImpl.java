@@ -271,7 +271,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     }
 
     @Override
-    public Optional<ByteString> read(JObjectKey fileUuid, long offset, int length) {
+    public ByteString read(JObjectKey fileUuid, long offset, int length) {
         return jObjectTxManager.executeTx(() -> {
             if (length < 0)
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Length should be more than zero: " + length));
@@ -281,12 +281,12 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             var file = remoteTx.getData(File.class, fileUuid).orElse(null);
             if (file == null) {
                 Log.error("File not found when trying to read: " + fileUuid);
-                return Optional.empty();
+                throw new StatusRuntimeException(Status.NOT_FOUND.withDescription("File not found when trying to read: " + fileUuid));
             }
 
             try (var it = jMapHelper.getIterator(file, IteratorStart.LE, JMapLongKey.of(offset))) {
                 if (!it.hasNext())
-                    return Optional.of(ByteString.empty());
+                    return ByteString.empty();
 
 //                if (it.peekNextKey().key() != offset) {
 //                    Log.warnv("Read over the end of file: {0} {1} {2}, next chunk: {3}", fileUuid, offset, length, it.peekNextKey());
@@ -324,10 +324,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
                     chunk = it.next();
                 }
 
-                return Optional.of(buf);
+                return buf;
             } catch (Exception e) {
                 Log.error("Error reading file: " + fileUuid, e);
-                return Optional.empty();
+                throw new StatusRuntimeException(Status.INTERNAL.withDescription("Error reading file: " + fileUuid));
             }
         });
     }
@@ -595,7 +595,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     public ByteString readlinkBS(JObjectKey uuid) {
         return jObjectTxManager.executeTx(() -> {
             var fileOpt = remoteTx.getData(File.class, uuid).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("File not found when trying to readlink: " + uuid)));
-            return read(uuid, 0, Math.toIntExact(size(uuid))).get();
+            return read(uuid, 0, Math.toIntExact(size(uuid)));
         });
     }
 

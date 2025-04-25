@@ -30,7 +30,7 @@ public interface DhfsFileService {
 
     long size(JObjectKey fileUuid);
 
-    Optional<ByteString> read(JObjectKey fileUuid, long offset, int length);
+    ByteString read(JObjectKey fileUuid, long offset, int length);
 
     Long write(JObjectKey fileUuid, long offset, ByteString data);
 
