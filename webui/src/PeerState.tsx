@@ -18,8 +18,11 @@ export function PeerState() {
 
     return (
         <div id={"PeerState"}>
-            <div>UUID: {loaderData.selfInfo.selfUuid}</div>
-            <div>Certificate: {loaderData.selfInfo.certHash} </div>
+            <div className={"selfInfo"}>
+                <div>This node:</div>
+                <div>UUID: {loaderData.selfInfo.selfUuid}</div>
+                <div>Certificate: {loaderData.selfInfo.certHash} </div>
+            </div>
             <div>
                 <div>Known peers</div>
                 <div>{knownPeers}</div>

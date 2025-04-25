@@ -25,20 +25,11 @@ export function PeerKnownCard({ peerInfo }: TPeerKnownCardProps) {
         <div className="peerKnownCard">
             <div className={"peerInfo"}>
                 <div>
-                    <div>
-                        <span>UUID: </span>
-                        <span>{peerInfo.uuid}</span>
-                    </div>
-                    <div>
-                        <span>
-                            {peerInfo.knownAddress
-                                ? "connected"
-                                : "not connected"}
-                        </span>
-                    </div>
-                    <div>
-                        <span>Cert: {peerInfo.certHash}</span>
-                    </div>
+                    <span>UUID: </span>
+                    <span>{peerInfo.uuid}</span>
+                </div>
+                <div>
+                    <span>Certificate: {peerInfo.certHash}</span>
                 </div>
                 <div>
                     <fetcher.Form method="put" action={"/home/peers"}>
@@ -60,6 +51,11 @@ export function PeerKnownCard({ peerInfo }: TPeerKnownCardProps) {
                         />
                         <button type="submit">save</button>
                     </fetcher.Form>
+                </div>
+                <div>
+                    <span>
+                        {peerInfo.knownAddress ? "connected" : "not connected"}
+                    </span>
                 </div>
             </div>
             <fetcher.Form
