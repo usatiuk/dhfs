@@ -168,7 +168,7 @@ public class InvalidationQueueService {
 
                         for (var p : ops.keySet()) {
                             var list = ops.get(p);
-                            Log.infov("Pushing invalidations to {0}: {1}", p, list);
+                            Log.tracev("Pushing invalidations to {0}: {1}", p, list);
                             remoteObjectServiceClient.pushOps(p, list);
                             commits.get(p).forEach(Runnable::run);
                         }
