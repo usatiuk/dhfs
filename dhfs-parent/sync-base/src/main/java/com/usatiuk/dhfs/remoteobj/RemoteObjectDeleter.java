@@ -138,7 +138,7 @@ public class RemoteObjectDeleter {
                             .map(PeerInfo::id)
                             .filter(id -> !finalTarget.confirmedDeletes().contains(id)).toList();
 
-                    var ret = remoteObjectServiceClient.canDelete(missing, objName, target.refsFrom());
+                    var ret = remoteObjectServiceClient.canDelete(missing, objName);
 
                     long ok = 0;
 

@@ -32,7 +32,6 @@ message GetObjectReply {
 
 message CanDeleteRequest {
   dhfs.persistence.JObjectKeyP name = 2;
-  repeated dhfs.persistence.JObjectKeyP ourReferrers = 3;
 }
 
 message CanDeleteReply {
