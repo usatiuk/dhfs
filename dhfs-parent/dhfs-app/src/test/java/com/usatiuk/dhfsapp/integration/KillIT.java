@@ -115,7 +115,7 @@ public class KillIT {
             Log.info(ls2);
             Log.info(cat2);
 
-            return ls1.equals(ls2) && cat1.equals(cat2);
+            return ls1.equals(ls2) && cat1.equals(cat2) && ls1.getExitCode() == 0 && ls2.getExitCode() == 0 && cat1.getExitCode() == 0 && cat2.getExitCode() == 0;
         });
     }
 
