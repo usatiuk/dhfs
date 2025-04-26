@@ -10,9 +10,6 @@ import java.util.Optional;
 // Persistent storage of objects
 // All changes are written as sequential transactions
 public interface ObjectPersistentStore {
-    @Nonnull
-    Optional<ByteString> readObject(JObjectKey name);
-
     Snapshot<JObjectKey, ByteString> getSnapshot();
 
     Runnable prepareTx(TxManifestRaw names, long txId);

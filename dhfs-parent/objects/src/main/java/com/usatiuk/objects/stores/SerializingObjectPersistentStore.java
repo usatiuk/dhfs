@@ -23,11 +23,6 @@ public class SerializingObjectPersistentStore {
     @Inject
     ObjectPersistentStore delegateStore;
 
-    @Nonnull
-    Optional<JDataVersionedWrapper> readObject(JObjectKey name) {
-        return delegateStore.readObject(name).map(serializer::deserialize);
-    }
-
     public Snapshot<JObjectKey, JDataVersionedWrapper> getSnapshot() {
         return new Snapshot<JObjectKey, JDataVersionedWrapper>() {
             private final Snapshot<JObjectKey, ByteString> _backing = delegateStore.getSnapshot();

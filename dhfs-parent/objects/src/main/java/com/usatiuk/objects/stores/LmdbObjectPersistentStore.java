@@ -10,7 +10,6 @@ import com.usatiuk.objects.iterators.IteratorStart;
 import com.usatiuk.objects.iterators.KeyPredicateKvIterator;
 import com.usatiuk.objects.iterators.ReversibleKvIterator;
 import com.usatiuk.objects.snapshot.Snapshot;
-import com.usatiuk.utils.RefcountedCloseable;
 import io.quarkus.arc.properties.IfBuildProperty;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
@@ -104,53 +103,48 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
         if (!_ready) throw new IllegalStateException("Wrong service order!");
     }
 
-    @Nonnull
-    @Override
-    public Optional<ByteString> readObject(JObjectKey name) {
-        verifyReady();
-        try (Txn<ByteBuffer> txn = _env.txnRead()) {
-            var value = _db.get(txn, name.toByteBuffer());
-            return Optional.ofNullable(value).map(ByteString::copyFrom);
-        }
-    }
-
     @Override
     public Snapshot<JObjectKey, ByteString> getSnapshot() {
-        var txn = new RefcountedCloseable<>(_env.txnRead());
-        long commitId = readTxId(txn.get()).orElseThrow();
-        return new Snapshot<JObjectKey, ByteString>() {
-            private final RefcountedCloseable<Txn<ByteBuffer>> _txn = txn;
-            private final long _id = commitId;
-            private boolean _closed = false;
+        var txn = _env.txnRead();
+        try {
+            long commitId = readTxId(txn).orElseThrow();
+            return new Snapshot<JObjectKey, ByteString>() {
+                private final Txn<ByteBuffer> _txn = txn;
+                private final long _id = commitId;
+                private boolean _closed = false;
 
-            @Override
-            public CloseableKvIterator<JObjectKey, ByteString> getIterator(IteratorStart start, JObjectKey key) {
-                assert !_closed;
-                return new KeyPredicateKvIterator<>(new LmdbKvIterator(_txn.ref(), start, key), start, key, (k) -> !k.value().equals(DB_VER_OBJ_NAME_STR));
-            }
+                @Override
+                public CloseableKvIterator<JObjectKey, ByteString> getIterator(IteratorStart start, JObjectKey key) {
+                    assert !_closed;
+                    return new KeyPredicateKvIterator<>(new LmdbKvIterator(_txn, start, key), start, key, (k) -> !k.value().equals(DB_VER_OBJ_NAME_STR));
+                }
 
-            @Nonnull
-            @Override
-            public Optional<ByteString> readObject(JObjectKey name) {
-                assert !_closed;
-                var got = _db.get(_txn.get(), name.toByteBuffer());
-                var ret = Optional.ofNullable(got).map(UnsafeByteOperations::unsafeWrap);
-                return ret;
-            }
+                @Nonnull
+                @Override
+                public Optional<ByteString> readObject(JObjectKey name) {
+                    assert !_closed;
+                    var got = _db.get(_txn, name.toByteBuffer());
+                    var ret = Optional.ofNullable(got).map(UnsafeByteOperations::unsafeWrap);
+                    return ret;
+                }
 
-            @Override
-            public long id() {
-                assert !_closed;
-                return _id;
-            }
+                @Override
+                public long id() {
+                    assert !_closed;
+                    return _id;
+                }
 
-            @Override
-            public void close() {
-                assert !_closed;
-                _closed = true;
-                _txn.unref();
-            }
-        };
+                @Override
+                public void close() {
+                    assert !_closed;
+                    _closed = true;
+                    _txn.close();
+                }
+            };
+        } catch (Exception e) {
+            txn.close();
+            throw e;
+        }
     }
 
     @Override
@@ -205,28 +199,28 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
 
     private class LmdbKvIterator extends ReversibleKvIterator<JObjectKey, ByteString> {
         private static final Cleaner CLEANER = Cleaner.create();
-        private final RefcountedCloseable<Txn<ByteBuffer>> _txn;
+        private final Txn<ByteBuffer> _txn; // Managed by the snapshot
         private final Cursor<ByteBuffer> _cursor;
         private final MutableObject<Boolean> _closed = new MutableObject<>(false);
         //        private final Exception _allocationStacktrace = new Exception();
-        private final Exception _allocationStacktrace = null;
+//        private final Exception _allocationStacktrace = null;
         private boolean _hasNext = false;
         private JObjectKey _peekedNextKey = null;
 
-        LmdbKvIterator(RefcountedCloseable<Txn<ByteBuffer>> txn, IteratorStart start, JObjectKey key) {
+        LmdbKvIterator(Txn<ByteBuffer> txn, IteratorStart start, JObjectKey key) {
             _txn = txn;
             _goingForward = true;
 
-            _cursor = _db.openCursor(_txn.get());
+            _cursor = _db.openCursor(_txn);
 
             var closedRef = _closed;
-            var bt = _allocationStacktrace;
-            CLEANER.register(this, () -> {
-                if (!closedRef.getValue()) {
-                    Log.error("Iterator was not closed before GC, allocated at: {0}", bt);
-                    System.exit(-1);
-                }
-            });
+//            var bt = _allocationStacktrace;
+//            CLEANER.register(this, () -> {
+//                if (!closedRef.getValue()) {
+//                    Log.error("Iterator was not closed before GC, allocated at: {0}", bt);
+//                    System.exit(-1);
+//                }
+//            });
 
             verifyReady();
 
@@ -308,7 +302,6 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             }
             _closed.setValue(true);
             _cursor.close();
-            _txn.unref();
         }
 
         @Override

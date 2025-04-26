@@ -21,14 +21,6 @@ public class MemoryObjectPersistentStore implements ObjectPersistentStore {
     private TreePMap<JObjectKey, ByteString> _objects = TreePMap.empty();
     private long _lastCommitId = 0;
 
-    @Nonnull
-    @Override
-    public Optional<ByteString> readObject(JObjectKey name) {
-        synchronized (this) {
-            return Optional.ofNullable(_objects.get(name));
-        }
-    }
-
     @Override
     public Snapshot<JObjectKey, ByteString> getSnapshot() {
         synchronized (this) {
