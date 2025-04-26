@@ -14,6 +14,9 @@ Syncthing and allowing you to stream your files like Google Drive File Stream
 This is a simple wrapper around the jar/web ui distribution that allows you to run/stop
 the DHFS server in the background, and update itself (hopefully!)
 
-## How to use it and how it works?
+## How to use it?
 
-TODO 😁
+
+Unpack the run-wrapper and run the `run` script. The filesystem should be mounted to the `fuse` folder in the run-wrapper root directory.
+
+Then, a web interface will be available at `losthost:8080`, that can be used to connect with other peers.
