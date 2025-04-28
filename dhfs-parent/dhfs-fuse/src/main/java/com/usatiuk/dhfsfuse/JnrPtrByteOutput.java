@@ -9,14 +9,12 @@ import java.nio.MappedByteBuffer;
 public class JnrPtrByteOutput extends ByteOutput {
     private final Pointer _backing;
     private final long _size;
-    private final JnrPtrByteOutputAccessors _accessors;
     private long _pos;
 
-    public JnrPtrByteOutput(JnrPtrByteOutputAccessors accessors, Pointer backing, long size) {
+    public JnrPtrByteOutput(Pointer backing, long size) {
         _backing = backing;
         _size = size;
         _pos = 0;
-        _accessors = accessors;
     }
 
     @Override
@@ -47,9 +45,9 @@ public class JnrPtrByteOutput extends ByteOutput {
             if (value instanceof MappedByteBuffer mb) {
                 mb.load();
             }
-            long addr = _accessors.getNioAccess().getBufferAddress(value) + value.position();
+            long addr = UnsafeAccessor.get().getNioAccess().getBufferAddress(value) + value.position();
             var out = _backing.address() + _pos;
-            _accessors.getUnsafe().copyMemory(addr, out, rem);
+            UnsafeAccessor.get().getUnsafe().copyMemory(addr, out, rem);
         } else {
             _backing.put(_pos, value.array(), value.arrayOffset() + value.position(), rem);
         }

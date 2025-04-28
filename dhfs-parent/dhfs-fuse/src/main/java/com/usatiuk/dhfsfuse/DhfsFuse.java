@@ -51,8 +51,6 @@ public class DhfsFuse extends FuseStubFS {
     @ConfigProperty(name = "dhfs.files.target_chunk_size")
     int targetChunkSize;
     @Inject
-    JnrPtrByteOutputAccessors jnrPtrByteOutputAccessors;
-    @Inject
     DhfsFileService fileService;
 
     private long allocateHandle(JObjectKey key) {
@@ -231,7 +229,7 @@ public class DhfsFuse extends FuseStubFS {
             var fileKey = getFromHandle(fi.fh.get());
             var read = fileService.read(fileKey, offset, (int) size);
             if (read.isEmpty()) return 0;
-            UnsafeByteOperations.unsafeWriteTo(read, new JnrPtrByteOutput(jnrPtrByteOutputAccessors, buf, size));
+            UnsafeByteOperations.unsafeWriteTo(read, new JnrPtrByteOutput(buf, size));
             return read.size();
         } catch (Throwable e) {
             Log.error("When reading " + path, e);
@@ -246,19 +244,15 @@ public class DhfsFuse extends FuseStubFS {
             var fileKey = getFromHandle(fi.fh.get());
             var buffer = ByteBuffer.allocateDirect((int) size);
 
-            if (buffer.isDirect()) {
-                jnrPtrByteOutputAccessors.getUnsafe().copyMemory(
-                        buf.address(),
-                        jnrPtrByteOutputAccessors.getNioAccess().getBufferAddress(buffer),
-                        size
-                );
-            } else {
-                buf.get(0, buffer.array(), 0, (int) size);
-            }
+            UnsafeAccessor.get().getUnsafe().copyMemory(
+                    buf.address(),
+                    UnsafeAccessor.get().getNioAccess().getBufferAddress(buffer),
+                    size
+            );
 
             var written = fileService.write(fileKey, offset, UnsafeByteOperations.unsafeWrap(buffer));
             return written.intValue();
-        } catch (Throwable e) {
+        } catch (Exception e) {
             Log.error("When writing " + path, e);
             return -ErrorCodes.EIO();
         }
@@ -394,7 +388,7 @@ public class DhfsFuse extends FuseStubFS {
             var file = fileOpt.get();
             var read = fileService.readlinkBS(fileOpt.get());
             if (read.isEmpty()) return 0;
-            UnsafeByteOperations.unsafeWriteTo(read, new JnrPtrByteOutput(jnrPtrByteOutputAccessors, buf, size));
+            UnsafeByteOperations.unsafeWriteTo(read, new JnrPtrByteOutput(buf, size));
             buf.putByte(Math.min(size - 1, read.size()), (byte) 0);
             return 0;
         } catch (Throwable e) {
