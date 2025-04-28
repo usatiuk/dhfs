@@ -7,6 +7,7 @@ import com.usatiuk.dhfsfs.service.DirectoryNotEmptyException;
 import com.usatiuk.dhfsfs.service.GetattrRes;
 import com.usatiuk.kleppmanntree.AlreadyExistsException;
 import com.usatiuk.objects.JObjectKey;
+import com.usatiuk.utils.UnsafeAccessor;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.quarkus.logging.Log;
