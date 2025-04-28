@@ -1,6 +1,7 @@
 package com.usatiuk.dhfsfuse;
 
 import com.google.protobuf.ByteOutput;
+import com.usatiuk.utils.UnsafeAccessor;
 import jnr.ffi.Pointer;
 
 import java.nio.ByteBuffer;
