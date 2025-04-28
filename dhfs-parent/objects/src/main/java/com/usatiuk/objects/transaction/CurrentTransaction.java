@@ -43,4 +43,9 @@ public class CurrentTransaction implements Transaction {
     public <T extends JData> void put(JData obj) {
         transactionManager.current().put(obj);
     }
+
+    @Override
+    public <T extends JData> void putNew(JData obj) {
+        transactionManager.current().putNew(obj);
+    }
 }

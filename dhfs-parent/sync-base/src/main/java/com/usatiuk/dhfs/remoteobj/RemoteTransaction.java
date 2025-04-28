@@ -93,6 +93,11 @@ public class RemoteTransaction {
         curTx.put(newData);
     }
 
+    public <T extends JDataRemote> void putDataNew(T obj) {
+        curTx.putNew(new RemoteObjectMeta(obj, persistentPeerDataService.getSelfUuid()));
+        curTx.putNew(new RemoteObjectDataWrapper<>(obj));
+    }
+
     public <T extends JDataRemote> void putData(T obj) {
         var curMeta = getMeta(obj.key()).orElse(null);
 
