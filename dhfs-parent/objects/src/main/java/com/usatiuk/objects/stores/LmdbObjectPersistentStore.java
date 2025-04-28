@@ -1,7 +1,5 @@
 package com.usatiuk.objects.stores;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.JObjectKeyMax;
 import com.usatiuk.objects.JObjectKeyMin;
@@ -104,27 +102,27 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
     }
 
     @Override
-    public Snapshot<JObjectKey, ByteString> getSnapshot() {
+    public Snapshot<JObjectKey, ByteBuffer> getSnapshot() {
         var txn = _env.txnRead();
         try {
             long commitId = readTxId(txn).orElseThrow();
-            return new Snapshot<JObjectKey, ByteString>() {
+            return new Snapshot<JObjectKey, ByteBuffer>() {
                 private final Txn<ByteBuffer> _txn = txn;
                 private final long _id = commitId;
                 private boolean _closed = false;
 
                 @Override
-                public CloseableKvIterator<JObjectKey, ByteString> getIterator(IteratorStart start, JObjectKey key) {
+                public CloseableKvIterator<JObjectKey, ByteBuffer> getIterator(IteratorStart start, JObjectKey key) {
                     assert !_closed;
                     return new KeyPredicateKvIterator<>(new LmdbKvIterator(_txn, start, key), start, key, (k) -> !k.value().equals(DB_VER_OBJ_NAME_STR));
                 }
 
                 @Nonnull
                 @Override
-                public Optional<ByteString> readObject(JObjectKey name) {
+                public Optional<ByteBuffer> readObject(JObjectKey name) {
                     assert !_closed;
                     var got = _db.get(_txn, name.toByteBuffer());
-                    var ret = Optional.ofNullable(got).map(UnsafeByteOperations::unsafeWrap);
+                    var ret = Optional.ofNullable(got).map(ByteBuffer::asReadOnlyBuffer);
                     return ret;
                 }
 
@@ -197,7 +195,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
         return _root.toFile().getUsableSpace();
     }
 
-    private class LmdbKvIterator extends ReversibleKvIterator<JObjectKey, ByteString> {
+    private class LmdbKvIterator extends ReversibleKvIterator<JObjectKey, ByteBuffer> {
         private static final Cleaner CLEANER = Cleaner.create();
         private final Txn<ByteBuffer> _txn; // Managed by the snapshot
         private final Cursor<ByteBuffer> _cursor;
@@ -352,14 +350,13 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
         }
 
         @Override
-        protected Pair<JObjectKey, ByteString> nextImpl() {
+        protected Pair<JObjectKey, ByteBuffer> nextImpl() {
             if (!_hasNext) {
                 throw new NoSuchElementException("No more elements");
             }
             // TODO: Right now with java serialization it doesn't matter, it's all copied to arrays anyway
             var val = _cursor.val();
-            var bs = UnsafeByteOperations.unsafeWrap(val);
-            var ret = Pair.of(JObjectKey.fromByteBuffer(_cursor.key()), bs);
+            var ret = Pair.of(JObjectKey.fromByteBuffer(_cursor.key()), val.asReadOnlyBuffer());
             if (_goingForward)
                 _hasNext = _cursor.next();
             else

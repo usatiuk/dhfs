@@ -13,6 +13,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.RepeatedTest;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 
 class Profiles {
@@ -46,49 +47,49 @@ public class LmdbKvIteratorTest {
 
         try (var snapshot = store.getSnapshot()) {
             var iterator = snapshot.getIterator(IteratorStart.GE, JObjectKey.of(""));
-            Just.checkIterator(iterator, List.of(Pair.of(JObjectKey.of(Long.toString(1)), ByteString.copyFrom(new byte[]{2})),
-                    Pair.of(JObjectKey.of(Long.toString(2)), ByteString.copyFrom(new byte[]{3})),
-                    Pair.of(JObjectKey.of(Long.toString(3)), ByteString.copyFrom(new byte[]{4}))));
+            Just.checkIterator(iterator, List.of(Pair.of(JObjectKey.of(Long.toString(1)), ByteBuffer.wrap(new byte[]{2})),
+                    Pair.of(JObjectKey.of(Long.toString(2)), ByteBuffer.wrap(new byte[]{3})),
+                    Pair.of(JObjectKey.of(Long.toString(3)), ByteBuffer.wrap(new byte[]{4}))));
             Assertions.assertFalse(iterator.hasNext());
             iterator.close();
 
             iterator = snapshot.getIterator(IteratorStart.LE, JObjectKey.of(Long.toString(3)));
-            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(3)), ByteString.copyFrom(new byte[]{4})));
+            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(3)), ByteBuffer.wrap(new byte[]{4})));
             Assertions.assertFalse(iterator.hasNext());
             iterator.close();
 
             iterator = snapshot.getIterator(IteratorStart.LE, JObjectKey.of(Long.toString(2)));
-            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(2)), ByteString.copyFrom(new byte[]{3})), Pair.of(JObjectKey.of(Long.toString(3)), ByteString.copyFrom(new byte[]{4})));
+            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(2)), ByteBuffer.wrap(new byte[]{3})), Pair.of(JObjectKey.of(Long.toString(3)), ByteBuffer.wrap(new byte[]{4})));
             Assertions.assertFalse(iterator.hasNext());
             iterator.close();
 
             iterator = snapshot.getIterator(IteratorStart.GE, JObjectKey.of(Long.toString(2)));
-            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(2)), ByteString.copyFrom(new byte[]{3})), Pair.of(JObjectKey.of(Long.toString(3)), ByteString.copyFrom(new byte[]{4})));
+            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(2)), ByteBuffer.wrap(new byte[]{3})), Pair.of(JObjectKey.of(Long.toString(3)), ByteBuffer.wrap(new byte[]{4})));
             Assertions.assertFalse(iterator.hasNext());
             iterator.close();
 
             iterator = snapshot.getIterator(IteratorStart.GT, JObjectKey.of(Long.toString(2)));
-            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(3)), ByteString.copyFrom(new byte[]{4})));
+            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(3)), ByteBuffer.wrap(new byte[]{4})));
             Assertions.assertFalse(iterator.hasNext());
             iterator.close();
 
             iterator = snapshot.getIterator(IteratorStart.LT, JObjectKey.of(Long.toString(3)));
-            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(2)), ByteString.copyFrom(new byte[]{3})), Pair.of(JObjectKey.of(Long.toString(3)), ByteString.copyFrom(new byte[]{4})));
+            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(2)), ByteBuffer.wrap(new byte[]{3})), Pair.of(JObjectKey.of(Long.toString(3)), ByteBuffer.wrap(new byte[]{4})));
             Assertions.assertFalse(iterator.hasNext());
             iterator.close();
 
             iterator = snapshot.getIterator(IteratorStart.LT, JObjectKey.of(Long.toString(2)));
-            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(1)), ByteString.copyFrom(new byte[]{2})), Pair.of(JObjectKey.of(Long.toString(2)), ByteString.copyFrom(new byte[]{3})), Pair.of(JObjectKey.of(Long.toString(3)), ByteString.copyFrom(new byte[]{4})));
+            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(1)), ByteBuffer.wrap(new byte[]{2})), Pair.of(JObjectKey.of(Long.toString(2)), ByteBuffer.wrap(new byte[]{3})), Pair.of(JObjectKey.of(Long.toString(3)), ByteBuffer.wrap(new byte[]{4})));
             Assertions.assertFalse(iterator.hasNext());
             iterator.close();
 
             iterator = snapshot.getIterator(IteratorStart.LT, JObjectKey.of(Long.toString(1)));
-            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(1)), ByteString.copyFrom(new byte[]{2})), Pair.of(JObjectKey.of(Long.toString(2)), ByteString.copyFrom(new byte[]{3})), Pair.of(JObjectKey.of(Long.toString(3)), ByteString.copyFrom(new byte[]{4})));
+            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(1)), ByteBuffer.wrap(new byte[]{2})), Pair.of(JObjectKey.of(Long.toString(2)), ByteBuffer.wrap(new byte[]{3})), Pair.of(JObjectKey.of(Long.toString(3)), ByteBuffer.wrap(new byte[]{4})));
             Assertions.assertFalse(iterator.hasNext());
             iterator.close();
 
             iterator = snapshot.getIterator(IteratorStart.LE, JObjectKey.of(Long.toString(1)));
-            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(1)), ByteString.copyFrom(new byte[]{2})), Pair.of(JObjectKey.of(Long.toString(2)), ByteString.copyFrom(new byte[]{3})), Pair.of(JObjectKey.of(Long.toString(3)), ByteString.copyFrom(new byte[]{4})));
+            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(1)), ByteBuffer.wrap(new byte[]{2})), Pair.of(JObjectKey.of(Long.toString(2)), ByteBuffer.wrap(new byte[]{3})), Pair.of(JObjectKey.of(Long.toString(3)), ByteBuffer.wrap(new byte[]{4})));
             Assertions.assertFalse(iterator.hasNext());
             iterator.close();
 
@@ -101,7 +102,7 @@ public class LmdbKvIteratorTest {
             iterator.close();
 
             iterator = snapshot.getIterator(IteratorStart.LE, JObjectKey.of(Long.toString(0)));
-            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(1)), ByteString.copyFrom(new byte[]{2})), Pair.of(JObjectKey.of(Long.toString(2)), ByteString.copyFrom(new byte[]{3})), Pair.of(JObjectKey.of(Long.toString(3)), ByteString.copyFrom(new byte[]{4})));
+            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(1)), ByteBuffer.wrap(new byte[]{2})), Pair.of(JObjectKey.of(Long.toString(2)), ByteBuffer.wrap(new byte[]{3})), Pair.of(JObjectKey.of(Long.toString(3)), ByteBuffer.wrap(new byte[]{4})));
             Assertions.assertFalse(iterator.hasNext());
             iterator.close();
 
@@ -111,11 +112,11 @@ public class LmdbKvIteratorTest {
             Assertions.assertEquals(JObjectKey.of(Long.toString(1)), iterator.peekPrevKey());
             Assertions.assertEquals(JObjectKey.of(Long.toString(2)), iterator.peekNextKey());
             Assertions.assertEquals(JObjectKey.of(Long.toString(1)), iterator.peekPrevKey());
-            Just.checkIterator(iterator.reversed(), Pair.of(JObjectKey.of(Long.toString(1)), ByteString.copyFrom(new byte[]{2})));
-            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(1)), ByteString.copyFrom(new byte[]{2})), Pair.of(JObjectKey.of(Long.toString(2)), ByteString.copyFrom(new byte[]{3})), Pair.of(JObjectKey.of(Long.toString(3)), ByteString.copyFrom(new byte[]{4})));
-            Assertions.assertEquals(Pair.of(JObjectKey.of(Long.toString(3)), ByteString.copyFrom(new byte[]{4})), iterator.prev());
-            Assertions.assertEquals(Pair.of(JObjectKey.of(Long.toString(2)), ByteString.copyFrom(new byte[]{3})), iterator.prev());
-            Assertions.assertEquals(Pair.of(JObjectKey.of(Long.toString(2)), ByteString.copyFrom(new byte[]{3})), iterator.next());
+            Just.checkIterator(iterator.reversed(), Pair.of(JObjectKey.of(Long.toString(1)), ByteBuffer.wrap(new byte[]{2})));
+            Just.checkIterator(iterator, Pair.of(JObjectKey.of(Long.toString(1)), ByteBuffer.wrap(new byte[]{2})), Pair.of(JObjectKey.of(Long.toString(2)), ByteBuffer.wrap(new byte[]{3})), Pair.of(JObjectKey.of(Long.toString(3)), ByteBuffer.wrap(new byte[]{4})));
+            Assertions.assertEquals(Pair.of(JObjectKey.of(Long.toString(3)), ByteBuffer.wrap(new byte[]{4})), iterator.prev());
+            Assertions.assertEquals(Pair.of(JObjectKey.of(Long.toString(2)), ByteBuffer.wrap(new byte[]{3})), iterator.prev());
+            Assertions.assertEquals(Pair.of(JObjectKey.of(Long.toString(2)), ByteBuffer.wrap(new byte[]{3})), iterator.next());
             iterator.close();
         }
 

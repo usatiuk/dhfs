@@ -69,7 +69,7 @@ public final class JObjectKeyImpl implements JObjectKey {
 
     @Override
     public int hashCode() {
-        return Objects.hash(value);
+        return value.hashCode();
     }
 
 }

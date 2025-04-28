@@ -2,11 +2,13 @@ package com.usatiuk.objects;
 
 
 import com.google.protobuf.ByteString;
+import com.google.protobuf.UnsafeByteOperations;
 import com.usatiuk.utils.SerializationHelper;
 import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 @ApplicationScoped
 @DefaultBean
@@ -16,9 +18,8 @@ public class JavaDataSerializer implements ObjectSerializer<JData> {
         return SerializationHelper.serialize(obj);
     }
 
-    @Override
-    public JData deserialize(ByteString data) {
-        try (var is = data.newInput()) {
+    public JData deserialize(ByteBuffer data) {
+        try (var is = UnsafeByteOperations.unsafeWrap(data).newInput()) {
             return SerializationHelper.deserialize(is);
         } catch (IOException e) {
             throw new RuntimeException(e);
