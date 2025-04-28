@@ -5,12 +5,13 @@ import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.snapshot.Snapshot;
 
 import javax.annotation.Nonnull;
+import java.nio.ByteBuffer;
 import java.util.Optional;
 
 // Persistent storage of objects
 // All changes are written as sequential transactions
 public interface ObjectPersistentStore {
-    Snapshot<JObjectKey, ByteString> getSnapshot();
+    Snapshot<JObjectKey, ByteBuffer> getSnapshot();
 
     Runnable prepareTx(TxManifestRaw names, long txId);
 

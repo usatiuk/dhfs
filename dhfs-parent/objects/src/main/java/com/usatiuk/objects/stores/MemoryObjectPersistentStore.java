@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.iterators.CloseableKvIterator;
 import com.usatiuk.objects.iterators.IteratorStart;
+import com.usatiuk.objects.iterators.MappingKvIterator;
 import com.usatiuk.objects.iterators.NavigableMapKvIterator;
 import com.usatiuk.objects.snapshot.Snapshot;
 import io.quarkus.arc.properties.IfBuildProperty;
@@ -11,6 +12,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import org.pcollections.TreePMap;
 
 import javax.annotation.Nonnull;
+import java.nio.ByteBuffer;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -22,21 +24,21 @@ public class MemoryObjectPersistentStore implements ObjectPersistentStore {
     private long _lastCommitId = 0;
 
     @Override
-    public Snapshot<JObjectKey, ByteString> getSnapshot() {
+    public Snapshot<JObjectKey, ByteBuffer> getSnapshot() {
         synchronized (this) {
-            return new Snapshot<JObjectKey, ByteString>() {
+            return new Snapshot<JObjectKey, ByteBuffer>() {
                 private final TreePMap<JObjectKey, ByteString> _objects = MemoryObjectPersistentStore.this._objects;
                 private final long _lastCommitId = MemoryObjectPersistentStore.this._lastCommitId;
 
                 @Override
-                public CloseableKvIterator<JObjectKey, ByteString> getIterator(IteratorStart start, JObjectKey key) {
-                    return new NavigableMapKvIterator<>(_objects, start, key);
+                public CloseableKvIterator<JObjectKey, ByteBuffer> getIterator(IteratorStart start, JObjectKey key) {
+                    return new MappingKvIterator<>(new NavigableMapKvIterator<>(_objects, start, key), ByteString::asReadOnlyByteBuffer);
                 }
 
                 @Nonnull
                 @Override
-                public Optional<ByteString> readObject(JObjectKey name) {
-                    return Optional.ofNullable(_objects.get(name));
+                public Optional<ByteBuffer> readObject(JObjectKey name) {
+                    return Optional.ofNullable(_objects.get(name)).map(ByteString::asReadOnlyByteBuffer);
                 }
 
                 @Override
