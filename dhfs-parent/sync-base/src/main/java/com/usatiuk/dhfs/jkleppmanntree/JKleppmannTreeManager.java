@@ -54,11 +54,11 @@ public class JKleppmannTreeManager {
                 );
                 curTx.put(data);
                 var rootNode = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_root"), null, rootNodeSupplier.get());
-                curTx.put(new JKleppmannTreeNodeHolder(rootNode));
+                curTx.put(new JKleppmannTreeNodeHolder(rootNode, true));
                 var trashNode = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_trash"), null, rootNodeSupplier.get());
-                curTx.put(new JKleppmannTreeNodeHolder(trashNode));
+                curTx.put(new JKleppmannTreeNodeHolder(trashNode, true));
                 var lf_node = new JKleppmannTreeNode(JObjectKey.of(name.value() + "_jt_lf"), null, rootNodeSupplier.get());
-                curTx.put(new JKleppmannTreeNodeHolder(lf_node));
+                curTx.put(new JKleppmannTreeNodeHolder(lf_node, true));
             }
             return new JKleppmannTree(data);
 //            opObjectRegistry.registerObject(tree);

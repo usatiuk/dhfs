@@ -18,6 +18,10 @@ public record JKleppmannTreeNodeHolder(PCollection<JDataRef> refsFrom, boolean f
         this(TreePSet.empty(), false, node);
     }
 
+    public JKleppmannTreeNodeHolder(JKleppmannTreeNode node, boolean frozen) {
+        this(TreePSet.empty(), frozen, node);
+    }
+
     public JKleppmannTreeNodeHolder withNode(JKleppmannTreeNode node) {
         Objects.requireNonNull(node, "node");
         return new JKleppmannTreeNodeHolder(refsFrom, frozen, node);
