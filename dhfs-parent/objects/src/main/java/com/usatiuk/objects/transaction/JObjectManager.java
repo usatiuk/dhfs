@@ -165,7 +165,8 @@ public class JObjectManager {
                     }
                 }
                 for (var write : writes.entrySet()) {
-                    toLock.add(write.getKey());
+                    if (!readSet.containsKey(write.getKey()))
+                        toLock.add(write.getKey());
                 }
                 Collections.sort(toLock);
                 for (var key : toLock) {
