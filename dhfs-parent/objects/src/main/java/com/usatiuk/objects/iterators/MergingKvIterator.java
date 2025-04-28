@@ -13,6 +13,7 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
     private final NavigableMap<K, IteratorEntry<K, V>> _sortedIterators = new TreeMap<>();
     private final String _name;
     private final List<IteratorEntry<K, V>> _iterators;
+
     public MergingKvIterator(String name, IteratorStart startType, K startKey, List<IterProdFn<K, V>> iterators) {
         _goingForward = true;
         _name = name;
@@ -22,6 +23,84 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
             IteratorEntry<K, V>[] iteratorEntries = new IteratorEntry[iterators.size()];
             for (int i = 0; i < iterators.size(); i++) {
                 iteratorEntries[i] = new IteratorEntry<>(i, iterators.get(i).get(startType, startKey));
+            }
+            _iterators = List.of(iteratorEntries);
+        }
+
+        if (startType == IteratorStart.LT || startType == IteratorStart.LE) {
+            // Starting at a greatest key less than/less or equal than:
+            // We have a bunch of iterators that have given us theirs "greatest LT/LE key"
+            // now we need to pick the greatest of those to start with
+            // But if some of them don't have a lesser key, we need to pick the smallest of those
+
+            K greatestLess = null;
+            K smallestMore = null;
+
+            for (var ite : _iterators) {
+                var it = ite.iterator();
+                if (it.hasNext()) {
+                    var peeked = it.peekNextKey();
+                    if (startType == IteratorStart.LE ? peeked.compareTo(startKey) <= 0 : peeked.compareTo(startKey) < 0) {
+                        if (greatestLess == null || peeked.compareTo(greatestLess) > 0) {
+                            greatestLess = peeked;
+                        }
+                    } else {
+                        if (smallestMore == null || peeked.compareTo(smallestMore) < 0) {
+                            smallestMore = peeked;
+                        }
+                    }
+                }
+            }
+
+            K initialMaxValue;
+            if (greatestLess != null)
+                initialMaxValue = greatestLess;
+            else
+                initialMaxValue = smallestMore;
+
+            if (initialMaxValue == null) {
+                // Empty iterators
+            }
+
+            for (var ite : _iterators) {
+                var iterator = ite.iterator();
+                while (iterator.hasNext() && iterator.peekNextKey().compareTo(initialMaxValue) < 0) {
+                    iterator.skip();
+                }
+            }
+        }
+
+        for (IteratorEntry<K, V> iterator : _iterators) {
+            advanceIterator(iterator);
+        }
+
+//        Log.tracev("{0} Initialized: {1}", _name, _sortedIterators);
+//        switch (startType) {
+////            case LT -> {
+////                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(initialStartKey) < 0;
+////            }
+////            case LE -> {
+////                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(initialStartKey) <= 0;
+////            }
+//            case GT -> {
+//                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(startKey) > 0;
+//            }
+//            case GE -> {
+//                assert _sortedIterators.isEmpty() || _sortedIterators.firstKey().compareTo(startKey) >= 0;
+//            }
+//        }
+    }
+
+    public MergingKvIterator(String name, IteratorStart startType, K startKey, IterProdFn2<K, V> iteratorsProd) {
+        _goingForward = true;
+        _name = name;
+
+        // Why streams are so slow?
+        {
+            var iterators = iteratorsProd.get(startType, startKey).toList();
+            IteratorEntry<K, V>[] iteratorEntries = new IteratorEntry[iterators.size()];
+            for (int i = 0; i < iterators.size(); i++) {
+                iteratorEntries[i] = new IteratorEntry<>(i, (CloseableKvIterator<K, V>) iterators.get(i));
             }
             _iterators = List.of(iteratorEntries);
         }

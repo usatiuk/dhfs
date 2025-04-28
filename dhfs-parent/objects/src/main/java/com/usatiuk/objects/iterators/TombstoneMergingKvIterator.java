@@ -19,4 +19,18 @@ public abstract class TombstoneMergingKvIterator {
     public static <K extends Comparable<K>, V> CloseableKvIterator<K, V> of(String name, IteratorStart startType, K startKey, IterProdFn<K, MaybeTombstone<V>>... iterators) {
         return of(name, startType, startKey, List.of(iterators));
     }
+
+    public static <K extends Comparable<K>, V> CloseableKvIterator<K, V> of(String name, IteratorStart startType, K startKey, IterProdFn2<K, V> itProd) {
+        return new PredicateKvIterator<K, MaybeTombstone<V>, V>(
+                new MergingKvIterator<K, MaybeTombstone<V>>(name + "-merging", startType, startKey, (IterProdFn2<K, MaybeTombstone<V>>) itProd),
+                startType, startKey,
+                pair -> {
+//                    Log.tracev("{0} - Processing pair {1}", name, pair);
+                    if (pair instanceof Tombstone<V>) {
+                        return null;
+                    }
+                    return ((Data<V>) pair).value();
+                });
+    }
+
 }

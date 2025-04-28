@@ -13,6 +13,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.*;
+import java.util.stream.Stream;
 
 @Singleton
 public class TransactionFactoryImpl implements TransactionFactory {
@@ -158,16 +159,21 @@ public class TransactionFactoryImpl implements TransactionFactory {
         @Override
         public CloseableKvIterator<JObjectKey, JData> getIterator(IteratorStart start, JObjectKey key) {
             Log.tracev("Getting tx iterator with start={0}, key={1}", start, key);
-            return new ReadTrackingIterator(TombstoneMergingKvIterator.<JObjectKey, ReadTrackingInternalCrap>of("tx", start, key,
-                    (tS, tK) -> new MappingKvIterator<>(new NavigableMapKvIterator<>(_writes, tS, tK),
+            return new ReadTrackingIterator(TombstoneMergingKvIterator.<JObjectKey, ReadTrackingInternalCrap>of("tx", start, key, (tS, tK) ->
+                    Stream.concat(Stream.of(new MappingKvIterator<>(new NavigableMapKvIterator<>(_writes, tS, tK),
                             t -> switch (t) {
                                 case TxRecord.TxObjectRecordWrite<?> write ->
-                                        new DataWrapper<>(new ReadTrackingInternalCrapTx(write.data()));
-                                case TxRecord.TxObjectRecordDeleted deleted -> new TombstoneImpl<>();
+                                        new DataWrapper<ReadTrackingInternalCrap>(new ReadTrackingInternalCrapTx(write.data()));
+                                case TxRecord.TxObjectRecordDeleted deleted ->
+                                        new TombstoneImpl<ReadTrackingInternalCrap>();
                                 case null, default -> null;
-                            }),
-                    (tS, tK) -> new MappingKvIterator<>(_snapshot.getIterator(tS, tK),
-                            d -> new DataWrapper<ReadTrackingInternalCrap>(new ReadTrackingInternalCrapSource(d)))));
+                            })), _snapshot.getIterator(tS, tK).map(itin -> new MappingKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>, MaybeTombstone<ReadTrackingInternalCrap>>(itin,
+                            d -> switch (d) {
+                                case Data<JDataVersionedWrapper> w ->
+                                        new DataWrapper<>(new ReadTrackingInternalCrapSource(w.value()));
+                                case Tombstone<JDataVersionedWrapper> t -> new TombstoneImpl<>();
+                                case null, default -> null;
+                            })))));
         }
 
         @Override

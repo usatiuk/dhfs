@@ -3,7 +3,10 @@ package com.usatiuk.objects.stores;
 import com.usatiuk.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.JDataVersionedWrapperImpl;
 import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.objects.iterators.*;
+import com.usatiuk.objects.iterators.CloseableKvIterator;
+import com.usatiuk.objects.iterators.IteratorStart;
+import com.usatiuk.objects.iterators.MaybeTombstone;
+import com.usatiuk.objects.iterators.NavigableMapKvIterator;
 import com.usatiuk.objects.snapshot.Snapshot;
 import com.usatiuk.objects.transaction.TxCommitException;
 import com.usatiuk.objects.transaction.TxRecord;
@@ -27,6 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 @ApplicationScoped
 public class WritebackObjectPersistentStore {
@@ -341,10 +345,8 @@ public class WritebackObjectPersistentStore {
                 private final long txId = finalPw.lastCommittedId();
 
                 @Override
-                public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-                    return TombstoneMergingKvIterator.<JObjectKey, JDataVersionedWrapper>of("writeback-ps", start, key,
-                            (tS, tK) -> new NavigableMapKvIterator<>(_pendingWrites, tS, tK),
-                            (tS, tK) -> (CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>) (CloseableKvIterator<JObjectKey, ?>) _cache.getIterator(tS, tK));
+                public Stream<CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>> getIterator(IteratorStart start, JObjectKey key) {
+                    return Stream.concat(Stream.of(new NavigableMapKvIterator<>(_pendingWrites, start, key)), _cache.getIterator(start, key));
                 }
 
                 @Nonnull

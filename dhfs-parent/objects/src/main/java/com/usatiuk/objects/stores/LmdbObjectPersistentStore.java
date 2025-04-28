@@ -3,10 +3,7 @@ package com.usatiuk.objects.stores;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.JObjectKeyMax;
 import com.usatiuk.objects.JObjectKeyMin;
-import com.usatiuk.objects.iterators.CloseableKvIterator;
-import com.usatiuk.objects.iterators.IteratorStart;
-import com.usatiuk.objects.iterators.KeyPredicateKvIterator;
-import com.usatiuk.objects.iterators.ReversibleKvIterator;
+import com.usatiuk.objects.iterators.*;
 import com.usatiuk.objects.snapshot.Snapshot;
 import io.quarkus.arc.properties.IfBuildProperty;
 import io.quarkus.logging.Log;
@@ -28,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.lmdbjava.DbiFlags.MDB_CREATE;
 import static org.lmdbjava.Env.create;
@@ -112,9 +110,9 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
                 private boolean _closed = false;
 
                 @Override
-                public CloseableKvIterator<JObjectKey, ByteBuffer> getIterator(IteratorStart start, JObjectKey key) {
+                public Stream<CloseableKvIterator<JObjectKey, MaybeTombstone<ByteBuffer>>> getIterator(IteratorStart start, JObjectKey key) {
                     assert !_closed;
-                    return new KeyPredicateKvIterator<>(new LmdbKvIterator(_txn, start, key), start, key, (k) -> !k.value().equals(DB_VER_OBJ_NAME_STR));
+                    return Stream.of(new KeyPredicateKvIterator<>(new LmdbKvIterator(_txn, start, key), start, key, (k) -> !k.value().equals(DB_VER_OBJ_NAME_STR)));
                 }
 
                 @Nonnull
@@ -195,7 +193,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
         return _root.toFile().getUsableSpace();
     }
 
-    private class LmdbKvIterator extends ReversibleKvIterator<JObjectKey, ByteBuffer> {
+    private class LmdbKvIterator extends ReversibleKvIterator<JObjectKey, MaybeTombstone<ByteBuffer>> {
         private static final Cleaner CLEANER = Cleaner.create();
         private final Txn<ByteBuffer> _txn; // Managed by the snapshot
         private final Cursor<ByteBuffer> _cursor;
@@ -350,13 +348,13 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
         }
 
         @Override
-        protected Pair<JObjectKey, ByteBuffer> nextImpl() {
+        protected Pair<JObjectKey, MaybeTombstone<ByteBuffer>> nextImpl() {
             if (!_hasNext) {
                 throw new NoSuchElementException("No more elements");
             }
             // TODO: Right now with java serialization it doesn't matter, it's all copied to arrays anyway
             var val = _cursor.val();
-            var ret = Pair.of(JObjectKey.fromByteBuffer(_cursor.key()), val.asReadOnlyBuffer());
+            Pair<JObjectKey, MaybeTombstone<ByteBuffer>> ret = Pair.of(JObjectKey.fromByteBuffer(_cursor.key()), new DataWrapper<>(val.asReadOnlyBuffer()));
             if (_goingForward)
                 _hasNext = _cursor.next();
             else
