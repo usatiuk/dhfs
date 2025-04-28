@@ -12,6 +12,7 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.enterprise.inject.Instance;
+import jakarta.enterprise.inject.spi.CDI;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -22,7 +23,7 @@ import java.util.stream.Stream;
 
 @ApplicationScoped
 public class JObjectManager {
-    private final List<PreCommitTxHook> _preCommitTxHooks;
+    private static final List<PreCommitTxHook> _preCommitTxHooks;
     @Inject
     WritebackObjectPersistentStore writebackObjectPersistentStore;
     @Inject
@@ -30,8 +31,12 @@ public class JObjectManager {
     @Inject
     LockManager lockManager;
     private boolean _ready = false;
+
+    static {
+        _preCommitTxHooks = List.copyOf(CDI.current().select(PreCommitTxHook.class).stream().sorted(Comparator.comparingInt(PreCommitTxHook::getPriority)).toList());
+    }
+
     JObjectManager(Instance<PreCommitTxHook> preCommitTxHooks) {
-        _preCommitTxHooks = List.copyOf(preCommitTxHooks.stream().sorted(Comparator.comparingInt(PreCommitTxHook::getPriority)).toList());
         Log.debugv("Pre-commit hooks: {0}", String.join("->", _preCommitTxHooks.stream().map(Objects::toString).toList()));
     }
 
