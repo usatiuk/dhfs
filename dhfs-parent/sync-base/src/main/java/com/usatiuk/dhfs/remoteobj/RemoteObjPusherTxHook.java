@@ -19,8 +19,8 @@ public class RemoteObjPusherTxHook implements PreCommitTxHook {
     @Override
     public void onChange(JObjectKey key, JData old, JData cur) {
         boolean invalidate = switch (cur) {
-            case RemoteObjectMeta remote -> !remote.changelog().equals(((RemoteObjectMeta) old).changelog());
-            case JKleppmannTreePersistentData pd -> !pd.queues().equals(((JKleppmannTreePersistentData) old).queues());
+            case RemoteObjectMeta remote -> remote.changelog() != ((RemoteObjectMeta) old).changelog();
+            case JKleppmannTreePersistentData pd -> pd.queues() != ((JKleppmannTreePersistentData) old).queues();
             default -> false;
         };
 
