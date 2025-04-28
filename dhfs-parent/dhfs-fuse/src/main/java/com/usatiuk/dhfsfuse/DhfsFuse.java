@@ -7,6 +7,7 @@ import com.usatiuk.dhfsfs.service.DirectoryNotEmptyException;
 import com.usatiuk.dhfsfs.service.GetattrRes;
 import com.usatiuk.kleppmanntree.AlreadyExistsException;
 import com.usatiuk.objects.JObjectKey;
+import com.usatiuk.utils.UninitializedByteBuffer;
 import com.usatiuk.utils.UnsafeAccessor;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -28,7 +29,6 @@ import ru.serce.jnrfuse.struct.FuseFileInfo;
 import ru.serce.jnrfuse.struct.Statvfs;
 import ru.serce.jnrfuse.struct.Timespec;
 
-import java.nio.ByteBuffer;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Optional;
@@ -243,7 +243,7 @@ public class DhfsFuse extends FuseStubFS {
         if (offset < 0) return -ErrorCodes.EINVAL();
         try {
             var fileKey = getFromHandle(fi.fh.get());
-            var buffer = ByteBuffer.allocateDirect((int) size);
+            var buffer = UninitializedByteBuffer.allocate((int) size);
 
             UnsafeAccessor.get().getUnsafe().copyMemory(
                     buf.address(),

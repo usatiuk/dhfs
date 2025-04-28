@@ -3,7 +3,10 @@ package com.usatiuk.objects.stores;
 import com.usatiuk.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.JDataVersionedWrapperImpl;
 import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.objects.iterators.*;
+import com.usatiuk.objects.iterators.CloseableKvIterator;
+import com.usatiuk.objects.iterators.IteratorStart;
+import com.usatiuk.objects.iterators.MaybeTombstone;
+import com.usatiuk.objects.iterators.NavigableMapKvIterator;
 import com.usatiuk.objects.snapshot.Snapshot;
 import com.usatiuk.objects.transaction.TxCommitException;
 import com.usatiuk.objects.transaction.TxRecord;
@@ -27,6 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 @ApplicationScoped
 public class WritebackObjectPersistentStore {
@@ -140,7 +144,7 @@ public class WritebackObjectPersistentStore {
 
                 Log.tracev("Bundle {0} committed", bundle.id());
 
-                while (true) {
+                synchronized (_pendingWrites) {
                     var curPw = _pendingWrites.get();
                     var curPwMap = curPw.pendingWrites();
                     for (var e : bundle._entries.values()) {
@@ -153,8 +157,7 @@ public class WritebackObjectPersistentStore {
                             bundle.id(),
                             curPw.lastCommittedId()
                     );
-                    if (_pendingWrites.compareAndSet(curPw, newCurPw))
-                        break;
+                    _pendingWrites.compareAndSet(curPw, newCurPw);
                 }
 
                 List<List<Runnable>> callbacks = new ArrayList<>();
@@ -251,7 +254,7 @@ public class WritebackObjectPersistentStore {
                     }
                 }
 
-                while (true) {
+                synchronized (_pendingWrites) {
                     var curPw = _pendingWrites.get();
                     var curPwMap = curPw.pendingWrites();
                     for (var e : ((TxBundle) bundle)._entries.values()) {
@@ -272,18 +275,17 @@ public class WritebackObjectPersistentStore {
                             bundle.id()
                     );
 
-                    if (!_pendingWrites.compareAndSet(curPw, newCurPw))
-                        continue;
-
-                    ((TxBundle) bundle).setReady();
-                    if (_pendingBundles.peek() == bundle)
-                        _pendingBundles.notify();
-                    synchronized (_flushWaitSynchronizer) {
-                        currentSize += ((TxBundle) bundle).size();
-                    }
-
-                    return bundle.id();
+                    _pendingWrites.compareAndSet(curPw, newCurPw);
                 }
+
+                ((TxBundle) bundle).setReady();
+                if (_pendingBundles.peek() == bundle)
+                    _pendingBundles.notify();
+                synchronized (_flushWaitSynchronizer) {
+                    currentSize += ((TxBundle) bundle).size();
+                }
+
+                return bundle.id();
             }
         }
     }
@@ -341,10 +343,8 @@ public class WritebackObjectPersistentStore {
                 private final long txId = finalPw.lastCommittedId();
 
                 @Override
-                public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-                    return TombstoneMergingKvIterator.<JObjectKey, JDataVersionedWrapper>of("writeback-ps", start, key,
-                            (tS, tK) -> new NavigableMapKvIterator<>(_pendingWrites, tS, tK),
-                            (tS, tK) -> (CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>) (CloseableKvIterator<JObjectKey, ?>) _cache.getIterator(tS, tK));
+                public Stream<CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>> getIterator(IteratorStart start, JObjectKey key) {
+                    return Stream.concat(Stream.of(new NavigableMapKvIterator<>(_pendingWrites, start, key)), _cache.getIterator(start, key));
                 }
 
                 @Nonnull
@@ -390,7 +390,7 @@ public class WritebackObjectPersistentStore {
     }
 
     private static class TxBundle {
-        private final LinkedHashMap<JObjectKey, BundleEntry> _entries = new LinkedHashMap<>();
+        private final HashMap<JObjectKey, BundleEntry> _entries = new HashMap<>();
         private final ArrayList<Runnable> _callbacks = new ArrayList<>();
         private long _txId;
         private volatile boolean _ready = false;

@@ -21,6 +21,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 
 @ApplicationScoped
 public class CachingObjectPersistentStore {
@@ -33,6 +34,7 @@ public class CachingObjectPersistentStore {
     private ExecutorService _statusExecutor;
     private AtomicLong _cached = new AtomicLong();
     private AtomicLong _cacheTries = new AtomicLong();
+
     public CachingObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.lru.limit") int sizeLimit) {
         _cache = new AtomicReference<>(
                 new Cache(TreePMap.empty(), 0, -1, sizeLimit)
@@ -150,10 +152,11 @@ public class CachingObjectPersistentStore {
                     }
 
                     @Override
-                    public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-                        return TombstoneMergingKvIterator.<JObjectKey, JDataVersionedWrapper>of("cache", start, key,
-                                (mS, mK) -> new NavigableMapKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>(_curCache.map(), mS, mK),
-                                (mS, mK) -> new CachingKvIterator(_backing.getIterator(start, key)));
+                    public Stream<CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>> getIterator(IteratorStart start, JObjectKey key) {
+                        return Stream.concat(
+                                Stream.of(new NavigableMapKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>(_curCache.map(), start, key)),
+                                _backing.getIterator(start, key).map(i -> new CachingKvIterator((CloseableKvIterator<JObjectKey, JDataVersionedWrapper>) (CloseableKvIterator<JObjectKey, ?>) i))
+                        );
                     }
 
                     @Nonnull
