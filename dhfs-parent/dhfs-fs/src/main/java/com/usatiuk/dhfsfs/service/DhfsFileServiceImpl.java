@@ -55,6 +55,9 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     @ConfigProperty(name = "dhfs.files.target_chunk_size")
     int targetChunkSize;
 
+    @ConfigProperty(name = "dhfs.files.max_chunk_size", defaultValue = "524288")
+    int maxChunkSize;
+
     @ConfigProperty(name = "dhfs.files.use_hash_for_chunks")
     boolean useHashForChunks;
 
@@ -360,16 +363,10 @@ public class DhfsFileServiceImpl implements DhfsFileService {
 
             var file = remoteTx.getData(File.class, fileUuid, LockingStrategy.WRITE).orElse(null);
             if (file == null) {
-                Log.error("File not found when trying to write: " + fileUuid);
-                return -1L;
+                throw new StatusRuntimeException(Status.NOT_FOUND.withDescription("File not found when trying to write: " + fileUuid));
             }
 
-            if (writeLogging) {
-                Log.info("Writing to file: " + file.key() + " size=" + size(fileUuid) + " "
-                        + offset + " " + data.size());
-            }
-
-            NavigableMap<Long, JObjectKey> removedChunks = new TreeMap<>();
+            Map<Long, JObjectKey> removedChunks = new HashMap<>();
 
             long realOffset = targetChunkAlignment >= 0 ? alignDown(offset, targetChunkAlignment) : offset;
             long writeEnd = offset + data.size();
@@ -407,7 +404,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             }
 
 
-            NavigableMap<Long, JObjectKey> newChunks = new TreeMap<>();
+            Map<Long, JObjectKey> newChunks = new HashMap<>();
 
             if (existingEnd < offset) {
                 if (!pendingPrefix.isEmpty()) {
@@ -424,12 +421,13 @@ public class DhfsFileServiceImpl implements DhfsFileService {
             int combinedSize = pendingWrites.size();
 
             {
-                int targetChunkSize = 1 << targetChunkAlignment;
                 int cur = 0;
                 while (cur < combinedSize) {
                     int end;
 
-                    if (targetChunkAlignment < 0)
+                    if (combinedSize - cur < maxChunkSize)
+                        end = combinedSize;
+                    else if (targetChunkAlignment < 0)
                         end = combinedSize;
                     else
                         end = Math.min(cur + targetChunkSize, combinedSize);
@@ -550,7 +548,7 @@ public class DhfsFileServiceImpl implements DhfsFileService {
         });
     }
 
-    private void fillZeros(long fillStart, long length, NavigableMap<Long, JObjectKey> newChunks) {
+    private void fillZeros(long fillStart, long length, Map<Long, JObjectKey> newChunks) {
         long combinedSize = (length - fillStart);
 
         long start = fillStart;
