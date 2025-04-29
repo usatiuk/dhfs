@@ -34,10 +34,8 @@ public class HashSetDelayedBlockingQueue<T> {
         synchronized (this) {
             if (_closed) throw new IllegalStateException("Adding to a queue that is closed!");
 
-            if (_set.containsKey(el))
+            if (_set.putIfAbsent(el, new SetElement<>(el, System.currentTimeMillis())) != null)
                 return false;
-
-            _set.put(el, new SetElement<>(el, System.currentTimeMillis()));
 
             this.notify();
             return true;
