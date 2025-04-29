@@ -1,21 +1,20 @@
 package com.usatiuk.objects.stores;
 
-import com.google.protobuf.ByteString;
 import com.usatiuk.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.JDataVersionedWrapperSerializer;
 import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.objects.ObjectSerializer;
-import com.usatiuk.objects.iterators.CloseableKvIterator;
-import com.usatiuk.objects.iterators.IteratorStart;
-import com.usatiuk.objects.iterators.MappingKvIterator;
+import com.usatiuk.objects.iterators.*;
 import com.usatiuk.objects.snapshot.Snapshot;
+import com.usatiuk.utils.ListUtils;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nonnull;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 @ApplicationScoped
 public class SerializingObjectPersistentStore {
@@ -30,8 +29,10 @@ public class SerializingObjectPersistentStore {
             private final Snapshot<JObjectKey, ByteBuffer> _backing = delegateStore.getSnapshot();
 
             @Override
-            public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-                return new MappingKvIterator<>(_backing.getIterator(start, key), d -> serializer.deserialize(d));
+            public List<CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>> getIterator(IteratorStart start, JObjectKey key) {
+                return ListUtils.map(_backing.getIterator(start, key),
+                        i -> new MappingKvIterator<JObjectKey, MaybeTombstone<ByteBuffer>, MaybeTombstone<JDataVersionedWrapper>>(i,
+                                d -> serializer.deserialize(((DataWrapper<ByteBuffer>) d).value())));
             }
 
             @Nonnull

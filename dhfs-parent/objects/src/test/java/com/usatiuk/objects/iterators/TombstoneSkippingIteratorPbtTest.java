@@ -1,6 +1,5 @@
 package com.usatiuk.objects.iterators;
 
-import jnr.ffi.annotations.In;
 import net.jqwik.api.*;
 import net.jqwik.api.state.Action;
 import net.jqwik.api.state.ActionChain;
@@ -10,16 +9,15 @@ import org.junit.jupiter.api.Assertions;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.function.BiConsumer;
 
-public class MergingKvIteratorPbtTest {
+public class TombstoneSkippingIteratorPbtTest {
     @Property
     public void checkMergingIterator(@ForAll("actions") ActionChain<MergingIteratorModel> actions) {
         actions.run();
     }
 
     @Provide
-    Arbitrary<ActionChain<MergingIteratorModel>> actions(@ForAll("lists") List<List<Map.Entry<Integer, Integer>>> list,
+    Arbitrary<ActionChain<MergingIteratorModel>> actions(@ForAll("lists") List<List<Map.Entry<Integer, MaybeTombstone<Integer>>>> list,
                                                          @ForAll IteratorStart iteratorStart, @ForAll("startKey") Integer startKey) {
         return ActionChain.startWith(() -> new MergingIteratorModel(list, iteratorStart, startKey))
                 .withAction(new NextAction())
@@ -33,8 +31,12 @@ public class MergingKvIteratorPbtTest {
     }
 
     @Provide
-    Arbitrary<List<List<Map.Entry<Integer, Integer>>>> lists() {
-        return Arbitraries.entries(Arbitraries.integers().between(-50, 50), Arbitraries.integers().between(-50, 50))
+    Arbitrary<List<List<Map.Entry<Integer, MaybeTombstone<Integer>>>>> lists() {
+        return Arbitraries.entries(Arbitraries.integers().between(-50, 50),
+                        Arbitraries.integers().between(-50, 50).flatMap(i -> Arbitraries.of(true, false).<MaybeTombstone<Integer>>flatMap(
+                                b -> b ? Arbitraries.just(new DataWrapper<Integer>(i)) : Arbitraries.just(new TombstoneImpl<>())
+                        ))
+                )
                 .list().uniqueElements(Map.Entry::getKey).ofMinSize(0).ofMaxSize(20)
                 .list().ofMinSize(1).ofMaxSize(5);
     }
@@ -48,16 +50,23 @@ public class MergingKvIteratorPbtTest {
         private final CloseableKvIterator<Integer, Integer> mergedIterator;
         private final CloseableKvIterator<Integer, Integer> mergingIterator;
 
-        private MergingIteratorModel(List<List<Map.Entry<Integer, Integer>>> pairs, IteratorStart startType, Integer startKey) {
-            TreeMap<Integer, Integer> perfectMerged = new TreeMap<>();
-            for (List<Map.Entry<Integer, Integer>> list : pairs) {
-                for (Map.Entry<Integer, Integer> pair : list) {
-                    perfectMerged.putIfAbsent(pair.getKey(), pair.getValue());
+        private MergingIteratorModel(List<List<Map.Entry<Integer, MaybeTombstone<Integer>>>> pairs, IteratorStart startType, Integer startKey) {
+            TreeMap<Integer, MaybeTombstone<Integer>> perfectMergedTombstones = new TreeMap<>();
+            for (List<Map.Entry<Integer, MaybeTombstone<Integer>>> list : pairs) {
+                for (Map.Entry<Integer, MaybeTombstone<Integer>> pair : list) {
+                    perfectMergedTombstones.putIfAbsent(pair.getKey(), pair.getValue());
                 }
             }
+            TreeMap<Integer, Integer> perfectMerged = new TreeMap<>();
+            for (var e : perfectMergedTombstones.entrySet()) {
+                if (e.getValue() instanceof Data<Integer> data)
+                    perfectMerged.put(e.getKey(), data.value());
+            }
+
+
             mergedIterator = new NavigableMapKvIterator<>(perfectMerged, startType, startKey);
-            mergingIterator = new MergingKvIterator<>(startType, startKey, pairs.stream().<CloseableKvIterator<Integer, Integer>>map(
-                    list -> new NavigableMapKvIterator<>(new TreeMap<Integer, Integer>(Map.ofEntries(list.toArray(Map.Entry[]::new))), startType, startKey)
+            mergingIterator = new TombstoneSkippingIterator<>(startType, startKey, pairs.stream().<CloseableKvIterator<Integer, MaybeTombstone<Integer>>>map(
+                    list -> new NavigableMapKvIterator<Integer, MaybeTombstone<Integer>>(new TreeMap<Integer, MaybeTombstone<Integer>>(Map.ofEntries(list.toArray(Map.Entry[]::new))), startType, startKey)
             ).toList());
         }
 

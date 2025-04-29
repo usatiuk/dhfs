@@ -5,6 +5,7 @@ import com.usatiuk.objects.JDataVersionedWrapperLazy;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.iterators.*;
 import com.usatiuk.objects.snapshot.Snapshot;
+import com.usatiuk.utils.ListUtils;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
@@ -16,6 +17,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.pcollections.TreePMap;
 
 import javax.annotation.Nonnull;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -33,6 +35,7 @@ public class CachingObjectPersistentStore {
     private ExecutorService _statusExecutor;
     private AtomicLong _cached = new AtomicLong();
     private AtomicLong _cacheTries = new AtomicLong();
+
     public CachingObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.lru.limit") int sizeLimit) {
         _cache = new AtomicReference<>(
                 new Cache(TreePMap.empty(), 0, -1, sizeLimit)
@@ -150,10 +153,12 @@ public class CachingObjectPersistentStore {
                     }
 
                     @Override
-                    public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-                        return TombstoneMergingKvIterator.<JObjectKey, JDataVersionedWrapper>of("cache", start, key,
-                                (mS, mK) -> new NavigableMapKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>(_curCache.map(), mS, mK),
-                                (mS, mK) -> new CachingKvIterator(_backing.getIterator(start, key)));
+                    public List<CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>> getIterator(IteratorStart start, JObjectKey key) {
+                        return ListUtils.prependAndMap(
+                                new NavigableMapKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>(_curCache.map(), start, key),
+                                _backing.getIterator(start, key),
+                                i -> new CachingKvIterator((CloseableKvIterator<JObjectKey, JDataVersionedWrapper>) (CloseableKvIterator<JObjectKey, ?>) i)
+                        );
                     }
 
                     @Nonnull

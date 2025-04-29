@@ -2,26 +2,26 @@ package com.usatiuk.objects.iterators;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.function.Function;
 
-public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends ReversibleKvIterator<K, V_T> {
-    private final CloseableKvIterator<K, V> _backing;
-    private final Function<V, V_T> _transformer;
-    private Pair<K, V_T> _next = null;
+public class TombstoneSkippingIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, V> {
+    private final MergingKvIterator<K, MaybeTombstone<V>> _backing;
+    private Pair<K, V> _next = null;
     private boolean _checkedNext = false;
 
-    public PredicateKvIterator(CloseableKvIterator<K, V> backing, IteratorStart start, K startKey, Function<V, V_T> transformer) {
+    public TombstoneSkippingIterator(IteratorStart start, K startKey, List<CloseableKvIterator<K, MaybeTombstone<V>>> iterators) {
         _goingForward = true;
-        _backing = backing;
-        _transformer = transformer;
+        _backing = new MergingKvIterator<>(start, startKey, iterators);
 
         if (start == IteratorStart.GE || start == IteratorStart.GT)
             return;
 
-        fillNext();
-
         boolean shouldGoBack = false;
+        if (canHaveNext())
+            tryFillNext();
+
         if (start == IteratorStart.LE) {
             if (_next == null || _next.getKey().compareTo(startKey) > 0) {
                 shouldGoBack = true;
@@ -38,34 +38,27 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends Revers
             _backing.skipPrev();
             fillNext();
             _goingForward = true;
-            _backing.skip();
+            if (_next != null)
+                _backing.skip();
             fillNext();
         }
+    }
 
+    private boolean canHaveNext() {
+        return (_goingForward ? _backing.hasNext() : _backing.hasPrev());
+    }
 
-//        switch (start) {
-//            case LT -> {
-////                assert _next == null || _next.getKey().compareTo(startKey) < 0;
-//            }
-//            case LE -> {
-////                assert _next == null || _next.getKey().compareTo(startKey) <= 0;
-//            }
-//            case GT -> {
-//                assert _next == null || _next.getKey().compareTo(startKey) > 0;
-//            }
-//            case GE -> {
-//                assert _next == null || _next.getKey().compareTo(startKey) >= 0;
-//            }
-//        }
+    private boolean tryFillNext() {
+        var next = _goingForward ? _backing.next() : _backing.prev();
+        if (next.getValue() instanceof Tombstone<?>)
+            return false;
+        _next = Pair.of(next.getKey(), ((Data<V>) next.getValue()).value());
+        return true;
     }
 
     private void fillNext() {
-        while ((_goingForward ? _backing.hasNext() : _backing.hasPrev()) && _next == null) {
-            var next = _goingForward ? _backing.next() : _backing.prev();
-            var transformed = _transformer.apply(next.getValue());
-            if (transformed == null)
-                continue;
-            _next = Pair.of(next.getKey(), transformed);
+        while (_next == null && canHaveNext()) {
+            tryFillNext();
         }
         _checkedNext = true;
     }
@@ -79,9 +72,6 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends Revers
             _backing.skip();
         else if (!_goingForward && !wasAtEnd)
             _backing.skipPrev();
-
-//        if (!wasAtEnd)
-//            Log.tracev("Skipped in reverse: {0}", _next);
 
         _next = null;
         _checkedNext = false;
@@ -117,7 +107,7 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends Revers
     }
 
     @Override
-    protected Pair<K, V_T> nextImpl() {
+    protected Pair<K, V> nextImpl() {
         if (!_checkedNext)
             fillNext();
 
@@ -137,7 +127,6 @@ public class PredicateKvIterator<K extends Comparable<K>, V, V_T> extends Revers
     @Override
     public String toString() {
         return "PredicateKvIterator{" +
-                "_backing=" + _backing +
                 ", _next=" + _next +
                 '}';
     }

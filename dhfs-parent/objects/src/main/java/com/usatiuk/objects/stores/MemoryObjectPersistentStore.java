@@ -2,10 +2,7 @@ package com.usatiuk.objects.stores;
 
 import com.google.protobuf.ByteString;
 import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.objects.iterators.CloseableKvIterator;
-import com.usatiuk.objects.iterators.IteratorStart;
-import com.usatiuk.objects.iterators.MappingKvIterator;
-import com.usatiuk.objects.iterators.NavigableMapKvIterator;
+import com.usatiuk.objects.iterators.*;
 import com.usatiuk.objects.snapshot.Snapshot;
 import io.quarkus.arc.properties.IfBuildProperty;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -13,8 +10,10 @@ import org.pcollections.TreePMap;
 
 import javax.annotation.Nonnull;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Stream;
 
 @ApplicationScoped
 @IfBuildProperty(name = "dhfs.objects.persistence", stringValue = "memory")
@@ -31,8 +30,8 @@ public class MemoryObjectPersistentStore implements ObjectPersistentStore {
                 private final long _lastCommitId = MemoryObjectPersistentStore.this._lastCommitId;
 
                 @Override
-                public CloseableKvIterator<JObjectKey, ByteBuffer> getIterator(IteratorStart start, JObjectKey key) {
-                    return new MappingKvIterator<>(new NavigableMapKvIterator<>(_objects, start, key), ByteString::asReadOnlyByteBuffer);
+                public List<CloseableKvIterator<JObjectKey, MaybeTombstone<ByteBuffer>>> getIterator(IteratorStart start, JObjectKey key) {
+                    return List.of(new MappingKvIterator<>(new NavigableMapKvIterator<>(_objects, start, key), s -> new DataWrapper<>(s.asReadOnlyByteBuffer())));
                 }
 
                 @Nonnull

@@ -11,17 +11,15 @@ import java.util.TreeMap;
 
 public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, V> {
     private final NavigableMap<K, IteratorEntry<K, V>> _sortedIterators = new TreeMap<>();
-    private final String _name;
     private final List<IteratorEntry<K, V>> _iterators;
-    public MergingKvIterator(String name, IteratorStart startType, K startKey, List<IterProdFn<K, V>> iterators) {
-        _goingForward = true;
-        _name = name;
 
-        // Why streams are so slow?
+    public MergingKvIterator(IteratorStart startType, K startKey, List<CloseableKvIterator<K, V>> iterators) {
+        _goingForward = true;
+
         {
             IteratorEntry<K, V>[] iteratorEntries = new IteratorEntry[iterators.size()];
             for (int i = 0; i < iterators.size(); i++) {
-                iteratorEntries[i] = new IteratorEntry<>(i, iterators.get(i).get(startType, startKey));
+                iteratorEntries[i] = new IteratorEntry<>(i, iterators.get(i));
             }
             _iterators = List.of(iteratorEntries);
         }
@@ -91,8 +89,8 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
     }
 
     @SafeVarargs
-    public MergingKvIterator(String name, IteratorStart startType, K startKey, IterProdFn<K, V>... iterators) {
-        this(name, startType, startKey, List.of(iterators));
+    public MergingKvIterator(IteratorStart startType, K startKey, CloseableKvIterator<K, V>... iterators) {
+        this(startType, startKey, List.of(iterators));
     }
 
     private void advanceIterator(IteratorEntry<K, V> iteratorEntry) {
@@ -151,7 +149,6 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
                 || (!_goingForward && peekImpl().compareTo(cur.getKey()) >= 0))) {
             skipImpl();
         }
-        Log.tracev("{0} Reversed to {1}", _name, _sortedIterators);
     }
 
     @Override
@@ -199,28 +196,14 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
     @Override
     public String toString() {
         return "MergingKvIterator{" +
-                "_name='" + _name + '\'' +
                 ", _sortedIterators=" + _sortedIterators.keySet() +
                 ", _iterators=" + _iterators +
                 '}';
-    }
-
-    private interface FirstMatchState<K extends Comparable<K>, V> {
     }
 
     private record IteratorEntry<K extends Comparable<K>, V>(int priority, CloseableKvIterator<K, V> iterator) {
         public IteratorEntry<K, V> reversed() {
             return new IteratorEntry<>(priority, iterator.reversed());
         }
-    }
-
-    private record FirstMatchNone<K extends Comparable<K>, V>() implements FirstMatchState<K, V> {
-    }
-
-    private record FirstMatchFound<K extends Comparable<K>, V>(
-            CloseableKvIterator<K, V> iterator) implements FirstMatchState<K, V> {
-    }
-
-    private record FirstMatchConsumed<K extends Comparable<K>, V>() implements FirstMatchState<K, V> {
     }
 }

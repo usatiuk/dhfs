@@ -6,6 +6,7 @@ import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.iterators.*;
 import com.usatiuk.objects.snapshot.Snapshot;
 import com.usatiuk.objects.stores.WritebackObjectPersistentStore;
+import com.usatiuk.utils.ListUtils;
 import io.quarkus.logging.Log;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -162,16 +163,24 @@ public class TransactionFactoryImpl implements TransactionFactory {
         @Override
         public CloseableKvIterator<JObjectKey, JData> getIterator(IteratorStart start, JObjectKey key) {
             Log.tracev("Getting tx iterator with start={0}, key={1}", start, key);
-            return new ReadTrackingIterator(TombstoneMergingKvIterator.<JObjectKey, ReadTrackingInternalCrap>of("tx", start, key,
-                    (tS, tK) -> new MappingKvIterator<>(new NavigableMapKvIterator<>(_writes, tS, tK),
-                            t -> switch (t) {
-                                case TxRecord.TxObjectRecordWrite<?> write ->
-                                        new DataWrapper<>(new ReadTrackingInternalCrapTx(write.data()));
-                                case TxRecord.TxObjectRecordDeleted deleted -> new TombstoneImpl<>();
-                                case null, default -> null;
-                            }),
-                    (tS, tK) -> new MappingKvIterator<>(_snapshot.getIterator(tS, tK),
-                            d -> new DataWrapper<ReadTrackingInternalCrap>(new ReadTrackingInternalCrapSource(d)))));
+            return new ReadTrackingIterator(new TombstoneSkippingIterator<JObjectKey, ReadTrackingInternalCrap>(start, key,
+                    ListUtils.prependAndMap(
+                            new MappingKvIterator<>(new NavigableMapKvIterator<>(_writes, start, key),
+                                    t -> switch (t) {
+                                        case TxRecord.TxObjectRecordWrite<?> write ->
+                                                new DataWrapper<ReadTrackingInternalCrap>(new ReadTrackingInternalCrapTx(write.data()));
+                                        case TxRecord.TxObjectRecordDeleted deleted ->
+                                                new TombstoneImpl<ReadTrackingInternalCrap>();
+                                        case null, default -> null;
+                                    }),
+                            _snapshot.getIterator(start, key),
+                            itin -> new MappingKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>, MaybeTombstone<ReadTrackingInternalCrap>>(itin,
+                                    d -> switch (d) {
+                                        case Data<JDataVersionedWrapper> w ->
+                                                new DataWrapper<>(new ReadTrackingInternalCrapSource(w.value()));
+                                        case Tombstone<JDataVersionedWrapper> t -> new TombstoneImpl<>();
+                                        case null, default -> null;
+                                    }))));
         }
 
         @Override

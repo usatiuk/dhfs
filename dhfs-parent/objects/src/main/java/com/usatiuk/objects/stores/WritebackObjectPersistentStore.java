@@ -7,6 +7,7 @@ import com.usatiuk.objects.iterators.*;
 import com.usatiuk.objects.snapshot.Snapshot;
 import com.usatiuk.objects.transaction.TxCommitException;
 import com.usatiuk.objects.transaction.TxRecord;
+import com.usatiuk.utils.ListUtils;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -316,10 +317,8 @@ public class WritebackObjectPersistentStore {
                 private final long txId = finalPw.lastCommittedId();
 
                 @Override
-                public CloseableKvIterator<JObjectKey, JDataVersionedWrapper> getIterator(IteratorStart start, JObjectKey key) {
-                    return TombstoneMergingKvIterator.<JObjectKey, JDataVersionedWrapper>of("writeback-ps", start, key,
-                            (tS, tK) -> new NavigableMapKvIterator<>(_pendingWrites, tS, tK),
-                            (tS, tK) -> (CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>) (CloseableKvIterator<JObjectKey, ?>) _cache.getIterator(tS, tK));
+                public List<CloseableKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>>> getIterator(IteratorStart start, JObjectKey key) {
+                    return ListUtils.prepend(new NavigableMapKvIterator<>(_pendingWrites, start, key), _cache.getIterator(start, key));
                 }
 
                 @Nonnull
