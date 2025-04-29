@@ -83,6 +83,7 @@ public class JObjectManager {
                     writes.put(n.key(), n);
                 }
 
+
                 // Run hooks for all objects
                 // Every hook should see every change made to every object, yet the object's evolution
                 // should be consistent from the view point of each individual hook
@@ -135,14 +136,14 @@ public class JObjectManager {
                                     lastCurHookSeen.put(n.key(), n);
                                     continue;
                                 }
-                                var before = hookPut.pendingWrites().put(n.key(), n);
-                                if (before == null)
-                                    pendingCount++;
-                            }
+                                    var before = hookPut.pendingWrites().put(n.key(), n);
+                                    if (before == null)
+                                        pendingCount++;
+                                }
                             writes.put(n.key(), n);
+                            }
                         }
                     }
-                }
             } catch (Throwable e) {
                 for (var read : tx.reads().entrySet()) {
                     if (read.getValue() instanceof TransactionObjectLocked<?> locked) {
@@ -164,11 +165,11 @@ public class JObjectManager {
                         toLock.add(read.getKey());
                     }
                 }
-                for (var write : writes.entrySet()) {
-                    if (!readSet.containsKey(write.getKey()))
-                        toLock.add(write.getKey());
+                for (var write : writes.keySet()) {
+                    if (!readSet.containsKey(write))
+                        toLock.add(write);
                 }
-                Collections.sort(toLock);
+                toLock.sort(null);
                 for (var key : toLock) {
                     var lock = lockManager.lockObject(key);
                     toUnlock.add(lock);
@@ -192,14 +193,16 @@ public class JObjectManager {
                     writebackObjectPersistentStore.asyncFence(finalVersion, r);
                 };
 
+                var onCommit = tx.getOnCommit();
+                var onFlush = tx.getOnFlush();
+
                 return Pair.of(
-                        Stream.concat(
-                                tx.getOnCommit().stream(),
-                                Stream.<Runnable>of(() -> {
-                                    for (var f : tx.getOnFlush())
-                                        fenceFn.accept(f);
-                                })
-                        ).toList(),
+                        List.of(() -> {
+                            for (var f : onCommit)
+                                f.run();
+                            for (var f : onFlush)
+                                fenceFn.accept(f);
+                        }),
                         new TransactionHandle() {
                             @Override
                             public void onFlush(Runnable runnable) {
@@ -221,7 +224,7 @@ public class JObjectManager {
                     }
 
                     if (current.isEmpty()) {
-                        // TODO: Every write gets a dependency due to hooks
+                        // Every write gets a dependency due to hooks
                         continue;
 //                    assert false;
 //                    throw new TxCommitException("Serialization hazard: " + dep.isEmpty() + " vs " + read.getValue().value().isEmpty());
@@ -246,7 +249,7 @@ public class JObjectManager {
             }
 
             return Pair.of(
-                    List.copyOf(tx.getOnCommit()),
+                    tx.getOnCommit(),
                     new TransactionHandle() {
                         @Override
                         public void onFlush(Runnable runnable) {
