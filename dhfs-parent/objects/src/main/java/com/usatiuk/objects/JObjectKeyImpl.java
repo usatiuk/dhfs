@@ -1,5 +1,7 @@
 package com.usatiuk.objects;
 
+import com.usatiuk.utils.UninitializedByteBuffer;
+
 import java.io.Serial;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
