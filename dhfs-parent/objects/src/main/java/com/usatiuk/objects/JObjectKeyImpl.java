@@ -46,7 +46,7 @@ public final class JObjectKeyImpl implements JObjectKey {
         synchronized (this) {
             if (_bb != null) return _bb;
             var bytes = value.getBytes(StandardCharsets.ISO_8859_1);
-            var directBb = ByteBuffer.allocateDirect(bytes.length);
+            var directBb = UninitializedByteBuffer.allocate(bytes.length);
             directBb.put(bytes);
             directBb.flip();
             _bb = directBb;

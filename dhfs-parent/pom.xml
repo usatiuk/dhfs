@@ -102,6 +102,7 @@
                         <arg>-parameters</arg>
                         <arg>--add-exports</arg>
                         <arg>java.base/jdk.internal.access=ALL-UNNAMED</arg>
+                        <arg>--enable-preview</arg>
                     </compilerArgs>
                 </configuration>
             </plugin>
@@ -119,6 +120,7 @@
                         --add-exports java.base/sun.nio.ch=ALL-UNNAMED
                         --add-exports java.base/jdk.internal.access=ALL-UNNAMED
                         --add-opens=java.base/java.nio=ALL-UNNAMED
+                        --enable-preview
                     </argLine>
                     <skipTests>${skip.unit}</skipTests>
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
