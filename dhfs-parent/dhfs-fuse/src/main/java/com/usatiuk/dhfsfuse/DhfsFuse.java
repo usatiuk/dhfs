@@ -1,12 +1,14 @@
 package com.usatiuk.dhfsfuse;
 
 import com.google.protobuf.UnsafeByteOperations;
+import com.kenai.jffi.MemoryIO;
 import com.sun.security.auth.module.UnixSystem;
 import com.usatiuk.dhfsfs.service.DhfsFileService;
 import com.usatiuk.dhfsfs.service.DirectoryNotEmptyException;
 import com.usatiuk.dhfsfs.service.GetattrRes;
 import com.usatiuk.kleppmanntree.AlreadyExistsException;
 import com.usatiuk.objects.JObjectKey;
+import com.usatiuk.utils.UninitializedByteBuffer;
 import com.usatiuk.utils.UnsafeAccessor;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -18,15 +20,18 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jnr.ffi.Pointer;
+import jnr.ffi.Runtime;
+import jnr.ffi.Struct;
+import jnr.ffi.types.off_t;
+import jnr.ffi.types.size_t;
 import org.apache.commons.lang3.SystemUtils;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import ru.serce.jnrfuse.ErrorCodes;
 import ru.serce.jnrfuse.FuseFillDir;
 import ru.serce.jnrfuse.FuseStubFS;
-import ru.serce.jnrfuse.struct.FileStat;
-import ru.serce.jnrfuse.struct.FuseFileInfo;
-import ru.serce.jnrfuse.struct.Statvfs;
-import ru.serce.jnrfuse.struct.Timespec;
+import ru.serce.jnrfuse.NotImplemented;
+import ru.serce.jnrfuse.flags.FuseBufFlags;
+import ru.serce.jnrfuse.struct.*;
 
 import java.nio.ByteBuffer;
 import java.nio.file.Paths;
@@ -240,17 +245,19 @@ public class DhfsFuse extends FuseStubFS {
 
     @Override
     public int write(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
+        var buffer = UninitializedByteBuffer.allocate((int) size);
+        UnsafeAccessor.get().getUnsafe().copyMemory(
+                buf.address(),
+                UnsafeAccessor.get().getNioAccess().getBufferAddress(buffer),
+                size
+        );
+        return write(path, buffer, offset, fi);
+    }
+
+    public int write(String path, ByteBuffer buffer, long offset, FuseFileInfo fi) {
         if (offset < 0) return -ErrorCodes.EINVAL();
         try {
             var fileKey = getFromHandle(fi.fh.get());
-            var buffer = ByteBuffer.allocateDirect((int) size);
-
-            UnsafeAccessor.get().getUnsafe().copyMemory(
-                    buf.address(),
-                    UnsafeAccessor.get().getNioAccess().getBufferAddress(buffer),
-                    size
-            );
-
             var written = fileService.write(fileKey, offset, UnsafeByteOperations.unsafeWrap(buffer));
             return written.intValue();
         } catch (Exception e) {
@@ -419,6 +426,31 @@ public class DhfsFuse extends FuseStubFS {
         } catch (Throwable e) {
             Log.error("When creating " + newpath, e);
             return -ErrorCodes.EIO();
+        }
+    }
+
+    @Override
+    public int write_buf(String path, FuseBufvec buf, @off_t long off, FuseFileInfo fi) {
+        int size = (int) libFuse.fuse_buf_size(buf);
+        FuseBufvec tmpVec = new FuseBufvec(Runtime.getSystemRuntime());
+        long tmpVecAddr = MemoryIO.getInstance().allocateMemory(Struct.size(tmpVec), false);
+        try {
+            tmpVec.useMemory(Pointer.wrap(Runtime.getSystemRuntime(), tmpVecAddr));
+            FuseBufvec.init(tmpVec, size);
+            var bb = UninitializedByteBuffer.allocate(size);
+            var mem = UninitializedByteBuffer.getAddress(bb);
+            tmpVec.buf.mem.set(mem);
+            tmpVec.buf.size.set(size);
+            int res = (int) libFuse.fuse_buf_copy(tmpVec, buf, 0);
+            if (res != size) {
+                Log.errorv("fuse_buf_copy failed: {0} != {1}", res, size);
+                return -ErrorCodes.ENOMEM();
+            }
+            return write(path, bb, off, fi);
+        } finally {
+            if (tmpVecAddr != 0) {
+                MemoryIO.getInstance().freeMemory(tmpVecAddr);
+            }
         }
     }
 }
