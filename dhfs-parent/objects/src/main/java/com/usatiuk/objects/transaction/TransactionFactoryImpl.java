@@ -56,10 +56,10 @@ public class TransactionFactoryImpl implements TransactionFactory {
     }
 
     private class TransactionImpl implements TransactionPrivate {
-        private final Map<JObjectKey, TransactionObject<?>> _readSet = new HashMap<>();
+        private final Map<JObjectKey, Optional<JDataVersionedWrapper>> _readSet = new HashMap<>();
         private final NavigableMap<JObjectKey, TxRecord.TxObjectRecord<?>> _writes = new TreeMap<>();
-        private final List<Runnable> _onCommit = new ArrayList<>();
-        private final List<Runnable> _onFlush = new ArrayList<>();
+        private final List<Runnable> _onCommit = new LinkedList<>();
+        private final List<Runnable> _onFlush = new LinkedList<>();
         private final HashSet<JObjectKey> _knownNew = new HashSet<>();
         private final Snapshot<JObjectKey, JDataVersionedWrapper> _snapshot;
         private boolean _closed = false;
@@ -99,30 +99,14 @@ public class TransactionFactoryImpl implements TransactionFactory {
             if (_knownNew.contains(key)) {
                 return Optional.empty();
             }
-            return _readSet.computeIfAbsent(key, k -> {
-                        var read = _snapshot.readObject(k);
-                        return new TransactionObjectNoLock<>(read);
-                    })
-                    .data()
-                    .map(w -> type.cast(w.data()));
-        }
-
-        public <T extends JData> Optional<T> getWriteLockedFromSource(Class<T> type, JObjectKey key) {
-            var got = _readSet.get(key);
-
-            if (got == null) {
-                var lock = lockManager.lockObject(key);
-                try {
-                    var read = _snapshot.readObject(key);
-                    _readSet.put(key, new TransactionObjectLocked<>(read, lock));
-                    return read.map(JDataVersionedWrapper::data).map(type::cast);
-                } catch (Exception e) {
-                    lock.close();
-                    throw e;
-                }
-            }
-
-            return got.data().map(JDataVersionedWrapper::data).map(type::cast);
+            var got = _readSet.computeIfAbsent(key, k -> {
+                var read = _snapshot.readObject(k);
+                return read;
+            });
+            if (got.isEmpty())
+                return Optional.empty();
+            var gotData = got.get();
+            return Optional.of(type.cast(gotData.data()));
         }
 
         @Override
@@ -138,13 +122,7 @@ public class TransactionFactoryImpl implements TransactionFactory {
                 }
             }
 
-            if (neverLock)
-                return getFromSource(type, key);
-
-            return switch (strategy) {
-                case OPTIMISTIC -> getFromSource(type, key);
-                case WRITE -> getWriteLockedFromSource(type, key);
-            };
+            return getFromSource(type, key);
         }
 
         @Override
@@ -186,7 +164,7 @@ public class TransactionFactoryImpl implements TransactionFactory {
         @Override
         public void put(JData obj) {
             var read = _readSet.get(obj.key());
-            if (read != null && (read.data().map(JDataVersionedWrapper::data).orElse(null) == obj)) {
+            if (read != null && (read.map(JDataVersionedWrapper::data).orElse(null) == obj)) {
                 return;
             }
 
@@ -210,8 +188,13 @@ public class TransactionFactoryImpl implements TransactionFactory {
         }
 
         @Override
-        public Map<JObjectKey, TransactionObject<?>> reads() {
-            return Collections.unmodifiableMap(_readSet);
+        public Map<JObjectKey, Optional<JDataVersionedWrapper>> reads() {
+            return _readSet;
+        }
+
+        @Override
+        public Set<JObjectKey> knownNew() {
+            return _knownNew;
         }
 
         @Override
@@ -247,7 +230,7 @@ public class TransactionFactoryImpl implements TransactionFactory {
             public Pair<JObjectKey, JData> prev() {
                 var got = _backing.prev();
                 if (got.getValue() instanceof ReadTrackingInternalCrapSource(JDataVersionedWrapper wrapped)) {
-                    _readSet.putIfAbsent(got.getKey(), new TransactionObjectNoLock<>(Optional.of(wrapped)));
+                    _readSet.putIfAbsent(got.getKey(), Optional.of(wrapped));
                 }
                 return Pair.of(got.getKey(), got.getValue().obj());
             }
@@ -276,7 +259,7 @@ public class TransactionFactoryImpl implements TransactionFactory {
             public Pair<JObjectKey, JData> next() {
                 var got = _backing.next();
                 if (got.getValue() instanceof ReadTrackingInternalCrapSource(JDataVersionedWrapper wrapped)) {
-                    _readSet.putIfAbsent(got.getKey(), new TransactionObjectNoLock<>(Optional.of(wrapped)));
+                    _readSet.putIfAbsent(got.getKey(), Optional.of(wrapped));
                 }
                 return Pair.of(got.getKey(), got.getValue().obj());
             }

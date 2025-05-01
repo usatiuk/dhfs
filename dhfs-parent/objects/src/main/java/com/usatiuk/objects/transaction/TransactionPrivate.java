@@ -9,12 +9,15 @@ import com.usatiuk.utils.AutoCloseableNoThrow;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 // The transaction interface actually used by user code to retrieve objects
 public interface TransactionPrivate extends Transaction, TransactionHandlePrivate, AutoCloseableNoThrow {
     Collection<TxRecord.TxObjectRecord<?>> drainNewWrites();
 
-    Map<JObjectKey, TransactionObject<?>> reads();
+    Map<JObjectKey, Optional<JDataVersionedWrapper>> reads();
+
+    Set<JObjectKey> knownNew();
 
     <T extends JData> Optional<T> getFromSource(Class<T> type, JObjectKey key);
 
