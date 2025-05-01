@@ -4,7 +4,7 @@ import com.usatiuk.objects.JData;
 import com.usatiuk.objects.JObjectKey;
 
 public class TxRecord {
-    public interface TxObjectRecord<T> {
+    public sealed interface TxObjectRecord<T> permits TxObjectRecordWrite, TxObjectRecordDeleted {
         JObjectKey key();
     }
 
