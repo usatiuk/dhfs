@@ -17,7 +17,7 @@ public class UninitializedByteBuffer {
     );
 
     public static ByteBuffer allocate(int capacity) {
-        UnsafeAccessor.get().getNioAccess().reserveMemory(capacity, capacity);
+        UnsafeAccessor.NIO.reserveMemory(capacity, capacity);
 
         MemorySegment segment = null;
         try {
@@ -29,7 +29,7 @@ public class UninitializedByteBuffer {
         Consumer<MemorySegment> cleanup = s -> {
             try {
                 free.invokeExact(s);
-                UnsafeAccessor.get().getNioAccess().unreserveMemory(capacity, capacity);
+                UnsafeAccessor.NIO.unreserveMemory(capacity, capacity);
             } catch (Throwable e) {
                 throw new RuntimeException(e);
             }
@@ -39,6 +39,6 @@ public class UninitializedByteBuffer {
     }
 
     public static long getAddress(ByteBuffer buffer) {
-        return UnsafeAccessor.get().getNioAccess().getBufferAddress(buffer);
+        return UnsafeAccessor.NIO.getBufferAddress(buffer);
     }
 }

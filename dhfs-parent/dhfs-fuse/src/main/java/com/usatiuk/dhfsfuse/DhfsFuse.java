@@ -246,9 +246,9 @@ public class DhfsFuse extends FuseStubFS {
     @Override
     public int write(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
         var buffer = UninitializedByteBuffer.allocate((int) size);
-        UnsafeAccessor.get().getUnsafe().copyMemory(
+        UnsafeAccessor.UNSAFE.copyMemory(
                 buf.address(),
-                UnsafeAccessor.get().getNioAccess().getBufferAddress(buffer),
+                UnsafeAccessor.NIO.getBufferAddress(buffer),
                 size
         );
         return write(path, buffer, offset, fi);

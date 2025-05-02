@@ -46,9 +46,9 @@ public class JnrPtrByteOutput extends ByteOutput {
             if (value instanceof MappedByteBuffer mb) {
                 mb.load();
             }
-            long addr = UnsafeAccessor.get().getNioAccess().getBufferAddress(value) + value.position();
+            long addr = UnsafeAccessor.NIO.getBufferAddress(value) + value.position();
             var out = _backing.address() + _pos;
-            UnsafeAccessor.get().getUnsafe().copyMemory(addr, out, rem);
+            UnsafeAccessor.UNSAFE.copyMemory(addr, out, rem);
         } else {
             _backing.put(_pos, value.array(), value.arrayOffset() + value.position(), rem);
         }

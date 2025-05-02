@@ -6,36 +6,18 @@ import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
 
-public class UnsafeAccessor {
-    private static final UnsafeAccessor INSTANCE;
+public abstract class UnsafeAccessor {
+    public static final JavaNioAccess NIO;
+    public static final Unsafe UNSAFE;
 
     static {
         try {
-            INSTANCE = new UnsafeAccessor();
+            NIO = SharedSecrets.getJavaNioAccess();
+            Field f = Unsafe.class.getDeclaredField("theUnsafe");
+            f.setAccessible(true);
+            UNSAFE = (Unsafe) f.get(null);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
-
-    public static UnsafeAccessor get() {
-        return INSTANCE;
-    }
-
-    private JavaNioAccess _nioAccess;
-    private Unsafe _unsafe;
-
-    private UnsafeAccessor() throws NoSuchFieldException, IllegalAccessException {
-        _nioAccess = SharedSecrets.getJavaNioAccess();
-        Field f = Unsafe.class.getDeclaredField("theUnsafe");
-        f.setAccessible(true);
-        _unsafe = (Unsafe) f.get(null);
-    }
-
-    public JavaNioAccess getNioAccess() {
-        return _nioAccess;
-    }
-
-    public Unsafe getUnsafe() {
-        return _unsafe;
     }
 }
