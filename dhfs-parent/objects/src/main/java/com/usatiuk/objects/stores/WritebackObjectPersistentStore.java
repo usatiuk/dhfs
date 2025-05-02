@@ -3,9 +3,11 @@ package com.usatiuk.objects.stores;
 import com.usatiuk.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.JDataVersionedWrapperImpl;
 import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.objects.iterators.*;
+import com.usatiuk.objects.iterators.CloseableKvIterator;
+import com.usatiuk.objects.iterators.IteratorStart;
+import com.usatiuk.objects.iterators.MaybeTombstone;
+import com.usatiuk.objects.iterators.NavigableMapKvIterator;
 import com.usatiuk.objects.snapshot.Snapshot;
-import com.usatiuk.objects.transaction.TxCommitException;
 import com.usatiuk.objects.transaction.TxRecord;
 import com.usatiuk.utils.ListUtils;
 import io.quarkus.logging.Log;
@@ -25,7 +27,6 @@ import javax.annotation.Nonnull;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
@@ -218,17 +219,18 @@ public class WritebackObjectPersistentStore {
             var curPwMap = curPw.pendingWrites();
 
             for (var action : writes) {
+                var key = action.key();
                 switch (action) {
                     case TxRecord.TxObjectRecordWrite<?> write -> {
 //                            Log.tracev("Flushing object {0}", write.key());
                         var wrapper = new JDataVersionedWrapperImpl(write.data(), oursId);
-                        curPwMap = curPwMap.plus(write.key(), new PendingWrite(wrapper, oursId));
+                        curPwMap = curPwMap.plus(key, new PendingWrite(wrapper, oursId));
                         curBundle.commit(wrapper);
                     }
                     case TxRecord.TxObjectRecordDeleted deleted -> {
 //                            Log.tracev("Deleting object {0}", deleted.key());
-                        curPwMap = curPwMap.plus(deleted.key(), new PendingDelete(deleted.key(), oursId));
-                        curBundle.delete(deleted.key());
+                        curPwMap = curPwMap.plus(key, new PendingDelete(key, oursId));
+                        curBundle.delete(key);
                     }
                 }
             }

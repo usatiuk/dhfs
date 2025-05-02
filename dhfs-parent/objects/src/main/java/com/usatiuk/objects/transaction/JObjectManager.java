@@ -19,7 +19,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.stream.Stream;
 
 @ApplicationScoped
 public class JObjectManager {
@@ -75,11 +74,12 @@ public class JObjectManager {
             }
 
             for (var n : tx.drainNewWrites()) {
+                var key = n.key();
                 for (var hookPut : hookIterationData) {
-                    hookPut.pendingWrites().put(n.key(), n);
+                    hookPut.pendingWrites().put(key, n);
                     pendingCount++;
                 }
-                writes.put(n.key(), n);
+                writes.put(key, n);
             }
 
 
@@ -108,19 +108,20 @@ public class JObjectManager {
 //                        Log.trace("Commit iteration with " + curIteration.size() + " records for hook " + hook.getClass());
 
                     for (var entry : curIteration.entrySet()) {
+                        var key = entry.getKey();
 //                            Log.trace("Running pre-commit hook " + hook.getClass() + " for" + entry.getKey());
-                        var oldObj = getPrev.apply(entry.getKey());
-                        lastCurHookSeen.put(entry.getKey(), entry.getValue());
+                        var oldObj = getPrev.apply(key);
+                        lastCurHookSeen.put(key, entry.getValue());
                         switch (entry.getValue()) {
                             case TxRecord.TxObjectRecordWrite<?> write -> {
                                 if (oldObj == null) {
-                                    hook.onCreate(write.key(), write.data());
+                                    hook.onCreate(key, write.data());
                                 } else {
-                                    hook.onChange(write.key(), oldObj, write.data());
+                                    hook.onChange(key, oldObj, write.data());
                                 }
                             }
                             case TxRecord.TxObjectRecordDeleted deleted -> {
-                                hook.onDelete(deleted.key(), oldObj);
+                                hook.onDelete(key, oldObj);
                             }
                             default -> throw new TxCommitException("Unexpected value: " + entry);
                         }
@@ -130,16 +131,17 @@ public class JObjectManager {
                     curIteration.clear();
 
                     for (var n : tx.drainNewWrites()) {
+                        var key = n.key();
                         for (var hookPut : hookIterationData) {
                             if (hookPut == hookId) {
-                                lastCurHookSeen.put(n.key(), n);
+                                lastCurHookSeen.put(key, n);
                                 continue;
                             }
-                            var before = hookPut.pendingWrites().put(n.key(), n);
+                            var before = hookPut.pendingWrites().put(key, n);
                             if (before == null)
                                 pendingCount++;
                         }
-                        writes.put(n.key(), n);
+                        writes.put(key, n);
                     }
                 }
             }

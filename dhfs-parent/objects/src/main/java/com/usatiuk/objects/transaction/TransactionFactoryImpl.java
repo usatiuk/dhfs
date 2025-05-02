@@ -63,6 +63,8 @@ public class TransactionFactoryImpl implements TransactionFactory {
         private final HashSet<JObjectKey> _knownNew = new HashSet<>();
         private final Snapshot<JObjectKey, JDataVersionedWrapper> _snapshot;
         private boolean _closed = false;
+
+        private boolean _writeTrack = false;
         private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _newWrites = new HashMap<>();
 
         private TransactionImpl() {
@@ -99,43 +101,29 @@ public class TransactionFactoryImpl implements TransactionFactory {
             if (_knownNew.contains(key)) {
                 return Optional.empty();
             }
-            var got = _readSet.computeIfAbsent(key, k -> {
-                var read = _snapshot.readObject(k);
-                return read;
-            });
-            if (got.isEmpty())
-                return Optional.empty();
-            var gotData = got.get();
-            return Optional.of(type.cast(gotData.data()));
+
+            return _readSet.computeIfAbsent(key, _snapshot::readObject)
+                    .map(JDataVersionedWrapper::data)
+                    .map(type::cast);
         }
 
         @Override
         public <T extends JData> Optional<T> get(Class<T> type, JObjectKey key, LockingStrategy strategy) {
-            switch (_writes.get(key)) {
-                case TxRecord.TxObjectRecordWrite<?> write -> {
-                    return Optional.of(type.cast(write.data()));
-                }
-                case TxRecord.TxObjectRecordDeleted deleted -> {
-                    return Optional.empty();
-                }
-                case null, default -> {
-                }
-            }
-
-            return getFromSource(type, key);
+            return switch (_writes.get(key)) {
+                case TxRecord.TxObjectRecordWrite<?> write -> Optional.of(type.cast(write.data()));
+                case TxRecord.TxObjectRecordDeleted deleted -> Optional.empty();
+                case null -> getFromSource(type, key);
+            };
         }
 
         @Override
         public void delete(JObjectKey key) {
-            var got = _writes.get(key);
-            if (got != null) {
-                if (got instanceof TxRecord.TxObjectRecordDeleted) {
-                    return;
-                }
+            var record = new TxRecord.TxObjectRecordDeleted(key);
+            if (_writes.put(key, record) instanceof TxRecord.TxObjectRecordDeleted) {
+                return;
             }
-
-            _writes.put(key, new TxRecord.TxObjectRecordDeleted(key));
-            _newWrites.put(key, new TxRecord.TxObjectRecordDeleted(key));
+            if (_writeTrack)
+                _newWrites.put(key, record);
         }
 
         @Override
@@ -163,25 +151,35 @@ public class TransactionFactoryImpl implements TransactionFactory {
 
         @Override
         public void put(JData obj) {
-            var read = _readSet.get(obj.key());
+            var key = obj.key();
+            var read = _readSet.get(key);
             if (read != null && (read.map(JDataVersionedWrapper::data).orElse(null) == obj)) {
                 return;
             }
 
-            _writes.put(obj.key(), new TxRecord.TxObjectRecordWrite<>(obj));
-            _newWrites.put(obj.key(), new TxRecord.TxObjectRecordWrite<>(obj));
+            var record = new TxRecord.TxObjectRecordWrite<>(obj);
+            _writes.put(key, record);
+            if (_writeTrack)
+                _newWrites.put(key, record);
         }
 
         @Override
         public void putNew(JData obj) {
-            _knownNew.add(obj.key());
+            var key = obj.key();
+            _knownNew.add(key);
 
-            _writes.put(obj.key(), new TxRecord.TxObjectRecordWrite<>(obj));
-            _newWrites.put(obj.key(), new TxRecord.TxObjectRecordWrite<>(obj));
+            var record = new TxRecord.TxObjectRecordWrite<>(obj);
+            _writes.put(key, record);
+            if (_writeTrack)
+                _newWrites.put(key, record);
         }
 
         @Override
         public Collection<TxRecord.TxObjectRecord<?>> drainNewWrites() {
+            if (!_writeTrack) {
+                _writeTrack = true;
+                return Collections.unmodifiableCollection(_writes.values());
+            }
             var ret = _newWrites;
             _newWrites = new HashMap<>();
             return ret.values();
