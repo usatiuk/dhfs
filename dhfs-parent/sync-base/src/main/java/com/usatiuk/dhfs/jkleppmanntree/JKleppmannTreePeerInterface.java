@@ -24,6 +24,6 @@ public class JKleppmannTreePeerInterface implements PeerInterface<PeerId> {
 
     @Override
     public Collection<PeerId> getAllPeers() {
-        return peerInfoService.getPeers().stream().map(PeerInfo::id).toList();
+        return peerInfoService.getSynchronizedPeers().stream().map(PeerInfo::id).toList();
     }
 }

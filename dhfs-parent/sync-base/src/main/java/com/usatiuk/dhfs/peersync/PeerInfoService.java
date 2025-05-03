@@ -87,17 +87,27 @@ public class PeerInfoService {
 
     public List<PeerInfo> getPeersNoSelf() {
         return jObjectTxManager.run(() -> {
-            var gotKey = getTreeR().traverse(List.of());
-            return curTx.get(JKleppmannTreeNodeHolder.class, gotKey).map(JKleppmannTreeNodeHolder::node).map(
-                            node -> node.children().keySet().stream()
-                                    .map(JObjectKey::of).map(this::getPeerInfoImpl)
-                                    .filter(o -> {
-                                        if (o.isEmpty())
-                                            Log.warnv("Could not get peer info for peer {0}", o);
-                                        return o.isPresent();
-                                    }).map(Optional::get).filter(
-                                            peerInfo -> !peerInfo.id().equals(persistentPeerDataService.getSelfUuid())).toList())
-                    .orElseThrow();
+            return getPeers().stream().filter(
+                    peerInfo -> !peerInfo.id().equals(persistentPeerDataService.getSelfUuid())).toList();
+        });
+    }
+
+    public List<PeerInfo> getSynchronizedPeers() {
+        return jObjectTxManager.run(() -> {
+            return getPeers().stream().filter(pi -> {
+                if (pi.id().equals(persistentPeerDataService.getSelfUuid())) {
+                    return true;
+                }
+                return persistentPeerDataService.isInitialSyncDone(pi.id());
+            }).toList();
+        });
+    }
+
+    public List<PeerInfo> getSynchronizedPeersNoSelf() {
+        return jObjectTxManager.run(() -> {
+            return getPeersNoSelf().stream().filter(pi -> {
+                return persistentPeerDataService.isInitialSyncDone(pi.id());
+            }).toList();
         });
     }
 

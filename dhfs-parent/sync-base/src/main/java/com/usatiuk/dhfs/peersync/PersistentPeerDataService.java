@@ -51,6 +51,8 @@ public class PersistentPeerDataService {
     PeerInfoService peerInfoService;
     @Inject
     TransactionManager txm;
+    @Inject
+    PeerManager peerManager;
 
     @ConfigProperty(name = "dhfs.peerdiscovery.preset-uuid")
     Optional<String> presetUuid;
@@ -88,21 +90,6 @@ public class PersistentPeerDataService {
         new File(stuffRoot).mkdirs();
         Files.write(Path.of(stuffRoot, "self_uuid"), _selfUuid.id().toString().getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
     }
-
-//    private void pushPeerUpdates() {
-//        pushPeerUpdates(null);
-//    }
-
-//    private void pushPeerUpdates(@Nullable JObject<?> obj) {
-//        if (obj != null)
-//            Log.info("Scheduling certificate update after " + obj.getMeta().getName() + " was updated");
-//        executorService.submit(() -> {
-//            updateCerts();
-//            invalidationQueueService.pushInvalidationToAll(PeerDirectory.PeerDirectoryObjName);
-//            for (var p : peerDirectory.get().runReadLocked(JObjectManager.ResolutionStrategy.LOCAL_ONLY, (m, d) -> d.getPeers().stream().toList()))
-//                invalidationQueueService.pushInvalidationToAll(PersistentPeerInfo.getNameFromUuid(p));
-//        });
-//    }
 
     public PeerId getSelfUuid() {
         return _selfUuid;
@@ -148,6 +135,7 @@ public class PersistentPeerDataService {
             }
             curTx.put(data.withInitialSyncDone(data.initialSyncDone().minus(peerId)));
             Log.infov("Did reset sync state for {0}", peerId);
+            curTx.onCommit(() -> peerManager.handleConnectionError(peerId));
             return true;
         });
     }
@@ -159,7 +147,6 @@ public class PersistentPeerDataService {
             return data.initialSyncDone().contains(peerId);
         });
     }
-
 
     public List<IpPeerAddress> getPersistentPeerAddresses() {
         return txm.run(() -> {

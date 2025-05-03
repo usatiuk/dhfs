@@ -125,17 +125,21 @@ public class PeerManager {
         }
     }
 
-    public void handleConnectionError(com.usatiuk.dhfs.peersync.PeerInfo host) {
+    public void handleConnectionError(PeerId host) {
         boolean wasReachable = isReachable(host);
 
         if (wasReachable)
             Log.infov("Lost connection to {0}", host);
 
-        _states.remove(host.id());
+        _states.remove(host);
 
         for (var l : _disconnectedListeners) {
-            l.handlePeerDisconnected(host.id());
+            l.handlePeerDisconnected(host);
         }
+    }
+
+    public void handleConnectionError(com.usatiuk.dhfs.peersync.PeerInfo host) {
+        handleConnectionError(host.id());
     }
 
     // FIXME:

@@ -132,7 +132,7 @@ public class RemoteObjectDeleter {
                         return true;
                     }
 
-                    var knownHosts = peerInfoService.getPeersNoSelf();
+                    var knownHosts = peerInfoService.getSynchronizedPeersNoSelf();
                     RemoteObjectMeta finalTarget = target;
                     List<PeerId> missing = knownHosts.stream()
                             .map(PeerInfo::id)
@@ -187,7 +187,7 @@ public class RemoteObjectDeleter {
         if (!obj.seen())
             return true;
 
-        var knownHosts = peerInfoService.getPeersNoSelf();
+        var knownHosts = peerInfoService.getSynchronizedPeersNoSelf();
         boolean missing = false;
         for (var x : knownHosts) {
             if (!obj.confirmedDeletes().contains(x.id())) {

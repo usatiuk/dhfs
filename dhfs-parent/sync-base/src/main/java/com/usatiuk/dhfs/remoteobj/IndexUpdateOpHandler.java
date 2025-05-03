@@ -20,7 +20,7 @@ public class IndexUpdateOpHandler implements OpHandler<IndexUpdateOp> {
     @Override
     public void handleOp(PeerId from, IndexUpdateOp op) {
         txm.run(() -> {
-            syncHandler.handleRemoteUpdate(from, op.key(), op.changelog(), null);
+            syncHandler.handleRemoteUpdate(from, op.key(), op.changelog(), op.data());
         });
     }
 }

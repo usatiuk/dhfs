@@ -1,7 +1,6 @@
 package com.usatiuk.dhfs.peertrust;
 
 import com.usatiuk.dhfs.invalidation.InvalidationQueueService;
-import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNode;
 import com.usatiuk.dhfs.jkleppmanntree.structs.JKleppmannTreeNodeHolder;
 import com.usatiuk.dhfs.peersync.PeerInfo;
 import com.usatiuk.dhfs.peersync.PeerInfoService;
@@ -43,7 +42,7 @@ public class PeerInfoCertUpdateTxHook implements PreCommitTxHook {
                 for (var curRef : oldNode.node().children().entrySet()) {
                     if (!n.node().children().containsKey(curRef.getKey())) {
                         Log.infov("Will reset sync state for {0}", curRef.getValue());
-                        curTx.onCommit(() -> persistentPeerDataService.resetInitialSyncDone(JKleppmannTreeNodeMetaPeer.nodeIdToPeerId(curRef.getValue())));
+                        persistentPeerDataService.resetInitialSyncDone(JKleppmannTreeNodeMetaPeer.nodeIdToPeerId(curRef.getValue()));
                     }
                 }
                 return;
@@ -54,8 +53,15 @@ public class PeerInfoCertUpdateTxHook implements PreCommitTxHook {
             return;
         }
 
-        if (!(remote.data() instanceof PeerInfo))
+        if (!(remote.data() instanceof PeerInfo curPi))
             return;
+
+        var oldPi = (PeerInfo) ((RemoteObjectDataWrapper) old).data();
+
+        if (oldPi.kickCounterSum() != curPi.kickCounterSum()) {
+            Log.warnv("Peer kicked out: {0} to {1}", key, cur);
+            persistentPeerDataService.resetInitialSyncDone(curPi.id());
+        }
 
         Log.infov("Changed peer info: {0} to {1}", key, cur);
 

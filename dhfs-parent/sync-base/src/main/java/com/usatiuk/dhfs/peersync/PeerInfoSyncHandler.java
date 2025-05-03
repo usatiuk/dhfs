@@ -89,16 +89,31 @@ public class PeerInfoSyncHandler implements ObjSyncHandler<PeerInfo, PeerInfo> {
                 if (oursCurData == null)
                     throw new StatusRuntimeException(Status.ABORTED.withDescription("Conflict but we don't have local copy"));
 
-                if (!receivedData.equals(oursCurData))
-                    throw new StatusRuntimeException(Status.ABORTED.withDescription("PeerInfo data conflict"));
+                if (!receivedData.cert().equals(oursCurData.cert()))
+                    throw new StatusRuntimeException(Status.ABORTED.withDescription("PeerInfo certificate conflict for " + key));
 
                 HashPMap<PeerId, Long> newChangelog = HashTreePMap.from(current.changelog());
+                HashPMap<PeerId, Long> newKickCounter = HashTreePMap.from(oursCurData.kickCounter());
 
                 for (var entry : receivedChangelog.entrySet()) {
                     newChangelog = newChangelog.plus(entry.getKey(),
                             Long.max(newChangelog.getOrDefault(entry.getKey(), 0L), entry.getValue())
                     );
                 }
+
+                for (var entry : receivedData.kickCounter().entrySet()) {
+                    newKickCounter = newKickCounter.plus(entry.getKey(),
+                            Long.max(newKickCounter.getOrDefault(entry.getKey(), 0L), entry.getValue())
+                    );
+                }
+
+                var newData = oursCurData.withKickCounter(newKickCounter)
+                        .withLastSeenTimestamp(Math.max(oursCurData.lastSeenTimestamp(), receivedData.lastSeenTimestamp()));
+
+                if (!newData.equals(oursCurData))
+                    newChangelog = newChangelog.plus(persistentPeerDataService.getSelfUuid(), newChangelog.getOrDefault(persistentPeerDataService.getSelfUuid(), 0L) + 1L);
+
+                remoteTx.putDataRaw(newData);
 
                 current = current.withChangelog(newChangelog);
             }
