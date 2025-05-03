@@ -1,47 +1,48 @@
 package com.usatiuk.objects.transaction;
 
 import io.quarkus.logging.Log;
+import jakarta.annotation.Nullable;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.Collection;
-import java.util.concurrent.ExecutorService;
+import java.util.Stack;
 
 @Singleton
 public class TransactionManagerImpl implements TransactionManager {
-    private static final ThreadLocal<TransactionPrivate> _currentTransaction = new ThreadLocal<>();
+    private static final ThreadLocal<Stack<TransactionPrivate>> _currentTransaction = ThreadLocal.withInitial(Stack::new);
     @Inject
     JObjectManager jObjectManager;
 
     @Override
     public void begin() {
-        if (_currentTransaction.get() != null) {
-            throw new IllegalStateException("Transaction already started");
-        }
-
         Log.trace("Starting transaction");
         var tx = jObjectManager.createTransaction();
-        _currentTransaction.set(tx);
+        _currentTransaction.get().push(tx);
     }
 
     @Override
     public TransactionHandle commit() {
-        if (_currentTransaction.get() == null) {
+        var stack = _currentTransaction.get();
+        if (stack.empty()) {
             throw new IllegalStateException("No transaction started");
         }
+        var peeked = stack.peek();
 
         Log.trace("Committing transaction");
 
         Pair<Collection<Runnable>, TransactionHandle> ret;
         try {
-            ret = jObjectManager.commit(_currentTransaction.get());
+            ret = jObjectManager.commit(peeked);
         } catch (Throwable e) {
             Log.trace("Transaction commit failed", e);
             throw e;
         } finally {
-            _currentTransaction.get().close();
-            _currentTransaction.remove();
+            peeked.close();
+            stack.pop();
+            if (stack.empty())
+                _currentTransaction.remove();
         }
 
         for (var r : ret.getLeft()) {
@@ -56,24 +57,33 @@ public class TransactionManagerImpl implements TransactionManager {
 
     @Override
     public void rollback() {
-        if (_currentTransaction.get() == null) {
+        var stack = _currentTransaction.get();
+        if (stack.empty()) {
             throw new IllegalStateException("No transaction started");
         }
+        var peeked = stack.peek();
 
         try {
-            jObjectManager.rollback(_currentTransaction.get());
+            jObjectManager.rollback(peeked);
         } catch (Throwable e) {
             Log.error("Transaction rollback failed", e);
             throw e;
         } finally {
-            _currentTransaction.get().close();
-            _currentTransaction.remove();
+            peeked.close();
+            stack.pop();
+            if (stack.empty())
+                _currentTransaction.remove();
         }
     }
 
     @Override
+    @Nullable
     public Transaction current() {
-        return _currentTransaction.get();
+        var stack = _currentTransaction.get();
+        if (stack.empty()) {
+            return null;
+        }
+        return stack.peek();
     }
 }
 

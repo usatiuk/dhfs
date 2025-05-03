@@ -23,7 +23,10 @@ import org.pcollections.PMap;
 
 import javax.annotation.Nullable;
 import java.lang.reflect.ParameterizedType;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 @ApplicationScoped
@@ -124,52 +127,42 @@ public class SyncHandler {
     public void resyncAfterCrash(@Observes @Priority(100000) StartupEvent event) {
         if (shutdownChecker.lastShutdownClean())
             return;
-        List<JObjectKey> objs = new LinkedList<>();
         txm.run(() -> {
             try (var it = curTx.getIterator(IteratorStart.GE, JObjectKey.first())) {
                 while (it.hasNext()) {
                     var key = it.peekNextKey();
-                    objs.add(key);
-                    // TODO: Nested transactions
+                    txm.run(() -> {
+                        var proc = curTx.get(JData.class, key).flatMap(o -> Optional.ofNullable(_initialSyncProcessors.get(o.getClass()))).orElse(null);
+                        if (proc != null) {
+                            proc.handleCrash(key);
+                        }
+                        Log.infov("Handled crash of {0}", key);
+
+                    }, true);
                     it.skip();
                 }
             }
         });
-
-        for (var obj : objs) {
-            txm.run(() -> {
-                var proc = curTx.get(JData.class, obj).flatMap(o -> Optional.ofNullable(_initialSyncProcessors.get(o.getClass()))).orElse(null);
-                if (proc != null) {
-                    proc.handleCrash(obj);
-                }
-                Log.infov("Handled crash of {0}", obj);
-            });
-        }
     }
 
     public void doInitialSync(PeerId peer) {
-        List<JObjectKey> objs = new LinkedList<>();
         txm.run(() -> {
             Log.tracev("Will do initial sync for {0}", peer);
             try (var it = curTx.getIterator(IteratorStart.GE, JObjectKey.first())) {
                 while (it.hasNext()) {
                     var key = it.peekNextKey();
-                    objs.add(key);
-                    // TODO: Nested transactions
+                    txm.run(() -> {
+                        var proc = curTx.get(JData.class, key).flatMap(o -> Optional.ofNullable(_initialSyncProcessors.get(o.getClass()))).orElse(null);
+                        if (proc != null) {
+                            proc.prepareForInitialSync(peer, key);
+                        }
+                        Log.infov("Adding to initial sync for peer {0}: {1}", peer, key);
+                        invalidationQueueService.pushInvalidationToOne(peer, key);
+
+                    }, true);
                     it.skip();
                 }
             }
         });
-
-        for (var obj : objs) {
-            txm.run(() -> {
-                var proc = curTx.get(JData.class, obj).flatMap(o -> Optional.ofNullable(_initialSyncProcessors.get(o.getClass()))).orElse(null);
-                if (proc != null) {
-                    proc.prepareForInitialSync(peer, obj);
-                }
-                Log.infov("Adding to initial sync for peer {0}: {1}", peer, obj);
-                invalidationQueueService.pushInvalidationToOne(peer, obj);
-            });
-        }
     }
 }

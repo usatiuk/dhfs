@@ -19,8 +19,6 @@ import jakarta.inject.Inject;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import java.util.LinkedList;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -56,27 +54,21 @@ public class AutosyncProcessor {
         if (downloadAll)
             executorService.submit(() -> {
                 Log.info("Adding all to autosync");
-                List<JObjectKey> objs = new LinkedList<>();
                 txm.run(() -> {
                     try (var it = curTx.getIterator(IteratorStart.GE, JObjectKey.first())) {
                         while (it.hasNext()) {
                             var key = it.peekNextKey();
-                            objs.add(key);
-                            // TODO: Nested transactions
+                            txm.run(() -> {
+                                var gotObj = curTx.get(JData.class, key).orElse(null);
+                                if (!(gotObj instanceof RemoteObjectMeta meta))
+                                    return;
+                                if (!meta.hasLocalData())
+                                    add(meta.key());
+                            }, true);
                             it.skip();
                         }
                     }
                 });
-
-                for (var obj : objs) {
-                    txm.run(() -> {
-                        var gotObj = curTx.get(JData.class, obj).orElse(null);
-                        if (!(gotObj instanceof RemoteObjectMeta meta))
-                            return;
-                        if (!meta.hasLocalData())
-                            add(meta.key());
-                    });
-                }
                 Log.info("Adding all to autosync: finished");
             });
     }

@@ -12,8 +12,8 @@ public interface TransactionManager {
 
     void rollback();
 
-    default <T> T runTries(Supplier<T> supplier, int tries) {
-        if (current() != null) {
+    default <T> T runTries(Supplier<T> supplier, int tries, boolean nest) {
+        if (!nest && current() != null) {
             return supplier.get();
         }
 
@@ -41,8 +41,8 @@ public interface TransactionManager {
         }
     }
 
-    default TransactionHandle runTries(VoidFn fn, int tries) {
-        if (current() != null) {
+    default TransactionHandle runTries(VoidFn fn, int tries, boolean nest) {
+        if (!nest && current() != null) {
             fn.apply();
             return new TransactionHandle() {
                 @Override
@@ -74,23 +74,38 @@ public interface TransactionManager {
                 throw e;
             }
         }
+    }
 
+    default <T> T runTries(Supplier<T> supplier, int tries) {
+        return runTries(supplier, tries, false);
+    }
+
+    default TransactionHandle runTries(VoidFn fn, int tries) {
+        return runTries(fn, tries, false);
+    }
+
+    default TransactionHandle run(VoidFn fn, boolean nest) {
+        return runTries(fn, 10, nest);
+    }
+
+    default <T> T run(Supplier<T> supplier, boolean nest) {
+        return runTries(supplier, 10, nest);
     }
 
     default TransactionHandle run(VoidFn fn) {
-        return runTries(fn, 10);
+        return run(fn, false);
     }
 
     default <T> T run(Supplier<T> supplier) {
-        return runTries(supplier, 10);
+        return run(supplier, false);
     }
 
     default void executeTx(VoidFn fn) {
-        run(fn);
+        run(fn, false);
     }
 
     default <T> T executeTx(Supplier<T> supplier) {
-        return run(supplier);
+        return run(supplier, false);
     }
 
     Transaction current();
