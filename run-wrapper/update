@@ -40,10 +40,10 @@ wget https://nightly.link/usatiuk/dhfs/actions/runs/$LATEST/Run%20wrapper.zip
 
 unzip "Run wrapper.zip"
 rm "Run wrapper.zip"
-tar xvf "run-wrapper.tar.gz" --strip-components=2
+tar xvf "run-wrapper.tar.gz" --strip-components 2
 rm "run-wrapper.tar.gz"
 
-rm -rf "DHFS Package"
+rm -rf "Server"
 rm -rf "Webui"
 rm -rf "NativeLibs"
 

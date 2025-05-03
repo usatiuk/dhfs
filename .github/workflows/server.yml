@@ -21,7 +21,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: 'recursive'
+          submodules: "recursive"
 
       - name: Install sudo for ACT
         run: apt-get update && apt-get install -y sudo
@@ -32,7 +32,7 @@ jobs:
 
       - name: User allow other for fuse
         run: echo "user_allow_other" | sudo tee -a /etc/fuse.conf
-      
+
       - name: Dump fuse.conf
         run: cat /etc/fuse.conf
 
@@ -212,7 +212,7 @@ jobs:
         run: mkdir -p run-wrapper-out/dhfs/data && mkdir -p run-wrapper-out/dhfs/fuse && mkdir -p run-wrapper-out/dhfs/app
 
       - name: Copy DHFS
-        run: cp -r ./dhfs-package-downloaded "run-wrapper-out/dhfs/app/DHFS Package"
+        run: cp -r ./dhfs-package-downloaded "run-wrapper-out/dhfs/app/Server"
 
       - name: Copy Webui
         run: cp -r ./webui-dist-downloaded "run-wrapper-out/dhfs/app/Webui"

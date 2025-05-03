@@ -38,7 +38,7 @@ java \
     -Dquarkus.log.category.\"com.usatiuk\".level=INFO \
     -Dquarkus.log.category.\"com.usatiuk.dhfs\".level=INFO \
     -Ddhfs.webui.root="$SCRIPT_DIR"/Webui $EXTRAOPTS_PARSED \
-    -jar "$SCRIPT_DIR"/"DHFS Package"/quarkus-run.jar >quarkus.log 2>&1 &
+    -jar "$SCRIPT_DIR"/"Server"/quarkus-run.jar >quarkus.log 2>&1 &
 
 echo "Started $!"
 
