@@ -218,6 +218,8 @@ public class DhfsFileServiceImpl implements DhfsFileService {
     public void unlink(String name) {
         jObjectTxManager.executeTx(() -> {
             var node = getDirEntryOpt(name).orElse(null);
+            if (node == null)
+                throw new StatusRuntimeException(Status.NOT_FOUND.withDescription("File not found when trying to unlink: " + name));
             if (node.meta() instanceof JKleppmannTreeNodeMetaDirectory f) {
                 if (!allowRecursiveDelete && !node.children().isEmpty())
                     throw new DirectoryNotEmptyException();
