@@ -23,14 +23,11 @@ import jnr.ffi.Pointer;
 import jnr.ffi.Runtime;
 import jnr.ffi.Struct;
 import jnr.ffi.types.off_t;
-import jnr.ffi.types.size_t;
 import org.apache.commons.lang3.SystemUtils;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import ru.serce.jnrfuse.ErrorCodes;
 import ru.serce.jnrfuse.FuseFillDir;
 import ru.serce.jnrfuse.FuseStubFS;
-import ru.serce.jnrfuse.NotImplemented;
-import ru.serce.jnrfuse.flags.FuseBufFlags;
 import ru.serce.jnrfuse.struct.*;
 
 import java.nio.ByteBuffer;
