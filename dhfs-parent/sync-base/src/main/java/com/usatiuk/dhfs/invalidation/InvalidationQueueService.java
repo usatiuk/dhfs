@@ -2,7 +2,7 @@ package com.usatiuk.dhfs.invalidation;
 
 import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.peersync.PeerInfoService;
-import com.usatiuk.dhfs.peersync.PeerManager;
+import com.usatiuk.dhfs.peersync.ConnectedPeerManager;
 import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
 import com.usatiuk.dhfs.rpc.RemoteObjectServiceClient;
 import com.usatiuk.objects.JData;
@@ -37,7 +37,7 @@ public class InvalidationQueueService {
     private final AtomicReference<ConcurrentHashSet<JObjectKey>> _toAllQueue = new AtomicReference<>(new ConcurrentHashSet<>());
     private final DataLocker _locker = new DataLocker();
     @Inject
-    PeerManager remoteHostManager;
+    ConnectedPeerManager remoteHostManager;
     @Inject
     DeferredInvalidationQueueService deferredInvalidationQueueService;
     @Inject

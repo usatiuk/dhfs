@@ -4,10 +4,9 @@ import com.usatiuk.dhfs.ProtoSerializer;
 import com.usatiuk.dhfs.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.invalidation.Op;
 import com.usatiuk.dhfs.peersync.PeerId;
-import com.usatiuk.dhfs.peersync.PeerManager;
+import com.usatiuk.dhfs.peersync.ConnectedPeerManager;
 import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
 import com.usatiuk.dhfs.persistence.JObjectKeyP;
-import com.usatiuk.dhfs.refcount.JDataRef;
 import com.usatiuk.dhfs.remoteobj.ReceivedObject;
 import com.usatiuk.dhfs.remoteobj.RemoteObjectMeta;
 import com.usatiuk.dhfs.remoteobj.RemoteTransaction;
@@ -52,7 +51,7 @@ public class RemoteObjectServiceClient {
     @Inject
     ProtoSerializer<GetObjectReply, ReceivedObject> receivedObjectProtoSerializer;
     @Inject
-    PeerManager peerManager;
+    ConnectedPeerManager connectedPeerManager;
 
     public Pair<PeerId, ReceivedObject> getSpecificObject(JObjectKey key, PeerId peerId) {
         return rpcClientFactory.withObjSyncClient(peerId, (peer, client) -> {
@@ -71,7 +70,7 @@ public class RemoteObjectServiceClient {
 
         var targetVersion = objMeta.versionSum();
         var targets = objMeta.knownRemoteVersions().isEmpty()
-                ? peerManager.getAvailableHosts()
+                ? connectedPeerManager.getAvailableHosts()
                 : objMeta.knownRemoteVersions().entrySet().stream()
                 .filter(entry -> entry.getValue().equals(targetVersion))
                 .map(Map.Entry::getKey).toList();

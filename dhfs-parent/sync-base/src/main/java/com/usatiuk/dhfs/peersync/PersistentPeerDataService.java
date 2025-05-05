@@ -52,7 +52,7 @@ public class PersistentPeerDataService {
     @Inject
     TransactionManager txm;
     @Inject
-    PeerManager peerManager;
+    ConnectedPeerManager connectedPeerManager;
 
     @ConfigProperty(name = "dhfs.peerdiscovery.preset-uuid")
     Optional<String> presetUuid;
@@ -135,7 +135,7 @@ public class PersistentPeerDataService {
             }
             curTx.put(data.withInitialSyncDone(data.initialSyncDone().minus(peerId)));
             Log.infov("Did reset sync state for {0}", peerId);
-            curTx.onCommit(() -> peerManager.handleConnectionError(peerId));
+            curTx.onCommit(() -> connectedPeerManager.handleConnectionError(peerId));
             return true;
         });
     }

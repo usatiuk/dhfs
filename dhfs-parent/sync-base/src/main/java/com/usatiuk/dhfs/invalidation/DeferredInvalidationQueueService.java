@@ -2,7 +2,7 @@ package com.usatiuk.dhfs.invalidation;
 
 import com.usatiuk.dhfs.peersync.PeerConnectedEventListener;
 import com.usatiuk.dhfs.peersync.PeerId;
-import com.usatiuk.dhfs.peersync.PeerManager;
+import com.usatiuk.dhfs.peersync.ConnectedPeerManager;
 import com.usatiuk.utils.SerializationHelper;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
@@ -24,7 +24,7 @@ import java.nio.file.Paths;
 public class DeferredInvalidationQueueService implements PeerConnectedEventListener {
     private static final String dataFileName = "invqueue";
     @Inject
-    PeerManager remoteHostManager;
+    ConnectedPeerManager remoteHostManager;
     @Inject
     InvalidationQueueService invalidationQueueService;
     @ConfigProperty(name = "dhfs.objects.persistence.files.root")

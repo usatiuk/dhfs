@@ -5,7 +5,7 @@ import com.usatiuk.dhfs.autosync.AutosyncProcessor;
 import com.usatiuk.dhfs.invalidation.Op;
 import com.usatiuk.dhfs.invalidation.OpHandlerService;
 import com.usatiuk.dhfs.peersync.PeerId;
-import com.usatiuk.dhfs.peersync.PeerManager;
+import com.usatiuk.dhfs.peersync.ConnectedPeerManager;
 import com.usatiuk.dhfs.persistence.JObjectKeyP;
 import com.usatiuk.dhfs.remoteobj.*;
 import com.usatiuk.dhfs.repository.*;
@@ -31,7 +31,7 @@ public class RemoteObjectServiceServerImpl {
     @Inject
     TransactionManager txm;
     @Inject
-    PeerManager peerManager;
+    ConnectedPeerManager connectedPeerManager;
     @Inject
     Transaction curTx;
 

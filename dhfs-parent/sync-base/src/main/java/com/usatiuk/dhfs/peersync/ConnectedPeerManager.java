@@ -30,9 +30,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @ApplicationScoped
-public class PeerManager {
+public class ConnectedPeerManager {
     private final ConcurrentMap<PeerId, PeerAddress> _states = new ConcurrentHashMap<>();
-    // FIXME: Ideally not call them on every ping
     private final Collection<PeerConnectedEventListener> _connectedListeners;
     private final Collection<PeerDisconnectedEventListener> _disconnectedListeners;
     @Inject
@@ -59,7 +58,7 @@ public class PeerManager {
     SyncHandler syncHandler;
     private ExecutorService _heartbeatExecutor;
 
-    public PeerManager(Instance<PeerConnectedEventListener> connectedListeners, Instance<PeerDisconnectedEventListener> disconnectedListeners) {
+    public ConnectedPeerManager(Instance<PeerConnectedEventListener> connectedListeners, Instance<PeerDisconnectedEventListener> disconnectedListeners) {
         _connectedListeners = List.copyOf(connectedListeners.stream().toList());
         _disconnectedListeners = List.copyOf(disconnectedListeners.stream().toList());
     }
