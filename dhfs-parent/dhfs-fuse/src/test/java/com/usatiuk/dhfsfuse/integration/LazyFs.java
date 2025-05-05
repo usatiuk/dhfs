@@ -1,4 +1,4 @@
-package com.usatiuk.dhfsapp.integration;
+package com.usatiuk.dhfsfuse.integration;
 
 import io.quarkus.logging.Log;
 

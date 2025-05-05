@@ -14,7 +14,6 @@
         <module>sync-base</module>
         <module>dhfs-fs</module>
         <module>dhfs-fuse</module>
-        <module>dhfs-app</module>
         <module>kleppmanntree</module>
         <module>objects</module>
         <module>utils</module>

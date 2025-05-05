@@ -1,4 +1,4 @@
-package com.usatiuk.dhfsapp;
+package com.usatiuk.dhfsfuse;
 
 import io.quarkus.runtime.Quarkus;
 import io.quarkus.runtime.QuarkusApplication;

@@ -1,7 +1,7 @@
-package com.usatiuk.dhfsapp.integration;
+package com.usatiuk.dhfsfuse.integration;
 
 import com.github.dockerjava.api.model.Device;
-import com.usatiuk.dhfsapp.TestDataCleaner;
+import com.usatiuk.dhfsfuse.TestDataCleaner;
 import io.quarkus.logging.Log;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;

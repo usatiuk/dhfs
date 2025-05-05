@@ -30,7 +30,7 @@ public class TestDataCleaner {
         purgeDirectory(Path.of(tempDirectory).toFile());
     }
 
-    void purgeDirectory(File dir) {
+    public void purgeDirectory(File dir) {
         for (File file : Objects.requireNonNull(dir.listFiles())) {
             if (file.isDirectory())
                 purgeDirectory(file);

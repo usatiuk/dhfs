@@ -1,4 +1,4 @@
-package com.usatiuk.dhfsapp.integration;
+package com.usatiuk.dhfsfuse.integration;
 
 import com.github.dockerjava.api.model.Device;
 import org.junit.jupiter.api.*;
