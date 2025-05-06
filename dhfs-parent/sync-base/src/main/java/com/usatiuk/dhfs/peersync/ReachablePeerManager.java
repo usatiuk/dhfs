@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @ApplicationScoped
-public class ConnectedPeerManager {
+public class ReachablePeerManager {
     private final ConcurrentMap<PeerId, PeerAddress> _states = new ConcurrentHashMap<>();
     private final Collection<PeerConnectedEventListener> _connectedListeners;
     private final Collection<PeerDisconnectedEventListener> _disconnectedListeners;
@@ -58,7 +58,7 @@ public class ConnectedPeerManager {
     SyncHandler syncHandler;
     private ExecutorService _heartbeatExecutor;
 
-    public ConnectedPeerManager(Instance<PeerConnectedEventListener> connectedListeners, Instance<PeerDisconnectedEventListener> disconnectedListeners) {
+    public ReachablePeerManager(Instance<PeerConnectedEventListener> connectedListeners, Instance<PeerDisconnectedEventListener> disconnectedListeners) {
         _connectedListeners = List.copyOf(connectedListeners.stream().toList());
         _disconnectedListeners = List.copyOf(disconnectedListeners.stream().toList());
     }

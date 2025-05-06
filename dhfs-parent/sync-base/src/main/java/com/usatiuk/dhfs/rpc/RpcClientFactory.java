@@ -4,7 +4,7 @@ import com.usatiuk.dhfs.peerdiscovery.IpPeerAddress;
 import com.usatiuk.dhfs.peerdiscovery.PeerAddress;
 import com.usatiuk.dhfs.peersync.PeerDisconnectedEventListener;
 import com.usatiuk.dhfs.peersync.PeerId;
-import com.usatiuk.dhfs.peersync.ConnectedPeerManager;
+import com.usatiuk.dhfs.peersync.ReachablePeerManager;
 import com.usatiuk.dhfs.repository.DhfsObjectSyncGrpcGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
@@ -29,7 +29,7 @@ public class RpcClientFactory implements PeerDisconnectedEventListener {
     long syncTimeout;
 
     @Inject
-    ConnectedPeerManager connectedPeerManager;
+    ReachablePeerManager reachablePeerManager;
 
     @Inject
     RpcChannelFactory rpcChannelFactory;
@@ -56,7 +56,7 @@ public class RpcClientFactory implements PeerDisconnectedEventListener {
     }
 
     public <R> R withObjSyncClient(PeerId target, ObjectSyncClientFunction<R> fn) {
-        var hostinfo = connectedPeerManager.getAddress(target);
+        var hostinfo = reachablePeerManager.getAddress(target);
 
         if (hostinfo == null)
             throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("Not known to be reachable: " + target));

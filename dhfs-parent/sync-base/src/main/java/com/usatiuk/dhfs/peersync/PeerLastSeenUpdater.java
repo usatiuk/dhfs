@@ -12,7 +12,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 @ApplicationScoped
 public class PeerLastSeenUpdater {
     @Inject
-    ConnectedPeerManager connectedPeerManager;
+    ReachablePeerManager reachablePeerManager;
     @Inject
     PeerInfoService peerInfoService;
     @Inject
@@ -30,7 +30,7 @@ public class PeerLastSeenUpdater {
     @Scheduled(every = "${dhfs.objects.last-seen.update}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     @Blocking
     void update() {
-        var snapshot = connectedPeerManager.getHostStateSnapshot();
+        var snapshot = reachablePeerManager.getHostStateSnapshot();
         for (var a : snapshot.available()) {
             txm.run(() -> {
                 var curInfo = remoteTransaction.getData(PeerInfo.class, a.id()).orElse(null);

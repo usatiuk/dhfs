@@ -2,7 +2,7 @@ package com.usatiuk.dhfs.invalidation;
 
 import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.peersync.PeerInfoService;
-import com.usatiuk.dhfs.peersync.ConnectedPeerManager;
+import com.usatiuk.dhfs.peersync.ReachablePeerManager;
 import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
 import com.usatiuk.dhfs.rpc.RemoteObjectServiceClient;
 import com.usatiuk.objects.JData;
@@ -37,7 +37,7 @@ public class InvalidationQueueService {
     private final AtomicReference<ConcurrentHashSet<JObjectKey>> _toAllQueue = new AtomicReference<>(new ConcurrentHashSet<>());
     private final DataLocker _locker = new DataLocker();
     @Inject
-    ConnectedPeerManager remoteHostManager;
+    ReachablePeerManager reachablePeerManager;
     @Inject
     DeferredInvalidationQueueService deferredInvalidationQueueService;
     @Inject
@@ -103,7 +103,7 @@ public class InvalidationQueueService {
                         }
 
                         if (toAllQueue != null) {
-                            var hostInfo = remoteHostManager.getHostStateSnapshot();
+                            var hostInfo = reachablePeerManager.getHostStateSnapshot();
                             for (var o : toAllQueue) {
                                 for (var h : hostInfo.available())
                                     _queue.add(new InvalidationQueueEntry(h, o));
@@ -129,7 +129,7 @@ public class InvalidationQueueService {
                                 continue;
                             }
 
-                            if (!remoteHostManager.isReachable(e.peer())) {
+                            if (!reachablePeerManager.isReachable(e.peer())) {
                                 deferredInvalidationQueueService.defer(e);
                                 continue;
                             }
@@ -210,14 +210,14 @@ public class InvalidationQueueService {
     }
 
     void pushInvalidationToOne(InvalidationQueueEntry entry) {
-        if (remoteHostManager.isReachable(entry.peer()))
+        if (reachablePeerManager.isReachable(entry.peer()))
             _queue.add(entry);
         else
             deferredInvalidationQueueService.defer(entry);
     }
 
     void pushInvalidationToOneNoDelay(InvalidationQueueEntry entry) {
-        if (remoteHostManager.isReachable(entry.peer()))
+        if (reachablePeerManager.isReachable(entry.peer()))
             _queue.addNoDelay(entry);
         else
             deferredInvalidationQueueService.defer(entry);

@@ -3,7 +3,7 @@ package com.usatiuk.dhfs.webapi;
 import com.usatiuk.dhfs.peerdiscovery.PeerAddrStringHelper;
 import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.peersync.PeerInfoService;
-import com.usatiuk.dhfs.peersync.ConnectedPeerManager;
+import com.usatiuk.dhfs.peersync.ReachablePeerManager;
 import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -15,7 +15,7 @@ public class PersistentPeerAddressApi {
     @Inject
     PeerInfoService peerInfoService;
     @Inject
-    ConnectedPeerManager connectedPeerManager;
+    ReachablePeerManager reachablePeerManager;
     @Inject
     PersistentPeerDataService persistentPeerDataService;
 
