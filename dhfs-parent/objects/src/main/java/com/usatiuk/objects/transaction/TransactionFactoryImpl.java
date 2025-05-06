@@ -108,7 +108,7 @@ public class TransactionFactoryImpl implements TransactionFactory {
         }
 
         @Override
-        public <T extends JData> Optional<T> get(Class<T> type, JObjectKey key, LockingStrategy strategy) {
+        public <T extends JData> Optional<T> get(Class<T> type, JObjectKey key) {
             return switch (_writes.get(key)) {
                 case TxRecord.TxObjectRecordWrite<?> write -> Optional.of(type.cast(write.data()));
                 case TxRecord.TxObjectRecordDeleted deleted -> Optional.empty();

@@ -25,8 +25,8 @@ public class CurrentTransaction implements Transaction {
     }
 
     @Override
-    public <T extends JData> Optional<T> get(Class<T> type, JObjectKey key, LockingStrategy strategy) {
-        return transactionManager.current().get(type, key, strategy);
+    public <T extends JData> Optional<T> get(Class<T> type, JObjectKey key) {
+        return transactionManager.current().get(type, key);
     }
 
     @Override

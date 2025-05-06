@@ -2,14 +2,11 @@ package com.usatiuk.objects;
 
 import com.usatiuk.objects.data.Parent;
 import com.usatiuk.objects.iterators.IteratorStart;
-import com.usatiuk.objects.transaction.LockingStrategy;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;
 import io.quarkus.logging.Log;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 
 import java.util.List;
 import java.util.Map;
@@ -151,12 +148,12 @@ public abstract class ObjectsTestImpl {
         });
 
         txm.run(() -> {
-            var parent = curTx.get(Parent.class, JObjectKey.of(testInfo.getDisplayName() + "Parent3"), LockingStrategy.OPTIMISTIC).orElse(null);
+            var parent = curTx.get(Parent.class, JObjectKey.of(testInfo.getDisplayName() + "Parent3")).orElse(null);
             Assertions.assertEquals("John", parent.name());
             curTx.put(parent.withName("John2"));
         });
         txm.run(() -> {
-            var parent = curTx.get(Parent.class, JObjectKey.of(testInfo.getDisplayName() + "Parent3"), LockingStrategy.WRITE).orElse(null);
+            var parent = curTx.get(Parent.class, JObjectKey.of(testInfo.getDisplayName() + "Parent3")).orElse(null);
             Assertions.assertEquals("John2", parent.name());
             curTx.put(parent.withName("John3"));
         });
@@ -236,10 +233,9 @@ public abstract class ObjectsTestImpl {
         }
     }
 
-    @ParameterizedTest
-    @EnumSource(LockingStrategy.class)
-    void editConflict(LockingStrategy strategy, TestInfo testInfo) {
-        String key = testInfo.getDisplayName() + "Parent4" + strategy.name();
+    @Test
+    void editConflict(TestInfo testInfo) {
+        String key = testInfo.getDisplayName() + "Parent4";
         txm.run(() -> {
             var newParent = new Parent(JObjectKey.of(key), "John3");
             curTx.put(newParent);
@@ -260,7 +256,7 @@ public abstract class ObjectsTestImpl {
                     } catch (Throwable e) {
                         throw new RuntimeException(e);
                     }
-                    var parent = curTx.get(Parent.class, JObjectKey.of(key), strategy).orElse(null);
+                    var parent = curTx.get(Parent.class, JObjectKey.of(key)).orElse(null);
                     curTx.put(parent.withName("John"));
                     Log.warn("Thread 1 commit");
                 }, 0);
@@ -276,7 +272,7 @@ public abstract class ObjectsTestImpl {
                 Log.warn("Thread 2");
                 barrier.await(); // Ensure thread 2 tx id is larger than thread 1
                 txm.runTries(() -> {
-                    var parent = curTx.get(Parent.class, JObjectKey.of(key), strategy).orElse(null);
+                    var parent = curTx.get(Parent.class, JObjectKey.of(key)).orElse(null);
                     curTx.put(parent.withName("John2"));
                     Log.warn("Thread 2 commit");
                 }, 0);
@@ -317,10 +313,9 @@ public abstract class ObjectsTestImpl {
         }
     }
 
-    @ParameterizedTest
-    @EnumSource(LockingStrategy.class)
-    void editConflict2(LockingStrategy strategy, TestInfo testInfo) {
-        String key = testInfo.getDisplayName() + "EditConflict2" + strategy.name();
+    @Test
+    void editConflict2(TestInfo testInfo) {
+        String key = testInfo.getDisplayName() + "EditConflict2";
         txm.run(() -> {
             var newParent = new Parent(JObjectKey.of(key), "John3");
             curTx.put(newParent);
@@ -341,7 +336,7 @@ public abstract class ObjectsTestImpl {
                     } catch (Throwable e) {
                         throw new RuntimeException(e);
                     }
-                    var parent = curTx.get(Parent.class, JObjectKey.of(key), strategy).orElse(null);
+                    var parent = curTx.get(Parent.class, JObjectKey.of(key)).orElse(null);
                     curTx.put(parent.withName("John"));
                     Log.warn("Thread 1 commit");
                 }, 0);
@@ -362,7 +357,7 @@ public abstract class ObjectsTestImpl {
                     } catch (Throwable e) {
                         throw new RuntimeException(e);
                     }
-                    var parent = curTx.get(Parent.class, JObjectKey.of(key), strategy).orElse(null);
+                    var parent = curTx.get(Parent.class, JObjectKey.of(key)).orElse(null);
                     curTx.put(parent.withName("John2"));
                     Log.warn("Thread 2 commit");
                 }, 0);
@@ -922,10 +917,8 @@ public abstract class ObjectsTestImpl {
                 () -> createGetObject(testInfo),
                 () -> createDeleteObject(testInfo),
                 () -> createCreateObject(testInfo),
-                () -> editConflict(LockingStrategy.WRITE, testInfo),
-                () -> editConflict(LockingStrategy.OPTIMISTIC, testInfo),
-                () -> editConflict2(LockingStrategy.WRITE, testInfo),
-                () -> editConflict2(LockingStrategy.OPTIMISTIC, testInfo),
+                () -> editConflict(testInfo),
+                () -> editConflict2(testInfo),
                 () -> snapshotTest1(testInfo),
                 () -> snapshotTest2(testInfo),
                 () -> snapshotTest3(testInfo),

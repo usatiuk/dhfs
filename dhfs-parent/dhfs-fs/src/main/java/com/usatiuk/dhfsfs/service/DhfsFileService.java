@@ -19,7 +19,6 @@ import com.usatiuk.dhfsfs.objects.JKleppmannTreeNodeMetaFile;
 import com.usatiuk.objects.JData;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.iterators.IteratorStart;
-import com.usatiuk.objects.transaction.LockingStrategy;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;
 import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
@@ -68,12 +67,8 @@ public class DhfsFileService {
     @Inject
     JMapHelper jMapHelper;
 
-    private JKleppmannTreeManager.JKleppmannTree getTreeW() {
+    private JKleppmannTreeManager.JKleppmannTree getTree() {
         return jKleppmannTreeManager.getTree(JObjectKey.of("fs"), () -> new JKleppmannTreeNodeMetaDirectory(""));
-    }
-
-    private JKleppmannTreeManager.JKleppmannTree getTreeR() {
-        return jKleppmannTreeManager.getTree(JObjectKey.of("fs"), LockingStrategy.OPTIMISTIC, () -> new JKleppmannTreeNodeMetaDirectory(""));
     }
 
     private ChunkData createChunk(ByteString bytes) {
@@ -84,25 +79,25 @@ public class DhfsFileService {
 
     void init(@Observes @Priority(500) StartupEvent event) {
         Log.info("Initializing file service");
-        getTreeW();
+        getTree();
     }
 
     private JKleppmannTreeNode getDirEntryW(String name) {
-        var res = getTreeW().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
+        var res = getTree().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
         if (res == null) throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
         var ret = curTx.get(JKleppmannTreeNodeHolder.class, res).map(JKleppmannTreeNodeHolder::node).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
         return ret;
     }
 
     private JKleppmannTreeNode getDirEntryR(String name) {
-        var res = getTreeR().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
+        var res = getTree().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
         if (res == null) throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
         var ret = curTx.get(JKleppmannTreeNodeHolder.class, res).map(JKleppmannTreeNodeHolder::node).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
         return ret;
     }
 
     private Optional<JKleppmannTreeNode> getDirEntryOpt(String name) {
-        var res = getTreeW().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
+        var res = getTree().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
         if (res == null) return Optional.empty();
         var ret = curTx.get(JKleppmannTreeNodeHolder.class, res).map(JKleppmannTreeNodeHolder::node);
         return ret;
@@ -167,7 +162,7 @@ public class DhfsFileService {
             remoteTx.putData(f);
 
             try {
-                getTreeW().move(parent.key(), new JKleppmannTreeNodeMetaFile(fname, f.key()), getTreeW().getNewNodeId());
+                getTree().move(parent.key(), new JKleppmannTreeNodeMetaFile(fname, f.key()), getTree().getNewNodeId());
             } catch (Exception e) {
 //                fobj.getMeta().removeRef(newNodeId);
                 throw e;
@@ -179,7 +174,7 @@ public class DhfsFileService {
     //FIXME: Slow..
     public Pair<String, JObjectKey> inoToParent(JObjectKey ino) {
         return jObjectTxManager.executeTx(() -> {
-            return getTreeW().findParent(w -> {
+            return getTree().findParent(w -> {
                 if (w.meta() instanceof JKleppmannTreeNodeMetaFile f)
                     return f.fileIno().equals(ino);
                 return false;
@@ -197,7 +192,7 @@ public class DhfsFileService {
 
             Log.debug("Creating directory " + name);
 
-            getTreeW().move(parent.key(), new JKleppmannTreeNodeMetaDirectory(dname), getTreeW().getNewNodeId());
+            getTree().move(parent.key(), new JKleppmannTreeNodeMetaDirectory(dname), getTree().getNewNodeId());
         });
     }
 
@@ -210,7 +205,7 @@ public class DhfsFileService {
                 if (!allowRecursiveDelete && !node.children().isEmpty())
                     throw new DirectoryNotEmptyException();
             }
-            getTreeW().trash(node.meta(), node.key());
+            getTree().trash(node.meta(), node.key());
         });
     }
 
@@ -223,7 +218,7 @@ public class DhfsFileService {
             var toDentry = getDirEntryW(toPath.getParent().toString());
             ensureDir(toDentry);
 
-            getTreeW().move(toDentry.key(), meta.withName(toPath.getFileName().toString()), node.key());
+            getTree().move(toDentry.key(), meta.withName(toPath.getFileName().toString()), node.key());
             return true;
         });
     }
@@ -344,7 +339,7 @@ public class DhfsFileService {
             if (offset < 0)
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Offset should be more than zero: " + offset));
 
-            var file = remoteTx.getData(File.class, fileUuid, LockingStrategy.WRITE).orElse(null);
+            var file = remoteTx.getData(File.class, fileUuid).orElse(null);
             if (file == null) {
                 throw new StatusRuntimeException(Status.NOT_FOUND.withDescription("File not found when trying to write: " + fileUuid));
             }
@@ -595,7 +590,7 @@ public class DhfsFileService {
             jMapHelper.put(f, JMapLongKey.of(0), newChunkData.key());
 
             remoteTx.putData(f);
-            getTreeW().move(parent.key(), new JKleppmannTreeNodeMetaFile(fname, f.key()), getTreeW().getNewNodeId());
+            getTree().move(parent.key(), new JKleppmannTreeNodeMetaFile(fname, f.key()), getTree().getNewNodeId());
             return f.key();
         });
     }

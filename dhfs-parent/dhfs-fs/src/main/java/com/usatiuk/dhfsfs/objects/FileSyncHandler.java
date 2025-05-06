@@ -8,7 +8,6 @@ import com.usatiuk.dhfs.remoteobj.*;
 import com.usatiuk.dhfsfs.service.DhfsFileService;
 import com.usatiuk.kleppmanntree.AlreadyExistsException;
 import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.objects.transaction.LockingStrategy;
 import com.usatiuk.objects.transaction.Transaction;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -42,12 +41,8 @@ public class FileSyncHandler implements ObjSyncHandler<File, FileDto> {
     @Inject
     DhfsFileService fileService;
 
-    private JKleppmannTreeManager.JKleppmannTree getTreeW() {
+    private JKleppmannTreeManager.JKleppmannTree getTree() {
         return jKleppmannTreeManager.getTree(JObjectKey.of("fs")).orElseThrow();
-    }
-
-    private JKleppmannTreeManager.JKleppmannTree getTreeR() {
-        return jKleppmannTreeManager.getTree(JObjectKey.of("fs"), LockingStrategy.OPTIMISTIC).orElseThrow();
     }
 
     private void resolveConflict(PeerId from, JObjectKey key, PMap<PeerId, Long> receivedChangelog,
@@ -131,12 +126,12 @@ public class FileSyncHandler implements ObjSyncHandler<File, FileDto> {
 
             do {
                 try {
-                    getTreeW().move(parent.getRight(),
+                    getTree().move(parent.getRight(),
                             new JKleppmannTreeNodeMetaFile(
                                     parent.getLeft() + ".fconflict." + persistentPeerDataService.getSelfUuid() + "." + otherHostname.toString() + "." + i,
                                     newFile.key()
                             ),
-                            getTreeW().getNewNodeId()
+                            getTree().getNewNodeId()
                     );
                 } catch (AlreadyExistsException aex) {
                     i++;

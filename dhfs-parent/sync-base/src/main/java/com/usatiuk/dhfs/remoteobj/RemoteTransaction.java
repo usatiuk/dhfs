@@ -3,7 +3,6 @@ package com.usatiuk.dhfs.remoteobj;
 import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
 import com.usatiuk.dhfs.rpc.RemoteObjectServiceClient;
 import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.objects.transaction.LockingStrategy;
 import com.usatiuk.objects.transaction.Transaction;
 import io.quarkus.logging.Log;
 import jakarta.inject.Inject;
@@ -55,11 +54,11 @@ public class RemoteTransaction {
     }
 
     @SuppressWarnings("unchecked")
-    private <T extends JDataRemote> Optional<T> getData(Class<T> type, JObjectKey key, LockingStrategy strategy, boolean tryRequest) {
-        return curTx.get(RemoteObjectMeta.class, RemoteObjectMeta.ofMetaKey(key), strategy)
+    private <T extends JDataRemote> Optional<T> getData(Class<T> type, JObjectKey key, boolean tryRequest) {
+        return curTx.get(RemoteObjectMeta.class, RemoteObjectMeta.ofMetaKey(key))
                 .flatMap(obj -> {
                     if (obj.hasLocalData()) {
-                        var realData = curTx.get(RemoteObjectDataWrapper.class, RemoteObjectMeta.ofDataKey(key), strategy).orElse(null);
+                        var realData = curTx.get(RemoteObjectDataWrapper.class, RemoteObjectMeta.ofDataKey(key)).orElse(null);
                         if (realData == null)
                             throw new IllegalStateException("Local data not found for " + key); // TODO: Race
                         if (!type.isInstance(realData.data()))
@@ -72,8 +71,8 @@ public class RemoteTransaction {
                 });
     }
 
-    public Optional<RemoteObjectMeta> getMeta(JObjectKey key, LockingStrategy strategy) {
-        return curTx.get(RemoteObjectMeta.class, RemoteObjectMeta.ofMetaKey(key), strategy);
+    public Optional<RemoteObjectMeta> getMeta(JObjectKey key) {
+        return curTx.get(RemoteObjectMeta.class, RemoteObjectMeta.ofMetaKey(key));
     }
 
     public <T extends JDataRemote> void putDataRaw(T obj) {
@@ -127,23 +126,12 @@ public class RemoteTransaction {
         curTx.put(newData);
     }
 
-    public Optional<RemoteObjectMeta> getMeta(JObjectKey key) {
-        return getMeta(key, LockingStrategy.OPTIMISTIC);
-    }
-
     public <T extends JDataRemote> Optional<T> getData(Class<T> type, JObjectKey key) {
-        return getData(type, key, LockingStrategy.OPTIMISTIC, true);
+        return getData(type, key, true);
     }
 
     public <T extends JDataRemote> Optional<T> getDataLocal(Class<T> type, JObjectKey key) {
-        return getData(type, key, LockingStrategy.OPTIMISTIC, false);
+        return getData(type, key, false);
     }
 
-    public <T extends JDataRemote> Optional<T> getData(Class<T> type, JObjectKey key, LockingStrategy strategy) {
-        return getData(type, key, strategy, true);
-    }
-
-    public <T extends JDataRemote> Optional<T> getDataLocal(Class<T> type, JObjectKey key, LockingStrategy strategy) {
-        return getData(type, key, strategy, false);
-    }
 }

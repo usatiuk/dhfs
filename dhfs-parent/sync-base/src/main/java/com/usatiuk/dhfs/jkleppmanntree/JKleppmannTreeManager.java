@@ -10,7 +10,6 @@ import com.usatiuk.dhfs.peersync.PeerInfoService;
 import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
 import com.usatiuk.kleppmanntree.*;
 import com.usatiuk.objects.JObjectKey;
-import com.usatiuk.objects.transaction.LockingStrategy;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;
 import io.quarkus.logging.Log;
@@ -39,9 +38,9 @@ public class JKleppmannTreeManager {
     @Inject
     PersistentPeerDataService persistentPeerDataService;
 
-    public JKleppmannTree getTree(JObjectKey name, LockingStrategy lockingStrategy, Supplier<JKleppmannTreeNodeMeta> rootNodeSupplier) {
+    public JKleppmannTree getTree(JObjectKey name, Supplier<JKleppmannTreeNodeMeta> rootNodeSupplier) {
         return txManager.executeTx(() -> {
-            var data = curTx.get(JKleppmannTreePersistentData.class, name, lockingStrategy).orElse(null);
+            var data = curTx.get(JKleppmannTreePersistentData.class, name).orElse(null);
             if (data == null) {
                 data = new JKleppmannTreePersistentData(
                         name,
@@ -66,18 +65,11 @@ public class JKleppmannTreeManager {
     }
 
     public Optional<JKleppmannTree> getTree(JObjectKey name) {
-        return getTree(name, LockingStrategy.WRITE);
-    }
-
-    public Optional<JKleppmannTree> getTree(JObjectKey name, LockingStrategy lockingStrategy) {
         return txManager.executeTx(() -> {
-            return curTx.get(JKleppmannTreePersistentData.class, name, lockingStrategy).map(JKleppmannTree::new);
+            return curTx.get(JKleppmannTreePersistentData.class, name).map(JKleppmannTree::new);
         });
     }
 
-    public JKleppmannTree getTree(JObjectKey name, Supplier<JKleppmannTreeNodeMeta> rootNodeSupplier) {
-        return getTree(name, LockingStrategy.WRITE, rootNodeSupplier);
-    }
 
     public class JKleppmannTree {
         private final KleppmannTree<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> _tree;

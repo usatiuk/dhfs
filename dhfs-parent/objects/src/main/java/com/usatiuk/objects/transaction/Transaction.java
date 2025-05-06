@@ -11,16 +11,12 @@ import java.util.Optional;
 public interface Transaction extends TransactionHandle {
     void onCommit(Runnable runnable);
 
-    <T extends JData> Optional<T> get(Class<T> type, JObjectKey key, LockingStrategy strategy);
+    <T extends JData> Optional<T> get(Class<T> type, JObjectKey key);
 
     <T extends JData> void put(JData obj);
     <T extends JData> void putNew(JData obj);
 
     void delete(JObjectKey key);
-
-    default <T extends JData> Optional<T> get(Class<T> type, JObjectKey key) {
-        return get(type, key, LockingStrategy.OPTIMISTIC);
-    }
 
     CloseableKvIterator<JObjectKey, JData> getIterator(IteratorStart start, JObjectKey key);
 
