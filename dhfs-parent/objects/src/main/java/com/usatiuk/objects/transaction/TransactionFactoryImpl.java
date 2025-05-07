@@ -19,10 +19,6 @@ import java.util.*;
 public class TransactionFactoryImpl implements TransactionFactory {
     @Inject
     WritebackObjectPersistentStore writebackObjectPersistentStore;
-    @Inject
-    LockManager lockManager;
-    @ConfigProperty(name = "dhfs.objects.transaction.never-lock")
-    boolean neverLock;
 
     @Override
     public TransactionPrivate createTransaction() {

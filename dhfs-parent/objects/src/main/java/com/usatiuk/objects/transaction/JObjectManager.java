@@ -6,6 +6,7 @@ import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.snapshot.Snapshot;
 import com.usatiuk.objects.stores.WritebackObjectPersistentStore;
 import com.usatiuk.utils.AutoCloseableNoThrow;
+import com.usatiuk.utils.DataLocker;
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
@@ -27,9 +28,9 @@ public class JObjectManager {
     WritebackObjectPersistentStore writebackObjectPersistentStore;
     @Inject
     TransactionFactory transactionFactory;
-    @Inject
-    LockManager lockManager;
+
     private boolean _ready = false;
+    private final DataLocker _objLocker = new DataLocker();
 
     static {
         _preCommitTxHooks = List.copyOf(CDI.current().select(PreCommitTxHook.class).stream().sorted(Comparator.comparingInt(PreCommitTxHook::getPriority)).toList());
@@ -162,7 +163,7 @@ public class JObjectManager {
                 for (var key : toLock) {
                     if (tx.knownNew().contains(key))
                         continue;
-                    var lock = lockManager.lockObject(key);
+                    var lock = _objLocker.lock(key);
                     toUnlock.add(lock);
                 }
 
