@@ -53,19 +53,18 @@ public class MemoryObjectPersistentStore implements ObjectPersistentStore {
         }
     }
 
-    public Runnable prepareTx(TxManifestRaw names, long txId) {
-        return () -> {
-            synchronized (this) {
-                for (var written : names.written()) {
-                    _objects = _objects.plus(written.getKey(), written.getValue());
-                }
-                for (JObjectKey key : names.deleted()) {
-                    _objects = _objects.minus(key);
-                }
-                assert txId > _lastCommitId;
-                _lastCommitId = txId;
+    @Override
+    public void commitTx(TxManifestRaw names, long txId) {
+        synchronized (this) {
+            for (var written : names.written()) {
+                _objects = _objects.plus(written.getKey(), written.getValue());
             }
-        };
+            for (JObjectKey key : names.deleted()) {
+                _objects = _objects.minus(key);
+            }
+            assert txId > _lastCommitId;
+            _lastCommitId = txId;
+        }
     }
 
     @Override

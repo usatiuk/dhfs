@@ -13,7 +13,7 @@ import java.util.Optional;
 public interface ObjectPersistentStore {
     Snapshot<JObjectKey, ByteBuffer> getSnapshot();
 
-    Runnable prepareTx(TxManifestRaw names, long txId);
+    void commitTx(TxManifestRaw names, long txId);
 
     long getTotalSpace();
 

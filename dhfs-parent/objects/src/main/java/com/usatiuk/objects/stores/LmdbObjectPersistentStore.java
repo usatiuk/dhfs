@@ -145,10 +145,9 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
     }
 
     @Override
-    public Runnable prepareTx(TxManifestRaw names, long txId) {
+    public void commitTx(TxManifestRaw names, long txId) {
         verifyReady();
-        var txn = _env.txnWrite();
-        try {
+        try (var txn = _env.txnWrite()) {
             for (var written : names.written()) {
                 var putBb = _db.reserve(txn, written.getKey().toByteBuffer(), written.getValue().size());
                 written.getValue().copyTo(putBb);
@@ -163,17 +162,8 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             bbData.putLong(txId);
             bbData.flip();
             _db.put(txn, DB_VER_OBJ_NAME.asReadOnlyBuffer(), bbData);
-        } catch (Throwable t) {
-            txn.close();
-            throw t;
+            txn.commit();
         }
-        return () -> {
-            try {
-                txn.commit();
-            } finally {
-                txn.close();
-            }
-        };
     }
 
     @Override

@@ -62,7 +62,7 @@ public class SerializingObjectPersistentStore {
                 , objs.deleted());
     }
 
-    Runnable prepareTx(TxManifestObj<? extends JDataVersionedWrapper> objects, long txId) {
-        return delegateStore.prepareTx(prepareManifest(objects), txId);
+    void commitTx(TxManifestObj<? extends JDataVersionedWrapper> objects, long txId) {
+        delegateStore.commitTx(prepareManifest(objects), txId);
     }
 }

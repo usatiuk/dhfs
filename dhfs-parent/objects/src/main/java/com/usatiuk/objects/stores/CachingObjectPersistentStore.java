@@ -31,7 +31,6 @@ public class CachingObjectPersistentStore {
     SerializingObjectPersistentStore delegate;
     @ConfigProperty(name = "dhfs.objects.lru.print-stats")
     boolean printStats;
-    private ExecutorService _commitExecutor;
     private ExecutorService _statusExecutor;
     private AtomicLong _cached = new AtomicLong();
     private AtomicLong _cacheTries = new AtomicLong();
@@ -47,7 +46,6 @@ public class CachingObjectPersistentStore {
             _cache.set(_cache.get().withVersion(s.id()));
         }
 
-        _commitExecutor = Executors.newSingleThreadExecutor();
         if (printStats) {
             _statusExecutor = Executors.newSingleThreadExecutor();
             _statusExecutor.submit(() -> {
@@ -68,7 +66,6 @@ public class CachingObjectPersistentStore {
         Log.tracev("Committing: {0} writes, {1} deletes", objs.written().size(), objs.deleted().size());
 
         var cache = _cache.get();
-        var commitFuture = _commitExecutor.submit(() -> delegate.prepareTx(objs, txId).run());
         for (var write : objs.written()) {
             cache = cache.withPut(write.getLeft(), Optional.of(write.getRight()));
         }
@@ -76,11 +73,7 @@ public class CachingObjectPersistentStore {
             cache = cache.withPut(del, Optional.empty());
         }
         cache = cache.withVersion(txId);
-        try {
-            commitFuture.get();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        delegate.commitTx(objs, txId);
         _cache.set(cache);
 
         Log.tracev("Committed: {0} writes, {1} deletes", objs.written().size(), objs.deleted().size());
