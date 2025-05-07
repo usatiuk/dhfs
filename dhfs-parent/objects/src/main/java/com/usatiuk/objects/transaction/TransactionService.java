@@ -46,14 +46,14 @@ public class TransactionService {
         _ready = true;
     }
 
-    public TransactionPrivate createTransaction() {
+    public TransactionImpl createTransaction() {
         verifyReady();
         var tx = new TransactionImpl(writebackObjectPersistentStore.getSnapshot());
         Log.tracev("Created transaction with snapshotId={0}", tx.snapshot().id());
         return tx;
     }
 
-    public Pair<Collection<Runnable>, TransactionHandle> commit(TransactionPrivate tx) {
+    public Pair<Collection<Runnable>, TransactionHandle> commit(TransactionImpl tx) {
         verifyReady();
         var writes = new HashMap<JObjectKey, TxRecord.TxObjectRecord<?>>();
         Snapshot<JObjectKey, JDataVersionedWrapper> commitSnapshot = null;
@@ -257,7 +257,7 @@ public class TransactionService {
         }
     }
 
-    public void rollback(TransactionPrivate tx) {
+    public void rollback(TransactionImpl tx) {
         verifyReady();
         tx.close();
     }

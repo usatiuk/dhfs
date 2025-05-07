@@ -5,13 +5,14 @@ import com.usatiuk.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.iterators.*;
 import com.usatiuk.objects.snapshot.Snapshot;
+import com.usatiuk.utils.AutoCloseableNoThrow;
 import com.usatiuk.utils.ListUtils;
 import io.quarkus.logging.Log;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
 
-class TransactionImpl implements TransactionPrivate {
+class TransactionImpl implements Transaction, AutoCloseableNoThrow {
     private final Map<JObjectKey, Optional<JDataVersionedWrapper>> _readSet = new HashMap<>();
     private final NavigableMap<JObjectKey, TxRecord.TxObjectRecord<?>> _writes = new TreeMap<>();
     private final List<Runnable> _onCommit = new LinkedList<>();
@@ -63,23 +64,19 @@ class TransactionImpl implements TransactionPrivate {
         _onFlush.add(runnable);
     }
 
-    @Override
-    public Collection<Runnable> getOnCommit() {
+    Collection<Runnable> getOnCommit() {
         return Collections.unmodifiableCollection(_onCommit);
     }
 
-    @Override
-    public Snapshot<JObjectKey, JDataVersionedWrapper> snapshot() {
+    Snapshot<JObjectKey, JDataVersionedWrapper> snapshot() {
         return _snapshot;
     }
 
-    @Override
-    public Collection<Runnable> getOnFlush() {
+    Collection<Runnable> getOnFlush() {
         return Collections.unmodifiableCollection(_onFlush);
     }
 
-    @Override
-    public <T extends JData> Optional<T> getFromSource(Class<T> type, JObjectKey key) {
+    <T extends JData> Optional<T> getFromSource(Class<T> type, JObjectKey key) {
         if (_knownNew.contains(key)) {
             return Optional.empty();
         }
@@ -156,8 +153,7 @@ class TransactionImpl implements TransactionPrivate {
             _newWrites.put(key, record);
     }
 
-    @Override
-    public Collection<TxRecord.TxObjectRecord<?>> drainNewWrites() {
+    Collection<TxRecord.TxObjectRecord<?>> drainNewWrites() {
         if (!_writeTrack) {
             _writeTrack = true;
             return Collections.unmodifiableCollection(_writes.values());
@@ -167,13 +163,11 @@ class TransactionImpl implements TransactionPrivate {
         return ret.values();
     }
 
-    @Override
-    public Map<JObjectKey, Optional<JDataVersionedWrapper>> reads() {
+    Map<JObjectKey, Optional<JDataVersionedWrapper>> reads() {
         return _readSet;
     }
 
-    @Override
-    public Set<JObjectKey> knownNew() {
+    Set<JObjectKey> knownNew() {
         return _knownNew;
     }
 

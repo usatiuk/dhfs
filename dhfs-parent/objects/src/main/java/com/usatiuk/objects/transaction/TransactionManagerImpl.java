@@ -11,7 +11,7 @@ import java.util.Stack;
 
 @Singleton
 public class TransactionManagerImpl implements TransactionManager {
-    private static final ThreadLocal<Stack<TransactionPrivate>> _currentTransaction = ThreadLocal.withInitial(Stack::new);
+    private static final ThreadLocal<Stack<TransactionImpl>> _currentTransaction = ThreadLocal.withInitial(Stack::new);
     @Inject
     TransactionService transactionService;
 
