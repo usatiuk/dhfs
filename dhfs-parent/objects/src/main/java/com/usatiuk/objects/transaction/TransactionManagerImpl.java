@@ -13,12 +13,12 @@ import java.util.Stack;
 public class TransactionManagerImpl implements TransactionManager {
     private static final ThreadLocal<Stack<TransactionPrivate>> _currentTransaction = ThreadLocal.withInitial(Stack::new);
     @Inject
-    JObjectManager jObjectManager;
+    TransactionService transactionService;
 
     @Override
     public void begin() {
         Log.trace("Starting transaction");
-        var tx = jObjectManager.createTransaction();
+        var tx = transactionService.createTransaction();
         _currentTransaction.get().push(tx);
     }
 
@@ -34,7 +34,7 @@ public class TransactionManagerImpl implements TransactionManager {
 
         Pair<Collection<Runnable>, TransactionHandle> ret;
         try {
-            ret = jObjectManager.commit(peeked);
+            ret = transactionService.commit(peeked);
         } catch (Throwable e) {
             Log.trace("Transaction commit failed", e);
             throw e;
@@ -64,7 +64,7 @@ public class TransactionManagerImpl implements TransactionManager {
         var peeked = stack.peek();
 
         try {
-            jObjectManager.rollback(peeked);
+            transactionService.rollback(peeked);
         } catch (Throwable e) {
             Log.error("Transaction rollback failed", e);
             throw e;

@@ -188,7 +188,7 @@ public class WritebackObjectPersistentStore {
         Log.info("Writeback thread exiting");
     }
 
-    public long commitBundle(Collection<TxRecord.TxObjectRecord<?>> writes) {
+    private long commitBundle(Collection<TxRecord.TxObjectRecord<?>> writes) {
         verifyReady();
         _pendingBundleLock.lock();
         try {

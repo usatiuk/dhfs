@@ -22,12 +22,10 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 @ApplicationScoped
-public class JObjectManager {
+public class TransactionService {
     private static final List<PreCommitTxHook> _preCommitTxHooks;
     @Inject
     WritebackObjectPersistentStore writebackObjectPersistentStore;
-    @Inject
-    TransactionFactory transactionFactory;
 
     private boolean _ready = false;
     private final DataLocker _objLocker = new DataLocker();
@@ -36,7 +34,7 @@ public class JObjectManager {
         _preCommitTxHooks = List.copyOf(CDI.current().select(PreCommitTxHook.class).stream().sorted(Comparator.comparingInt(PreCommitTxHook::getPriority)).toList());
     }
 
-    JObjectManager(Instance<PreCommitTxHook> preCommitTxHooks) {
+    TransactionService(Instance<PreCommitTxHook> preCommitTxHooks) {
         Log.debugv("Pre-commit hooks: {0}", String.join("->", _preCommitTxHooks.stream().map(Objects::toString).toList()));
     }
 
@@ -50,7 +48,7 @@ public class JObjectManager {
 
     public TransactionPrivate createTransaction() {
         verifyReady();
-        var tx = transactionFactory.createTransaction();
+        var tx = new TransactionImpl(writebackObjectPersistentStore.getSnapshot());
         Log.tracev("Created transaction with snapshotId={0}", tx.snapshot().id());
         return tx;
     }
