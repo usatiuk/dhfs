@@ -18,6 +18,4 @@ public interface ObjectPersistentStore {
     long getTotalSpace();
 
     long getFreeSpace();
-
-    long getUsableSpace();
 }

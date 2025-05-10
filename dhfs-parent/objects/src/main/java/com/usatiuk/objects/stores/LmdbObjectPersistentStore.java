@@ -178,12 +178,6 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
         return _root.toFile().getFreeSpace();
     }
 
-    @Override
-    public long getUsableSpace() {
-        verifyReady();
-        return _root.toFile().getUsableSpace();
-    }
-
     private class LmdbKvIterator extends ReversibleKvIterator<JObjectKey, MaybeTombstone<ByteBuffer>> {
         private static final Cleaner CLEANER = Cleaner.create();
         private final Txn<ByteBuffer> _txn; // Managed by the snapshot

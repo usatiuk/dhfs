@@ -76,9 +76,4 @@ public class MemoryObjectPersistentStore implements ObjectPersistentStore {
     public long getFreeSpace() {
         return 0;
     }
-
-    @Override
-    public long getUsableSpace() {
-        return 0;
-    }
 }
