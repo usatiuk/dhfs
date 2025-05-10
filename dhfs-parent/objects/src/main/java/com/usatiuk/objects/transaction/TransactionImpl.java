@@ -5,14 +5,13 @@ import com.usatiuk.objects.JDataVersionedWrapper;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.iterators.*;
 import com.usatiuk.objects.snapshot.Snapshot;
-import com.usatiuk.utils.AutoCloseableNoThrow;
 import com.usatiuk.utils.ListUtils;
 import io.quarkus.logging.Log;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
 
-class TransactionImpl implements Transaction, AutoCloseableNoThrow {
+class TransactionImpl implements Transaction, AutoCloseable {
     private final Map<JObjectKey, Optional<JDataVersionedWrapper>> _readSet = new HashMap<>();
     private final NavigableMap<JObjectKey, TxRecord.TxObjectRecord<?>> _writes = new TreeMap<>();
     private final List<Runnable> _onCommit = new LinkedList<>();

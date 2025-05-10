@@ -1,11 +1,10 @@
 package com.usatiuk.objects.iterators;
 
-import com.usatiuk.utils.AutoCloseableNoThrow;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.Iterator;
 
-public interface CloseableKvIterator<K extends Comparable<? super K>, V> extends Iterator<Pair<K, V>>, AutoCloseableNoThrow {
+public interface CloseableKvIterator<K extends Comparable<? super K>, V> extends Iterator<Pair<K, V>>, AutoCloseable {
     K peekNextKey();
 
     void skip();
@@ -21,4 +20,7 @@ public interface CloseableKvIterator<K extends Comparable<? super K>, V> extends
     default CloseableKvIterator<K, V> reversed() {
         return new ReversedKvIterator<K, V>(this);
     }
+
+    @Override
+    void close();
 }
