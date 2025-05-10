@@ -154,7 +154,7 @@ public class LazyFsIT {
         Thread.sleep(3000);
         Log.info("Killing");
         lazyFs1.crash();
-        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("org.lmdbjava.LmdbNativeException"), 60, TimeUnit.SECONDS);
         var client = DockerClientFactory.instance().client();
         client.killContainerCmd(container1.getContainerId()).exec();
         container1.stop();
@@ -195,7 +195,7 @@ public class LazyFsIT {
             lazyFs1.crash();
         }
         try {
-            waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
+            waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("org.lmdbjava.LmdbNativeException"), 60, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
             // Sometimes crash doesn't work
             Log.info("Failed to crash: " + testInfo.getDisplayName());
@@ -237,7 +237,7 @@ public class LazyFsIT {
         Thread.sleep(3000);
         Log.info("Killing");
         lazyFs1.crash();
-        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("org.lmdbjava.LmdbNativeException"), 60, TimeUnit.SECONDS);
         var client = DockerClientFactory.instance().client();
         client.killContainerCmd(container1.getContainerId()).exec();
         container1.stop();
@@ -279,7 +279,7 @@ public class LazyFsIT {
             lazyFs1.crash();
         }
         try {
-            waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
+            waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("org.lmdbjava.LmdbNativeException"), 60, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
             // Sometimes crash doesn't work
             Log.info("Failed to crash: " + testInfo.getDisplayName());
@@ -322,7 +322,7 @@ public class LazyFsIT {
         Log.info("Killing");
         lazyFs2.crash();
         container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting1");
-        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("org.lmdbjava.LmdbNativeException"), 60, TimeUnit.SECONDS);
         var client = DockerClientFactory.instance().client();
         client.killContainerCmd(container2.getContainerId()).exec();
         container2.stop();
@@ -366,7 +366,7 @@ public class LazyFsIT {
         }
         container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting2");
         try {
-            waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
+            waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("org.lmdbjava.LmdbNativeException"), 60, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
             // Sometimes crash doesn't work
             Log.info("Failed to crash: " + testInfo.getDisplayName());
@@ -409,7 +409,7 @@ public class LazyFsIT {
         Log.info("Killing");
         lazyFs2.crash();
         container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting1");
-        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("org.lmdbjava.LmdbNativeException"), 60, TimeUnit.SECONDS);
         var client = DockerClientFactory.instance().client();
         client.killContainerCmd(container2.getContainerId()).exec();
         container2.stop();
@@ -453,7 +453,7 @@ public class LazyFsIT {
         }
         container1.execInContainer("/bin/sh", "-c", "touch /tmp/stopprinting2");
         try {
-            waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Caused by: org.lmdbjava"), 60, TimeUnit.SECONDS);
+            waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("org.lmdbjava.LmdbNativeException"), 60, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
             // Sometimes crash doesn't work
             Log.info("Failed to crash: " + testInfo.getDisplayName());
