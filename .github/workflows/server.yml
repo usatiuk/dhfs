@@ -238,9 +238,14 @@ jobs:
           path: ~/run-wrapper.tar.gz
 
   publish-javadoc:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+      pages: write
+      id-token: write
 
     needs: [build-webui, build-dhfs]
 
@@ -251,17 +256,17 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: DHFS Javadocs
-          path: /tmp/dhfs-javadocs-downloaded
+          path: dhfs-javadocs-downloaded
 
-      - name: Upload
-        run: |
-          git config --global user.email "dhfs-javadocs@usatiuk.com"
-          git config --global user.name "Dhfs Javadocs"
-          git branch javadocs || echo "Branch exists"
-          git checkout javadocs
-          rm -rf *
-          mv /tmp/dhfs-javadocs-downloaded/* .
-          git add .
-          git commit -m "update javadocs"
-          git push origin javadocs
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Upload entire repository
+          path: 'dhfs-javadocs-downloaded'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
 
