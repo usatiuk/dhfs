@@ -261,6 +261,7 @@ jobs:
           git checkout javadocs
           rm -rf *
           mv /tmp/dhfs-javadocs-downloaded/* .
+          git add .
           git commit -m "update javadocs"
           git push origin javadocs
 
