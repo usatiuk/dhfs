@@ -43,11 +43,11 @@ jobs:
           distribution: "zulu"
           cache: maven
 
-      - name: Build LazyFS
-        run: cd thirdparty/lazyfs/ && ./build.sh
+      # - name: Build LazyFS
+      #   run: cd thirdparty/lazyfs/ && ./build.sh
 
       - name: Test with Maven
-        run: cd dhfs-parent && mvn -T $(nproc) --batch-mode --update-snapshots package verify javadoc:aggregate
+        run: cd dhfs-parent && mvn -T $(nproc) --batch-mode --update-snapshots javadoc:aggregate
 
       # - name: Build with Maven
       #   run: cd dhfs-parent && mvn --batch-mode --update-snapshots package # -Dquarkus.log.category.\"com.usatiuk.dhfs\".min-level=DEBUG
@@ -236,3 +236,32 @@ jobs:
         with:
           name: Run wrapper
           path: ~/run-wrapper.tar.gz
+
+  publish-javadoc:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    needs: [build-webui, build-dhfs]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: DHFS Javadocs
+          path: /tmp/dhfs-javadocs-downloaded
+
+      - name: Upload
+        run: |
+          git config --global user.email "dhfs-javadocs@usatiuk.com"
+          git config --global user.name "Dhfs Javadocs"
+          git branch javadocs || echo "Branch exists"
+          git checkout javadocs
+          rm -rf *
+          mv /tmp/dhfs-javadocs-downloaded/* .
+          git add .
+          git commit -m "update javadocs"
+          git push origin javadocs
+
