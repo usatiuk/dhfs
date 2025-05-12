@@ -23,6 +23,9 @@ import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Handles synchronization of file objects.
+ */
 @ApplicationScoped
 public class FileSyncHandler implements ObjSyncHandler<File, FileDto> {
     @Inject
@@ -45,6 +48,14 @@ public class FileSyncHandler implements ObjSyncHandler<File, FileDto> {
         return jKleppmannTreeManager.getTree(JObjectKey.of("fs")).orElseThrow();
     }
 
+    /**
+     * Resolve conflict between two file versions, update the file in storage and create a conflict file.
+     *
+     * @param from              the peer that sent the update
+     * @param key               the key of the file
+     * @param receivedChangelog the changelog of the received file
+     * @param receivedData      the received file data
+     */
     private void resolveConflict(PeerId from, JObjectKey key, PMap<PeerId, Long> receivedChangelog,
                                  @Nullable FileDto receivedData) {
         var oursCurMeta = curTx.get(RemoteObjectMeta.class, key).orElse(null);

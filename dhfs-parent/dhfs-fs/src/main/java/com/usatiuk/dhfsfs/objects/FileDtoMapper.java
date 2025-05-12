@@ -5,6 +5,9 @@ import com.usatiuk.dhfs.syncmap.DtoMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+/**
+ * Maps a {@link File} object to a {@link FileDto} object and vice versa.
+ */
 @ApplicationScoped
 public class FileDtoMapper implements DtoMapper<File, FileDto> {
     @Inject

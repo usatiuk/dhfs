@@ -9,6 +9,14 @@ import com.usatiuk.objects.JObjectKey;
 import java.util.Collection;
 import java.util.Set;
 
+/**
+ * File is a data structure that represents a file in the file system
+ * @param key unique key
+ * @param mode file mode
+ * @param cTime creation time
+ * @param mTime modification time
+ * @param symlink true if the file is a symlink, false otherwise
+ */
 public record File(JObjectKey key, long mode, long cTime, long mTime,
                    boolean symlink
 ) implements JDataRemote, JMapHolder<JMapLongKey> {

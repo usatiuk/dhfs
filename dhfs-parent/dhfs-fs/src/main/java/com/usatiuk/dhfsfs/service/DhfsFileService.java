@@ -39,6 +39,9 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.StreamSupport;
 
+/**
+ * Actual filesystem implementation.
+ */
 @ApplicationScoped
 public class DhfsFileService {
     @ConfigProperty(name = "dhfs.files.target_chunk_alignment")
@@ -71,6 +74,12 @@ public class DhfsFileService {
         return jKleppmannTreeManager.getTree(JObjectKey.of("fs"), () -> new JKleppmannTreeNodeMetaDirectory(""));
     }
 
+    /**
+     * Create a new chunk with the given data and a new unique ID.
+     *
+     * @param bytes the data to store in the chunk
+     * @return the created chunk
+     */
     private ChunkData createChunk(ByteString bytes) {
         var newChunk = new ChunkData(JObjectKey.of(UUID.randomUUID().toString()), bytes);
         remoteTx.putDataNew(newChunk);
@@ -82,14 +91,7 @@ public class DhfsFileService {
         getTree();
     }
 
-    private JKleppmannTreeNode getDirEntryW(String name) {
-        var res = getTree().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
-        if (res == null) throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
-        var ret = curTx.get(JKleppmannTreeNodeHolder.class, res).map(JKleppmannTreeNodeHolder::node).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
-        return ret;
-    }
-
-    private JKleppmannTreeNode getDirEntryR(String name) {
+    private JKleppmannTreeNode getDirEntry(String name) {
         var res = getTree().traverse(StreamSupport.stream(Path.of(name).spliterator(), false).map(p -> p.toString()).toList());
         if (res == null) throw new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND);
         var ret = curTx.get(JKleppmannTreeNodeHolder.class, res).map(JKleppmannTreeNodeHolder::node).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("Tree node exists but not found as jObject: " + name)));
@@ -103,6 +105,11 @@ public class DhfsFileService {
         return ret;
     }
 
+    /**
+     * Get the attributes of a file or directory.
+     * @param uuid the UUID of the file or directory
+     * @return the attributes of the file or directory
+     */
     public Optional<GetattrRes> getattr(JObjectKey uuid) {
         return jObjectTxManager.executeTx(() -> {
             var ref = curTx.get(JData.class, uuid).orElse(null);
@@ -124,10 +131,15 @@ public class DhfsFileService {
         });
     }
 
+    /**
+     * Try to resolve a path to a file or directory.
+     * @param name the path to resolve
+     * @return the key of the file or directory, or an empty optional if it does not exist
+     */
     public Optional<JObjectKey> open(String name) {
         return jObjectTxManager.executeTx(() -> {
             try {
-                var ret = getDirEntryR(name);
+                var ret = getDirEntry(name);
                 return switch (ret.meta()) {
                     case JKleppmannTreeNodeMetaFile f -> Optional.of(f.fileIno());
                     case JKleppmannTreeNodeMetaDirectory f -> Optional.of(ret.key());
@@ -147,10 +159,16 @@ public class DhfsFileService {
             throw new StatusRuntimeExceptionNoStacktrace(Status.INVALID_ARGUMENT.withDescription("Not a directory: " + entry.key()));
     }
 
+    /**
+     * Create a new file with the given name and mode.
+     * @param name the name of the file
+     * @param mode the mode of the file
+     * @return the key of the created file
+     */
     public Optional<JObjectKey> create(String name, long mode) {
         return jObjectTxManager.executeTx(() -> {
             Path path = Path.of(name);
-            var parent = getDirEntryW(path.getParent().toString());
+            var parent = getDirEntry(path.getParent().toString());
 
             ensureDir(parent);
 
@@ -171,9 +189,14 @@ public class DhfsFileService {
         });
     }
 
-    //FIXME: Slow..
+    /**
+     * Get the parent directory of a file or directory.
+     * @param ino the key of the file or directory
+     * @return the parent directory
+     */
     public Pair<String, JObjectKey> inoToParent(JObjectKey ino) {
         return jObjectTxManager.executeTx(() -> {
+            // FIXME: Slow
             return getTree().findParent(w -> {
                 if (w.meta() instanceof JKleppmannTreeNodeMetaFile f)
                     return f.fileIno().equals(ino);
@@ -182,20 +205,31 @@ public class DhfsFileService {
         });
     }
 
+    /**
+     * Create a new directory with the given name and mode.
+     * @param name the name of the directory
+     * @param mode the mode of the directory
+     */
     public void mkdir(String name, long mode) {
         jObjectTxManager.executeTx(() -> {
             Path path = Path.of(name);
-            var parent = getDirEntryW(path.getParent().toString());
+            var parent = getDirEntry(path.getParent().toString());
             ensureDir(parent);
 
             String dname = path.getFileName().toString();
 
             Log.debug("Creating directory " + name);
 
+            // TODO: No modes for directories yet
             getTree().move(parent.key(), new JKleppmannTreeNodeMetaDirectory(dname), getTree().getNewNodeId());
         });
     }
 
+    /**
+     * Unlink a file or directory.
+     * @param name the name of the file or directory
+     * @throws DirectoryNotEmptyException if the directory is not empty and recursive delete is not allowed
+     */
     public void unlink(String name) {
         jObjectTxManager.executeTx(() -> {
             var node = getDirEntryOpt(name).orElse(null);
@@ -209,13 +243,19 @@ public class DhfsFileService {
         });
     }
 
+    /**
+     * Rename a file or directory.
+     * @param from the old name
+     * @param to the new name
+     * @return true if the rename was successful, false otherwise
+     */
     public Boolean rename(String from, String to) {
         return jObjectTxManager.executeTx(() -> {
-            var node = getDirEntryW(from);
+            var node = getDirEntry(from);
             JKleppmannTreeNodeMeta meta = node.meta();
 
             var toPath = Path.of(to);
-            var toDentry = getDirEntryW(toPath.getParent().toString());
+            var toDentry = getDirEntry(toPath.getParent().toString());
             ensureDir(toDentry);
 
             getTree().move(toDentry.key(), meta.withName(toPath.getFileName().toString()), node.key());
@@ -223,6 +263,12 @@ public class DhfsFileService {
         });
     }
 
+    /**
+     * Change the mode of a file or directory.
+     * @param uuid the ID of the file or directory
+     * @param mode the new mode
+     * @return true if the mode was changed successfully, false otherwise
+     */
     public Boolean chmod(JObjectKey uuid, long mode) {
         return jObjectTxManager.executeTx(() -> {
             var dent = curTx.get(JData.class, uuid).orElseThrow(() -> new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND));
@@ -243,9 +289,14 @@ public class DhfsFileService {
         });
     }
 
+    /**
+     * Read the contents of a directory.
+     * @param name the path of the directory
+     * @return an iterable of the names of the files in the directory
+     */
     public Iterable<String> readDir(String name) {
         return jObjectTxManager.executeTx(() -> {
-            var found = getDirEntryW(name);
+            var found = getDirEntry(name);
 
             if (!(found.meta() instanceof JKleppmannTreeNodeMetaDirectory md))
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
@@ -254,6 +305,13 @@ public class DhfsFileService {
         });
     }
 
+    /**
+     * Read the contents of a file.
+     * @param fileUuid the ID of the file
+     * @param offset the offset to start reading from
+     * @param length the number of bytes to read
+     * @return the contents of the file as a ByteString
+     */
     public ByteString read(JObjectKey fileUuid, long offset, int length) {
         return jObjectTxManager.executeTx(() -> {
             if (length < 0)
@@ -315,6 +373,11 @@ public class DhfsFileService {
         });
     }
 
+    /**
+     * Get the size of a file.
+     * @param uuid the ID of the file
+     * @return the size of the file
+     */
     private ByteString readChunk(JObjectKey uuid) {
         var chunkRead = remoteTx.getData(ChunkData.class, uuid).orElse(null);
 
@@ -326,6 +389,11 @@ public class DhfsFileService {
         return chunkRead.data();
     }
 
+    /**
+     * Get the size of a chunk.
+     * @param uuid the ID of the chunk
+     * @return the size of the chunk
+     */
     private int getChunkSize(JObjectKey uuid) {
         return readChunk(uuid).size();
     }
@@ -334,6 +402,13 @@ public class DhfsFileService {
         return num & -(1L << n);
     }
 
+    /**
+     * Write data to a file.
+     * @param fileUuid the ID of the file
+     * @param offset the offset to write to
+     * @param data the data to write
+     * @return the number of bytes written
+     */
     public Long write(JObjectKey fileUuid, long offset, ByteString data) {
         return jObjectTxManager.executeTx(() -> {
             if (offset < 0)
@@ -436,6 +511,12 @@ public class DhfsFileService {
         });
     }
 
+    /**
+     * Truncate a file to the given length.
+     * @param fileUuid the ID of the file
+     * @param length the new length of the file
+     * @return true if the truncate was successful, false otherwise
+     */
     public Boolean truncate(JObjectKey fileUuid, long length) {
         return jObjectTxManager.executeTx(() -> {
             if (length < 0)
@@ -525,6 +606,12 @@ public class DhfsFileService {
         });
     }
 
+    /**
+     * Fill the given range with zeroes.
+     * @param fillStart the start of the range
+     * @param length the end of the range
+     * @param newChunks the map to store the new chunks in
+     */
     private void fillZeros(long fillStart, long length, Map<Long, JObjectKey> newChunks) {
         long combinedSize = (length - fillStart);
 
@@ -560,12 +647,22 @@ public class DhfsFileService {
         }
     }
 
+    /**
+     * Read the contents of a symlink.
+     * @param uuid the ID of the symlink
+     * @return the contents of the symlink as a string
+     */
     public String readlink(JObjectKey uuid) {
         return jObjectTxManager.executeTx(() -> {
             return readlinkBS(uuid).toStringUtf8();
         });
     }
 
+    /**
+     * Read the contents of a symlink as a ByteString.
+     * @param uuid the ID of the symlink
+     * @return the contents of the symlink as a ByteString
+     */
     public ByteString readlinkBS(JObjectKey uuid) {
         return jObjectTxManager.executeTx(() -> {
             var fileOpt = remoteTx.getData(File.class, uuid).orElseThrow(() -> new StatusRuntimeException(Status.NOT_FOUND.withDescription("File not found when trying to readlink: " + uuid)));
@@ -573,10 +670,16 @@ public class DhfsFileService {
         });
     }
 
+    /**
+     * Create a symlink.
+     * @param oldpath the target of the symlink
+     * @param newpath the path of the symlink
+     * @return the key of the created symlink
+     */
     public JObjectKey symlink(String oldpath, String newpath) {
         return jObjectTxManager.executeTx(() -> {
             Path path = Path.of(newpath);
-            var parent = getDirEntryW(path.getParent().toString());
+            var parent = getDirEntry(path.getParent().toString());
 
             ensureDir(parent);
 
@@ -595,6 +698,13 @@ public class DhfsFileService {
         });
     }
 
+    /**
+     * Set the access and modification times of a file.
+     * @param fileUuid the ID of the file
+     * @param atimeMs the access time in milliseconds
+     * @param mtimeMs the modification time in milliseconds
+     * @return true if the times were set successfully, false otherwise
+     */
     public Boolean setTimes(JObjectKey fileUuid, long atimeMs, long mtimeMs) {
         return jObjectTxManager.executeTx(() -> {
             var dent = curTx.get(JData.class, fileUuid).orElseThrow(() -> new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND));
@@ -616,6 +726,11 @@ public class DhfsFileService {
         });
     }
 
+    /**
+     * Get the size of a file.
+     * @param fileUuid the ID of the file
+     * @return the size of the file
+     */
     public long size(JObjectKey fileUuid) {
         return jObjectTxManager.executeTx(() -> {
             long realSize = 0;
@@ -635,6 +750,13 @@ public class DhfsFileService {
         });
     }
 
+    /**
+     * Write data to a file.
+     * @param fileUuid the ID of the file
+     * @param offset the offset to write to
+     * @param data the data to write
+     * @return the number of bytes written
+     */
     public Long write(JObjectKey fileUuid, long offset, byte[] data) {
         return write(fileUuid, offset, UnsafeByteOperations.unsafeWrap(data));
     }
