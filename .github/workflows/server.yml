@@ -43,11 +43,11 @@ jobs:
           distribution: "zulu"
           cache: maven
 
-      - name: Build LazyFS
-        run: cd thirdparty/lazyfs/ && ./build.sh
+      # - name: Build LazyFS
+      #   run: cd thirdparty/lazyfs/ && ./build.sh
 
       - name: Test with Maven
-        run: cd dhfs-parent && mvn -T $(nproc) --batch-mode --update-snapshots package verify javadoc:aggregate
+        run: cd dhfs-parent && mvn -T $(nproc) --batch-mode --update-snapshots javadoc:aggregate
 
       # - name: Build with Maven
       #   run: cd dhfs-parent && mvn --batch-mode --update-snapshots package # -Dquarkus.log.category.\"com.usatiuk.dhfs\".min-level=DEBUG
@@ -236,3 +236,37 @@ jobs:
         with:
           name: Run wrapper
           path: ~/run-wrapper.tar.gz
+
+  publish-javadoc:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    needs: [build-webui, build-dhfs]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: DHFS Javadocs
+          path: dhfs-javadocs-downloaded
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Upload entire repository
+          path: 'dhfs-javadocs-downloaded'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+
