@@ -7,6 +7,9 @@ import org.apache.commons.collections4.multimap.HashSetValuedHashMap;
 import java.io.Serial;
 import java.io.Serializable;
 
+/**
+ * Stores data about deferred invalidations.
+ */
 public class DeferredInvalidationQueueData implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;

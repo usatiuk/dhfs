@@ -14,6 +14,9 @@ import org.pcollections.PSortedMap;
 import java.util.Collection;
 import java.util.List;
 
+/**
+ * Various persistent data for JKleppmannTree
+ */
 public record JKleppmannTreePersistentData(
         JObjectKey key, PCollection<JDataRef> refsFrom, boolean frozen,
         long clock,

@@ -14,6 +14,9 @@ import jakarta.inject.Inject;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Service for managing information about peers connected to the cluster.
+ */
 @ApplicationScoped
 public class PeerInfoService {
     public static final JObjectKey TREE_KEY = JObjectKey.of("peers");
@@ -32,7 +35,7 @@ public class PeerInfoService {
         return jKleppmannTreeManager.getTree(TREE_KEY, () -> null);
     }
 
-    public Optional<PeerInfo> getPeerInfoImpl(JObjectKey key) {
+    Optional<PeerInfo> getPeerInfoImpl(JObjectKey key) {
         return jObjectTxManager.run(() -> {
             return curTx.get(JKleppmannTreeNodeHolder.class, key).map(JKleppmannTreeNodeHolder::node).flatMap(node -> {
                 var meta = (JKleppmannTreeNodeMetaPeer) node.meta();
@@ -42,6 +45,12 @@ public class PeerInfoService {
 
     }
 
+    /**
+     * Checks if the peer with the given ID is known to the cluster.
+     *
+     * @param peer the ID of the peer to check
+     * @return true if the peer exists, false otherwise
+     */
     public boolean existsPeer(PeerId peer) {
         return jObjectTxManager.run(() -> {
             var gotKey = getTree().traverse(List.of(JKleppmannTreeNodeMetaPeer.peerIdToNodeId(peer).value()));
@@ -52,6 +61,12 @@ public class PeerInfoService {
         });
     }
 
+    /**
+     * Gets the information about the peer with the given ID.
+     *
+     * @param peer the ID of the peer to get information about
+     * @return an Optional containing the PeerInfo object if the peer exists, or an empty Optional if it does not
+     */
     public Optional<PeerInfo> getPeerInfo(PeerId peer) {
         return jObjectTxManager.run(() -> {
             var gotKey = getTree().traverse(List.of(JKleppmannTreeNodeMetaPeer.peerIdToNodeId(peer).value()));
@@ -65,6 +80,11 @@ public class PeerInfoService {
         });
     }
 
+    /**
+     * Gets the information about all peers in the cluster.
+     *
+     * @return a list of PeerInfo objects representing all peers in the cluster
+     */
     public List<PeerInfo> getPeers() {
         return jObjectTxManager.run(() -> {
             var gotKey = getTree().traverse(List.of());
@@ -80,6 +100,11 @@ public class PeerInfoService {
         });
     }
 
+    /**
+     * Gets the information about all peers in the cluster, excluding the current peer.
+     *
+     * @return a list of PeerInfo objects representing all peers in the cluster, excluding the current peer
+     */
     public List<PeerInfo> getPeersNoSelf() {
         return jObjectTxManager.run(() -> {
             return getPeers().stream().filter(
@@ -87,6 +112,12 @@ public class PeerInfoService {
         });
     }
 
+    /**
+     * Gets the information about all synchronized peers in the cluster.
+     * A peer might not be synchronized if it had not been seen for a while, for example.
+     *
+     * @return a list of PeerInfo objects representing all synchronized peers in the cluster
+     */
     public List<PeerInfo> getSynchronizedPeers() {
         return jObjectTxManager.run(() -> {
             return getPeers().stream().filter(pi -> {
@@ -98,6 +129,12 @@ public class PeerInfoService {
         });
     }
 
+    /**
+     * Gets the information about all synchronized peers in the cluster, excluding the current peer.
+     * A peer might not be synchronized if it had not been seen for a while, for example.
+     *
+     * @return a list of PeerInfo objects representing all synchronized peers in the cluster, excluding the current peer
+     */
     public List<PeerInfo> getSynchronizedPeersNoSelf() {
         return jObjectTxManager.run(() -> {
             return getPeersNoSelf().stream().filter(pi -> {
@@ -106,6 +143,12 @@ public class PeerInfoService {
         });
     }
 
+    /**
+     * Add a new peer to the cluster.
+     *
+     * @param id   the ID of the peer to add
+     * @param cert the certificate of the peer
+     */
     public void putPeer(PeerId id, byte[] cert) {
         jObjectTxManager.run(() -> {
             var parent = getTree().traverse(List.of());
@@ -115,6 +158,11 @@ public class PeerInfoService {
         });
     }
 
+    /**
+     * Remove a peer from the cluster.
+     *
+     * @param id the ID of the peer to remove
+     */
     public void removePeer(PeerId id) {
         jObjectTxManager.run(() -> {
             var gotKey = getTree().traverse(List.of(JKleppmannTreeNodeMetaPeer.peerIdToNodeId(id).value()));

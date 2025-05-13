@@ -24,6 +24,10 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+/**
+ * Automatically synchronized and persistent Kleppmann tree service.
+ * The trees are identified by their names, and can have any type of root node.
+ */
 @ApplicationScoped
 public class JKleppmannTreeManager {
     private static final String dataFileName = "trees";
@@ -38,6 +42,12 @@ public class JKleppmannTreeManager {
     @Inject
     PersistentPeerDataService persistentPeerDataService;
 
+    /**
+     * Get or create a tree with the given name.
+     * @param name the name of the tree
+     * @param rootNodeSupplier a supplier for the root node meta
+     * @return the tree
+     */
     public JKleppmannTree getTree(JObjectKey name, Supplier<JKleppmannTreeNodeMeta> rootNodeSupplier) {
         return txManager.executeTx(() -> {
             var data = curTx.get(JKleppmannTreePersistentData.class, name).orElse(null);
@@ -64,13 +74,20 @@ public class JKleppmannTreeManager {
         });
     }
 
+    /**
+     * Get a tree with the given name.
+     * @param name the name of the tree
+     * @return the tree
+     */
     public Optional<JKleppmannTree> getTree(JObjectKey name) {
         return txManager.executeTx(() -> {
             return curTx.get(JKleppmannTreePersistentData.class, name).map(JKleppmannTree::new);
         });
     }
 
-
+    /**
+     * Kleppmann tree wrapper, automatically synchronized and persistent.
+     */
     public class JKleppmannTree {
         private final KleppmannTree<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> _tree;
         private final JKleppmannTreeStorageInterface _storageInterface;
@@ -88,26 +105,57 @@ public class JKleppmannTreeManager {
             _tree = new KleppmannTree<>(_storageInterface, peerInterface, _clock, new JOpRecorder());
         }
 
+        /**
+         * Traverse the tree from root to find a node with the given name.
+         * @param names list of names to traverse
+         * @return the node key
+         */
         public JObjectKey traverse(List<String> names) {
             return _tree.traverse(names);
         }
 
+        /**
+         * Get a new node id. (random)
+         * @return the new node id
+         */
         public JObjectKey getNewNodeId() {
             return _storageInterface.getNewNodeId();
         }
 
+        /**
+         * Move a node to a new parent.
+         * @param newParent the new parent
+         * @param newMeta the new node metadata
+         * @param node the node to move
+         */
         public void move(JObjectKey newParent, JKleppmannTreeNodeMeta newMeta, JObjectKey node) {
             _tree.move(newParent, newMeta, node);
         }
 
+        /**
+         * Move a node to the trash.
+         * @param newMeta the new node metadata
+         * @param nodeKey the node key
+         */
         public void trash(JKleppmannTreeNodeMeta newMeta, JObjectKey nodeKey) {
             _tree.move(_storageInterface.getTrashId(), newMeta.withName(nodeKey.toString()), nodeKey);
         }
 
+        /**
+         * Check if there are any pending operations for the given peer.
+         * @param host the peer id
+         * @return true if there are pending operations, false otherwise
+         */
         public boolean hasPendingOpsForHost(PeerId host) {
             return !_data.queues().getOrDefault(host, TreePMap.empty()).isEmpty();
         }
 
+        /**
+         * Get the pending operations for the given peer.
+         * @param host the peer id
+         * @param limit the maximum number of operations to return
+         * @return the list of pending operations
+         */
         public List<Op> getPendingOpsForHost(PeerId host, int limit) {
             ArrayList<Op> collected = new ArrayList<>();
             for (var node : _data.queues().getOrDefault(host, TreePMap.empty()).entrySet()) {
@@ -119,7 +167,13 @@ public class JKleppmannTreeManager {
             return Collections.unmodifiableList(collected);
         }
 
-        //        @Override
+        /**
+         * Mark the operation as committed for the given host.
+         * This should be called when the operation is successfully applied on the host.
+         * All operations should be sent and received in timestamp order.
+         * @param host the peer id
+         * @param op the operation to commit
+         */
         public void commitOpForHost(PeerId host, Op op) {
             if (op instanceof JKleppmannTreePeriodicPushOp)
                 return;
@@ -135,15 +189,27 @@ public class JKleppmannTreeManager {
             curTx.put(_data);
         }
 
+        /**
+         * Record bootstrap operations for the given host.
+         * @param host the peer id
+         */
         public void recordBootstrap(PeerId host) {
             _tree.recordBoostrapFor(host);
         }
 
+        /**
+         * Get the parent of a node that matches the given predicate.
+         * @param predicate the predicate to match
+         */
         public Pair<String, JObjectKey> findParent(Function<TreeNode<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey>, Boolean> predicate) {
             return _tree.findParent(predicate);
         }
 
-        //        @Override
+        /**
+         * Accept an external operation from the given peer.
+         * @param from the peer id
+         * @param op the operation to accept
+         */
         public void acceptExternalOp(PeerId from, Op op) {
             if (op instanceof JKleppmannTreePeriodicPushOp(JObjectKey treeName, PeerId from1, long timestamp)) {
                 _tree.updateExternalTimestamp(from1, timestamp);
@@ -166,6 +232,11 @@ public class JKleppmannTreeManager {
             _tree.applyExternalOp(from, jop.op());
         }
 
+        /**
+         * Create a dummy operation that contains the timestamp of the last operation, to move causality threshold
+         * forward even without any real operations.
+         * @return the periodic push operation
+         */
         public Op getPeriodicPushOp() {
             return new JKleppmannTreePeriodicPushOp(_treeName, persistentPeerDataService.getSelfUuid(), _clock.peekTimestamp());
         }

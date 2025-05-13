@@ -9,6 +9,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Notifies PeerDiscoveryDirectory about statically configured peer addresses.
+ */
 @ApplicationScoped
 public class StaticPeerDiscovery {
     private final List<IpPeerAddress> _peers;

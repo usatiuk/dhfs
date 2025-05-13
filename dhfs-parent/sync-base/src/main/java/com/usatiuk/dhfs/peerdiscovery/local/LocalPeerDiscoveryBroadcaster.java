@@ -15,6 +15,9 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.net.*;
 
+/**
+ * Broadcasts information about this peer to the local network.
+ */
 @ApplicationScoped
 @IfBuildProperty(name = "dhfs.local-discovery", stringValue = "true")
 public class LocalPeerDiscoveryBroadcaster {

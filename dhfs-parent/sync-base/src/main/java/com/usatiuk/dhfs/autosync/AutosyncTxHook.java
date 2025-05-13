@@ -10,6 +10,9 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+/**
+ * Pre-commit hook to automatically download remote objects, if the option to download all objects is enabled.
+ */
 @Singleton
 public class AutosyncTxHook implements PreCommitTxHook {
     @Inject

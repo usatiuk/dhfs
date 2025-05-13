@@ -14,6 +14,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
+/**
+ * Service for extracting operations from JData objects.
+ * This service uses the {@link OpExtractor} interface to extract operations from JData objects.
+ * It is used to extract operations from JData objects before they are sent to the peer.
+ */
 @ApplicationScoped
 public class OpExtractorService {
     private final Map<Class<? extends JData>, OpExtractor> _opExtractorMap;
@@ -38,6 +43,13 @@ public class OpExtractorService {
         _opExtractorMap = Map.copyOf(opExtractorMap);
     }
 
+    /**
+     * Extract operations from the given JData object.
+     *
+     * @param data  the JData object to extract operations from
+     * @param peerId the ID of the peer to extract operations for
+     * @return a pair of a list of operations and a runnable to execute after the operations are sent to the peer
+     */
     public @Nullable Pair<List<Op>, Runnable> extractOps(JData data, PeerId peerId) {
         var extractor = _opExtractorMap.get(data.getClass());
         if (extractor == null) {

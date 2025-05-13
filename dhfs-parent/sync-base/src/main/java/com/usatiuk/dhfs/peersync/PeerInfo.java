@@ -11,6 +11,15 @@ import org.pcollections.PMap;
 
 import java.security.cert.X509Certificate;
 
+/**
+ * Represents information about a peer in the cluster
+ *
+ * @param key               the key of the peer
+ * @param id                the ID of the peer
+ * @param cert              the certificate of the peer
+ * @param kickCounter       the kick counter of the peer, entries are incremented when a peer is kicked out for not being seen for a long time
+ * @param lastSeenTimestamp the last time the peer was seen
+ */
 @JDataRemotePush
 public record PeerInfo(JObjectKey key, PeerId id, ByteString cert,
                        PMap<PeerId, Long> kickCounter,

@@ -6,6 +6,12 @@ import com.usatiuk.objects.JObjectKey;
 
 import java.util.Comparator;
 
+/**
+ * A reference from a JMap object to some object.
+ * This is used to get the parent object from the reference.
+ * @param holder the object that holds the map
+ * @param mapKey the key in the map
+ */
 public record JMapRef(JObjectKey holder, JMapKey mapKey) implements JDataRef {
     @Override
     public JObjectKey obj() {

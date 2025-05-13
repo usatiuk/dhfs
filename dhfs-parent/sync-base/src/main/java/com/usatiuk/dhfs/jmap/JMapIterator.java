@@ -6,6 +6,10 @@ import com.usatiuk.objects.iterators.CloseableKvIterator;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.tuple.Pair;
 
+/**
+ * Iterates over JMap entries of a given holder.
+ * @param <K> the type of the key
+ */
 public class JMapIterator<K extends JMapKey> implements CloseableKvIterator<K, JMapEntry<K>> {
     private final CloseableKvIterator<JObjectKey, JData> _backing;
     private final JObjectKey _prefix;

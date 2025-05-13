@@ -8,6 +8,9 @@ import jakarta.ws.rs.Path;
 import java.security.cert.CertificateEncodingException;
 import java.util.Base64;
 
+/**
+ * Provides information about the peer publicly, without any authentication.
+ */
 @Path("/peer-info")
 public class PeerSyncApi {
     @Inject

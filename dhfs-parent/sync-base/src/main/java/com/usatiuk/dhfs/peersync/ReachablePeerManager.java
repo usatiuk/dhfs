@@ -29,6 +29,9 @@ import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * Handles connections to known peers in the cluster.
+ */
 @ApplicationScoped
 public class ReachablePeerManager {
     private final ConcurrentMap<PeerId, PeerAddress> _states = new ConcurrentHashMap<>();
@@ -137,11 +140,10 @@ public class ReachablePeerManager {
         }
     }
 
-    public void handleConnectionError(com.usatiuk.dhfs.peersync.PeerInfo host) {
+    private void handleConnectionError(com.usatiuk.dhfs.peersync.PeerInfo host) {
         handleConnectionError(host.id());
     }
 
-    // FIXME:
     private boolean pingCheck(com.usatiuk.dhfs.peersync.PeerInfo host, PeerAddress address) {
         try {
             return rpcClientFactory.withObjSyncClient(host.id(), address, pingTimeout, (peer, c) -> {
@@ -154,18 +156,37 @@ public class ReachablePeerManager {
         }
     }
 
+    /**
+     * Checks if the given host is reachable.
+     * @param host the host to check
+     * @return true if the host is reachable, false otherwise
+     */
     public boolean isReachable(PeerId host) {
         return _states.containsKey(host);
     }
 
+    /**
+     * Checks if the given host is reachable.
+     * @param host the host to check
+     * @return true if the host is reachable, false otherwise
+     */
     public boolean isReachable(com.usatiuk.dhfs.peersync.PeerInfo host) {
         return isReachable(host.id());
     }
 
+    /**
+     * Gets the address of the given host.
+     * @param host the host to get the address for
+     * @return the address of the host, or null if not reachable
+     */
     public PeerAddress getAddress(PeerId host) {
         return _states.get(host);
     }
 
+    /**
+     * Gets the ids of all reachable hosts.
+     * @return a list of ids of all reachable hosts
+     */
     public List<PeerId> getAvailableHosts() {
         return _states.keySet().stream().toList();
     }
@@ -176,6 +197,10 @@ public class ReachablePeerManager {
 //                .map(Map.Entry::getKey).toList());
 //    }
 
+    /**
+     * Gets a snapshot of current state of the connected (and not connected) peers
+     * @return information about all connected/disconnected peers
+     */
     public HostStateSnapshot getHostStateSnapshot() {
         return transactionManager.run(() -> {
             var partition = peerInfoService.getPeersNoSelf().stream().map(com.usatiuk.dhfs.peersync.PeerInfo::id)
@@ -184,16 +209,31 @@ public class ReachablePeerManager {
         });
     }
 
+    /**
+     * Removes the given host from the cluster
+     * @param peerId the id of the host to remove
+     */
     public void removeRemoteHost(PeerId peerId) {
         transactionManager.run(() -> {
             peerInfoService.removePeer(peerId);
         });
     }
 
+    /**
+     * Selects the best address for the given host.
+     * The address is selected based on the type of the address. (with e.g. LAN address preferred over WAN)
+     * @param host the host to select the address for
+     * @return the best address for the host, or null if not reachable
+     */
     public Optional<PeerAddress> selectBestAddress(PeerId host) {
         return peerDiscoveryDirectory.getForPeer(host).stream().min(Comparator.comparing(PeerAddress::type));
     }
 
+    /**
+     * Call the given peer and get its information.
+     * @param host the peer to get the information for
+     * @return the information about the peer
+     */
     private ApiPeerInfo getInfo(PeerId host) {
         return transactionManager.run(() -> {
             if (peerInfoService.getPeerInfo(host).isPresent())
@@ -206,6 +246,12 @@ public class ReachablePeerManager {
         });
     }
 
+    /**
+     * Adds the given peer to the cluster.
+     * The certificate provided is verified against the one peer is using right now.
+     * @param host the peer to add
+     * @param cert the certificate of the peer
+     */
     public void addRemoteHost(PeerId host, @Nullable String cert) {
         transactionManager.run(() -> {
             var info = getInfo(host);
@@ -222,7 +268,10 @@ public class ReachablePeerManager {
         peerTrustManager.reloadTrustManagerHosts(transactionManager.run(() -> peerInfoService.getPeers().stream().toList())); //FIXME:
     }
 
-
+    /**
+     * Gets the information about all reachable peers that are not added to the cluster.
+     * @return a collection of pairs of peer id and peer info
+     */
     public Collection<Pair<PeerId, ApiPeerInfo>> getSeenButNotAddedHosts() {
         return transactionManager.run(() -> {
             return peerDiscoveryDirectory.getReachablePeers().stream().filter(p -> !peerInfoService.getPeerInfo(p).isPresent())

@@ -10,6 +10,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 
+/**
+ * Service for handling operations.
+ * This service uses the {@link OpHandler} interface to handle operations.
+ * It is used to handle operations received from the peer.
+ */
 @ApplicationScoped
 public class OpHandlerService {
     private final Map<Class<? extends Op>, OpHandler> _opHandlerMap;
@@ -34,6 +39,12 @@ public class OpHandlerService {
         _opHandlerMap = Map.copyOf(OpHandlerMap);
     }
 
+    /**
+     * Handle the given operation.
+     *
+     * @param from the ID of the peer that sent the operation
+     * @param op   the operation to handle
+     */
     public void handleOp(PeerId from, Op op) {
         var handler = _opHandlerMap.get(op.getClass());
         if (handler == null) {

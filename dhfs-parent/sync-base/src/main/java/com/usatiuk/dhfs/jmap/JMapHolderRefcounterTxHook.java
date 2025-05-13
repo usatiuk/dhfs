@@ -10,6 +10,9 @@ import com.usatiuk.objects.transaction.Transaction;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
+/**
+ * This hook is used to delete all the entries of a map in a map holder when the holder is deleted.
+ */
 @Singleton
 public class JMapHolderRefcounterTxHook implements PreCommitTxHook {
     @Inject

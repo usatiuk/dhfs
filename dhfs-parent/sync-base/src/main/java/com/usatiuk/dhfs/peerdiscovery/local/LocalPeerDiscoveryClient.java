@@ -19,6 +19,10 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.net.*;
 import java.nio.ByteBuffer;
 
+/**
+ * Listens for peer discovery packets from other peers on the local network.
+ * When a packet is received, it notifies the PeerDiscoveryDirectory about the new peer.
+ */
 @ApplicationScoped
 @IfBuildProperty(name = "dhfs.local-discovery", stringValue = "true")
 public class LocalPeerDiscoveryClient {

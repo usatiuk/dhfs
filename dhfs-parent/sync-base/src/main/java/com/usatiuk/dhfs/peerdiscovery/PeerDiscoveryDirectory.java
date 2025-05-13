@@ -13,12 +13,21 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+/**
+ * Peer discovery directory collects known peer addresses, and automatically cleans up old entries.
+ */
 @ApplicationScoped
 public class PeerDiscoveryDirectory {
     private final MultiValuedMap<PeerId, PeerEntry> _entries = new HashSetValuedHashMap<>();
     @ConfigProperty(name = "dhfs.peerdiscovery.timeout")
     long timeout;
 
+    /**
+     * Notifies the directory about a new address for a peer.
+     * If the address is already known, it updates the last seen time.
+     *
+     * @param addr the new address
+     */
     public void notifyAddr(PeerAddress addr) {
         Log.tracev("New address {0}", addr);
         synchronized (_entries) {
@@ -28,6 +37,13 @@ public class PeerDiscoveryDirectory {
         }
     }
 
+    /**
+     * Returns a collection of addresses for a given peer.
+     * Cleans up old entries that are no longer reachable.
+     *
+     * @param peer the peer ID
+     * @return a collection of addresses for the peer
+     */
     public Collection<PeerAddress> getForPeer(PeerId peer) {
         synchronized (_entries) {
             long curTime = System.currentTimeMillis();
@@ -43,6 +59,12 @@ public class PeerDiscoveryDirectory {
         }
     }
 
+    /**
+     * Returns a collection of reachable peers.
+     * Cleans up old entries that are no longer reachable.
+     *
+     * @return a collection of reachable peers
+     */
     public Collection<PeerId> getReachablePeers() {
         synchronized (_entries) {
             long curTime = System.currentTimeMillis();

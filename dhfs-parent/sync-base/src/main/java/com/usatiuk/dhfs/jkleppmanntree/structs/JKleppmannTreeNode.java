@@ -14,6 +14,9 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * KleppmannTree node implementation for JKleppmannTree
+ */
 public record JKleppmannTreeNode(JObjectKey key, JObjectKey parent,
                                  OpMove<Long, PeerId, JKleppmannTreeNodeMeta, JObjectKey> lastEffectiveOp,
                                  @Nullable JKleppmannTreeNodeMeta meta,

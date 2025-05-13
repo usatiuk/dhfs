@@ -10,7 +10,9 @@ import java.io.Serializable;
 import java.util.Collection;
 import java.util.Objects;
 
-// Separate refcounting from JKleppmannTreeNode
+/**
+ * Separate reference counting from JKleppmannTreeNode
+ */
 public record JKleppmannTreeNodeHolder(PCollection<JDataRef> refsFrom, boolean frozen,
                                        JKleppmannTreeNode node) implements JDataRefcounted, Serializable {
 

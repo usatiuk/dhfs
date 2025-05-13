@@ -5,6 +5,9 @@ import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+/**
+ * Notified PeerDiscoveryDirectory about manually added peer addresses.
+ */
 @ApplicationScoped
 public class PersistentStaticPeerDiscovery {
     @Inject

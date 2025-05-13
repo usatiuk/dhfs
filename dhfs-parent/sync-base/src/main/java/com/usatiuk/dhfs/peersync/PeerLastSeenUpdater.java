@@ -9,6 +9,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+/**
+ * Periodically updates the last seen timestamp of reachable peers and increments the kick counter for unreachable peers.
+ */
 @ApplicationScoped
 public class PeerLastSeenUpdater {
     @Inject

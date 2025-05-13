@@ -20,6 +20,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+/**
+ * Service to handle deferred invalidations.
+ * It is responsible for storing and returning deferred invalidations to the invalidation queue.
+ * It also is responsible for persisting and restoring the deferred invalidations on startup and shutdown.
+ */
 @ApplicationScoped
 public class DeferredInvalidationQueueService implements PeerConnectedEventListener {
     private static final String dataFileName = "invqueue";
@@ -59,7 +64,9 @@ public class DeferredInvalidationQueueService implements PeerConnectedEventListe
         }
     }
 
-    // FIXME:
+    /**
+     * Periodically returns deferred invalidations to the invalidation queue for all reachable hosts.
+     */
     @Scheduled(every = "15s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     @Blocking
     void periodicReturn() {
@@ -67,6 +74,11 @@ public class DeferredInvalidationQueueService implements PeerConnectedEventListe
             returnForHost(reachable);
     }
 
+    /**
+     * Returns deferred invalidations for a specific host.
+     *
+     * @param host the host to return deferred invalidations for
+     */
     void returnForHost(PeerId host) {
         synchronized (this) {
             var col = _persistentData.deferredInvalidations.get(host);
@@ -78,6 +90,10 @@ public class DeferredInvalidationQueueService implements PeerConnectedEventListe
         }
     }
 
+    /**
+     * Defer a specific invalidation.
+     * @param entry the invalidation to defer
+     */
     void defer(InvalidationQueueEntry entry) {
         synchronized (this) {
             Log.tracev("Deferred invalidation: {0}", entry);

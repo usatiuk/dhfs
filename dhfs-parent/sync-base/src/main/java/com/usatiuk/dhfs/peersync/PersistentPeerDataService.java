@@ -33,6 +33,10 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
+/**
+ * Handles various locally relevant persistent data related to peers,
+ * such as local peer's UUID, certificate, and persistent peer addresses.
+ */
 @ApplicationScoped
 public class PersistentPeerDataService {
     @Inject

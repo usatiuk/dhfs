@@ -2,8 +2,8 @@ package com.usatiuk.dhfs.invalidation;
 
 import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.peersync.PeerInfoService;
-import com.usatiuk.dhfs.peersync.ReachablePeerManager;
 import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
+import com.usatiuk.dhfs.peersync.ReachablePeerManager;
 import com.usatiuk.dhfs.rpc.RemoteObjectServiceClient;
 import com.usatiuk.objects.JData;
 import com.usatiuk.objects.JObjectKey;
@@ -31,6 +31,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * Service to handle sending operations to remote peers.
+ * This service works with objects, containing a queue of them.
+ * The operations to be sent to peers are extracted from the objects in the queue.
+ */
 @ApplicationScoped
 public class InvalidationQueueService {
     private final HashSetDelayedBlockingQueue<InvalidationQueueEntry> _queue;
@@ -118,6 +123,7 @@ public class InvalidationQueueService {
                     String stats = "Sent invalidation: ";
                     long success = 0;
 
+                    // Don't try to send same object in multiple threads
                     List<AutoCloseableNoThrow> locks = new LinkedList<>();
                     try {
                         ArrayListValuedHashMap<PeerId, Op> ops = new ArrayListValuedHashMap<>();
@@ -194,6 +200,11 @@ public class InvalidationQueueService {
         Log.info("Invalidation sender exiting");
     }
 
+    /**
+     * Extract operations from an object for all peers and push them.
+     *
+     * @param key the object key to process
+     */
     public void pushInvalidationToAll(JObjectKey key) {
         while (true) {
             var queue = _toAllQueue.get();
@@ -209,6 +220,7 @@ public class InvalidationQueueService {
         }
     }
 
+
     void pushInvalidationToOne(InvalidationQueueEntry entry) {
         if (reachablePeerManager.isReachable(entry.peer()))
             _queue.add(entry);
@@ -223,11 +235,23 @@ public class InvalidationQueueService {
             deferredInvalidationQueueService.defer(entry);
     }
 
+    /**
+     * Extract operations from an object for some specific peer and push them.
+     *
+     * @param host the host to extract operations for
+     * @param obj  the object key to process
+     */
     public void pushInvalidationToOne(PeerId host, JObjectKey obj) {
         var entry = new InvalidationQueueEntry(host, obj);
         pushInvalidationToOne(entry);
     }
 
+    /**
+     * Extract operations from an object for some specific peer and push them, without delay.
+     *
+     * @param host the host to extract operations for
+     * @param obj  the object key to process
+     */
     public void pushInvalidationToOneNoDelay(PeerId host, JObjectKey obj) {
         var entry = new InvalidationQueueEntry(host, obj);
         pushInvalidationToOneNoDelay(entry);

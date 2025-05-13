@@ -22,6 +22,9 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * Simple class to automatically download remote objects in the background.
+ */
 @ApplicationScoped
 public class AutosyncProcessor {
     private final HashSetDelayedBlockingQueue<JObjectKey> _pending = new HashSetDelayedBlockingQueue<>(0);
@@ -77,6 +80,11 @@ public class AutosyncProcessor {
         _autosyncExcecutor.shutdownNow();
     }
 
+    /**
+     * Adds an object to the queue to be downloaded.
+     *
+     * @param name the object to add
+     */
     public void add(JObjectKey name) {
         _pending.add(name);
     }
