@@ -17,6 +17,9 @@ import java.security.cert.X509Certificate;
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * Custom trust manager that trusts the certificates of peers in the cluster.
+ */
 @ApplicationScoped
 public class PeerTrustManager implements X509TrustManager {
     private final AtomicReference<X509TrustManager> trustManager = new AtomicReference<>();

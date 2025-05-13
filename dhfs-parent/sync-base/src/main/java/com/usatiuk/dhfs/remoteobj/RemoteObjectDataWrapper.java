@@ -8,6 +8,12 @@ import org.pcollections.PCollection;
 
 import java.util.Collection;
 
+/**
+ * Wrapper for remote object data.
+ * This class is used to store additional metadata about incoming references to objects for reference counting.
+ *
+ * @param <T> the type of the remote object data
+ */
 public record RemoteObjectDataWrapper<T extends JDataRemote>(
         JObjectKey key,
         PCollection<JDataRef> refsFrom,

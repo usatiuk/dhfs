@@ -6,7 +6,18 @@ import org.pcollections.PMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * Helper class for synchronizing objects.
+ */
 public class SyncHelper {
+
+    /**
+     * Compares two changelogs.
+     *
+     * @param current the current changelog
+     * @param other   the other changelog
+     * @return the result of the comparison
+     */
     public static ChangelogCmpResult compareChangelogs(PMap<PeerId, Long> current, PMap<PeerId, Long> other) {
         boolean hasLower = false;
         boolean hasHigher = false;

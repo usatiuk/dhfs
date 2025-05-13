@@ -9,6 +9,10 @@ import org.pcollections.*;
 import java.util.Collection;
 import java.util.List;
 
+/**
+ * Metadata for remote objects.
+ * This class makes a peer aware of remote object's existence without necessarily downloading its data.
+ */
 public record RemoteObjectMeta(JObjectKey key, PCollection<JDataRef> refsFrom, boolean frozen,
                                PMap<PeerId, Long> knownRemoteVersions,
                                Class<? extends JDataRemote> knownType,

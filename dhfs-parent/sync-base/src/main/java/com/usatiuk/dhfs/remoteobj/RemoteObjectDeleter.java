@@ -29,6 +29,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
+/**
+ * Handles deletion of remote objects, asynchronously.
+ */
 @ApplicationScoped
 public class RemoteObjectDeleter {
     private final HashSetDelayedBlockingQueue<JObjectKey> _quickCandidates = new HashSetDelayedBlockingQueue<>(0);
@@ -79,14 +82,7 @@ public class RemoteObjectDeleter {
             _refProcessorExecutorService.submit(this::refProcessor);
         }
 
-        // Continue GC from last shutdown
-        //FIXME
-//        executorService.submit(() ->
-//                jObjectManager.findAll().forEach(n -> {
-//                    jObjectManager.get(n).ifPresent(o -> o.runWriteLocked(JObjectManager.ResolutionStrategy.NO_RESOLUTION, (m, d, b, v) -> {
-//                        return null;
-//                    }));
-//                }));
+        // TODO: Continue GC from last shutdown
     }
 
     void shutdown(@Observes @Priority(800) ShutdownEvent event) throws InterruptedException {
@@ -96,10 +92,10 @@ public class RemoteObjectDeleter {
         }
     }
 
-//    public void putQuickDeletionCandidate(JObjectKey obj) {
-//        _quickCandidates.add(obj);
-//    }
-
+    /**
+     * Add a deletion candidate to the queue.
+     * @param obj the object to be deleted
+     */
     public void putDeletionCandidate(RemoteObjectMeta obj) {
         if (!obj.seen()) {
             if (_quickCandidates.add(obj.key()))
@@ -177,7 +173,6 @@ public class RemoteObjectDeleter {
         });
     }
 
-    // FIXME:
     private boolean canDelete(JDataRefcounted obj) {
         return obj.refsFrom().isEmpty() && !obj.frozen();
     }

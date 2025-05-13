@@ -10,6 +10,10 @@ import io.quarkus.logging.Log;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
+/**
+ * Automatically deletes objects that are not referenced by anything else.
+ * For remote objects, it puts them into the deletion queue.
+ */
 @Singleton
 public class DeleterTxHook implements PreCommitTxHook {
     @Inject

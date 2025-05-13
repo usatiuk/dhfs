@@ -6,7 +6,7 @@ import com.usatiuk.utils.SerializationHelper;
 import jakarta.inject.Singleton;
 
 @Singleton
-public class TemporaryOpSerializer implements ProtoSerializer<OpP, Op> {
+public class OpSerializer implements ProtoSerializer<OpP, Op> {
     @Override
     public Op deserialize(OpP message) {
         return SerializationHelper.deserialize(message.getSerializedData().toByteArray());

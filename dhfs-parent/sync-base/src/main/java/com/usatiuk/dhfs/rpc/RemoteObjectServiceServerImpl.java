@@ -47,7 +47,7 @@ public class RemoteObjectServiceServerImpl {
     DtoMapperService dtoMapperService;
     @Inject
     AutosyncProcessor autosyncProcessor;
-
+    
     public Uni<GetObjectReply> getObject(PeerId from, GetObjectRequest request) {
         Log.info("<-- getObject: " + request.getName() + " from " + from);
 

@@ -6,6 +6,9 @@ import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
 
+/**
+ * Provides access to the {@link Unsafe} class and {@link JavaNioAccess} class.
+ */
 public abstract class UnsafeAccessor {
     public static final JavaNioAccess NIO;
     public static final Unsafe UNSAFE;

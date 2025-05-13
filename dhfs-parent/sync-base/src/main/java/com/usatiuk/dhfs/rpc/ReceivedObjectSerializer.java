@@ -14,7 +14,7 @@ import org.pcollections.HashTreePMap;
 import org.pcollections.PMap;
 
 @ApplicationScoped
-public class TemporaryReceivedObjectSerializer implements ProtoSerializer<GetObjectReply, ReceivedObject> {
+public class ReceivedObjectSerializer implements ProtoSerializer<GetObjectReply, ReceivedObject> {
     @Inject
     ProtoSerializer<JDataRemoteDtoP, JDataRemoteDto> remoteObjectSerializer;
 

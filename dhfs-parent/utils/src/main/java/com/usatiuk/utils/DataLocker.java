@@ -9,6 +9,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+/**
+ * Allows to lock arbitrary keys.
+ */
 public class DataLocker {
     private final ConcurrentHashMap<Object, WeakReference<ReentrantLock>> _locks = new ConcurrentHashMap<>();
     private static final Cleaner CLEANER = Cleaner.create();
@@ -36,6 +39,12 @@ public class DataLocker {
         }
     }
 
+    /**
+     * Locks the data and returns an AutoCloseable that unlocks it when closed.
+     *
+     * @param data the data to lock
+     * @return an AutoCloseable that unlocks the data when closed
+     */
     @Nonnull
     public AutoCloseableNoThrow lock(Object data) {
         var lock = getTag(data);
@@ -43,6 +52,13 @@ public class DataLocker {
         return lock::unlock;
     }
 
+    /**
+     * Tries to lock the data and returns an AutoCloseable that unlocks it when closed.
+     * If the lock is not acquired, returns null.
+     *
+     * @param data the data to lock
+     * @return an AutoCloseable that unlocks the data when closed, or null if the lock was not acquired
+     */
     @Nullable
     public AutoCloseableNoThrow tryLock(Object data) {
         var lock = getTag(data);

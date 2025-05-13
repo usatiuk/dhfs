@@ -13,6 +13,9 @@ import javax.net.ssl.KeyManagerFactory;
 import java.security.KeyStore;
 import java.security.cert.Certificate;
 
+/**
+ * Customizes the HTTP server options to use the peer trust manager and the self-signed certificate.
+ */
 @ApplicationScoped
 public class PeerTrustServerCustomizer implements HttpServerOptionsCustomizer {
 

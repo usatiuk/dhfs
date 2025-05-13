@@ -12,6 +12,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Optional;
 
+/**
+ * Web UI router for serving static files.
+ */
 @ApplicationScoped
 public class WebUiRouter {
 

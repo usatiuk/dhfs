@@ -15,6 +15,9 @@ import io.quarkus.logging.Log;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
+/**
+ * Automatically refreshes certificates in the trust manager for peers when their info is updated.
+ */
 @Singleton
 public class PeerInfoCertUpdateTxHook implements PreCommitTxHook {
     @Inject

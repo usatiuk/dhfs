@@ -1,3 +1,5 @@
+package com.usatiuk.dhfs;
+
 import io.quarkus.logging.Log;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -12,6 +14,9 @@ import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * Periodically check for deadlocks in the JVM and log them if found.
+ */
 @ApplicationScoped
 public class DeadlockDetector {
     private final ExecutorService _executor = Executors.newSingleThreadExecutor();

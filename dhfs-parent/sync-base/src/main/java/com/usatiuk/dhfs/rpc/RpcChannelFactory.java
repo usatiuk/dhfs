@@ -15,6 +15,9 @@ import java.security.KeyStore;
 import java.security.cert.Certificate;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Factory for creating gRPC channels
+ */
 @ApplicationScoped
 public class RpcChannelFactory {
     @Inject
@@ -39,6 +42,14 @@ public class RpcChannelFactory {
         }
     }
 
+    /**
+     * Creates a secure channel to the given host and port, with correct credentials.
+     *
+     * @param host    the host to connect to
+     * @param address the address of the host
+     * @param port    the port to connect to
+     * @return a secure gRPC channel
+     */
     ManagedChannel getSecureChannel(PeerId host, String address, int port) {
         return NettyChannelBuilder.forAddress(address, port, getChannelCredentials()).overrideAuthority(host.toString()).idleTimeout(10, TimeUnit.SECONDS).build();
     }

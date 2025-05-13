@@ -14,6 +14,9 @@ import jakarta.inject.Inject;
 
 import java.util.function.Supplier;
 
+/**
+ * Augments the security identity of peers that are members of the cluster.
+ */
 @ApplicationScoped
 public class PeerRolesAugmentor implements SecurityIdentityAugmentor {
     @Inject

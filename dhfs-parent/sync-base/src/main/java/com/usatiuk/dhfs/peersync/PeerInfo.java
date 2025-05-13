@@ -13,6 +13,8 @@ import java.security.cert.X509Certificate;
 
 /**
  * Represents information about a peer in the cluster
+ * {@link JDataRemotePush} annotation is used, as invalidating a peer information by the peer itself might make it unreachable,
+ * as it will not be possible to download it from the invalidated peer, so the peer information should be send with the notification
  *
  * @param key               the key of the peer
  * @param id                the ID of the peer

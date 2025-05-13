@@ -22,8 +22,17 @@ import java.security.cert.X509Certificate;
 import java.util.Calendar;
 import java.util.Date;
 
+/**
+ * Helper class for generating and manipulating X.509 certificates.
+ */
 public class CertificateTools {
 
+    /**
+     * Converts a byte array to an X.509 certificate.
+     *
+     * @param bytes the byte array representing the certificate
+     * @return the X.509 certificate
+     */
     public static X509Certificate certFromBytes(byte[] bytes) {
         try {
             CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
@@ -34,6 +43,10 @@ public class CertificateTools {
         }
     }
 
+    /**
+     * Generates a random RSA key pair.
+     * @return the generated RSA key pair
+     */
     public static KeyPair generateKeyPair() {
         try {
             KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
@@ -44,6 +57,13 @@ public class CertificateTools {
         }
     }
 
+    /**
+     * Generates an X.509 certificate using the provided key pair and subject name.
+     *
+     * @param keyPair the key pair to use for the certificate
+     * @param subject the subject name for the certificate
+     * @return the generated X.509 certificate
+     */
     public static X509Certificate generateCertificate(KeyPair keyPair, String subject) {
         try {
             Provider bcProvider = new BouncyCastleProvider();

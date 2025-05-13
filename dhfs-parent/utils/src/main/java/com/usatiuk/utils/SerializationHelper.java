@@ -10,6 +10,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
 
+/**
+ * Utility class for serialization and deserialization of objects.
+ * <p>
+ * This class provides methods to serialize and deserialize objects using Java's built-in serialization mechanism.
+ * It also includes methods to handle byte arrays and input streams for serialization and deserialization.
+ * </p>
+ */
 public abstract class SerializationHelper {
     // Taken from SerializationUtils
     public static <T> T deserialize(final InputStream inputStream) {

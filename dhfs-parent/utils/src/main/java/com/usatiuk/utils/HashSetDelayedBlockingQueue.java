@@ -7,20 +7,38 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.function.Function;
 
+/**
+ * Blocking queue that delays the objects for a given time, and deduplicates them.
+ *
+ * @param <T> the type of the objects in the queue
+ */
 public class HashSetDelayedBlockingQueue<T> {
     private final LinkedHashMap<T, SetElement<T>> _set = new LinkedHashMap<>();
     private final Object _sleepSynchronizer = new Object();
     private long _delay;
     private boolean _closed = false;
 
+    /**
+     * Creates a new HashSetDelayedBlockingQueue with the specified delay.
+     *
+     * @param delay the delay in milliseconds
+     */
     public HashSetDelayedBlockingQueue(long delay) {
         _delay = delay;
     }
 
+    /**
+     * @return the delay in milliseconds
+     */
     public long getDelay() {
         return _delay;
     }
 
+    /**
+     * Sets the delay for the queue.
+     *
+     * @param delay the delay in milliseconds
+     */
     public void setDelay(long delay) {
         synchronized (_sleepSynchronizer) {
             _delay = delay;
@@ -28,8 +46,12 @@ public class HashSetDelayedBlockingQueue<T> {
         }
     }
 
-    // If there's object with key in the queue, don't do anything
-    // Returns whether it was added or not
+    /**
+     * Adds the object to the queue if it doesn't exist.
+     *
+     * @param el the object to add
+     * @return true if the object was added, false if it already exists
+     */
     public boolean add(T el) {
         synchronized (this) {
             if (_closed) throw new IllegalStateException("Adding to a queue that is closed!");
@@ -43,9 +65,12 @@ public class HashSetDelayedBlockingQueue<T> {
     }
 
 
-    // Adds the object to the queue, if it exists re-adds it
-    // With no delay
-    // Returns the old object, or null
+    /**
+     * Adds the object to the queue with no delay.
+     *
+     * @param el the object to add
+     * @return the old object if it existed, null otherwise
+     */
     public T addNoDelay(T el) {
         synchronized (this) {
             if (_closed) throw new IllegalStateException("Adding to a queue that is closed!");
@@ -60,8 +85,12 @@ public class HashSetDelayedBlockingQueue<T> {
         }
     }
 
-    // Adds the object to the queue, if it exists re-adds it with a new delay
-    // Returns the old object, or null
+    /**
+     * Adds the object to the queue, if it exists re-adds it with a new delay
+     *
+     * @param el the object to add
+     * @return the old object if it existed, null otherwise
+     */
     public T readd(T el) {
         synchronized (this) {
             if (_closed) throw new IllegalStateException("Adding to a queue that is closed!");
@@ -76,8 +105,13 @@ public class HashSetDelayedBlockingQueue<T> {
         }
     }
 
-    // Merges the object with the old one
-    // Returns the old object, or null
+    /**
+     * Merges the object with the old one.
+     *
+     * @param el          the object to merge
+     * @param transformer the function to transform the old object
+     * @return the old object if it existed, null otherwise
+     */
     public T merge(T el, Function<T, T> transformer) {
         synchronized (this) {
             if (_closed) throw new IllegalStateException("Adding to a queue that is closed!");
@@ -97,7 +131,12 @@ public class HashSetDelayedBlockingQueue<T> {
         }
     }
 
-    // Removes the object
+    /**
+     * Removes the object from the queue.
+     *
+     * @param el the object to remove
+     * @return the removed object, or null if it didn't exist
+     */
     public T remove(T el) {
         synchronized (this) {
             var rem = _set.remove(el);
@@ -106,6 +145,13 @@ public class HashSetDelayedBlockingQueue<T> {
         }
     }
 
+    /**
+     * Gets the object from the queue, waiting for it if necessary.
+     *
+     * @param timeout the timeout in milliseconds, or -1 for no timeout
+     * @return the object, or null if it timed out
+     * @throws InterruptedException if the thread is interrupted
+     */
     public T get(long timeout) throws InterruptedException {
         long startedWaiting = timeout > 0 ? System.currentTimeMillis() : -1;
 
@@ -148,6 +194,12 @@ public class HashSetDelayedBlockingQueue<T> {
         throw new InterruptedException();
     }
 
+    /**
+     * Gets the object from the queue, waiting for it if necessary.
+     *
+     * @return the object
+     * @throws InterruptedException if the thread is interrupted
+     */
     public T get() throws InterruptedException {
         T ret;
         do {
@@ -155,6 +207,11 @@ public class HashSetDelayedBlockingQueue<T> {
         return ret;
     }
 
+    /**
+     * Checks if the queue has an object that is ready to be processed.
+     *
+     * @return true if there is an object ready, false otherwise
+     */
     public boolean hasImmediate() {
         synchronized (this) {
             if (_set.isEmpty()) return false;
@@ -166,6 +223,11 @@ public class HashSetDelayedBlockingQueue<T> {
         }
     }
 
+    /**
+     * Tries to get the object from the queue without waiting.
+     *
+     * @return the object, or null if it doesn't exist
+     */
     @Nullable
     public T tryGet() {
         synchronized (this) {
@@ -182,6 +244,11 @@ public class HashSetDelayedBlockingQueue<T> {
         }
     }
 
+    /**
+     * Gets all objects from the queue that are ready to be processed.
+     *
+     * @return a collection of objects
+     */
     public Collection<T> getAll() {
         ArrayList<T> out = new ArrayList<>();
 
@@ -198,6 +265,11 @@ public class HashSetDelayedBlockingQueue<T> {
         return out;
     }
 
+    /**
+     * Closes the queue and returns all objects in it.
+     *
+     * @return a collection of objects
+     */
     public Collection<T> close() {
         synchronized (this) {
             _closed = true;
@@ -207,6 +279,12 @@ public class HashSetDelayedBlockingQueue<T> {
         }
     }
 
+    /**
+     * Gets all objects from the queue, waiting for them if necessary.
+     *
+     * @return a collection of objects
+     * @throws InterruptedException if the thread is interrupted
+     */
     public Collection<T> getAllWait() throws InterruptedException {
         Collection<T> out;
         do {
@@ -214,6 +292,13 @@ public class HashSetDelayedBlockingQueue<T> {
         return out;
     }
 
+    /**
+     * Gets all objects from the queue, waiting for them if necessary.
+     *
+     * @param max the maximum number of objects to get
+     * @return a collection of objects
+     * @throws InterruptedException if the thread is interrupted
+     */
     public Collection<T> getAllWait(int max) throws InterruptedException {
         Collection<T> out;
         do {
@@ -221,6 +306,14 @@ public class HashSetDelayedBlockingQueue<T> {
         return out;
     }
 
+    /**
+     * Gets all objects from the queue, waiting for them if necessary.
+     *
+     * @param max     the maximum number of objects to get
+     * @param timeout the timeout in milliseconds, or -1 for no timeout
+     * @return a collection of objects
+     * @throws InterruptedException if the thread is interrupted
+     */
     public Collection<T> getAllWait(int max, long timeout) throws InterruptedException {
         ArrayList<T> out = new ArrayList<>();
 

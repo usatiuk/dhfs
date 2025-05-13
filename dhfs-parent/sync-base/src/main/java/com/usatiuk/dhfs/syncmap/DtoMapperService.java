@@ -11,6 +11,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 
+/**
+ * Service for mapping between remote objects and their DTO representations.
+ */
 @Singleton
 public class DtoMapperService {
     private final Map<Class<? extends JDataRemote>, DtoMapper> _remoteToDtoMap;
@@ -41,6 +44,15 @@ public class DtoMapperService {
         _dtoToRemoteMap = Map.copyOf(dtoToRemoteMap);
     }
 
+    /**
+     * Converts a remote object to its DTO representation.
+     *
+     * @param from the remote object to convert
+     * @param to   the class of the DTO representation
+     * @param <F>  the type of the remote object
+     * @param <D>  the type of the DTO
+     * @return the DTO representation of the remote object
+     */
     public <F extends JDataRemote, D extends JDataRemoteDto> D toDto(F from, Class<D> to) {
         if (to.equals(from.getClass())) {
             return (D) from;
@@ -50,6 +62,15 @@ public class DtoMapperService {
         return to.cast(got);
     }
 
+    /**
+     * Converts a DTO to its corresponding remote object.
+     *
+     * @param from the DTO to convert
+     * @param to   the class of the remote object representation
+     * @param <F>  the type of the remote object
+     * @param <D>  the type of the DTO
+     * @return the remote object representation of the DTO
+     */
     public <F extends JDataRemote, D extends JDataRemoteDto> F fromDto(D from, Class<F> to) {
         if (to.equals(from.getClass())) {
             return (F) from;

@@ -29,6 +29,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+/**
+ * Handles synchronization of remote objects.
+ */
 @ApplicationScoped
 public class SyncHandler {
     private final Map<Class<? extends JDataRemote>, ObjSyncHandler> _objToSyncHandler;
@@ -93,6 +96,15 @@ public class SyncHandler {
         _initialSyncProcessors = Map.copyOf(initialSyncProcessorHashMap);
     }
 
+    /**
+     * Handles remote update of an object.
+     *
+     * @param from              the ID of the peer that sent the update
+     * @param key               the key of the object
+     * @param receivedChangelog the changelog received from the peer
+     * @param receivedData      the data received from the peer
+     * @param <D>               the type of the remote object DTO
+     */
     public <D extends JDataRemoteDto> void handleRemoteUpdate(PeerId from, JObjectKey key,
                                                               PMap<PeerId, Long> receivedChangelog,
                                                               @Nullable D receivedData) {
@@ -123,7 +135,9 @@ public class SyncHandler {
         }
     }
 
-
+    /**
+     * Resync objects after a crash.
+     */
     public void resyncAfterCrash(@Observes @Priority(100000) StartupEvent event) {
         if (shutdownChecker.lastShutdownClean())
             return;
@@ -145,6 +159,11 @@ public class SyncHandler {
         });
     }
 
+    /**
+     * Do initial sync for a newly connected (or reconnected) peer.
+     *
+     * @param peer the ID of the peer
+     */
     public void doInitialSync(PeerId peer) {
         txm.run(() -> {
             Log.tracev("Will do initial sync for {0}", peer);

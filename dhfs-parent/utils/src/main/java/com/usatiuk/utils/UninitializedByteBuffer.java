@@ -5,6 +5,9 @@ import java.lang.invoke.MethodHandle;
 import java.nio.ByteBuffer;
 import java.util.function.Consumer;
 
+/**
+ * Utility class for creating uninitialized ByteBuffers, to avoid zeroing memory unnecessarily.
+ */
 public class UninitializedByteBuffer {
     private static final Linker LINKER = Linker.nativeLinker();
     private static final MethodHandle malloc = LINKER.downcallHandle(
@@ -16,6 +19,12 @@ public class UninitializedByteBuffer {
             FunctionDescriptor.ofVoid(ValueLayout.ADDRESS)
     );
 
+    /**
+     * Allocates a new uninitialized ByteBuffer of the specified capacity.
+     *
+     * @param capacity the capacity of the ByteBuffer
+     * @return a new uninitialized ByteBuffer
+     */
     public static ByteBuffer allocate(int capacity) {
         UnsafeAccessor.NIO.reserveMemory(capacity, capacity);
 
@@ -38,6 +47,12 @@ public class UninitializedByteBuffer {
         return reint.asByteBuffer();
     }
 
+    /**
+     * Gets the address of the given ByteBuffer.
+     *
+     * @param buffer the ByteBuffer to get the address of
+     * @return the address of the ByteBuffer
+     */
     public static long getAddress(ByteBuffer buffer) {
         return UnsafeAccessor.NIO.getBufferAddress(buffer);
     }

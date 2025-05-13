@@ -191,12 +191,6 @@ public class ReachablePeerManager {
         return _states.keySet().stream().toList();
     }
 
-//    public List<UUID> getUnavailableHosts() {
-//        return _transientPeersState.runReadLocked(d -> d.getStates().entrySet().stream()
-//                .filter(e -> !e.getValue().isReachable())
-//                .map(Map.Entry::getKey).toList());
-//    }
-
     /**
      * Gets a snapshot of current state of the connected (and not connected) peers
      * @return information about all connected/disconnected peers

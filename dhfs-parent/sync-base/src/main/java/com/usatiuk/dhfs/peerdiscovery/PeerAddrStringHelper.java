@@ -8,9 +8,7 @@ import java.util.Optional;
 
 /**
  * Helper class for parsing peer addresses from strings.
- * <p>
- * The expected format is: <peerId>:<ip>:<port>:<securePort>
- * </p>
+ * The expected format is: peerId:ip:port:securePort
  */
 public class PeerAddrStringHelper {
 

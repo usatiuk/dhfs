@@ -4,8 +4,8 @@ import com.usatiuk.dhfs.ProtoSerializer;
 import com.usatiuk.dhfs.invalidation.InvalidationQueueService;
 import com.usatiuk.dhfs.invalidation.Op;
 import com.usatiuk.dhfs.peersync.PeerId;
-import com.usatiuk.dhfs.peersync.ReachablePeerManager;
 import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
+import com.usatiuk.dhfs.peersync.ReachablePeerManager;
 import com.usatiuk.dhfs.persistence.JObjectKeyP;
 import com.usatiuk.dhfs.remoteobj.ReceivedObject;
 import com.usatiuk.dhfs.remoteobj.RemoteObjectMeta;
@@ -29,6 +29,9 @@ import java.util.concurrent.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * Helper class for calling remote peers RPCs.
+ */
 @ApplicationScoped
 public class RemoteObjectServiceClient {
     private final ExecutorService _batchExecutor = Executors.newVirtualThreadPerTaskExecutor();
@@ -53,6 +56,13 @@ public class RemoteObjectServiceClient {
     @Inject
     ReachablePeerManager reachablePeerManager;
 
+    /**
+     * Download a specific object from a specific peer.
+     *
+     * @param key    the key of the object to download
+     * @param peerId the ID of the peer to download from
+     * @return a pair of the peer ID from which the object was downloaded and the downloaded object
+     */
     public Pair<PeerId, ReceivedObject> getSpecificObject(JObjectKey key, PeerId peerId) {
         return rpcClientFactory.withObjSyncClient(peerId, (peer, client) -> {
             var reply = client.getObject(GetObjectRequest.newBuilder().setName(JObjectKeyP.newBuilder().setName(key.toString()).build()).build());
@@ -61,6 +71,12 @@ public class RemoteObjectServiceClient {
         });
     }
 
+    /**
+     * Download a specific object from some reachable peer.
+     *
+     * @param key       the key of the object to download
+     * @param onReceive a callback function to process the received object
+     */
     public void getObject(JObjectKey key, Function<Pair<PeerId, ReceivedObject>, Boolean> onReceive) {
         var objMeta = remoteTx.getMeta(key).orElse(null);
 
@@ -93,6 +109,13 @@ public class RemoteObjectServiceClient {
         });
     }
 
+    /**
+     * Push a list of operations to a specific peer.
+     *
+     * @param target the ID of the peer to push to
+     * @param ops    the list of operations to push
+     * @return the reply from the peer
+     */
     public OpPushReply pushOps(PeerId target, List<Op> ops) {
         var barrier = new CountDownLatch(ops.size());
         for (Op op : ops) {
@@ -116,6 +139,13 @@ public class RemoteObjectServiceClient {
         return OpPushReply.getDefaultInstance();
     }
 
+    /**
+     * Ask given peers if they can delete the object with the given key.
+     *
+     * @param targets the list of peers to ask
+     * @param objKey  the key of the object to delete
+     * @return a collection of pairs of peer IDs and their replies
+     */
     public Collection<Pair<PeerId, CanDeleteReply>> canDelete(Collection<PeerId> targets, JObjectKey objKey) {
         Log.trace("Asking canDelete for " + objKey + " from " + targets.stream().map(PeerId::toString).collect(Collectors.joining(", ")));
         try {

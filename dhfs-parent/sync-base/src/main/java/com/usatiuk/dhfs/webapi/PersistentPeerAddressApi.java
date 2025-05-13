@@ -3,13 +3,16 @@ package com.usatiuk.dhfs.webapi;
 import com.usatiuk.dhfs.peerdiscovery.PeerAddrStringHelper;
 import com.usatiuk.dhfs.peersync.PeerId;
 import com.usatiuk.dhfs.peersync.PeerInfoService;
-import com.usatiuk.dhfs.peersync.ReachablePeerManager;
 import com.usatiuk.dhfs.peersync.PersistentPeerDataService;
+import com.usatiuk.dhfs.peersync.ReachablePeerManager;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 
 import java.util.Collection;
 
+/**
+ * Simple API for managing connected peers and manually specifying their addresses.
+ */
 @Path("/peers-addr-manage")
 public class PersistentPeerAddressApi {
     @Inject

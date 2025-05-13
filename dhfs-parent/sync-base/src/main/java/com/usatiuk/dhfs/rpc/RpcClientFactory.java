@@ -22,7 +22,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
-// TODO: Dedup this
+/**
+ * Factory for creating gRPC clients for object synchronization and other RPC calls.
+ */
 @ApplicationScoped
 public class RpcClientFactory implements PeerDisconnectedEventListener {
     @ConfigProperty(name = "dhfs.objects.sync.timeout")
@@ -34,9 +36,16 @@ public class RpcClientFactory implements PeerDisconnectedEventListener {
     @Inject
     RpcChannelFactory rpcChannelFactory;
 
-    // FIXME: Leaks!
     private ConcurrentMap<ObjSyncStubKey, DhfsObjectSyncGrpcGrpc.DhfsObjectSyncGrpcBlockingStub> _objSyncCache = new ConcurrentHashMap<>();
 
+    /**
+     * Try calling a given function on given peers in random order.
+     *
+     * @param targets the list of targets to call
+     * @param fn      the function to call
+     * @param <R>     the return type of the function
+     * @return the result of the function call
+     */
     public <R> R withObjSyncClient(Collection<PeerId> targets, ObjectSyncClientFunction<R> fn) {
         var shuffledList = new ArrayList<>(targets);
         Collections.shuffle(shuffledList);
@@ -55,6 +64,14 @@ public class RpcClientFactory implements PeerDisconnectedEventListener {
         throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription("No reachable targets!"));
     }
 
+    /**
+     * Try calling a given function on a given target.
+     *
+     * @param target the target to call
+     * @param fn     the function to call
+     * @param <R>    the return type of the function
+     * @return the result of the function call
+     */
     public <R> R withObjSyncClient(PeerId target, ObjectSyncClientFunction<R> fn) {
         var hostinfo = reachablePeerManager.getAddress(target);
 
@@ -64,6 +81,16 @@ public class RpcClientFactory implements PeerDisconnectedEventListener {
         return withObjSyncClient(target, hostinfo, syncTimeout, fn);
     }
 
+    /**
+     * Try calling a given function on a given target with a specified timeout.
+     *
+     * @param host    the host to call
+     * @param address the address of the host
+     * @param timeout the timeout for the call
+     * @param fn      the function to call
+     * @param <R>     the return type of the function
+     * @return the result of the function call
+     */
     public <R> R withObjSyncClient(PeerId host, PeerAddress address, long timeout, ObjectSyncClientFunction<R> fn) {
         return switch (address) {
             case IpPeerAddress ipPeerAddress ->
@@ -72,6 +99,17 @@ public class RpcClientFactory implements PeerDisconnectedEventListener {
         };
     }
 
+    /**
+     * Try calling a given function on a given target with a specified timeout.
+     *
+     * @param host    the host to call
+     * @param addr    the address of the host
+     * @param port    the port of the host
+     * @param timeout the timeout for the call
+     * @param fn      the function to call
+     * @param <R>     the return type of the function
+     * @return the result of the function call
+     */
     public <R> R withObjSyncClient(PeerId host, InetAddress addr, int port, long timeout, ObjectSyncClientFunction<R> fn) {
         var key = new ObjSyncStubKey(host, addr, port);
         var stub = _objSyncCache.computeIfAbsent(key, (k) -> {

@@ -12,6 +12,9 @@ import org.pcollections.PMap;
 
 import javax.annotation.Nullable;
 
+/**
+ * Fallback handler for remote object updates, no conflict resolution.
+ */
 @ApplicationScoped
 public class DefaultObjSyncHandler {
     @Inject

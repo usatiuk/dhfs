@@ -11,6 +11,11 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.io.IOException;
 import java.nio.file.Paths;
 
+/**
+ * This class checks if the application was shut down cleanly.
+ * It creates a file in the specified directory on startup and deletes it on shutdown.
+ * If the file exists on startup, it means the application was not shut down cleanly.
+ */
 @ApplicationScoped
 public class ShutdownChecker {
     private static final String dataFileName = "running";

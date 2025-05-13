@@ -9,6 +9,9 @@ import com.usatiuk.objects.transaction.Transaction;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
+/**
+ * Transaction hook to automatically notify {@link InvalidationQueueService} about changed objects.
+ */
 @Singleton
 public class RemoteObjPusherTxHook implements PreCommitTxHook {
     @Inject
