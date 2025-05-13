@@ -33,6 +33,10 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
+/**
+ * Asynchronous write cache of objects.
+ * Objects are put into a write queue by commitTx, and written to the storage by a separate thread.
+ */
 @ApplicationScoped
 public class WritebackObjectPersistentStore {
     @Inject
@@ -260,16 +264,23 @@ public class WritebackObjectPersistentStore {
         }
     }
 
-    public void asyncFence(long bundleId, Runnable fn) {
+    /**
+     * Run a given callback after the transaction with id txId is committed.
+     * If the transaction is already committed, the callback is run immediately.
+     *
+     * @param txId transaction id to wait for
+     * @param fn   callback to run
+     */
+    public void asyncFence(long txId, Runnable fn) {
         verifyReady();
-        if (bundleId < 0) throw new IllegalArgumentException("txId should be >0!");
-        if (_lastFlushedId.get() >= bundleId) {
+        if (txId < 0) throw new IllegalArgumentException("txId should be >0!");
+        if (_lastFlushedId.get() >= txId) {
             fn.run();
             return;
         }
         _pendingBundleLock.lock();
         try {
-            if (_lastFlushedId.get() >= bundleId) {
+            if (_lastFlushedId.get() >= txId) {
                 fn.run();
                 return;
             }
@@ -284,12 +295,23 @@ public class WritebackObjectPersistentStore {
         }
     }
 
+    /**
+     * Commit a transaction to the persistent store.
+     *
+     * @param writes the transaction manifest
+     * @return a function that allows to add a callback to be run after the transaction is committed
+     */
     public Consumer<Runnable> commitTx(Collection<TxRecord.TxObjectRecord<?>> writes) {
         long bundleId = commitBundle(writes);
 
         return r -> asyncFence(bundleId, r);
     }
 
+    /**
+     * Get a snapshot of the persistent store, including the pending writes.
+     *
+     * @return a snapshot of the store
+     */
     public Snapshot<JObjectKey, JDataVersionedWrapper> getSnapshot() {
         Snapshot<JObjectKey, JDataVersionedWrapper> cache = null;
         PendingWriteData pw = null;

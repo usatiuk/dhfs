@@ -15,6 +15,10 @@ import java.util.Optional;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Stream;
 
+/**
+ * In-memory implementation of the ObjectPersistentStore interface.
+ * For testing purposes.
+ */
 @ApplicationScoped
 @IfBuildProperty(name = "dhfs.objects.persistence", stringValue = "memory")
 public class MemoryObjectPersistentStore implements ObjectPersistentStore {

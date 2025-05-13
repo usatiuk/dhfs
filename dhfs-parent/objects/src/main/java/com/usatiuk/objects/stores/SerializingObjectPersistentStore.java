@@ -16,6 +16,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+/**
+ * Serializing wrapper for the ObjectPersistentStore.
+ * It serializes the objects before storing them in the persistent store.
+ * It deserializes the objects after reading them from the persistent store.
+ */
 @ApplicationScoped
 public class SerializingObjectPersistentStore {
     @Inject
@@ -24,6 +29,13 @@ public class SerializingObjectPersistentStore {
     @Inject
     ObjectPersistentStore delegateStore;
 
+    /**
+     * Get a snapshot of the persistent store, with deserialized objects.
+     *
+     * The objects are deserialized lazily, only when their data is accessed.
+     *
+     * @return a snapshot of the persistent store
+     */
     public Snapshot<JObjectKey, JDataVersionedWrapper> getSnapshot() {
         return new Snapshot<JObjectKey, JDataVersionedWrapper>() {
             private final Snapshot<JObjectKey, ByteBuffer> _backing = delegateStore.getSnapshot();
@@ -54,6 +66,12 @@ public class SerializingObjectPersistentStore {
 
     }
 
+
+    /**
+     * Serialize the objects, in parallel
+     * @param objs the objects to serialize
+     * @return the serialized objects
+     */
     private TxManifestRaw prepareManifest(TxManifestObj<? extends JDataVersionedWrapper> objs) {
         return new TxManifestRaw(
                 objs.written().parallelStream()
@@ -62,6 +80,11 @@ public class SerializingObjectPersistentStore {
                 , objs.deleted());
     }
 
+    /**
+     * Commit a transaction to the persistent store.
+     * @param objects the transaction manifest
+     * @param txId the transaction ID
+     */
     void commitTx(TxManifestObj<? extends JDataVersionedWrapper> objects, long txId) {
         delegateStore.commitTx(prepareManifest(objects), txId);
     }

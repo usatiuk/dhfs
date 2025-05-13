@@ -2,6 +2,9 @@ package com.usatiuk.objects;
 
 import java.nio.ByteBuffer;
 
+/**
+ * JObjectKey implementation that compares less than all other keys.
+ */
 public record JObjectKeyMin() implements JObjectKey {
     @Override
     public int compareTo(JObjectKey o) {

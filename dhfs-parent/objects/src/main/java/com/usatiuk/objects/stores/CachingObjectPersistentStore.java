@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * CachingObjectPersistentStore is a caching layer for the SerializingObjectPersistentStore
  * It stores the already deserialized objects in memory.
- *
+ * Not (yet) thread safe for writes.
  */
 @ApplicationScoped
 public class CachingObjectPersistentStore {
@@ -67,6 +67,12 @@ public class CachingObjectPersistentStore {
         }
     }
 
+    /**
+     * Commit the transaction to the underlying store and update the cache.
+     * Once this function returns, the transaction is committed and the cache is updated.
+     * @param objs the transaction manifest object
+     * @param txId the transaction ID
+     */
     public void commitTx(TxManifestObj<? extends JDataVersionedWrapper> objs, long txId) {
         Log.tracev("Committing: {0} writes, {1} deletes", objs.written().size(), objs.deleted().size());
 
@@ -84,6 +90,12 @@ public class CachingObjectPersistentStore {
         Log.tracev("Committed: {0} writes, {1} deletes", objs.written().size(), objs.deleted().size());
     }
 
+    /**
+     * Get a snapshot of underlying store and the cache.
+     * Objects are read from the cache if possible, if not, they are read from the underlying store,
+     * then possibly lazily cached when their data is accessed.
+     * @return a snapshot of the cached store
+     */
     public Snapshot<JObjectKey, JDataVersionedWrapper> getSnapshot() {
         while (true) {
             var cache = _cache.get();

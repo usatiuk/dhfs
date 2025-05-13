@@ -7,6 +7,9 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
+/**
+ * A "real" implementation of JObjectKey, containing an underlying string, and a cached lazily created byte buffer.
+ */
 public final class JObjectKeyImpl implements JObjectKey {
     @Serial
     private static final long serialVersionUID = 0L;

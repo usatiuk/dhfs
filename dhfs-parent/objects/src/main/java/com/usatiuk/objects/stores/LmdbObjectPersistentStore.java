@@ -26,15 +26,19 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 import static org.lmdbjava.DbiFlags.MDB_CREATE;
 import static org.lmdbjava.Env.create;
 
+/**
+ * Persistent object storage using LMDB
+ */
 @ApplicationScoped
 @IfBuildProperty(name = "dhfs.objects.persistence", stringValue = "lmdb")
 public class LmdbObjectPersistentStore implements ObjectPersistentStore {
     private static final String DB_NAME = "objects";
+
+    // LMDB object name for the transaction id
     private static final String DB_VER_OBJ_NAME_STR = "__DB_VER_OBJ";
     private static final ByteBuffer DB_VER_OBJ_NAME;
 
@@ -100,6 +104,12 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
         if (!_ready) throw new IllegalStateException("Wrong service order!");
     }
 
+    /**
+     * Get a snapshot of the database.
+     * Note that the ByteBuffers are invalid after the snapshot is closed.
+     *
+     * @return a snapshot of the database
+     */
     @Override
     public Snapshot<JObjectKey, ByteBuffer> getSnapshot() {
         var txn = _env.txnRead();

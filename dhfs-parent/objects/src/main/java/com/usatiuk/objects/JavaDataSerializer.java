@@ -10,6 +10,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+/**
+ * Simple Java object serializer.
+ */
 @ApplicationScoped
 @DefaultBean
 public class JavaDataSerializer implements ObjectSerializer<JData> {
