@@ -24,6 +24,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * CachingObjectPersistentStore is a caching layer for the SerializingObjectPersistentStore
+ * It stores the already deserialized objects in memory.
+ *
+ */
 @ApplicationScoped
 public class CachingObjectPersistentStore {
     private final AtomicReference<Cache> _cache;
