@@ -5,11 +5,25 @@ import org.apache.commons.lang3.tuple.Pair;
 import java.util.NoSuchElementException;
 import java.util.function.Function;
 
+/**
+ * A key-value iterator that filters keys based on a predicate.
+ *
+ * @param <K> the type of the keys
+ * @param <V> the type of the values
+ */
 public class KeyPredicateKvIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, V> {
     private final CloseableKvIterator<K, V> _backing;
     private final Function<K, Boolean> _filter;
     private K _next;
 
+    /**
+     * Constructs a KeyPredicateKvIterator with the specified backing iterator, start position, and filter.
+     *
+     * @param backing  the backing iterator
+     * @param start    the starting position relative to the startKey
+     * @param startKey the starting key
+     * @param filter   the filter function to apply to keys. Only keys for which this function returns true will be included in the iteration.
+     */
     public KeyPredicateKvIterator(CloseableKvIterator<K, V> backing, IteratorStart start, K startKey, Function<K, Boolean> filter) {
         _goingForward = true;
         _backing = backing;

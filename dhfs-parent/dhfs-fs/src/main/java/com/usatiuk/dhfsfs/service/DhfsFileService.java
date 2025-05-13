@@ -107,6 +107,7 @@ public class DhfsFileService {
 
     /**
      * Get the attributes of a file or directory.
+     *
      * @param uuid the UUID of the file or directory
      * @return the attributes of the file or directory
      */
@@ -133,6 +134,7 @@ public class DhfsFileService {
 
     /**
      * Try to resolve a path to a file or directory.
+     *
      * @param name the path to resolve
      * @return the key of the file or directory, or an empty optional if it does not exist
      */
@@ -161,6 +163,7 @@ public class DhfsFileService {
 
     /**
      * Create a new file with the given name and mode.
+     *
      * @param name the name of the file
      * @param mode the mode of the file
      * @return the key of the created file
@@ -191,6 +194,7 @@ public class DhfsFileService {
 
     /**
      * Get the parent directory of a file or directory.
+     *
      * @param ino the key of the file or directory
      * @return the parent directory
      */
@@ -207,6 +211,7 @@ public class DhfsFileService {
 
     /**
      * Create a new directory with the given name and mode.
+     *
      * @param name the name of the directory
      * @param mode the mode of the directory
      */
@@ -227,6 +232,7 @@ public class DhfsFileService {
 
     /**
      * Unlink a file or directory.
+     *
      * @param name the name of the file or directory
      * @throws DirectoryNotEmptyException if the directory is not empty and recursive delete is not allowed
      */
@@ -245,8 +251,9 @@ public class DhfsFileService {
 
     /**
      * Rename a file or directory.
+     *
      * @param from the old name
-     * @param to the new name
+     * @param to   the new name
      * @return true if the rename was successful, false otherwise
      */
     public Boolean rename(String from, String to) {
@@ -265,6 +272,7 @@ public class DhfsFileService {
 
     /**
      * Change the mode of a file or directory.
+     *
      * @param uuid the ID of the file or directory
      * @param mode the new mode
      * @return true if the mode was changed successfully, false otherwise
@@ -291,6 +299,7 @@ public class DhfsFileService {
 
     /**
      * Read the contents of a directory.
+     *
      * @param name the path of the directory
      * @return an iterable of the names of the files in the directory
      */
@@ -307,9 +316,10 @@ public class DhfsFileService {
 
     /**
      * Read the contents of a file.
+     *
      * @param fileUuid the ID of the file
-     * @param offset the offset to start reading from
-     * @param length the number of bytes to read
+     * @param offset   the offset to start reading from
+     * @param length   the number of bytes to read
      * @return the contents of the file as a ByteString
      */
     public ByteString read(JObjectKey fileUuid, long offset, int length) {
@@ -375,6 +385,7 @@ public class DhfsFileService {
 
     /**
      * Get the size of a file.
+     *
      * @param uuid the ID of the file
      * @return the size of the file
      */
@@ -391,6 +402,7 @@ public class DhfsFileService {
 
     /**
      * Get the size of a chunk.
+     *
      * @param uuid the ID of the chunk
      * @return the size of the chunk
      */
@@ -404,9 +416,10 @@ public class DhfsFileService {
 
     /**
      * Write data to a file.
+     *
      * @param fileUuid the ID of the file
-     * @param offset the offset to write to
-     * @param data the data to write
+     * @param offset   the offset to write to
+     * @param data     the data to write
      * @return the number of bytes written
      */
     public Long write(JObjectKey fileUuid, long offset, ByteString data) {
@@ -513,8 +526,9 @@ public class DhfsFileService {
 
     /**
      * Truncate a file to the given length.
+     *
      * @param fileUuid the ID of the file
-     * @param length the new length of the file
+     * @param length   the new length of the file
      * @return true if the truncate was successful, false otherwise
      */
     public Boolean truncate(JObjectKey fileUuid, long length) {
@@ -608,8 +622,9 @@ public class DhfsFileService {
 
     /**
      * Fill the given range with zeroes.
+     *
      * @param fillStart the start of the range
-     * @param length the end of the range
+     * @param length    the end of the range
      * @param newChunks the map to store the new chunks in
      */
     private void fillZeros(long fillStart, long length, Map<Long, JObjectKey> newChunks) {
@@ -649,6 +664,7 @@ public class DhfsFileService {
 
     /**
      * Read the contents of a symlink.
+     *
      * @param uuid the ID of the symlink
      * @return the contents of the symlink as a string
      */
@@ -660,6 +676,7 @@ public class DhfsFileService {
 
     /**
      * Read the contents of a symlink as a ByteString.
+     *
      * @param uuid the ID of the symlink
      * @return the contents of the symlink as a ByteString
      */
@@ -672,6 +689,7 @@ public class DhfsFileService {
 
     /**
      * Create a symlink.
+     *
      * @param oldpath the target of the symlink
      * @param newpath the path of the symlink
      * @return the key of the created symlink
@@ -700,9 +718,10 @@ public class DhfsFileService {
 
     /**
      * Set the access and modification times of a file.
+     *
      * @param fileUuid the ID of the file
-     * @param atimeMs the access time in milliseconds
-     * @param mtimeMs the modification time in milliseconds
+     * @param atimeMs  the access time in milliseconds
+     * @param mtimeMs  the modification time in milliseconds
      * @return true if the times were set successfully, false otherwise
      */
     public Boolean setTimes(JObjectKey fileUuid, long atimeMs, long mtimeMs) {
@@ -728,6 +747,7 @@ public class DhfsFileService {
 
     /**
      * Get the size of a file.
+     *
      * @param fileUuid the ID of the file
      * @return the size of the file
      */
@@ -752,9 +772,10 @@ public class DhfsFileService {
 
     /**
      * Write data to a file.
+     *
      * @param fileUuid the ID of the file
-     * @param offset the offset to write to
-     * @param data the data to write
+     * @param offset   the offset to write to
+     * @param data     the data to write
      * @return the number of bytes written
      */
     public Long write(JObjectKey fileUuid, long offset, byte[] data) {

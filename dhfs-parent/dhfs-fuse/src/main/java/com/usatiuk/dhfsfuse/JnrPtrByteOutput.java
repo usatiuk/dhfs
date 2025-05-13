@@ -7,6 +7,9 @@ import jnr.ffi.Pointer;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 
+/**
+ * JnrPtrByteOutput is a ByteOutput implementation that writes to a `jnr.ffi.Pointer`.
+ */
 public class JnrPtrByteOutput extends ByteOutput {
     private final Pointer _backing;
     private final long _size;

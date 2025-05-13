@@ -8,6 +8,14 @@ import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * An implementation of a tree as described in <a href="https://martin.kleppmann.com/papers/move-op.pdf">A highly-available move operation for replicated trees</a>
+ *
+ * @param <TimestampT> Type of the timestamp
+ * @param <PeerIdT>    Type of the peer ID
+ * @param <MetaT>      Type of the node metadata
+ * @param <NodeIdT>    Type of the node ID
+ */
 public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT extends Comparable<PeerIdT>, MetaT extends NodeMeta, NodeIdT> {
     private static final Logger LOGGER = Logger.getLogger(KleppmannTree.class.getName());
 
@@ -16,6 +24,14 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
     private final Clock<TimestampT> _clock;
     private final OpRecorder<TimestampT, PeerIdT, MetaT, NodeIdT> _opRecorder;
 
+    /**
+     * Constructor with all the dependencies
+     *
+     * @param storage    Storage interface
+     * @param peers      Peer interface
+     * @param clock      Clock interface
+     * @param opRecorder Operation recorder interface
+     */
     public KleppmannTree(StorageInterface<TimestampT, PeerIdT, MetaT, NodeIdT> storage,
                          PeerInterface<PeerIdT> peers,
                          Clock<TimestampT> clock,
@@ -26,6 +42,13 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         _opRecorder = opRecorder;
     }
 
+    /**
+     * Traverse the tree from the given node ID using the given list of names
+     *
+     * @param fromId The starting node ID
+     * @param names  The list of names to traverse
+     * @return The resulting node ID or null if not found
+     */
     private NodeIdT traverseImpl(NodeIdT fromId, List<String> names) {
         if (names.isEmpty()) return fromId;
 
@@ -39,14 +62,21 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         return traverseImpl(childId, names.subList(1, names.size()));
     }
 
-    public NodeIdT traverse(NodeIdT fromId, List<String> names) {
-        return traverseImpl(fromId, names.subList(1, names.size()));
-    }
-
+    /**
+     * Traverse the tree from its root node using the given list of names
+     *
+     * @param names The list of names to traverse
+     * @return The resulting node ID or null if not found
+     */
     public NodeIdT traverse(List<String> names) {
         return traverseImpl(_storage.getRootId(), names);
     }
 
+    /**
+     * Undo the effect of a log effect
+     *
+     * @param effect The log effect to undo
+     */
     private void undoEffect(LogEffect<TimestampT, PeerIdT, MetaT, NodeIdT> effect) {
         if (effect.oldInfo() != null) {
             var node = _storage.getById(effect.childId());
@@ -89,6 +119,11 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         }
     }
 
+    /**
+     * Undo the effects of a log record
+     *
+     * @param op The log record to undo
+     */
     private void undoOp(LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> op) {
         LOGGER.finer(() -> "Will undo op: " + op);
         if (op.effects() != null)
@@ -96,16 +131,32 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
                 undoEffect(e);
     }
 
+    /**
+     * Redo the operation in a log record
+     *
+     * @param entry The log record to redo
+     */
     private void redoOp(Map.Entry<CombinedTimestamp<TimestampT, PeerIdT>, LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT>> entry) {
         var newEffects = doOp(entry.getValue().op(), false);
         _storage.getLog().replace(entry.getKey(), newEffects);
     }
 
+    /**
+     * Perform the operation and put it in the log
+     *
+     * @param op                   The operation to perform
+     * @param failCreatingIfExists Whether to fail if there is a name conflict,
+     *                             otherwise replace the existing node
+     * @throws AlreadyExistsException If the node already exists and failCreatingIfExists is true
+     */
     private void doAndPut(OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> op, boolean failCreatingIfExists) {
         var res = doOp(op, failCreatingIfExists);
         _storage.getLog().put(res.op().timestamp(), res);
     }
 
+    /**
+     * Try to trim the log to the causality threshold
+     */
     private void tryTrimLog() {
         var log = _storage.getLog();
         var timeLog = _storage.getPeerTimestampLog();
@@ -161,22 +212,52 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         }
     }
 
+    /**
+     * Move a node to a new parent with new metadata
+     *
+     * @param newParent The new parent node ID
+     * @param newMeta   The new metadata
+     * @param child     The child node ID
+     * @throws AlreadyExistsException If the node already exists and failCreatingIfExists is true
+     */
     public <LocalMetaT extends MetaT> void move(NodeIdT newParent, LocalMetaT newMeta, NodeIdT child) {
         move(newParent, newMeta, child, true);
     }
 
+    /**
+     * Move a node to a new parent with new metadata
+     *
+     * @param newParent            The new parent node ID
+     * @param newMeta              The new metadata
+     * @param child                The child node ID
+     * @param failCreatingIfExists Whether to fail if there is a name conflict,
+     *                             otherwise replace the existing node
+     * @throws AlreadyExistsException If the node already exists and failCreatingIfExists is true
+     */
     public void move(NodeIdT newParent, MetaT newMeta, NodeIdT child, boolean failCreatingIfExists) {
         var createdMove = createMove(newParent, newMeta, child);
         applyOp(_peers.getSelfId(), createdMove, failCreatingIfExists);
         _opRecorder.recordOp(createdMove);
     }
 
+    /**
+     * Apply an external operation from a remote peer
+     *
+     * @param from The peer ID
+     * @param op   The operation to apply
+     */
     public void applyExternalOp(PeerIdT from, OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> op) {
         _clock.updateTimestamp(op.timestamp().timestamp());
         applyOp(from, op, false);
     }
 
-    // Returns true if the timestamp is newer than what's seen, false otherwise
+    /**
+     * Update the causality threshold timestamp for a peer
+     *
+     * @param from         The peer ID
+     * @param newTimestamp The timestamp received from it
+     * @return True if the timestamp was updated, false otherwise
+     */
     private boolean updateTimestampImpl(PeerIdT from, TimestampT newTimestamp) {
         TimestampT oldRef = _storage.getPeerTimestampLog().getForPeer(from);
         if (oldRef != null && oldRef.compareTo(newTimestamp) >= 0) { // FIXME?
@@ -187,6 +268,12 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         return true;
     }
 
+    /**
+     * Update the causality threshold timestamp for a peer
+     *
+     * @param from      The peer ID
+     * @param timestamp The timestamp received from it
+     */
     public void updateExternalTimestamp(PeerIdT from, TimestampT timestamp) {
         var gotExt = _storage.getPeerTimestampLog().getForPeer(from);
         var gotSelf = _storage.getPeerTimestampLog().getForPeer(_peers.getSelfId());
@@ -197,6 +284,15 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         tryTrimLog();
     }
 
+    /**
+     * Apply an operation from a peer
+     *
+     * @param from                 The peer ID
+     * @param op                   The operation to apply
+     * @param failCreatingIfExists Whether to fail if there is a name conflict,
+     *                             otherwise replace the existing node
+     * @throws AlreadyExistsException If the node already exists and failCreatingIfExists is true
+     */
     private void applyOp(PeerIdT from, OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> op, boolean failCreatingIfExists) {
         if (!updateTimestampImpl(op.timestamp().nodeId(), op.timestamp().timestamp())) return;
 
@@ -229,14 +325,36 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         }
     }
 
+    /**
+     * Get a new timestamp, incrementing the one in storage
+     *
+     * @return A new timestamp
+     */
     private CombinedTimestamp<TimestampT, PeerIdT> getTimestamp() {
         return new CombinedTimestamp<>(_clock.getTimestamp(), _peers.getSelfId());
     }
 
+    /**
+     * Create a new move operation
+     *
+     * @param newParent The new parent node ID
+     * @param newMeta   The new metadata
+     * @param node      The child node ID
+     * @return A new move operation
+     */
     private <LocalMetaT extends MetaT> OpMove<TimestampT, PeerIdT, LocalMetaT, NodeIdT> createMove(NodeIdT newParent, LocalMetaT newMeta, NodeIdT node) {
         return new OpMove<>(getTimestamp(), newParent, newMeta, node);
     }
 
+    /**
+     * Perform the operation and return the log record
+     *
+     * @param op                   The operation to perform
+     * @param failCreatingIfExists Whether to fail if there is a name conflict,
+     *                             otherwise replace the existing node
+     * @return The log record
+     * @throws AlreadyExistsException If the node already exists and failCreatingIfExists is true
+     */
     private LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> doOp(OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> op, boolean failCreatingIfExists) {
         LOGGER.finer(() -> "Doing op: " + op);
         LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> computed;
@@ -253,10 +371,24 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         return computed;
     }
 
+    /**
+     * Get a new node from storage
+     *
+     * @param key    The node ID
+     * @param parent The parent node ID
+     * @param meta   The metadata
+     * @return A new tree node
+     */
     private TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT> getNewNode(NodeIdT key, NodeIdT parent, MetaT meta) {
         return _storage.createNewNode(key, parent, meta);
     }
 
+    /**
+     * Apply the effects of a log record
+     *
+     * @param sourceOp The source operation
+     * @param effects  The list of log effects
+     */
     private void applyEffects(OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> sourceOp, List<LogEffect<TimestampT, PeerIdT, MetaT, NodeIdT>> effects) {
         for (var effect : effects) {
             LOGGER.finer(() -> "Applying effect: " + effect + " from op " + sourceOp);
@@ -297,6 +429,15 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         }
     }
 
+    /**
+     * Compute the effects of a move operation
+     *
+     * @param op                   The operation to process
+     * @param failCreatingIfExists Whether to fail if there is a name conflict,
+     *                             otherwise replace the existing node
+     * @return The log record with the computed effects
+     * @throws AlreadyExistsException If the node already exists and failCreatingIfExists is true
+     */
     private LogRecord<TimestampT, PeerIdT, MetaT, NodeIdT> computeEffects(OpMove<TimestampT, PeerIdT, MetaT, NodeIdT> op, boolean failCreatingIfExists) {
         var node = _storage.getById(op.childId());
 
@@ -380,6 +521,13 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         ));
     }
 
+    /**
+     * Check if a node is an ancestor of another node
+     *
+     * @param child  The child node ID
+     * @param parent The parent node ID
+     * @return True if the child is an ancestor of the parent, false otherwise
+     */
     private boolean isAncestor(NodeIdT child, NodeIdT parent) {
         var node = _storage.getById(parent);
         NodeIdT curParent;
@@ -390,6 +538,11 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         return false;
     }
 
+    /**
+     * Walk the tree and apply the given consumer to each node
+     *
+     * @param consumer The consumer to apply to each node
+     */
     public void walkTree(Consumer<TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT>> consumer) {
         ArrayDeque<NodeIdT> queue = new ArrayDeque<>();
         queue.push(_storage.getRootId());
@@ -403,6 +556,12 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         }
     }
 
+    /**
+     * Find the parent of a node that matches the given predicate
+     *
+     * @param kidPredicate The predicate to match the child node
+     * @return A pair containing the name of the child and the ID of the parent, or null if not found
+     */
     public Pair<String, NodeIdT> findParent(Function<TreeNode<TimestampT, PeerIdT, MetaT, NodeIdT>, Boolean> kidPredicate) {
         ArrayDeque<NodeIdT> queue = new ArrayDeque<>();
         queue.push(_storage.getRootId());
@@ -423,6 +582,13 @@ public class KleppmannTree<TimestampT extends Comparable<TimestampT>, PeerIdT ex
         return null;
     }
 
+    /**
+     * Record the bootstrap operations for a given peer
+     * Will visit all nodes of the tree and add their effective operations to both the queue to be sent to the peer,
+     * and to the global operation log.
+     *
+     * @param host The peer ID
+     */
     public void recordBoostrapFor(PeerIdT host) {
         TreeMap<CombinedTimestamp<TimestampT, PeerIdT>, OpMove<TimestampT, PeerIdT, MetaT, NodeIdT>> result = new TreeMap<>();
 

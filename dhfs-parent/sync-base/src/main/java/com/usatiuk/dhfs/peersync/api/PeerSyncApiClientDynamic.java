@@ -20,8 +20,8 @@ public class PeerSyncApiClientDynamic {
     private ApiPeerInfo getSelfInfo(String address, int port) {
         var client = QuarkusRestClientBuilder.newBuilder()
                 .baseUri(URI.create("http://" + address + ":" + port))
-                .connectTimeout(5, TimeUnit.SECONDS)
-                .readTimeout(5, TimeUnit.SECONDS)
+                .connectTimeout(1, TimeUnit.SECONDS)
+                .readTimeout(1, TimeUnit.SECONDS)
                 .build(PeerSyncApiClient.class);
         return client.getSelfInfo();
     }

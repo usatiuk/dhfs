@@ -39,6 +39,9 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static jnr.posix.FileStat.*;
 
+/**
+ * FUSE file system implementation.
+ */
 @ApplicationScoped
 public class DhfsFuse extends FuseStubFS {
     private static final int blksize = 1048576;
@@ -56,6 +59,11 @@ public class DhfsFuse extends FuseStubFS {
     @Inject
     DhfsFileService fileService;
 
+    /**
+     * Allocate a handle for the given key.
+     * @param key the key to allocate a handle for
+     * @return the allocated handle, not 0
+     */
     private long allocateHandle(JObjectKey key) {
         while (true) {
             var newFh = _fh.getAndIncrement();
@@ -66,8 +74,14 @@ public class DhfsFuse extends FuseStubFS {
         }
     }
 
+    /**
+     * Get the key from the handle.
+     * @param handle the handle to get the key from
+     * @return the key, or null if not found
+     */
     private JObjectKey getFromHandle(long handle) {
-        assert handle != 0;
+        if(handle == 0)
+            throw new IllegalStateException("Handle is 0");
         return _openHandles.get(handle);
     }
 

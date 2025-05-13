@@ -9,10 +9,25 @@ import java.util.NavigableMap;
 import java.util.NoSuchElementException;
 import java.util.TreeMap;
 
+/**
+ * A merging key-value iterator that combines multiple iterators into a single iterator.
+ *
+ * @param <K> the type of the keys
+ * @param <V> the type of the values
+ */
 public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, V> {
     private final NavigableMap<K, IteratorEntry<K, V>> _sortedIterators = new TreeMap<>();
     private final List<IteratorEntry<K, V>> _iterators;
 
+    /**
+     * Constructs a MergingKvIterator with the specified start type, start key, and list of iterators.
+     * The iterators have priority based on their order in the list: if two iterators have the same key,
+     * the one that is in the beginning of the list will be used.
+     *
+     * @param startType the starting position relative to the startKey
+     * @param startKey  the starting key
+     * @param iterators the list of iterators to merge
+     */
     public MergingKvIterator(IteratorStart startType, K startKey, List<CloseableKvIterator<K, V>> iterators) {
         _goingForward = true;
 
@@ -88,6 +103,15 @@ public class MergingKvIterator<K extends Comparable<K>, V> extends ReversibleKvI
 //        }
     }
 
+    /**
+     * Constructs a MergingKvIterator with the specified start type, start key, and array of iterators.
+     * The iterators have priority based on their order in the array: if two iterators have the same key,
+     * the one that is in the beginning of the array will be used.
+     *
+     * @param startType the starting position relative to the startKey
+     * @param startKey  the starting key
+     * @param iterators the array of iterators to merge
+     */
     @SafeVarargs
     public MergingKvIterator(IteratorStart startType, K startKey, CloseableKvIterator<K, V>... iterators) {
         this(startType, startKey, List.of(iterators));

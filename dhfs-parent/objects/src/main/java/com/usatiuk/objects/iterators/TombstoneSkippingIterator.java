@@ -6,11 +6,25 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.function.Function;
 
+/**
+ * A key-value iterator that skips tombstones.
+ *
+ * @param <K> the type of the keys
+ * @param <V> the type of the values
+ */
 public class TombstoneSkippingIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, V> {
     private final MergingKvIterator<K, MaybeTombstone<V>> _backing;
     private Pair<K, V> _next = null;
     private boolean _checkedNext = false;
 
+    /**
+     * Constructs a TombstoneSkippingIterator with the specified start position, start key, and list of iterators.
+     * Like {@link MappingKvIterator}, iterators have a priority depending on their order in the list.
+     *
+     * @param start     the starting position relative to the startKey
+     * @param startKey  the starting key
+     * @param iterators the list of iterators to merge
+     */
     public TombstoneSkippingIterator(IteratorStart start, K startKey, List<CloseableKvIterator<K, MaybeTombstone<V>>> iterators) {
         _goingForward = true;
         _backing = new MergingKvIterator<>(start, startKey, iterators);

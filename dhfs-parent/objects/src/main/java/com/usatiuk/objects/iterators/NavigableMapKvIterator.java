@@ -4,11 +4,25 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
 
+/**
+ * A key-value iterator for a {@link NavigableMap}.
+ * It allows iterating over the keys and values in a sorted order.
+ *
+ * @param <K> the type of the keys
+ * @param <V> the type of the values
+ */
 public class NavigableMapKvIterator<K extends Comparable<K>, V> extends ReversibleKvIterator<K, V> {
     private final NavigableMap<K, V> _map;
     private Iterator<Map.Entry<K, V>> _iterator;
     private Map.Entry<K, V> _next;
 
+    /**
+     * Constructs a NavigableMapKvIterator with the specified map, start type, and start key.
+     *
+     * @param map   the map to iterate over
+     * @param start the starting position relative to the startKey
+     * @param key   the starting key
+     */
     public NavigableMapKvIterator(NavigableMap<K, ? extends V> map, IteratorStart start, K key) {
         _map = (NavigableMap<K, V>) map;
         SortedMap<K, V> _view;

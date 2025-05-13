@@ -2,9 +2,19 @@ package com.usatiuk.objects.iterators;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+/**
+ * A wrapper for a key-value iterator that iterates in reverse order.
+ * @param <K> the type of the keys
+ * @param <V> the type of the values
+ */
 public class ReversedKvIterator<K extends Comparable<? super K>, V> implements CloseableKvIterator<K, V> {
     private final CloseableKvIterator<K, V> _backing;
 
+    /**
+     * Constructs a ReversedKvIterator with the specified backing iterator.
+     *
+     * @param backing the backing iterator
+     */
     public ReversedKvIterator(CloseableKvIterator<K, V> backing) {
         _backing = backing;
     }
