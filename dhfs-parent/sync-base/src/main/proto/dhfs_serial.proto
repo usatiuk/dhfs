@@ -22,20 +22,6 @@ message ObjectChangelog {
   repeated entries_Entry entries = 1;
 }
 
-// TODO: Serialization
-message FileDtoP {
-  bytes serializedData = 1;
-}
-
-message ChunkDataP {
-  JObjectKeyP key = 1;
-  bytes data = 2;
-}
-
-message PeerInfoP {
-  bytes serializedData = 1;
-}
-
 message JDataRemoteDtoP {
   bytes serializedData = 1;
 }
