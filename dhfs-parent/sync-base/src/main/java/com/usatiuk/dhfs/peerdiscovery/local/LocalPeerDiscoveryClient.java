@@ -14,7 +14,6 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.net.*;
 import java.nio.ByteBuffer;
@@ -28,17 +27,19 @@ import java.nio.ByteBuffer;
 public class LocalPeerDiscoveryClient {
     @Inject
     PeerDiscoveryDirectory peerDiscoveryDirectory;
-    @ConfigProperty(name = "dhfs.objects.peerdiscovery.broadcast")
-    boolean enabled;
+    @Inject
+    LocalPeerDiscoveryConfig localPeerDiscoveryConfig;
+    ;
+
     private Thread _clientThread;
     private DatagramSocket _socket;
 
     @Startup
     void init() throws SocketException, UnknownHostException {
-        if (!enabled) {
+        if (!localPeerDiscoveryConfig.broadcast()) {
             return;
         }
-        _socket = new DatagramSocket(42069, InetAddress.getByName("0.0.0.0"));
+        _socket = new DatagramSocket(localPeerDiscoveryConfig.port(), InetAddress.getByName("0.0.0.0"));
         _socket.setBroadcast(true);
 
         _clientThread = new Thread(this::client);
@@ -47,7 +48,7 @@ public class LocalPeerDiscoveryClient {
     }
 
     void shutdown(@Observes @Priority(10) ShutdownEvent event) throws InterruptedException {
-        if (!enabled) {
+        if (!localPeerDiscoveryConfig.broadcast()) {
             return;
         }
         _socket.close();

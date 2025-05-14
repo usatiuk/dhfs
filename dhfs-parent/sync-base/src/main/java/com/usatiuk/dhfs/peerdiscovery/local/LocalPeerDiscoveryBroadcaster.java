@@ -23,6 +23,8 @@ import java.net.*;
 public class LocalPeerDiscoveryBroadcaster {
     @Inject
     PersistentPeerDataService persistentPeerDataService;
+    @Inject
+    LocalPeerDiscoveryConfig localPeerDiscoveryConfig;
 
     @ConfigProperty(name = "quarkus.http.port")
     int ourPort;
@@ -30,17 +32,11 @@ public class LocalPeerDiscoveryBroadcaster {
     @ConfigProperty(name = "quarkus.http.ssl-port")
     int ourSecurePort;
 
-    @ConfigProperty(name = "dhfs.objects.peerdiscovery.port")
-    int broadcastPort;
-
-    @ConfigProperty(name = "dhfs.objects.peerdiscovery.broadcast")
-    boolean enabled;
-
     private DatagramSocket _socket;
 
     @Startup
     void init() throws SocketException {
-        if (!enabled) {
+        if (!localPeerDiscoveryConfig.broadcast()) {
             return;
         }
         _socket = new DatagramSocket();
@@ -48,7 +44,7 @@ public class LocalPeerDiscoveryBroadcaster {
     }
 
     void shutdown(@Observes @Priority(10) ShutdownEvent event) {
-        if (!enabled) {
+        if (!localPeerDiscoveryConfig.broadcast()) {
             return;
         }
         _socket.close();
@@ -56,7 +52,7 @@ public class LocalPeerDiscoveryBroadcaster {
 
     @Scheduled(every = "${dhfs.objects.peerdiscovery.interval}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP, skipExecutionIf = Scheduled.ApplicationNotRunning.class)
     public void broadcast() throws Exception {
-        if (!enabled) {
+        if (!localPeerDiscoveryConfig.broadcast()) {
             return;
         }
         var sendData = PeerDiscoveryInfo.newBuilder()
@@ -69,7 +65,7 @@ public class LocalPeerDiscoveryBroadcaster {
 
         DatagramPacket sendPacket
                 = new DatagramPacket(sendBytes, sendBytes.length,
-                InetAddress.getByName("255.255.255.255"), broadcastPort);
+                InetAddress.getByName("255.255.255.255"), localPeerDiscoveryConfig.port());
 
         _socket.send(sendPacket);
 
@@ -92,15 +88,13 @@ public class LocalPeerDiscoveryBroadcaster {
                 }
 
                 try {
-                    sendPacket = new DatagramPacket(sendBytes, sendBytes.length, broadcast, broadcastPort);
+                    sendPacket = new DatagramPacket(sendBytes, sendBytes.length, broadcast, localPeerDiscoveryConfig.port());
                     _socket.send(sendPacket);
                     Log.tracev("Broadcast sent to: {0}, at: {1}", broadcast.getHostAddress(), networkInterface.getDisplayName());
                 } catch (Exception ignored) {
                     continue;
                 }
 
-//                            Log.trace(getClass().getName() + "Broadcast sent to: " + broadcast.getHostAddress()
-//                                    + ", at: " + networkInterface.getDisplayName());
             }
         }
     }
