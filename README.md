@@ -34,7 +34,7 @@ In the run-wrapper, 3 scripts are available.
 - `stop` script stops it
 - `update` script will update the filesystem to the newest available CI build
 
-On Windows, Powershell alternatives should be used. For them to work, it might be required to allow execution of unsigned scripts using `set-executionpolicy remotesigned`.
+On Windows, Powershell alternatives should be used. For them to work, it might be required to allow execution of unsigned scripts using `set-executionpolicy unrestricted`.
 
 Additional options for the filesystem can be specified in the `extra-opts` file in the same directory with the run scripts.
 

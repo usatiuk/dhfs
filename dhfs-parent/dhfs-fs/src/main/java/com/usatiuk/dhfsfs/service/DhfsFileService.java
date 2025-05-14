@@ -51,14 +51,9 @@ public class DhfsFileService {
     int targetChunkSize;
     @ConfigProperty(name = "dhfs.files.max_chunk_size", defaultValue = "524288")
     int maxChunkSize;
-    @ConfigProperty(name = "dhfs.files.use_hash_for_chunks")
-    boolean useHashForChunks;
     @ConfigProperty(name = "dhfs.files.allow_recursive_delete")
     boolean allowRecursiveDelete;
-    @ConfigProperty(name = "dhfs.objects.ref_verification")
-    boolean refVerification;
-    @ConfigProperty(name = "dhfs.objects.write_log")
-    boolean writeLogging;
+
 
     @Inject
     Transaction curTx;
