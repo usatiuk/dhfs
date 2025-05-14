@@ -54,7 +54,7 @@ One line in the `extra-opts` file corresponds to one option passed to the JVM wh
 
 Some extra possible configuration options are:
 
-- `-Ddhfs.fuse.root=` specifies the root where filesystem should be mounted. By default, it is the `fuse` path under the `run-wrapper` root. For windows, it should be a disk letter, by default `Z:\`.
+- `-Ddhfs.fuse.root=` specifies the root where filesystem should be mounted. By default, it is the `fuse` path under the `run-wrapper` root. For windows, it should be a disk root, by default `Z:\`.
 - `-Ddhfs.objects.last-seen.timeout=` specifies the period of time (in seconds) after which unavailable peers will be ignored for garbage collection and resynchronized after being reconnected. The default is 43200 (30 days), if set to `-1`, this feature is disabled.
 - `-Ddhfs.objects.autosync.download-all=` specifies whether all objects (files and their data) should be downloaded to this peer. `true` or `false`, the default is `false`.
 - `-Ddhfs.objects.peerdiscovery.port=` port to broadcast on and listen to for LAN peer discovery (default is `42262`)
