@@ -73,3 +73,11 @@ In case of errors, the standard output is redirected to `quarkus.log` in the `ap
 ### How to connect to other peers?
 
 Then, a web interface will be available at `losthost:8080` (or whatever the HTTP port is), that can be used to connect with other peers. Peers on local network should be available to be connected to automatically.
+
+## Other notes
+
+### Running tests
+
+To run LazyFS tests, LazyFS needs to be built: the git submodules need to be cloned and `./thirdparty/lazyfs/build.sh` script needs to be run. 
+
+LazyFS tests were only tested on Linux.
