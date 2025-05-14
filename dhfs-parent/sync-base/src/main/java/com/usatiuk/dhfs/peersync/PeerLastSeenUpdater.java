@@ -30,7 +30,7 @@ public class PeerLastSeenUpdater {
     @Inject
     PersistentPeerDataService persistentPeerDataService;
 
-    @Scheduled(every = "${dhfs.objects.last-seen.update}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    @Scheduled(every = "${dhfs.objects.last-seen.update}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP, skipExecutionIf = Scheduled.ApplicationNotRunning.class)
     @Blocking
     void update() {
         var snapshot = reachablePeerManager.getHostStateSnapshot();

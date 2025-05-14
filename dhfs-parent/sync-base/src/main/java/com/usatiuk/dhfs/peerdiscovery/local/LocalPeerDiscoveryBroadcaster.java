@@ -54,7 +54,7 @@ public class LocalPeerDiscoveryBroadcaster {
         _socket.close();
     }
 
-    @Scheduled(every = "${dhfs.objects.peerdiscovery.interval}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    @Scheduled(every = "${dhfs.objects.peerdiscovery.interval}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP, skipExecutionIf = Scheduled.ApplicationNotRunning.class)
     public void broadcast() throws Exception {
         if (!enabled) {
             return;

@@ -67,7 +67,7 @@ public class DeferredInvalidationQueueService implements PeerConnectedEventListe
     /**
      * Periodically returns deferred invalidations to the invalidation queue for all reachable hosts.
      */
-    @Scheduled(every = "15s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    @Scheduled(every = "15s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP, skipExecutionIf = Scheduled.ApplicationNotRunning.class)
     @Blocking
     void periodicReturn() {
         for (var reachable : reachablePeerManager.getAvailableHosts())

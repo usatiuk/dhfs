@@ -25,7 +25,7 @@ public class StaticPeerDiscovery {
         ).toList();
     }
 
-    @Scheduled(every = "1s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    @Scheduled(every = "1s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP, skipExecutionIf = Scheduled.ApplicationNotRunning.class)
     public void discoverPeers() {
         for (var peer : _peers) {
             peerDiscoveryDirectory.notifyAddr(peer);

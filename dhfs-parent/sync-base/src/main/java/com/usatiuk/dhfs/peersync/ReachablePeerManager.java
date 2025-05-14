@@ -71,7 +71,7 @@ public class ReachablePeerManager {
         _heartbeatExecutor = Executors.newVirtualThreadPerTaskExecutor();
     }
 
-    @Scheduled(every = "${dhfs.objects.reconnect_interval}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    @Scheduled(every = "${dhfs.objects.reconnect_interval}", concurrentExecution = Scheduled.ConcurrentExecution.SKIP, skipExecutionIf = Scheduled.ApplicationNotRunning.class)
     @Blocking
     public void tryConnectAll() {
         if (_heartbeatExecutor == null) return;
@@ -158,6 +158,7 @@ public class ReachablePeerManager {
 
     /**
      * Checks if the given host is reachable.
+     *
      * @param host the host to check
      * @return true if the host is reachable, false otherwise
      */
@@ -167,6 +168,7 @@ public class ReachablePeerManager {
 
     /**
      * Checks if the given host is reachable.
+     *
      * @param host the host to check
      * @return true if the host is reachable, false otherwise
      */
@@ -176,6 +178,7 @@ public class ReachablePeerManager {
 
     /**
      * Gets the address of the given host.
+     *
      * @param host the host to get the address for
      * @return the address of the host, or null if not reachable
      */
@@ -185,6 +188,7 @@ public class ReachablePeerManager {
 
     /**
      * Gets the ids of all reachable hosts.
+     *
      * @return a list of ids of all reachable hosts
      */
     public List<PeerId> getAvailableHosts() {
@@ -193,6 +197,7 @@ public class ReachablePeerManager {
 
     /**
      * Gets a snapshot of current state of the connected (and not connected) peers
+     *
      * @return information about all connected/disconnected peers
      */
     public HostStateSnapshot getHostStateSnapshot() {
@@ -205,6 +210,7 @@ public class ReachablePeerManager {
 
     /**
      * Removes the given host from the cluster
+     *
      * @param peerId the id of the host to remove
      */
     public void removeRemoteHost(PeerId peerId) {
@@ -216,6 +222,7 @@ public class ReachablePeerManager {
     /**
      * Selects the best address for the given host.
      * The address is selected based on the type of the address. (with e.g. LAN address preferred over WAN)
+     *
      * @param host the host to select the address for
      * @return the best address for the host, or null if not reachable
      */
@@ -225,6 +232,7 @@ public class ReachablePeerManager {
 
     /**
      * Call the given peer and get its information.
+     *
      * @param host the peer to get the information for
      * @return the information about the peer
      */
@@ -243,6 +251,7 @@ public class ReachablePeerManager {
     /**
      * Adds the given peer to the cluster.
      * The certificate provided is verified against the one peer is using right now.
+     *
      * @param host the peer to add
      * @param cert the certificate of the peer
      */
@@ -264,6 +273,7 @@ public class ReachablePeerManager {
 
     /**
      * Gets the information about all reachable peers that are not added to the cluster.
+     *
      * @return a collection of pairs of peer id and peer info
      */
     public Collection<Pair<PeerId, ApiPeerInfo>> getSeenButNotAddedHosts() {

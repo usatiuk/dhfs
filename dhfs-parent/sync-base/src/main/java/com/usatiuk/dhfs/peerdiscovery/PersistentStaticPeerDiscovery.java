@@ -15,7 +15,7 @@ public class PersistentStaticPeerDiscovery {
     @Inject
     PersistentPeerDataService persistentPeerDataService;
 
-    @Scheduled(every = "1s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+    @Scheduled(every = "1s", concurrentExecution = Scheduled.ConcurrentExecution.SKIP, skipExecutionIf = Scheduled.ApplicationNotRunning.class)
     public void discoverPeers() {
         var addrs = persistentPeerDataService.getPersistentPeerAddresses();
         for (var addr : addrs) {
