@@ -67,11 +67,14 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
             Log.info("Initializing with root " + _root);
             _root.toFile().mkdirs();
         }
+        Log.info("Opening LMDB with root " + _root);
         _env = create()
                 .setMapSize(lmdbSize)
                 .setMaxDbs(1)
                 .open(_root.toFile(), EnvFlags.MDB_NOTLS);
         _db = _env.openDbi(DB_NAME, MDB_CREATE);
+
+        Log.info("Opened LMDB with root " + _root);
 
         try (Txn<ByteBuffer> txn = _env.txnWrite()) {
             var read = readTxId(txn);
@@ -87,6 +90,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
         }
 
         _ready = true;
+        Log.info("LMDB storage ready");
     }
 
     private Optional<Long> readTxId(Txn<ByteBuffer> txn) {
@@ -95,6 +99,9 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
     }
 
     void shutdown(@Observes @Priority(900) ShutdownEvent event) throws IOException {
+        if (!_ready) {
+            return;
+        }
         _ready = false;
         _db.close();
         _env.close();
@@ -112,6 +119,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
      */
     @Override
     public Snapshot<JObjectKey, ByteBuffer> getSnapshot() {
+        verifyReady();
         var txn = _env.txnRead();
         try {
             long commitId = readTxId(txn).orElseThrow();
