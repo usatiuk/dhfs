@@ -188,8 +188,9 @@ public class DhfsFuse extends FuseStubFS {
             stat.st_ctim.tv_nsec.set((found.get().ctime() % 1000) * 1000);
             stat.st_mtim.tv_sec.set(found.get().mtime() / 1000);
             stat.st_mtim.tv_nsec.set((found.get().mtime() % 1000) * 1000);
-            stat.st_atim.tv_sec.set(found.get().mtime() / 1000);
-            stat.st_atim.tv_nsec.set((found.get().mtime() % 1000) * 1000);
+            var atime = Math.max(found.get().ctime(), found.get().mtime());
+            stat.st_atim.tv_sec.set(atime / 1000);
+            stat.st_atim.tv_nsec.set((atime % 1000) * 1000000L);
             stat.st_blksize.set(blksize);
         } catch (Throwable e) {
             Log.error("When getattr " + path, e);
@@ -205,8 +206,7 @@ public class DhfsFuse extends FuseStubFS {
             if (fileOpt.isEmpty()) return -ErrorCodes.ENOENT();
             var file = fileOpt.get();
             var res = fileService.setTimes(file,
-                    timespec[0].tv_sec.get() * 1000,
-                    timespec[1].tv_sec.get() * 1000);
+                    timespec[1].tv_sec.get() * 1000L + timespec[1].tv_nsec.longValue() / 1000000L);
             if (!res) return -ErrorCodes.EINVAL();
             else return 0;
         } catch (Throwable e) {

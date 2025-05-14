@@ -289,7 +289,7 @@ public class DhfsFileService {
             } else if (dent instanceof RemoteObjectMeta) {
                 var remote = remoteTx.getData(JDataRemote.class, uuid).orElse(null);
                 if (remote instanceof File f) {
-                    remoteTx.putData(f.withMode(mode).withCurrentMTime());
+                    remoteTx.putData(f.withMode(mode).withCurrentCTime());
                     return true;
                 } else {
                     throw new IllegalArgumentException(uuid + " is not a file");
@@ -723,11 +723,10 @@ public class DhfsFileService {
      * Set the access and modification times of a file.
      *
      * @param fileUuid the ID of the file
-     * @param atimeMs  the access time in milliseconds
      * @param mtimeMs  the modification time in milliseconds
      * @return true if the times were set successfully, false otherwise
      */
-    public Boolean setTimes(JObjectKey fileUuid, long atimeMs, long mtimeMs) {
+    public Boolean setTimes(JObjectKey fileUuid, long mtimeMs) {
         return jObjectTxManager.executeTx(() -> {
             var dent = curTx.get(JData.class, fileUuid).orElseThrow(() -> new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND));
 
@@ -737,7 +736,7 @@ public class DhfsFileService {
             } else if (dent instanceof RemoteObjectMeta) {
                 var remote = remoteTx.getData(JDataRemote.class, fileUuid).orElse(null);
                 if (remote instanceof File f) {
-                    remoteTx.putData(f.withCTime(atimeMs).withMTime(mtimeMs));
+                    remoteTx.putData(f.withCTime(System.currentTimeMillis()).withMTime(mtimeMs));
                     return true;
                 } else {
                     throw new IllegalArgumentException(fileUuid + " is not a file");

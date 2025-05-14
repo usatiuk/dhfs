@@ -11,10 +11,11 @@ import java.util.Set;
 
 /**
  * File is a data structure that represents a file in the file system
- * @param key unique key
- * @param mode file mode
- * @param cTime creation time
- * @param mTime modification time
+ *
+ * @param key     unique key
+ * @param mode    file mode
+ * @param cTime   inode modification time
+ * @param mTime   modification time
  * @param symlink true if the file is a symlink, false otherwise
  */
 public record File(JObjectKey key, long mode, long cTime, long mTime,
@@ -38,6 +39,10 @@ public record File(JObjectKey key, long mode, long cTime, long mTime,
 
     public File withCurrentMTime() {
         return new File(key, mode, cTime, System.currentTimeMillis(), symlink);
+    }
+
+    public File withCurrentCTime() {
+        return new File(key, mode, System.currentTimeMillis(), mTime, symlink);
     }
 
     @Override
