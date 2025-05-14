@@ -16,11 +16,13 @@ Syncthing and allowing you to stream your files like Google Drive File Stream
 This is a simple set of scripts that allows you to run/stop
 the DHFS server in the background, and update it.
 
-Once unpacked, in the root folder, there will be 3 folders:
+Once unpacked, in the root folder (`dhfs`), there will be 3 folders:
 
 - `app` contains the application
 - `data` contains the filesystem data storage
-- `fuse` is the default filesystem mount point (not on Windows)
+- `fuse` is the default filesystem mount point (not on Windows, the default mount drive letter is `Z`)
+
+Note that on Windows, the path to the root can not contain spaces.
 
 ## How to use it?
 
