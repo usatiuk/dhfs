@@ -23,14 +23,16 @@ class TransactionImpl implements Transaction, AutoCloseable {
     private boolean _writeTrack = false;
     private Map<JObjectKey, TxRecord.TxObjectRecord<?>> _newWrites = new HashMap<>();
 
-    private interface ReadTrackingInternalCrap {
+    /**
+     * Identifies the source of the read: whether it's from the source or written from the transaction.
+     */
+    private interface ReadTrackingSourceWrapper {
         boolean fromSource();
 
         JData obj();
     }
 
-    // FIXME:
-    private record ReadTrackingInternalCrapSource(JDataVersionedWrapper wrapped) implements ReadTrackingInternalCrap {
+    private record ReadTrackingSourceWrapperSource(JDataVersionedWrapper wrapped) implements ReadTrackingSourceWrapper {
         @Override
         public boolean fromSource() {
             return true;
@@ -42,7 +44,7 @@ class TransactionImpl implements Transaction, AutoCloseable {
         }
     }
 
-    private record ReadTrackingInternalCrapTx(JData obj) implements ReadTrackingInternalCrap {
+    private record ReadTrackingSourceWrapperTx(JData obj) implements ReadTrackingSourceWrapper {
         @Override
         public boolean fromSource() {
             return false;
@@ -107,21 +109,21 @@ class TransactionImpl implements Transaction, AutoCloseable {
     @Override
     public CloseableKvIterator<JObjectKey, JData> getIterator(IteratorStart start, JObjectKey key) {
         Log.tracev("Getting tx iterator with start={0}, key={1}", start, key);
-        return new ReadTrackingIterator(new TombstoneSkippingIterator<JObjectKey, ReadTrackingInternalCrap>(start, key,
+        return new ReadTrackingIterator(new TombstoneSkippingIterator<JObjectKey, ReadTrackingSourceWrapper>(start, key,
                 ListUtils.prependAndMap(
                         new MappingKvIterator<>(new NavigableMapKvIterator<>(_writes, start, key),
                                 t -> switch (t) {
                                     case TxRecord.TxObjectRecordWrite<?> write ->
-                                            new DataWrapper<ReadTrackingInternalCrap>(new ReadTrackingInternalCrapTx(write.data()));
+                                            new DataWrapper<ReadTrackingSourceWrapper>(new ReadTrackingSourceWrapperTx(write.data()));
                                     case TxRecord.TxObjectRecordDeleted deleted ->
-                                            new TombstoneImpl<ReadTrackingInternalCrap>();
+                                            new TombstoneImpl<ReadTrackingSourceWrapper>();
                                     case null, default -> null;
                                 }),
                         _snapshot.getIterator(start, key),
-                        itin -> new MappingKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>, MaybeTombstone<ReadTrackingInternalCrap>>(itin,
+                        itin -> new MappingKvIterator<JObjectKey, MaybeTombstone<JDataVersionedWrapper>, MaybeTombstone<ReadTrackingSourceWrapper>>(itin,
                                 d -> switch (d) {
                                     case Data<JDataVersionedWrapper> w ->
-                                            new DataWrapper<>(new ReadTrackingInternalCrapSource(w.value()));
+                                            new DataWrapper<>(new ReadTrackingSourceWrapperSource(w.value()));
                                     case Tombstone<JDataVersionedWrapper> t -> new TombstoneImpl<>();
                                     case null, default -> null;
                                 }))));
@@ -178,9 +180,9 @@ class TransactionImpl implements Transaction, AutoCloseable {
     }
 
     private class ReadTrackingIterator implements CloseableKvIterator<JObjectKey, JData> {
-        private final CloseableKvIterator<JObjectKey, ReadTrackingInternalCrap> _backing;
+        private final CloseableKvIterator<JObjectKey, ReadTrackingSourceWrapper> _backing;
 
-        public ReadTrackingIterator(CloseableKvIterator<JObjectKey, ReadTrackingInternalCrap> backing) {
+        public ReadTrackingIterator(CloseableKvIterator<JObjectKey, ReadTrackingSourceWrapper> backing) {
             _backing = backing;
         }
 
@@ -202,7 +204,7 @@ class TransactionImpl implements Transaction, AutoCloseable {
         @Override
         public Pair<JObjectKey, JData> prev() {
             var got = _backing.prev();
-            if (got.getValue() instanceof ReadTrackingInternalCrapSource(JDataVersionedWrapper wrapped)) {
+            if (got.getValue() instanceof ReadTrackingSourceWrapperSource(JDataVersionedWrapper wrapped)) {
                 _readSet.putIfAbsent(got.getKey(), Optional.of(wrapped));
             }
             return Pair.of(got.getKey(), got.getValue().obj());
@@ -231,7 +233,7 @@ class TransactionImpl implements Transaction, AutoCloseable {
         @Override
         public Pair<JObjectKey, JData> next() {
             var got = _backing.next();
-            if (got.getValue() instanceof ReadTrackingInternalCrapSource(JDataVersionedWrapper wrapped)) {
+            if (got.getValue() instanceof ReadTrackingSourceWrapperSource(JDataVersionedWrapper wrapped)) {
                 _readSet.putIfAbsent(got.getKey(), Optional.of(wrapped));
             }
             return Pair.of(got.getKey(), got.getValue().obj());
