@@ -55,11 +55,6 @@
                 <scope>provided</scope>
             </dependency>
             <dependency>
-                <groupId>net.openhft</groupId>
-                <artifactId>zero-allocation-hashing</artifactId>
-                <version>0.16</version>
-            </dependency>
-            <dependency>
                 <groupId>org.awaitility</groupId>
                 <artifactId>awaitility</artifactId>
                 <version>4.2.2</version>
