@@ -254,7 +254,7 @@ public class DhfsFileService {
      * @param to   the new name
      * @return true if the rename was successful, false otherwise
      */
-    public Boolean rename(String from, String to) {
+    public boolean rename(String from, String to) {
         return jObjectTxManager.executeTx(() -> {
             var node = getDirEntry(from);
             JKleppmannTreeNodeMeta meta = node.meta();
@@ -275,7 +275,7 @@ public class DhfsFileService {
      * @param mode the new mode
      * @return true if the mode was changed successfully, false otherwise
      */
-    public Boolean chmod(JObjectKey uuid, long mode) {
+    public boolean chmod(JObjectKey uuid, long mode) {
         return jObjectTxManager.executeTx(() -> {
             var dent = curTx.get(JData.class, uuid).orElseThrow(() -> new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND));
 
@@ -420,7 +420,7 @@ public class DhfsFileService {
      * @param data     the data to write
      * @return the number of bytes written
      */
-    public Long write(JObjectKey fileUuid, long offset, ByteString data) {
+    public long write(JObjectKey fileUuid, long offset, ByteString data) {
         return jObjectTxManager.executeTx(() -> {
             if (offset < 0)
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Offset should be more than zero: " + offset));
@@ -529,7 +529,7 @@ public class DhfsFileService {
      * @param length   the new length of the file
      * @return true if the truncate was successful, false otherwise
      */
-    public Boolean truncate(JObjectKey fileUuid, long length) {
+    public boolean truncate(JObjectKey fileUuid, long length) {
         return jObjectTxManager.executeTx(() -> {
             if (length < 0)
                 throw new StatusRuntimeException(Status.INVALID_ARGUMENT.withDescription("Length should be more than zero: " + length));
@@ -721,7 +721,7 @@ public class DhfsFileService {
      * @param mtimeMs  the modification time in milliseconds
      * @return true if the times were set successfully, false otherwise
      */
-    public Boolean setTimes(JObjectKey fileUuid, long mtimeMs) {
+    public boolean setTimes(JObjectKey fileUuid, long mtimeMs) {
         return jObjectTxManager.executeTx(() -> {
             var dent = curTx.get(JData.class, fileUuid).orElseThrow(() -> new StatusRuntimeExceptionNoStacktrace(Status.NOT_FOUND));
 
@@ -775,7 +775,7 @@ public class DhfsFileService {
      * @param data     the data to write
      * @return the number of bytes written
      */
-    public Long write(JObjectKey fileUuid, long offset, byte[] data) {
+    public long write(JObjectKey fileUuid, long offset, byte[] data) {
         return write(fileUuid, offset, UnsafeByteOperations.unsafeWrap(data));
     }
 

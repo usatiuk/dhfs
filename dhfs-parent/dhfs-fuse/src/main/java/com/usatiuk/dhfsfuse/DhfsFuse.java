@@ -267,7 +267,7 @@ public class DhfsFuse extends FuseStubFS {
         try {
             var fileKey = getFromHandle(fi.fh.get());
             var written = fileService.write(fileKey, offset, UnsafeByteOperations.unsafeWrap(buffer));
-            return written.intValue();
+            return Math.toIntExact(written);
         } catch (Exception e) {
             Log.error("When writing " + path, e);
             return -ErrorCodes.EIO();
