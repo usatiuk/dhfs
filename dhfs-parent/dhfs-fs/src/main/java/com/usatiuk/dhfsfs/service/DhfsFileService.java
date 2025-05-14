@@ -45,10 +45,8 @@ import java.util.stream.StreamSupport;
  */
 @ApplicationScoped
 public class DhfsFileService {
-    @ConfigProperty(name = "dhfs.files.target_chunk_alignment")
+    @ConfigProperty(name = "dhfs.files.target_chunk_alignment", defaultValue = "17")
     int targetChunkAlignment;
-    @ConfigProperty(name = "dhfs.files.target_chunk_size")
-    int targetChunkSize;
     @ConfigProperty(name = "dhfs.files.max_chunk_size", defaultValue = "524288")
     int maxChunkSize;
     @ConfigProperty(name = "dhfs.files.allow_recursive_delete")
@@ -82,6 +80,10 @@ public class DhfsFileService {
         var newChunk = new ChunkData(JObjectKey.of(UUID.randomUUID().toString()), bytes);
         remoteTx.putDataNew(newChunk);
         return newChunk;
+    }
+
+    int targetChunkSize() {
+        return 1 << targetChunkAlignment;
     }
 
     void init(@Observes @Priority(500) StartupEvent event) {
@@ -494,7 +496,7 @@ public class DhfsFileService {
                     else if (targetChunkAlignment < 0)
                         end = combinedSize;
                     else
-                        end = Math.min(cur + targetChunkSize, combinedSize);
+                        end = Math.min(cur + targetChunkSize(), combinedSize);
 
                     var thisChunk = pendingWrites.substring(cur, end);
 
@@ -638,11 +640,11 @@ public class DhfsFileService {
             while (cur < combinedSize) {
                 long end;
 
-                if (targetChunkSize <= 0)
+                if (targetChunkSize() <= 0)
                     end = combinedSize;
                 else {
-                    if ((combinedSize - cur) > (targetChunkSize * 1.5)) {
-                        end = cur + targetChunkSize;
+                    if ((combinedSize - cur) > (targetChunkSize() * 1.5)) {
+                        end = cur + targetChunkSize();
                     } else {
                         end = combinedSize;
                     }
