@@ -14,27 +14,37 @@ Syncthing and allowing you to stream your files like Google Drive File Stream
 This is a simple wrapper around the jar/web ui distribution that allows you to run/stop
 the DHFS server in the background, and update itself (hopefully!)
 
+There will be 3 folders:
+
+- `app` contains the application
+- `data` contains the filesystem data storage
+- `fuse` is the default filesystem mount point (not on Windows)
+
 ## How to use it?
 
 ### General prerequisites
 
-Java should be available as `java` in path, and Java 21+ is required.
+Java should be available as `java` in `PATH`, and Java 21+ is required.
 
 FUSE 2 userspace library also should be available:
 
-- On Ubuntu `libfuse2` package can be installed.
+- On Ubuntu `libfuse2` package can be installed, or a analogous package for other distributions.
 
 - On Windows, [WinFsp](https://winfsp.dev/) should be installed. 
 
 - On macOS, [macFUSE](https://macfuse.github.io/).
 
-In the run-wrapper, 3 scripts are available.
+### How to run it?
+
+In the run-wrapper `app` folder, 3 scripts are available.
 
 - `run` script starts the filesystem
 - `stop` script stops it
 - `update` script will update the filesystem to the newest available CI build
 
 On Windows, Powershell alternatives should be used. For them to work, it might be required to allow execution of unsigned scripts using `set-executionpolicy unrestricted`.
+
+### Additional options
 
 Additional options for the filesystem can be specified in the `extra-opts` file in the same directory with the run scripts.
 
@@ -48,4 +58,8 @@ Some extra possible configuration options are:
 
 On Windows, the entire space for the filesystem should also be preallocated, the `-Ddhfs.objects.persistence.lmdb.size=` option controls the size (the value is in bytes), on Windows the default is 100 GB.
 
-Then, a web interface will be available at `losthost:8080`, that can be used to connect with other peers.
+In case of errors, the standard output is redirected to `quarkus.log` in the `app` folder, on Windows the error output is separate.
+
+### How to connect to other peers?
+
+Then, a web interface will be available at `losthost:8080`, that can be used to connect with other peers. Peers on local network should be available to be connected automatically.
