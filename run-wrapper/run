@@ -23,7 +23,18 @@ EXTRAOPTS_PARSED="$(tr '\n\r' ' ' <"$EXTRAOPTS")"
 
 echo "Extra options: $EXTRAOPTS_PARSED"
 
-java \
+if [ -n "${JAVA_HOME:-}" ]; then
+    JAVA_EXEC="$JAVA_HOME/bin/java"
+else
+    JAVA_EXEC="java"
+fi
+
+if ! command -v "$JAVA_EXEC"; then
+    echo "Java not found"
+    exit 1
+fi
+
+"$JAVA_EXEC" \
     -Xmx512M \
     --enable-preview \
     -Ddhfs.objects.writeback.limit=134217728 \
