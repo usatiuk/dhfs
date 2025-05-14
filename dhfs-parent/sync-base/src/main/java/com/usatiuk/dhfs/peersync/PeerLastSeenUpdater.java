@@ -52,10 +52,12 @@ public class PeerLastSeenUpdater {
                 var curInfo = remoteTransaction.getData(PeerInfo.class, u.id()).orElse(null);
                 if (curInfo == null) return;
 
-                var lastSeen = curInfo.lastSeenTimestamp();
-                if (System.currentTimeMillis() - lastSeen > (lastSeenTimeout * 1000)) {
-                    var kicked = curInfo.withIncrementedKickCounter(persistentPeerDataService.getSelfUuid());
-                    remoteTransaction.putData(kicked);
+                if (lastSeenTimeout != -1) {
+                    var lastSeen = curInfo.lastSeenTimestamp();
+                    if (System.currentTimeMillis() - lastSeen > (lastSeenTimeout * 1000)) {
+                        var kicked = curInfo.withIncrementedKickCounter(persistentPeerDataService.getSelfUuid());
+                        remoteTransaction.putData(kicked);
+                    }
                 }
             });
         }

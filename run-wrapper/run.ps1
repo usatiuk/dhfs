@@ -1,3 +1,5 @@
+# https://chatgpt.com/c/681762a4-dddc-800a-adad-2797355013f8
+
 $ErrorActionPreference = 'Stop'
 
 $PIDFILE = Join-Path $PSScriptRoot ".pid"
