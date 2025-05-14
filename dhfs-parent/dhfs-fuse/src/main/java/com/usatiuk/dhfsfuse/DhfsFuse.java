@@ -54,13 +54,12 @@ public class DhfsFuse extends FuseStubFS {
     boolean enabled;
     @ConfigProperty(name = "dhfs.fuse.debug")
     Boolean debug;
-    @ConfigProperty(name = "dhfs.files.target_chunk_size")
-    int targetChunkSize;
     @Inject
     DhfsFileService fileService;
 
     /**
      * Allocate a handle for the given key.
+     *
      * @param key the key to allocate a handle for
      * @return the allocated handle, not 0
      */
@@ -76,11 +75,12 @@ public class DhfsFuse extends FuseStubFS {
 
     /**
      * Get the key from the handle.
+     *
      * @param handle the handle to get the key from
      * @return the key, or null if not found
      */
     private JObjectKey getFromHandle(long handle) {
-        if(handle == 0)
+        if (handle == 0)
             throw new IllegalStateException("Handle is 0");
         return _openHandles.get(handle);
     }
@@ -112,7 +112,6 @@ public class DhfsFuse extends FuseStubFS {
                 opts.add("-o");
                 opts.add("iosize=" + iosize);
             } else if (SystemUtils.IS_OS_LINUX) {
-                // FIXME: There's something else missing: the writes still seem to be 32k max
 //            opts.add("-o");
 //            opts.add("large_read");
                 opts.add("-o");
@@ -144,13 +143,12 @@ public class DhfsFuse extends FuseStubFS {
         try {
             stbuf.f_frsize.set(blksize);
             stbuf.f_bsize.set(blksize);
-            // FIXME:
-            stbuf.f_blocks.set(1024 * 1024 * 1024 / blksize); // total data blocks in file system
-            stbuf.f_bfree.set(1024 * 1024 * 1024 / blksize);  // free blocks in fs
-            stbuf.f_bavail.set(1024 * 1024 * 1024 / blksize); // avail blocks in fs
-            stbuf.f_files.set(1000); //FIXME:
-            stbuf.f_ffree.set(Integer.MAX_VALUE - 2000); //FIXME:
-            stbuf.f_favail.set(Integer.MAX_VALUE - 2000); //FIXME:
+            stbuf.f_blocks.set(fileService.getTotalSpace() / blksize); // total data blocks in file system
+            stbuf.f_bfree.set(fileService.getFreeSpace() / blksize);  // free blocks in fs
+            stbuf.f_bavail.set(fileService.getFreeSpace() / blksize); // avail blocks in fs
+            stbuf.f_files.set(1000); // TODO: Calculate real file counts?
+            stbuf.f_ffree.set(Integer.MAX_VALUE - 1000);
+            stbuf.f_favail.set(Integer.MAX_VALUE - 1000);
             stbuf.f_namemax.set(2048);
             return super.statfs(path, stbuf);
         } catch (Throwable e) {
@@ -186,7 +184,6 @@ public class DhfsFuse extends FuseStubFS {
                 }
             }
 
-            // FIXME: Race?
             stat.st_ctim.tv_sec.set(found.get().ctime() / 1000);
             stat.st_ctim.tv_nsec.set((found.get().ctime() % 1000) * 1000);
             stat.st_mtim.tv_sec.set(found.get().mtime() / 1000);

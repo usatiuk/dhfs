@@ -66,7 +66,6 @@ public class ReachablePeerManager {
         _disconnectedListeners = List.copyOf(disconnectedListeners.stream().toList());
     }
 
-    // Note: keep priority updated with below
     void init(@Observes @Priority(600) StartupEvent event) throws IOException {
         _heartbeatExecutor = Executors.newVirtualThreadPerTaskExecutor();
     }

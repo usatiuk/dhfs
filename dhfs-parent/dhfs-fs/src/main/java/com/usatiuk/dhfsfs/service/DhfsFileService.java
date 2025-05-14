@@ -19,6 +19,7 @@ import com.usatiuk.dhfsfs.objects.JKleppmannTreeNodeMetaFile;
 import com.usatiuk.objects.JData;
 import com.usatiuk.objects.JObjectKey;
 import com.usatiuk.objects.iterators.IteratorStart;
+import com.usatiuk.objects.stores.ObjectPersistentStore;
 import com.usatiuk.objects.transaction.Transaction;
 import com.usatiuk.objects.transaction.TransactionManager;
 import com.usatiuk.utils.StatusRuntimeExceptionNoStacktrace;
@@ -69,6 +70,8 @@ public class DhfsFileService {
     JKleppmannTreeManager jKleppmannTreeManager;
     @Inject
     JMapHelper jMapHelper;
+    @Inject
+    ObjectPersistentStore objectPersistentStore;
 
     private JKleppmannTreeManager.JKleppmannTree getTree() {
         return jKleppmannTreeManager.getTree(JObjectKey.of("fs"), () -> new JKleppmannTreeNodeMetaDirectory(""));
@@ -780,5 +783,23 @@ public class DhfsFileService {
      */
     public Long write(JObjectKey fileUuid, long offset, byte[] data) {
         return write(fileUuid, offset, UnsafeByteOperations.unsafeWrap(data));
+    }
+
+    /**
+     * Get the free space on the filesystem.
+     *
+     * @return the free space in bytes
+     */
+    public long getFreeSpace() {
+        return objectPersistentStore.getFreeSpace();
+    }
+
+    /**
+     * Get the total space on the filesystem.
+     *
+     * @return the total space in bytes
+     */
+    public long getTotalSpace() {
+        return objectPersistentStore.getTotalSpace();
     }
 }
