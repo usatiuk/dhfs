@@ -30,9 +30,9 @@ Java should be available as `java` in `PATH`, or with a correctly set `JAVA_HOME
 
 FUSE 2 userspace library also should be available:
 
-- On Ubuntu `libfuse2` package can be installed, or a analogous package for other distributions.
+- On Ubuntu `libfuse2` package can be installed, or an analogous package for other distributions.
 
-- On Windows, [WinFsp](https://winfsp.dev/) should be installed. 
+- On Windows, [WinFsp](https://winfsp.dev/) should be installed.
 
 - On macOS, [macFUSE](https://macfuse.github.io/).
 
