@@ -40,11 +40,11 @@ public class DhfsFuseIT {
         container1 = new GenericContainer<>(DhfsImage.getInstance())
                 .withPrivilegedMode(true)
                 .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")))
-                .waitingFor(Wait.forLogMessage(".*Listening.*", 1).withStartupTimeout(Duration.ofSeconds(60))).withNetwork(network);
+                .withNetwork(network);
         container2 = new GenericContainer<>(DhfsImage.getInstance())
                 .withPrivilegedMode(true)
                 .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")))
-                .waitingFor(Wait.forLogMessage(".*Listening.*", 1).withStartupTimeout(Duration.ofSeconds(60))).withNetwork(network);
+                .withNetwork(network);
 
         Stream.of(container1, container2).parallel().forEach(GenericContainer::start);
 
@@ -54,6 +54,9 @@ public class DhfsFuseIT {
         waitingConsumer2 = new WaitingConsumer();
         var loggingConsumer2 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFuseIT.class)).withPrefix("2-" + testInfo.getDisplayName());
         container2.followOutput(loggingConsumer2.andThen(waitingConsumer2));
+
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Listening"), 60, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Listening"), 60, TimeUnit.SECONDS);
 
         c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/stuff/self_uuid").getStdout();
         c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/stuff/self_uuid").getStdout();

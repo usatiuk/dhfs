@@ -68,27 +68,28 @@ public class PersistentPeerDataService {
     private KeyPair _selfKeyPair;
 
     void init(@Observes @Priority(300) StartupEvent event) throws IOException {
-        jObjectTxManager.run(() -> {
-            var selfData = curTx.get(PersistentRemoteHostsData.class, PersistentRemoteHostsData.KEY).orElse(null);
-            if (selfData != null) {
-                _selfUuid = selfData.selfUuid();
-                _selfCertificate = CertificateTools.certFromBytes(selfData.selfCertificate().toByteArray());
-                _selfKeyPair = SerializationHelper.deserialize(selfData.selfKeyPair().toByteArray());
-                return;
-            } else {
-                try {
-                    _selfUuid = presetUuid.map(PeerId::of).orElseGet(() -> PeerId.of(UUID.randomUUID().toString()));
-                    Log.info("Generating a key pair, please wait");
-                    _selfKeyPair = CertificateTools.generateKeyPair();
-                    _selfCertificate = CertificateTools.generateCertificate(_selfKeyPair, _selfUuid.toString());
+        var selfData = jObjectTxManager.run(() -> {
+            return curTx.get(PersistentRemoteHostsData.class, PersistentRemoteHostsData.KEY).orElse(null);
+        });
+        if (selfData != null) {
+            _selfUuid = selfData.selfUuid();
+            _selfCertificate = CertificateTools.certFromBytes(selfData.selfCertificate().toByteArray());
+            _selfKeyPair = SerializationHelper.deserialize(selfData.selfKeyPair().toByteArray());
+        } else {
+            Log.info("Generating a key pair, please wait");
+            _selfKeyPair = CertificateTools.generateKeyPair();
+            _selfUuid = presetUuid.map(PeerId::of).orElseGet(() -> PeerId.of(UUID.randomUUID().toString()));
+            _selfCertificate = CertificateTools.generateCertificate(_selfKeyPair, _selfUuid.toString());
 
+            jObjectTxManager.run(() -> {
+                try {
                     curTx.put(new PersistentRemoteHostsData(_selfUuid, ByteString.copyFrom(_selfCertificate.getEncoded()), SerializationHelper.serialize(_selfKeyPair), HashTreePSet.empty(), HashTreePMap.empty()));
                     peerInfoService.putPeer(_selfUuid, _selfCertificate.getEncoded());
                 } catch (CertificateEncodingException e) {
                     throw new RuntimeException(e);
                 }
-            }
-        });
+            });
+        }
         peerTrustManager.reloadTrustManagerHosts(peerInfoService.getPeers());
         Log.info("Self uuid is: " + _selfUuid.toString());
         new File(stuffRoot).mkdirs();

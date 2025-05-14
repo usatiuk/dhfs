@@ -48,39 +48,42 @@ public class DhfsFusex3IT {
         container1 = new GenericContainer<>(DhfsImage.getInstance())
                 .withPrivilegedMode(true)
                 .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")))
-                .waitingFor(Wait.forLogMessage(".*Listening.*", 1).withStartupTimeout(Duration.ofSeconds(60))).withNetwork(network);
+                .withNetwork(network);
         container2 = new GenericContainer<>(DhfsImage.getInstance())
                 .withPrivilegedMode(true)
                 .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")))
-                .waitingFor(Wait.forLogMessage(".*Listening.*", 1).withStartupTimeout(Duration.ofSeconds(60))).withNetwork(network);
+                .withNetwork(network);
         container3 = new GenericContainer<>(DhfsImage.getInstance())
                 .withPrivilegedMode(true)
                 .withCreateContainerCmdModifier(cmd -> Objects.requireNonNull(cmd.getHostConfig()).withDevices(Device.parse("/dev/fuse")))
-                .waitingFor(Wait.forLogMessage(".*Listening.*", 1).withStartupTimeout(Duration.ofSeconds(60))).withNetwork(network);
-
+                .withNetwork(network);
 
         Stream.of(container1, container2, container3).parallel().forEach(GenericContainer::start);
+
+        waitingConsumer1 = new WaitingConsumer();
+        var loggingConsumer1 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFusex3IT.class))
+                .withPrefix(1 + "-" + testInfo.getDisplayName());
+        container1.followOutput(loggingConsumer1.andThen(waitingConsumer1));
+        waitingConsumer2 = new WaitingConsumer();
+        var loggingConsumer2 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFusex3IT.class))
+                .withPrefix(2 + "-" + testInfo.getDisplayName());
+        container2.followOutput(loggingConsumer2.andThen(waitingConsumer2));
+        waitingConsumer3 = new WaitingConsumer();
+        var loggingConsumer3 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFusex3IT.class))
+                .withPrefix(3 + "-" + testInfo.getDisplayName());
+        container3.followOutput(loggingConsumer3.andThen(waitingConsumer3));
+
+        waitingConsumer3.waitUntil(frame -> frame.getUtf8String().contains("Listening"), 60, TimeUnit.SECONDS);
+        waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Listening"), 60, TimeUnit.SECONDS);
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Listening"), 60, TimeUnit.SECONDS);
 
         c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/stuff/self_uuid").getStdout();
         c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/stuff/self_uuid").getStdout();
         c3uuid = container3.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/stuff/self_uuid").getStdout();
 
-        Log.info(container1.getContainerId() + "=" + c1uuid);
-        Log.info(container2.getContainerId() + "=" + c2uuid);
-        Log.info(container3.getContainerId() + "=" + c3uuid);
-
-        waitingConsumer1 = new WaitingConsumer();
-        var loggingConsumer1 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFusex3IT.class))
-                .withPrefix(c1uuid.substring(0, 4) + "-" + testInfo.getDisplayName());
-        container1.followOutput(loggingConsumer1.andThen(waitingConsumer1));
-        waitingConsumer2 = new WaitingConsumer();
-        var loggingConsumer2 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFusex3IT.class))
-                .withPrefix(c2uuid.substring(0, 4) + "-" + testInfo.getDisplayName());
-        container2.followOutput(loggingConsumer2.andThen(waitingConsumer2));
-        waitingConsumer3 = new WaitingConsumer();
-        var loggingConsumer3 = new Slf4jLogConsumer(LoggerFactory.getLogger(DhfsFusex3IT.class))
-                .withPrefix(c3uuid.substring(0, 4) + "-" + testInfo.getDisplayName());
-        container3.followOutput(loggingConsumer3.andThen(waitingConsumer3));
+        Log.info(container1.getContainerId() + "=" + c1uuid + " = 1");
+        Log.info(container2.getContainerId() + "=" + c2uuid + " = 2");
+        Log.info(container3.getContainerId() + "=" + c3uuid + " = 3");
 
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c1uuid));
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c2uuid));
