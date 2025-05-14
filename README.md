@@ -28,7 +28,7 @@ Note that on Windows, the path to the root can not contain spaces.
 
 ### General prerequisites
 
-Java should be available as `java` in `PATH`, or with a correctly set `JAVA_HOME`, and Java 21 is required.
+Java should be available as `java` in `PATH`, or with a correctly set `JAVA_HOME` (ignored on Windows), and Java 21 is required.
 
 FUSE 2 userspace library also should be available:
 
