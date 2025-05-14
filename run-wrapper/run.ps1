@@ -31,7 +31,7 @@ $JAVA_OPTS = @(
     "--add-opens=java.base/java.nio=ALL-UNNAMED"
     "-Ddhfs.objects.persistence.files.root=$($PSScriptRoot)\..\data\objects"
     "-Ddhfs.objects.persistence.stuff.root=$($PSScriptRoot)\..\data\stuff"
-    "-Ddhfs.objects.persistence.lmdb.size=1000000000"
+    "-Ddhfs.objects.persistence.lmdb.size=100000000000"
     "-Ddhfs.fuse.root=Z:\"
     "-Dquarkus.http.host=0.0.0.0"
     '-Dquarkus.log.category.\"com.usatiuk\".level=INFO'
