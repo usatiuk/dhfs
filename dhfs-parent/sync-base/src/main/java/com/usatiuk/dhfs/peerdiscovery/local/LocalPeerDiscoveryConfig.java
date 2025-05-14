@@ -6,7 +6,7 @@ import io.smallrye.config.WithDefault;
 
 @ConfigMapping(prefix = "dhfs.objects.peerdiscovery")
 public interface LocalPeerDiscoveryConfig {
-    @WithDefault("42168")
+    @WithDefault("42262")
     int port();
 
     @WithDefault("true")

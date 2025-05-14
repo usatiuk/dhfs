@@ -1,4 +1,4 @@
-# Distributed Home File System 🚧
+# Distributed Home File System
 
 ## What is this?
 
@@ -11,10 +11,10 @@ Syncthing and allowing you to stream your files like Google Drive File Stream
 
 [Download latest build](https://nightly.link/usatiuk/dhfs/workflows/server/main/Run%20wrapper.zip)
 
-This is a simple wrapper around the jar/web ui distribution that allows you to run/stop
-the DHFS server in the background, and update itself (hopefully!)
+This is a simple set of scripts that allows you to run/stop
+the DHFS server in the background, and update it.
 
-There will be 3 folders:
+Once unpacked, in the root folder, there will be 3 folders:
 
 - `app` contains the application
 - `data` contains the filesystem data storage
@@ -42,7 +42,7 @@ In the run-wrapper `app` folder, 3 scripts are available.
 - `stop` script stops it
 - `update` script will update the filesystem to the newest available CI build
 
-On Windows, Powershell alternatives should be used. For them to work, it might be required to allow execution of unsigned scripts using `set-executionpolicy unrestricted`.
+On Windows, Powershell versions of the scripts should be used. For them to work, it might be required to allow execution of unsigned scripts using `set-executionpolicy unrestricted`.
 
 ### Additional options
 
@@ -53,8 +53,13 @@ One line in the `extra-opts` file corresponds to one option passed to the JVM wh
 Some extra possible configuration options are:
 
 - `-Ddhfs.fuse.root=` specifies the root where filesystem should be mounted. By default, it is the `fuse` path under the `run-wrapper` root. For windows, it should be a disk letter, by default `Z:\`.
-- `-Ddhfs.objects.last-seen.timeout=` specifies the period of time (in seconds) after which unavailable peers will be ignored for gabgage collection and resynchronized after being reconnected. The default is 43200 (30 days), if set to `-1`, this feature is disabled.
+- `-Ddhfs.objects.last-seen.timeout=` specifies the period of time (in seconds) after which unavailable peers will be ignored for garbage collection and resynchronized after being reconnected. The default is 43200 (30 days), if set to `-1`, this feature is disabled.
 - `-Ddhfs.objects.autosync.download-all=` specifies whether all objects (files and their data) should be downloaded to this peer. `true` or `false`, the default is `false`.
+- `-Ddhfs.objects.peerdiscovery.port=` port to broadcast on and listen to for LAN peer discovery (default is `42262`)
+- `-Ddhfs.objects.peerdiscovery.broadcast=` whether to enable local peer discovery or not (default is `true`)
+- `-Dquarkus.http.port=` HTTP port to listen on (default is `8080`)
+- `-Dquarkus.http.ssl-port=` HTTPS port to listen on (default is `8443`)
+- `-Dquarkus.http.host=` IP address to listen on (default is `0.0.0.0`)
 
 On Windows, the entire space for the filesystem should also be preallocated, the `-Ddhfs.objects.persistence.lmdb.size=` option controls the size (the value is in bytes), on Windows the default is 100 GB.
 
@@ -62,4 +67,4 @@ In case of errors, the standard output is redirected to `quarkus.log` in the `ap
 
 ### How to connect to other peers?
 
-Then, a web interface will be available at `losthost:8080`, that can be used to connect with other peers. Peers on local network should be available to be connected automatically.
+Then, a web interface will be available at `losthost:8080` (or whatever the HTTP port is), that can be used to connect with other peers. Peers on local network should be available to be connected to automatically.
