@@ -1,5 +1,7 @@
 # Distributed Home File System
 
+[Javadocs](https://usatiuk.github.io/dhfs/)
+
 ## What is this?
 
 Inspired by Syncthing and Google Drive File Stream, this project
@@ -48,7 +50,7 @@ On Windows, Powershell versions of the scripts should be used. For them to work,
 
 Additional options for the filesystem can be specified in the `extra-opts` file in the same directory with the run scripts.
 
-One line in the `extra-opts` file corresponds to one option passed to the JVM when starting the filesystem. 
+One line in the `extra-opts` file corresponds to one option passed to the JVM when starting the filesystem.
 
 Some extra possible configuration options are:
 
