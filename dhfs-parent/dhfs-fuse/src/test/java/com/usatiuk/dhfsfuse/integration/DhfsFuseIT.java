@@ -10,10 +10,8 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.output.WaitingConsumer;
-import org.testcontainers.containers.wait.strategy.Wait;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -131,13 +129,15 @@ public class DhfsFuseIT {
                 "tesempty\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/testf1").getStdout()));
 
         var client = DockerClientFactory.instance().client();
-        client.pauseContainerCmd(container2.getContainerId()).exec();
+        client.disconnectFromNetworkCmd().withContainerId(container2.getContainerId()).withNetworkId(network.getId()).exec();
+        client.disconnectFromNetworkCmd().withContainerId(container1.getContainerId()).withNetworkId(network.getId()).exec();
 
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS);
 
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo newfile > /dhfs_test/fuse/testf2").getExitCode());
 
-        client.unpauseContainerCmd(container2.getContainerId()).exec();
+        client.connectToNetworkCmd().withContainerId(container2.getContainerId()).withNetworkId(network.getId()).exec();
+        client.connectToNetworkCmd().withContainerId(container1.getContainerId()).withNetworkId(network.getId()).exec();
 
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
         await().atMost(45, TimeUnit.SECONDS).until(() ->
@@ -155,13 +155,13 @@ public class DhfsFuseIT {
                 "tesempty\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/testf1").getStdout()));
 
         var client = DockerClientFactory.instance().client();
-        client.pauseContainerCmd(container2.getContainerId()).exec();
+        client.disconnectFromNetworkCmd().withNetworkId(network.getId()).withContainerId(container2.getContainerId()).exec();
 
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS);
 
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo rewritten > /dhfs_test/fuse/testf1").getExitCode());
 
-        client.unpauseContainerCmd(container2.getContainerId()).exec();
+        client.connectToNetworkCmd().withContainerId(container2.getContainerId()).withNetworkId(network.getId()).exec();
 
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
 
@@ -203,18 +203,34 @@ public class DhfsFuseIT {
         await().atMost(45, TimeUnit.SECONDS).until(() ->
                 "tesempty\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/testf1").getStdout()));
 
-        container2.stop();
+        var client = DockerClientFactory.instance().client();
+        client.disconnectFromNetworkCmd().withNetworkId(network.getId()).withContainerId(container2.getContainerId()).exec();
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("kicked"), 60, TimeUnit.SECONDS, 1);
+
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty2 > /dhfs_test/fuse/testf2").getExitCode());
+        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "echo tesempty3 > /dhfs_test/fuse/testf3").getExitCode());
 
         Log.info("Deleting");
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "rm /dhfs_test/fuse/testf1").getExitCode());
         Log.info("Deleted");
 
-        // FIXME?
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Deleting from persistent"), 60, TimeUnit.SECONDS, 3);
+
+        client.connectToNetworkCmd().withContainerId(container2.getContainerId()).withNetworkId(network.getId()).exec();
+
+        waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS);
 
         await().atMost(45, TimeUnit.SECONDS).until(() ->
                 1 == container1.execInContainer("/bin/sh", "-c", "test -f /dhfs_test/fuse/testf1").getExitCode());
+
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                "tesempty2\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/testf2").getStdout()));
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                "tesempty3\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/testf3").getStdout()));
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                "tesempty2\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/testf2").getStdout()));
+        await().atMost(45, TimeUnit.SECONDS).until(() ->
+                "tesempty3\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/testf3").getStdout()));
     }
 
     @Test
@@ -362,12 +378,12 @@ public class DhfsFuseIT {
         });
 
         var client = DockerClientFactory.instance().client();
-        client.pauseContainerCmd(container1.getContainerId()).exec();
+        client.disconnectFromNetworkCmd().withContainerId(container1.getContainerId()).withNetworkId(network.getId()).exec();
+        client.disconnectFromNetworkCmd().withContainerId(container2.getContainerId()).withNetworkId(network.getId()).exec();
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "mv /dhfs_test/fuse/a /dhfs_test/fuse/b").getExitCode());
-        client.pauseContainerCmd(container2.getContainerId()).exec();
-        client.unpauseContainerCmd(container1.getContainerId()).exec();
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "mv /dhfs_test/fuse/b /dhfs_test/fuse/a").getExitCode());
-        client.unpauseContainerCmd(container2.getContainerId()).exec();
+        client.connectToNetworkCmd().withContainerId(container1.getContainerId()).withNetworkId(network.getId()).exec();
+        client.connectToNetworkCmd().withContainerId(container2.getContainerId()).withNetworkId(network.getId()).exec();
 
 
         await().atMost(45, TimeUnit.SECONDS).until(() -> {
@@ -401,14 +417,14 @@ public class DhfsFuseIT {
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "ls /dhfs_test/fuse/").getExitCode());
         await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/testf1").getStdout()));
 
-        client.pauseContainerCmd(container1.getContainerId()).exec();
+        client.disconnectFromNetworkCmd().withContainerId(container1.getContainerId()).withNetworkId(network.getId()).exec();
+        client.disconnectFromNetworkCmd().withContainerId(container2.getContainerId()).withNetworkId(network.getId()).exec();
+
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS, 1);
 
         Log.info("Removing");
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "rm /dhfs_test/fuse/testf1").getExitCode());
 
-        client.pauseContainerCmd(container2.getContainerId()).exec();
-        client.unpauseContainerCmd(container1.getContainerId()).exec();
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS, 1);
         Log.info("Moving");
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "mv /dhfs_test/fuse/testf1 /dhfs_test/fuse/testf2").getExitCode());
@@ -416,12 +432,14 @@ public class DhfsFuseIT {
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "ls /dhfs_test/fuse/").getExitCode());
         Log.info("Reading");
         await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/testf2").getStdout()));
-        client.unpauseContainerCmd(container2.getContainerId()).exec();
+
+        client.connectToNetworkCmd().withContainerId(container1.getContainerId()).withNetworkId(network.getId()).exec();
+        client.connectToNetworkCmd().withContainerId(container2.getContainerId()).withNetworkId(network.getId()).exec();
 
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 1);
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 1);
+
         // Either removed, or moved
-        // TODO: it always seems to be removed?
         Log.info("Reading both");
         await().atMost(45, TimeUnit.SECONDS).until(() -> {
             var ls1 = container1.execInContainer("/bin/sh", "-c", "ls /dhfs_test/fuse/");

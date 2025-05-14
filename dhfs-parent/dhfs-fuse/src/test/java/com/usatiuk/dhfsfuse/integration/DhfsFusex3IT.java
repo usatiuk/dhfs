@@ -9,10 +9,8 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.output.WaitingConsumer;
-import org.testcontainers.containers.wait.strategy.Wait;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -36,9 +34,6 @@ public class DhfsFusex3IT {
     String c3uuid;
 
     Network network;
-
-    // This calculation is somewhat racy, so keep it hardcoded for now
-    long emptyFileCount = 9;
 
     @BeforeEach
     void setup(TestInfo testInfo) throws IOException, InterruptedException, TimeoutException {
@@ -122,17 +117,6 @@ public class DhfsFusex3IT {
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
     }
 
-    private boolean checkEmpty() throws IOException, InterruptedException {
-        for (var container : List.of(container1, container2, container3)) {
-            var found = container.execInContainer("/bin/sh", "-c", "find /dhfs_test/data/objs -type f");
-            var foundWc = container.execInContainer("/bin/sh", "-c", "find /dhfs_test/data/objs -type f | wc -l");
-            Log.info("Remaining objects in " + container.getContainerId() + ": " + found.toString() + " " + foundWc.toString());
-            if (!(found.getExitCode() == 0 && foundWc.getExitCode() == 0 && Integer.parseInt(foundWc.getStdout().strip()) == emptyFileCount))
-                return false;
-        }
-        return true;
-    }
-
     @AfterEach
     void stop() {
         Stream.of(container1, container2, container3).parallel().forEach(GenericContainer::stop);
@@ -144,25 +128,6 @@ public class DhfsFusex3IT {
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty > /dhfs_test/fuse/testf1").getExitCode());
         await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/testf1").getStdout()));
         await().atMost(45, TimeUnit.SECONDS).until(() -> "tesempty\n".equals(container3.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/testf1").getStdout()));
-    }
-
-    // FIXME:
-    @Test
-    @Disabled
-    void largerFileDeleteTest() throws IOException, InterruptedException, TimeoutException {
-        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "cd /dhfs_test/fuse && dd if=/dev/urandom of=10MB.bin bs=1M count=10").getExitCode());
-        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "head -c 10 /dhfs_test/fuse/10MB.bin").getExitCode());
-        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container3.execInContainer("/bin/sh", "-c", "rm /dhfs_test/fuse/10MB.bin").getExitCode());
-        await().atMost(45, TimeUnit.SECONDS).until(() -> checkEmpty());
-    }
-
-    @Test
-    @Disabled
-    void largerFileDeleteTestNoDelays() throws IOException, InterruptedException, TimeoutException {
-        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "cd /dhfs_test/fuse && dd if=/dev/urandom of=10MB.bin bs=1M count=10").getExitCode());
-        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "head -c 10 /dhfs_test/fuse/10MB.bin").getExitCode());
-        await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container3.execInContainer("/bin/sh", "-c", "rm /dhfs_test/fuse/10MB.bin").getExitCode());
-        await().atMost(45, TimeUnit.SECONDS).until(() -> checkEmpty());
     }
 
     @Test
@@ -210,21 +175,22 @@ public class DhfsFusex3IT {
     @Test
     void dirConflictTest() throws IOException, InterruptedException, TimeoutException {
         var client = DockerClientFactory.instance().client();
-        client.pauseContainerCmd(container1.getContainerId()).exec();
-        client.pauseContainerCmd(container2.getContainerId()).exec();
-        // Pauses needed as otherwise docker buffers some incoming packets
+
+        client.disconnectFromNetworkCmd().withContainerId(container1.getContainerId()).withNetworkId(network.getId()).exec();
+        client.disconnectFromNetworkCmd().withContainerId(container2.getContainerId()).withNetworkId(network.getId()).exec();
+        client.disconnectFromNetworkCmd().withContainerId(container3.getContainerId()).withNetworkId(network.getId()).exec();
+
         waitingConsumer3.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS, 2);
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container3.execInContainer("/bin/sh", "-c", "echo test3 >> /dhfs_test/fuse/testf").getExitCode());
-        client.pauseContainerCmd(container3.getContainerId()).exec();
-        client.unpauseContainerCmd(container2.getContainerId()).exec();
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS, 2);
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container2.execInContainer("/bin/sh", "-c", "echo test2 >> /dhfs_test/fuse/testf").getExitCode());
-        client.pauseContainerCmd(container2.getContainerId()).exec();
-        client.unpauseContainerCmd(container1.getContainerId()).exec();
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Lost connection to"), 60, TimeUnit.SECONDS, 2);
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo test1 >> /dhfs_test/fuse/testf").getExitCode());
-        client.unpauseContainerCmd(container2.getContainerId()).exec();
-        client.unpauseContainerCmd(container3.getContainerId()).exec();
+
+        client.connectToNetworkCmd().withContainerId(container1.getContainerId()).withNetworkId(network.getId()).exec();
+        client.connectToNetworkCmd().withContainerId(container2.getContainerId()).withNetworkId(network.getId()).exec();
+        client.connectToNetworkCmd().withContainerId(container3.getContainerId()).withNetworkId(network.getId()).exec();
+
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
         waitingConsumer3.waitUntil(frame -> frame.getUtf8String().contains("Connected"), 60, TimeUnit.SECONDS, 2);
