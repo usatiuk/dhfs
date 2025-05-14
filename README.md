@@ -60,6 +60,7 @@ Some extra possible configuration options are:
 - `-Dquarkus.http.port=` HTTP port to listen on (default is `8080`)
 - `-Dquarkus.http.ssl-port=` HTTPS port to listen on (default is `8443`)
 - `-Dquarkus.http.host=` IP address to listen on (default is `0.0.0.0`)
+- `-Ddhfs.peerdiscovery.static-peers=` allows to manually specify a peer's address in format of `peer id:http port:https port`, for example `-Ddhfs.peerdiscovery.static-peers=11000000-0000-0000-0000-000000000000:127.0.0.1:9010:9011`
 
 On Windows, the entire space for the filesystem should also be preallocated, the `-Ddhfs.objects.persistence.lmdb.size=` option controls the size (the value is in bytes), on Windows the default is 100 GB.
 
