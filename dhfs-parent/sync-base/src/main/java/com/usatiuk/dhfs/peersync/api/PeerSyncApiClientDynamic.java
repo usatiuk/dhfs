@@ -4,6 +4,7 @@ import com.usatiuk.dhfs.peerdiscovery.IpPeerAddress;
 import com.usatiuk.dhfs.peerdiscovery.PeerAddress;
 import io.quarkus.rest.client.reactive.QuarkusRestClientBuilder;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.net.URI;
 import java.util.concurrent.TimeUnit;
@@ -13,6 +14,10 @@ import java.util.concurrent.TimeUnit;
  */
 @ApplicationScoped
 public class PeerSyncApiClientDynamic {
+
+    @ConfigProperty(name = "dhfs.objects.sync.peer-sync-api.timeout", defaultValue = "5")
+    int timeout;
+
     /**
      * Queries peer about its information.
      *
@@ -29,8 +34,8 @@ public class PeerSyncApiClientDynamic {
     private ApiPeerInfo getSelfInfo(String address, int port) {
         var client = QuarkusRestClientBuilder.newBuilder()
                 .baseUri(URI.create("http://" + address + ":" + port))
-                .connectTimeout(1, TimeUnit.SECONDS)
-                .readTimeout(1, TimeUnit.SECONDS)
+                .connectTimeout(timeout, TimeUnit.SECONDS)
+                .readTimeout(timeout, TimeUnit.SECONDS)
                 .build(PeerSyncApiClient.class);
         return client.getSelfInfo();
     }

@@ -12,12 +12,10 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.output.WaitingConsumer;
-import org.testcontainers.containers.wait.strategy.Wait;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.time.Duration;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.*;
@@ -125,7 +123,7 @@ public class LazyFsIT {
     }
 
     private void checkConsistency(String testName) {
-        await().atMost(45, TimeUnit.SECONDS).until(() -> {
+        await().atMost(120, TimeUnit.SECONDS).until(() -> {
             var ls1 = container1.execInContainer("/bin/sh", "-c", "ls /dhfs_test/fuse");
             var cat1 = container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/fuse/*");
             var ls2 = container2.execInContainer("/bin/sh", "-c", "ls /dhfs_test/fuse");
