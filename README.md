@@ -85,6 +85,6 @@ LazyFS tests were only tested on Linux.
 
 ### Notice
 
-This software was developed with the support of the Faculty of Information Technology, Czech Technical University in Prague, fit.cvut.cz 
+This software was developed with the support of the Faculty of Information Technology, Czech Technical University in Prague, [fit.cvut.cz](https://fit.cvut.cz)
 
 <img src="./docs/logo-fit-en-cerna.svg" height="64">
