@@ -81,3 +81,10 @@ Then, a web interface will be available at `losthost:8080` (or whatever the HTTP
 To run LazyFS tests, LazyFS needs to be built: the git submodules need to be cloned and `./thirdparty/lazyfs/build.sh` script needs to be run. 
 
 LazyFS tests were only tested on Linux.
+
+
+### Notice
+
+This software was developed with the support of the Faculty of Information Technology, Czech Technical University in Prague, fit.cvut.cz 
+
+<img src="./docs/logo-fit-en-cerna.svg" height="64">
