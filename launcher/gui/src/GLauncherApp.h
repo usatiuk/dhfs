@@ -16,12 +16,15 @@
 #include <wx/colour.h>
 #include <wx/settings.h>
 #include <wx/string.h>
-#include <wx/sizer.h>
-#include <wx/statbox.h>
-#include <wx/panel.h>
+#include <wx/stattext.h>
+#include <wx/button.h>
 #include <wx/bitmap.h>
 #include <wx/image.h>
 #include <wx/icon.h>
+#include <wx/gbsizer.h>
+#include <wx/sizer.h>
+#include <wx/statbox.h>
+#include <wx/panel.h>
 #include <wx/notebook.h>
 #include <wx/frame.h>
 
@@ -38,7 +41,14 @@ class MainFrame : public wxFrame
 		wxStatusBar* m_statusBar1;
 		wxNotebook* m_notebook1;
 		wxPanel* m_panel1;
+		wxStaticText* m_staticText1;
+		wxButton* m_startStopButton;
+		wxPanel* m_panel3;
 		wxPanel* m_panel2;
+
+		// Virtual event handlers, override them in your derived class
+		virtual void OnStartStopButtonClick( wxCommandEvent& event ) { event.Skip(); }
+
 
 	public:
 
