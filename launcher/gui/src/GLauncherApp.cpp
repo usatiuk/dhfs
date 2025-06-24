@@ -19,33 +19,56 @@ MainFrame::MainFrame( wxWindow* parent, wxWindowID id, const wxString& title, co
 
 	m_notebook1 = new wxNotebook( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0 );
 	m_panel1 = new wxPanel( m_notebook1, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
-	wxBoxSizer* bSizer4;
-	bSizer4 = new wxBoxSizer( wxVERTICAL );
+	wxBoxSizer* bSizer2;
+	bSizer2 = new wxBoxSizer( wxVERTICAL );
+
+	wxStaticBoxSizer* sbSizer4;
+	sbSizer4 = new wxStaticBoxSizer( new wxStaticBox( m_panel1, wxID_ANY, _("Status") ), wxVERTICAL );
+
+	wxGridBagSizer* gbSizer1;
+	gbSizer1 = new wxGridBagSizer( 0, 0 );
+	gbSizer1->SetFlexibleDirection( wxBOTH );
+	gbSizer1->SetNonFlexibleGrowMode( wxFLEX_GROWMODE_SPECIFIED );
+
+	m_staticText1 = new wxStaticText( sbSizer4->GetStaticBox(), wxID_ANY, _("Running"), wxDefaultPosition, wxDefaultSize, 0 );
+	m_staticText1->Wrap( -1 );
+	gbSizer1->Add( m_staticText1, wxGBPosition( 0, 0 ), wxGBSpan( 1, 1 ), wxALL, 5 );
+
+	m_startStopButton = new wxButton( sbSizer4->GetStaticBox(), wxID_ANY, _("Start"), wxDefaultPosition, wxDefaultSize, 0 );
+	gbSizer1->Add( m_startStopButton, wxGBPosition( 0, 1 ), wxGBSpan( 1, 1 ), wxALL, 5 );
 
 
-	bSizer4->Add( 0, 8, 1, wxEXPAND, 5 );
-
-	wxStaticBoxSizer* sbSizer3;
-	sbSizer3 = new wxStaticBoxSizer( new wxStaticBox( m_panel1, wxID_ANY, _("Status") ), wxVERTICAL );
+	sbSizer4->Add( gbSizer1, 1, wxEXPAND, 5 );
 
 
-	bSizer4->Add( sbSizer3, 1, wxEXPAND, 5 );
+	bSizer2->Add( sbSizer4, 1, wxEXPAND, 5 );
+
+	wxStaticBoxSizer* sbSizer6;
+	sbSizer6 = new wxStaticBoxSizer( new wxStaticBox( m_panel1, wxID_ANY, _("Statistics") ), wxVERTICAL );
 
 
-	m_panel1->SetSizer( bSizer4 );
+	bSizer2->Add( sbSizer6, 1, wxEXPAND, 5 );
+
+
+	m_panel1->SetSizer( bSizer2 );
 	m_panel1->Layout();
-	bSizer4->Fit( m_panel1 );
+	bSizer2->Fit( m_panel1 );
 	m_notebook1->AddPage( m_panel1, _("Info"), true );
+	m_panel3 = new wxPanel( m_notebook1, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
+	m_notebook1->AddPage( m_panel3, _("Logs"), false );
 	m_panel2 = new wxPanel( m_notebook1, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
 	m_notebook1->AddPage( m_panel2, _("Settings"), false );
 
-	bSizer3->Add( m_notebook1, 1, wxEXPAND | wxALL, 5 );
+	bSizer3->Add( m_notebook1, 1, wxALL|wxEXPAND, 5 );
 
 
 	this->SetSizer( bSizer3 );
 	this->Layout();
 
 	this->Centre( wxBOTH );
+
+	// Connect Events
+	m_startStopButton->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( MainFrame::OnStartStopButtonClick ), NULL, this );
 }
 
 MainFrame::~MainFrame()
