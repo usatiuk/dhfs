@@ -11,3 +11,4 @@ add_executable(launcher
 )
 
 target_link_libraries(launcher ${wxWidgets_LIBRARIES})
+target_link_libraries(launcher backend)

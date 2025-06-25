@@ -28,5 +28,6 @@ if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_link_options(-O3)
 endif ()
 
-add_subdirectory(gui)
+add_subdirectory(libjvm_wrapper)
 add_subdirectory(backend)
+add_subdirectory(gui)
