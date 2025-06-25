@@ -116,9 +116,11 @@ MainFrame::MainFrame( wxWindow* parent, wxWindowID id, const wxString& title, co
 	m_panel2->SetSizer( bSizer5 );
 	m_panel2->Layout();
 	bSizer5->Fit( m_panel2 );
-	m_notebook1->AddPage( m_panel2, _("Settings"), true );
+	m_notebook1->AddPage( m_panel2, _("Settings"), false );
 	m_panel4 = new wxPanel( m_notebook1, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
 	m_notebook1->AddPage( m_panel4, _("Advanced Settings"), false );
+	m_panel5 = new wxPanel( m_notebook1, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
+	m_notebook1->AddPage( m_panel5, _("a page"), true );
 
 	bSizer3->Add( m_notebook1, 1, wxALL|wxEXPAND, 5 );
 
