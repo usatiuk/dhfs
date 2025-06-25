@@ -8,5 +8,6 @@ LauncherAppMainFrame::LauncherAppMainFrame(wxWindow* parent)
 
 void LauncherAppMainFrame::OnStartStopButtonClick(wxCommandEvent& event) {
     std::cout << "Hi!" << std::endl;
+    _dhfsInstance.start();
     // TODO: Implement OnStartStopButtonClick
 }
