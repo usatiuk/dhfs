@@ -15,11 +15,13 @@
 
 #include "LauncherAppMainFrame.h"
 #include "wx/taskbar.h"
-
+#include <wx/fileconf.h>
 IMPLEMENT_APP(LauncherApp)
 
 // This is executed upon startup, like 'main()' in non-wxWidgets programs.
 bool LauncherApp::OnInit() {
+    wxFileConfig::Get()->SetAppName("DHFS");
+
     wxFrame* frame = new LauncherAppMainFrame(NULL);
     frame->Show(true);
     SetTopWindow(frame);

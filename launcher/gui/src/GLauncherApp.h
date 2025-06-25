@@ -25,6 +25,7 @@
 #include <wx/sizer.h>
 #include <wx/statbox.h>
 #include <wx/panel.h>
+#include <wx/filepicker.h>
 #include <wx/notebook.h>
 #include <wx/frame.h>
 
@@ -41,18 +42,26 @@ class MainFrame : public wxFrame
 		wxStatusBar* m_statusBar1;
 		wxNotebook* m_notebook1;
 		wxPanel* m_panel1;
-		wxStaticText* m_staticText1;
+		wxStaticText* m_statusText;
 		wxButton* m_startStopButton;
 		wxPanel* m_panel3;
 		wxPanel* m_panel2;
+		wxButton* m_button2;
+		wxDirPickerCtrl* m_javaHomeDirPicker;
+		wxStaticText* m_staticText2;
+		wxStaticText* m_staticText6;
+		wxDirPickerCtrl* m_mountPathDirPicker;
+		wxPanel* m_panel4;
 
 		// Virtual event handlers, override them in your derived class
 		virtual void OnStartStopButtonClick( wxCommandEvent& event ) { event.Skip(); }
+		virtual void OnJavaHomeChanged( wxFileDirPickerEvent& event ) { event.Skip(); }
+		virtual void OnMountPathChanged( wxFileDirPickerEvent& event ) { event.Skip(); }
 
 
 	public:
 
-		MainFrame( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("DHFS"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( 500,300 ), long style = wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL, const wxString& name = wxT("DHFS") );
+		MainFrame( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("DHFS"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( 499,341 ), long style = wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL, const wxString& name = wxT("DHFS") );
 
 		~MainFrame();
 
