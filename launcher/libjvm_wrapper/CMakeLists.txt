@@ -8,3 +8,5 @@ target_include_directories(libjvm_wrapper PUBLIC include_public)
 
 find_package(JNI REQUIRED)
 target_include_directories(libjvm_wrapper PUBLIC ${JNI_INCLUDE_DIRS})
+
+target_link_libraries(libjvm_wrapper PUBLIC utils)

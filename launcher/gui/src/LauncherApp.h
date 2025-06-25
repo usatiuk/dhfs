@@ -9,7 +9,9 @@
 // containing a statusbar with the text "Hello World"
 class LauncherApp : public wxApp {
 public:
-    virtual bool OnInit();
+    virtual bool OnInit() override;
+
+    virtual bool OnExceptionInMainLoop() override;
 };
 
 DECLARE_APP(LauncherApp)
