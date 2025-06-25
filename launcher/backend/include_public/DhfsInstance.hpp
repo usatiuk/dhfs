@@ -6,6 +6,8 @@
 #define DHFSINSTANCE_HPP
 
 #include <jni.h>
+#include <string>
+#include <vector>
 
 enum class DhfsInstanceState {
     RUNNING,
@@ -20,7 +22,7 @@ public:
 
     DhfsInstanceState state();
 
-    void start();
+    void start(const std::string& mount_path, const std::vector<std::string>& extra_options);
 
     void stop();
 
@@ -28,7 +30,7 @@ private:
     DhfsInstanceState _state = DhfsInstanceState::STOPPED;
 
     JavaVM* _jvm = nullptr;
-    JNIEnv *_env = nullptr;
+    JNIEnv* _env = nullptr;
 };
 
 
