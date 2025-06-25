@@ -60,7 +60,7 @@ public class PersistentPeerDataService {
 
     @ConfigProperty(name = "dhfs.peerdiscovery.preset-uuid")
     Optional<String> presetUuid;
-    @ConfigProperty(name = "dhfs.objects.persistence.stuff.root")
+    @ConfigProperty(name = "dhfs.objects.persistence.root")
     String stuffRoot;
 
     private PeerId _selfUuid;

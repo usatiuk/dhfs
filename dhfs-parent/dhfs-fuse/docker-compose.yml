@@ -11,8 +11,7 @@ services:
       - $HOME/dhfs/dhfs1_f:/dhfs_root/fuse:rshared
       - ./target/quarkus-app:/app
     command: "java --add-exports java.base/sun.nio.ch=ALL-UNNAMED
-     -Ddhfs.objects.persistence.files.root=/dhfs_root/p 
-     -Ddhfs.objects.root=/dhfs_root/d 
+     -Ddhfs.objects.persistence.root=/dhfs_root/p 
      -Ddhfs.fuse.root=/dhfs_root/fuse -Dquarkus.http.host=0.0.0.0 
      -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
      -jar /app/quarkus-run.jar"
@@ -32,8 +31,7 @@ services:
     command: "java --add-exports java.base/sun.nio.ch=ALL-UNNAMED
      --add-exports java.base/jdk.internal.access=ALL-UNNAMED
      --add-opens=java.base/java.nio=ALL-UNNAMED
-     -Ddhfs.objects.persistence.files.root=/dhfs_root/p 
-     -Ddhfs.objects.root=/dhfs_root/d 
+     -Ddhfs.objects.persistence.root=/dhfs_root/p 
      -Ddhfs.fuse.root=/dhfs_root/fuse -Dquarkus.http.host=0.0.0.0
      -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5010
      -jar /app/quarkus-run.jar"

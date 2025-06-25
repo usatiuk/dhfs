@@ -32,7 +32,7 @@ public class DeferredInvalidationQueueService implements PeerConnectedEventListe
     ReachablePeerManager reachablePeerManager;
     @Inject
     InvalidationQueueService invalidationQueueService;
-    @ConfigProperty(name = "dhfs.objects.persistence.files.root")
+    @ConfigProperty(name = "dhfs.objects.persistence.root")
     String dataRoot;
     private DeferredInvalidationQueueData _persistentData = new DeferredInvalidationQueueData();
 

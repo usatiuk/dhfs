@@ -58,7 +58,7 @@ public class LmdbObjectPersistentStore implements ObjectPersistentStore {
     private Dbi<ByteBuffer> _db;
     private boolean _ready = false;
 
-    public LmdbObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.persistence.files.root") String root) {
+    public LmdbObjectPersistentStore(@ConfigProperty(name = "dhfs.objects.persistence.root") String root) {
         _root = Path.of(root).resolve("objects");
     }
 

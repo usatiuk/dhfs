@@ -87,7 +87,7 @@ public class DhfsImage implements Future<String> {
                                         "-Dquarkus.log.category.\"com.usatiuk.objects.transaction\".level=INFO",
                                         "-Ddhfs.objects.periodic-push-op-interval=5s",
                                         "-Ddhfs.fuse.root=/dhfs_test/fuse",
-                                        "-Ddhfs.objects.persistence.files.root=/dhfs_test/data",
+                                        "-Ddhfs.objects.persistence.root=/dhfs_test/data",
                                         "-Ddhfs.objects.persistence.stuff.root=/dhfs_test/data/stuff",
                                         "-jar", "/app/quarkus-run.jar")
                                 .run("mkdir /dhfs_test && chmod 777 /dhfs_test")

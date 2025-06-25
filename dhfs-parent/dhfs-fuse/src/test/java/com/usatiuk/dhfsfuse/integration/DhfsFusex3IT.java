@@ -72,9 +72,9 @@ public class DhfsFusex3IT {
         waitingConsumer2.waitUntil(frame -> frame.getUtf8String().contains("Listening"), 60, TimeUnit.SECONDS);
         waitingConsumer1.waitUntil(frame -> frame.getUtf8String().contains("Listening"), 60, TimeUnit.SECONDS);
 
-        c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/stuff/self_uuid").getStdout();
-        c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/stuff/self_uuid").getStdout();
-        c3uuid = container3.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/stuff/self_uuid").getStdout();
+        c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/self_uuid").getStdout();
+        c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/self_uuid").getStdout();
+        c3uuid = container3.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/self_uuid").getStdout();
 
         Log.info(container1.getContainerId() + "=" + c1uuid + " = 1");
         Log.info(container2.getContainerId() + "=" + c2uuid + " = 2");

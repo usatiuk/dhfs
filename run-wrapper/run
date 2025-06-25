@@ -42,8 +42,7 @@ fi
     --add-exports java.base/sun.nio.ch=ALL-UNNAMED \
     --add-exports java.base/jdk.internal.access=ALL-UNNAMED \
     --add-opens=java.base/java.nio=ALL-UNNAMED \
-    -Ddhfs.objects.persistence.files.root="$SCRIPT_DIR"/../data/objects \
-    -Ddhfs.objects.persistence.stuff.root="$SCRIPT_DIR"/../data/stuff \
+    -Ddhfs.objects.persistence.root="$SCRIPT_DIR"/../data \
     -Ddhfs.fuse.root="$SCRIPT_DIR"/../fuse \
     -Dquarkus.http.host=0.0.0.0 \
     -Dquarkus.log.category.\"com.usatiuk\".level=INFO \

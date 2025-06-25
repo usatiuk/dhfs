@@ -21,7 +21,7 @@ abstract public class TempDataProfile implements QuarkusTestProfile {
             throw new RuntimeException(e);
         }
         var ret = new HashMap<String, String>();
-        ret.put("dhfs.objects.persistence.files.root", tempDirWithPrefix.resolve("dhfs_root_test").toString());
+        ret.put("dhfs.objects.persistence.root", tempDirWithPrefix.resolve("dhfs_root_test").toString());
         ret.put("dhfs.fuse.root", tempDirWithPrefix.resolve("dhfs_fuse_root_test").toString());
         getConfigOverrides(ret);
         return ret;

@@ -15,7 +15,7 @@ import java.util.Objects;
 
 @ApplicationScoped
 public class TestDataCleaner {
-    @ConfigProperty(name = "dhfs.objects.persistence.files.root")
+    @ConfigProperty(name = "dhfs.objects.persistence.root")
     String tempDirectory;
 
     void init(@Observes @Priority(1) StartupEvent event) throws IOException {

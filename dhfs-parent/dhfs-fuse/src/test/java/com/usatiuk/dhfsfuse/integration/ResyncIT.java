@@ -66,8 +66,8 @@ public class ResyncIT {
     @Test
     void readWriteFileTest() throws IOException, InterruptedException, TimeoutException {
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty > /dhfs_test/fuse/testf1").getExitCode());
-        c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/stuff/self_uuid").getStdout();
-        c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/stuff/self_uuid").getStdout();
+        c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/self_uuid").getStdout();
+        c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/self_uuid").getStdout();
 
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c1uuid));
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c2uuid));
@@ -106,8 +106,8 @@ public class ResyncIT {
         foundWc = container2.execInContainer("/bin/sh", "-c", "find /dhfs_test/fuse -type f | wc -l");
         Assertions.assertEquals(200, Integer.valueOf(foundWc.getStdout().strip()));
 
-        c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/stuff/self_uuid").getStdout();
-        c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/stuff/self_uuid").getStdout();
+        c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/self_uuid").getStdout();
+        c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/self_uuid").getStdout();
 
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c1uuid));
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c2uuid));
@@ -146,8 +146,8 @@ public class ResyncIT {
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "mv /dhfs_test/fuse/testd1 /dhfs_test/fuse/testd2").getExitCode());
         await().atMost(45, TimeUnit.SECONDS).until(() -> 0 == container1.execInContainer("/bin/sh", "-c", "echo tesempty2 > /dhfs_test/fuse/testd2/testf2").getExitCode());
 
-        c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/stuff/self_uuid").getStdout();
-        c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/stuff/self_uuid").getStdout();
+        c1uuid = container1.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/self_uuid").getStdout();
+        c2uuid = container2.execInContainer("/bin/sh", "-c", "cat /dhfs_test/data/self_uuid").getStdout();
 
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c1uuid));
         Assertions.assertDoesNotThrow(() -> UUID.fromString(c2uuid));
