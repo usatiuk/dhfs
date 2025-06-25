@@ -52,6 +52,7 @@ class MainFrame : public wxFrame
 		wxStaticText* m_staticText6;
 		wxDirPickerCtrl* m_mountPathDirPicker;
 		wxPanel* m_panel4;
+		wxPanel* m_panel5;
 
 		// Virtual event handlers, override them in your derived class
 		virtual void OnStartStopButtonClick( wxCommandEvent& event ) { event.Skip(); }
