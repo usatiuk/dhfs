@@ -31,3 +31,12 @@ bool LauncherApp::OnInit() {
 
     return true;
 }
+
+bool LauncherApp::OnExceptionInMainLoop() {
+    try {
+        std::rethrow_exception(std::current_exception());
+    } catch (const std::exception& e) {
+        wxMessageBox(e.what(), "Error", wxOK | wxICON_ERROR | wxCENTRE, GetTopWindow());
+    }
+    return true;
+}

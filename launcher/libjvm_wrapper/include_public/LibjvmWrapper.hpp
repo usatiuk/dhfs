@@ -4,14 +4,14 @@
 
 #ifndef LIBJVMWRAPPER_HPP
 #define LIBJVMWRAPPER_HPP
-#include <jni.h>
 
+#include <jni.h>
 
 class LibjvmWrapper {
 public:
     static LibjvmWrapper& instance();
 
-    decltype(JNI_CreateJavaVM)* JNI_CreateJavaVM;
+    decltype(JNI_CreateJavaVM)* WJNI_CreateJavaVM;
 
 private:
     LibjvmWrapper();

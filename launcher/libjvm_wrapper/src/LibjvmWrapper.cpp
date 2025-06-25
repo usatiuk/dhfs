@@ -6,6 +6,8 @@
 #include <dlfcn.h>
 #include <jni.h>
 
+#include "Exception.h"
+
 static constexpr auto LIBJVM_PATH =
         "/Library/Java/JavaVirtualMachines/zulu-21.jdk/Contents/Home/lib/server/libjvm.dylib";
 
@@ -16,8 +18,12 @@ LibjvmWrapper& LibjvmWrapper::instance() {
 
 LibjvmWrapper::LibjvmWrapper() {
     _lib_handle = dlopen(LIBJVM_PATH, RTLD_NOW | RTLD_GLOBAL);
-    JNI_CreateJavaVM = reinterpret_cast<decltype(JNI_CreateJavaVM)>(
+    if (_lib_handle == nullptr)
+        throw Exception(dlerror());
+    WJNI_CreateJavaVM = reinterpret_cast<decltype(WJNI_CreateJavaVM)>(
         dlsym(_lib_handle, "JNI_CreateJavaVM"));
+    if (WJNI_CreateJavaVM == nullptr)
+        throw Exception(dlerror());
 }
 
 LibjvmWrapper::~LibjvmWrapper() {

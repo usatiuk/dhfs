@@ -6,4 +6,4 @@ add_library(backend
 target_include_directories(backend PRIVATE include)
 target_include_directories(backend PUBLIC include_public)
 
-target_link_libraries(backend PUBLIC libjvm_wrapper)
+target_link_libraries(backend PUBLIC libjvm_wrapper utils)

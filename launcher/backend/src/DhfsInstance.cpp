@@ -35,7 +35,7 @@ void DhfsInstance::start() {
     args.options = options.data();
     args.ignoreUnrecognized = false;
 
-    LibjvmWrapper::instance().JNI_CreateJavaVM(&_jvm, (void**) &_env, &args);
+    LibjvmWrapper::instance().WJNI_CreateJavaVM(&_jvm, (void**) &_env, &args);
 }
 
 void DhfsInstance::stop() {
