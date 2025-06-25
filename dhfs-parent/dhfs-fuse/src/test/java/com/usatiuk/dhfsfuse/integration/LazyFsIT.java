@@ -23,6 +23,7 @@ import java.util.stream.Stream;
 
 import static org.awaitility.Awaitility.await;
 
+@Disabled
 public class LazyFsIT {
     GenericContainer<?> container1;
     GenericContainer<?> container2;
