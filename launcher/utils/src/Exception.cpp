@@ -7,8 +7,6 @@
 #include <execinfo.h>
 #include <sstream>
 
-#include <openssl/err.h>
-
 Exception::Exception(const std::string& text) : runtime_error(text + "\n" + getStacktrace()) {
 }
 

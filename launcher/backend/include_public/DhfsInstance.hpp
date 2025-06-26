@@ -5,9 +5,14 @@
 #ifndef DHFSINSTANCE_HPP
 #define DHFSINSTANCE_HPP
 
-#include <jni.h>
+#include <wx/process.h>
 #include <string>
 #include <vector>
+#include <thread>
+#include<mutex>
+
+#include "DhfsStartOptions.hpp"
+#include "DhfsWxProcess.hpp"
 
 enum class DhfsInstanceState {
     RUNNING,
@@ -18,19 +23,25 @@ class DhfsInstance {
 public:
     DhfsInstance();
 
-    ~DhfsInstance();
+    virtual ~DhfsInstance();
 
     DhfsInstanceState state();
 
-    void start(const std::string& mount_path, const std::vector<std::string>& extra_options);
+    void start(DhfsStartOptions start_options);
 
     void stop();
 
+    virtual void OnTerminate(int pid, int status) = 0;
+
+    virtual void OnRead(std::string s) = 0;
+
+protected:
+    std::unique_ptr<wxProcess> process = std::make_unique<DhfsWxProcess>(*this);
+
 private:
     DhfsInstanceState _state = DhfsInstanceState::STOPPED;
-
-    JavaVM* _jvm = nullptr;
-    JNIEnv* _env = nullptr;
+    std::thread _readThread;
+    std::mutex _mutex;
 };
 
 

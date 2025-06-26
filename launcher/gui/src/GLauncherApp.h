@@ -25,6 +25,7 @@
 #include <wx/sizer.h>
 #include <wx/statbox.h>
 #include <wx/panel.h>
+#include <wx/textctrl.h>
 #include <wx/filepicker.h>
 #include <wx/notebook.h>
 #include <wx/frame.h>
@@ -45,6 +46,7 @@ class MainFrame : public wxFrame
 		wxStaticText* m_statusText;
 		wxButton* m_startStopButton;
 		wxPanel* m_panel3;
+		wxTextCtrl* m_logOutputTextCtrl;
 		wxPanel* m_panel2;
 		wxButton* m_button2;
 		wxDirPickerCtrl* m_javaHomeDirPicker;
