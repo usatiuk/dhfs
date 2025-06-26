@@ -15,11 +15,15 @@
 #include "DhfsWxProcess.hpp"
 
 enum class DhfsInstanceState {
+    STARTING,
     RUNNING,
+    STOPPING,
     STOPPED,
 };
 
 class DhfsInstance {
+    friend DhfsWxProcess;
+
 public:
     DhfsInstance();
 
@@ -31,14 +35,16 @@ public:
 
     void stop();
 
-    virtual void OnTerminate(int pid, int status) = 0;
+protected:
+    virtual void OnStateChange() = 0;
 
     virtual void OnRead(std::string s) = 0;
 
-protected:
+private:
     std::unique_ptr<DhfsWxProcess> process = std::make_unique<DhfsWxProcess>(*this);
 
-private:
+    void OnTerminateInternal(int pid, int status);
+
     DhfsInstanceState _state = DhfsInstanceState::STOPPED;
     std::thread _readThread;
     std::thread _readThreadErr;

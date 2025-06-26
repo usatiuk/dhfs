@@ -19,7 +19,7 @@ static constexpr auto kMountPointSettingsKey = "DHFS/MountDir";
 static constexpr auto kDataDirSettingsKey = "DHFS/DataDir";
 
 wxDECLARE_EVENT(NEW_LINE_OUTPUT_EVENT, wxCommandEvent);
-wxDECLARE_EVENT(SHUTDOWN_EVENT, wxCommandEvent);
+wxDECLARE_EVENT(DHFS_STATE_CHANGE_EVENT, wxCommandEvent);
 
 /** Implementing MainFrame */
 class LauncherAppMainFrame : public MainFrame {

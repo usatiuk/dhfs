@@ -6,7 +6,7 @@
 #include "Exception.h"
 
 wxDEFINE_EVENT(NEW_LINE_OUTPUT_EVENT, wxCommandEvent);
-wxDEFINE_EVENT(SHUTDOWN_EVENT, wxCommandEvent);
+wxDEFINE_EVENT(DHFS_STATE_CHANGE_EVENT, wxCommandEvent);
 
 LauncherAppMainFrame::LauncherAppMainFrame(wxWindow* parent)
     : MainFrame(parent) {
@@ -20,7 +20,7 @@ LauncherAppMainFrame::LauncherAppMainFrame(wxWindow* parent)
     m_webViewSizer->Fit(m_panel5);
 
     Bind(NEW_LINE_OUTPUT_EVENT, &LauncherAppMainFrame::onNewLineOutput, this);
-    Bind(SHUTDOWN_EVENT, &LauncherAppMainFrame::onShutdown, this);
+    Bind(DHFS_STATE_CHANGE_EVENT, &LauncherAppMainFrame::onShutdown, this);
     wxFont font = wxFont(wxSize(16, 16),
                          wxFontFamily::wxFONTFAMILY_TELETYPE,
                          wxFontStyle::wxFONTSTYLE_NORMAL,
@@ -36,10 +36,22 @@ void LauncherAppMainFrame::updateState() {
             m_startStopButton->SetLabel("Stop");
             m_statusBar1->SetStatusText("Running", 0);
             break;
+        case DhfsInstanceState::STARTING: {
+            m_statusText->SetLabel("Starting");
+            m_startStopButton->SetLabel("Stop");
+            m_statusBar1->SetStatusText("Starting", 0);
+            break;
+        }
         case DhfsInstanceState::STOPPED: {
             m_statusText->SetLabel("Stopped");
             m_startStopButton->SetLabel("Start");
             m_statusBar1->SetStatusText("Stopped", 0);
+            break;
+        }
+        case DhfsInstanceState::STOPPING: {
+            m_statusText->SetLabel("Stopping");
+            m_startStopButton->SetLabel("Kill");
+            m_statusBar1->SetStatusText("Stopping", 0);
             break;
         }
         default:
@@ -50,8 +62,10 @@ void LauncherAppMainFrame::updateState() {
 void LauncherAppMainFrame::OnStartStopButtonClick(wxCommandEvent& event) {
     switch (_dhfsInstance.state()) {
         case DhfsInstanceState::RUNNING:
+        case DhfsInstanceState::STARTING: {
             _dhfsInstance.stop();
             break;
+        }
         case DhfsInstanceState::STOPPED: {
             DhfsStartOptions options;
             options.java_home = wxFileConfig::Get()->Read(kJavaHomeSettingsKey);
@@ -63,6 +77,10 @@ void LauncherAppMainFrame::OnStartStopButtonClick(wxCommandEvent& event) {
             options.webui_path = bundlePath + "/app/Webui";
 
             _dhfsInstance.start(options);
+            break;
+        }
+        case DhfsInstanceState::STOPPING: {
+            // TODO:
             break;
         }
         default:
