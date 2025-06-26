@@ -20,7 +20,7 @@ LauncherAppMainFrame::LauncherAppMainFrame(wxWindow* parent)
     m_webViewSizer->Fit(m_panel5);
 
     Bind(NEW_LINE_OUTPUT_EVENT, &LauncherAppMainFrame::onNewLineOutput, this);
-    Bind(DHFS_STATE_CHANGE_EVENT, &LauncherAppMainFrame::onShutdown, this);
+    Bind(DHFS_STATE_CHANGE_EVENT, &LauncherAppMainFrame::onDhfsInstanceStateChange, this);
     wxFont font = wxFont(wxSize(16, 16),
                          wxFontFamily::wxFONTFAMILY_TELETYPE,
                          wxFontStyle::wxFONTSTYLE_NORMAL,
@@ -31,11 +31,18 @@ LauncherAppMainFrame::LauncherAppMainFrame(wxWindow* parent)
 
 void LauncherAppMainFrame::updateState() {
     switch (_dhfsInstance.state()) {
-        case DhfsInstanceState::RUNNING:
+        case DhfsInstanceState::RUNNING: {
             m_statusText->SetLabel("Running");
             m_startStopButton->SetLabel("Stop");
             m_statusBar1->SetStatusText("Running", 0);
+
+            if (m_notebook1->GetSelection() == 4) {
+                if (m_webView != nullptr)
+                    m_webView->LoadURL("http://localhost:8080");
+            }
+
             break;
+        }
         case DhfsInstanceState::STARTING: {
             m_statusText->SetLabel("Starting");
             m_startStopButton->SetLabel("Stop");
@@ -113,7 +120,7 @@ void LauncherAppMainFrame::OnNotebookPageChanging(wxBookCtrlEvent& event) {
     else unloadWebview();
 }
 
-void LauncherAppMainFrame::onShutdown(wxCommandEvent& event) {
+void LauncherAppMainFrame::onDhfsInstanceStateChange(wxCommandEvent& event) {
     updateState();
 }
 
