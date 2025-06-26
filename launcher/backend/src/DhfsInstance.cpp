@@ -8,7 +8,6 @@
 #include <vector>
 
 #include "Exception.h"
-#include "LibjvmWrapper.hpp"
 
 DhfsInstance::DhfsInstance() {
 }
@@ -17,10 +16,12 @@ DhfsInstance::~DhfsInstance() {
 }
 
 DhfsInstanceState DhfsInstance::state() {
+    std::lock_guard<std::mutex> lock(_mutex);
     return _state;
 }
 
-void DhfsInstance::start(const std::string& mount_path, const std::vector<std::string>& extra_options) {
+void DhfsInstance::start(DhfsStartOptions options) {
+    std::lock_guard<std::mutex> lock(_mutex);
     switch (_state) {
         case DhfsInstanceState::RUNNING:
             return;
@@ -31,23 +32,39 @@ void DhfsInstance::start(const std::string& mount_path, const std::vector<std::s
     }
     _state = DhfsInstanceState::RUNNING;
 
-    JavaVMInitArgs args;
-    std::vector<JavaVMOption> options;
-    for (const auto& option: extra_options) {
-        options.emplace_back((char*) option.c_str(), nullptr);
+    std::vector<char*> args;
+    auto readyOptions = options.getOptions();
+    for (const auto& option: readyOptions) {
+        args.push_back(const_cast<char*>(option.c_str()));
     }
-    std::string mount_option = "-Ddhfs.fuse.root=";
-    mount_option += mount_path;
-    options.emplace_back((char*) mount_option.c_str(), nullptr);
-    args.version = JNI_VERSION_21;
-    args.nOptions = options.size();
-    args.options = options.data();
-    args.ignoreUnrecognized = false;
 
-    LibjvmWrapper::instance().get_JNI_CreateJavaVM()(&_jvm, (void**) &_env, &args);
+    long ret = wxExecute(args.data(), wxEXEC_ASYNC | wxEXEC_HIDE_CONSOLE | wxEXEC_MAKE_GROUP_LEADER, process.get(),
+                         nullptr);
+    if (ret == 0) {
+        _state = DhfsInstanceState::STOPPED;
+        throw Exception("Failed to start DHFS");
+    }
+
+    OnRead("Started! " + std::to_string(ret) + " PID: " + std::to_string(process->GetPid()));
+
+    _readThread = std::thread([&]() {
+        auto stream = process->GetInputStream();
+        while (!stream->Eof()) {
+            char buffer[1024];
+            size_t bytesRead = stream->Read(buffer, sizeof(buffer) - 1).LastRead();
+            if (bytesRead > 0) {
+                buffer[bytesRead] = '\0'; // Null-terminate the string
+                OnRead(std::string(buffer));
+            } else if (bytesRead == 0) {
+                break; // EOF reached
+            }
+        }
+        OnRead("Stream end");
+    });
 }
 
 void DhfsInstance::stop() {
+    std::lock_guard<std::mutex> lock(_mutex);
     switch (_state) {
         case DhfsInstanceState::RUNNING:
             break;
@@ -57,12 +74,12 @@ void DhfsInstance::stop() {
             throw std::runtime_error("Unknown DhfsInstanceState");
     }
 
-    if (_jvm == nullptr)
-        throw Exception("JVM not running");
-
-    JNIEnv* env;
-    _jvm->AttachCurrentThread((void**) &env, nullptr);
-    _jvm->DestroyJavaVM();
-    _jvm = nullptr;
     _state = DhfsInstanceState::STOPPED;
+
+    int err = wxProcess::Kill(process->GetPid(), wxSIGTERM, wxKILL_CHILDREN);
+    if (err != wxKILL_OK) {
+        throw Exception("Failed to stop DHFS: " + std::to_string(err));
+    }
+    _readThread.join();
+    OnRead("Stopped!");
 }

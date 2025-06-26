@@ -29,6 +29,5 @@ if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif ()
 
 add_subdirectory(utils)
-add_subdirectory(libjvm_wrapper)
 add_subdirectory(backend)
 add_subdirectory(gui)

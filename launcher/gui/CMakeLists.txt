@@ -8,6 +8,8 @@ add_executable(launcher
         src/LauncherApp.cpp
         src/GLauncherApp.cpp
         src/LauncherAppMainFrame.cpp
+        src/DhfsGuiInstance.cpp
+        src/DhfsGuiInstance.hpp
 )
 
 target_link_libraries(launcher ${wxWidgets_LIBRARIES})
