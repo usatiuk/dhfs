@@ -13,7 +13,7 @@ class DhfsGuiInstance : public DhfsInstance {
 public:
     DhfsGuiInstance(LauncherAppMainFrame& parent);
 
-    void OnTerminate(int pid, int status) override;
+    void OnStateChange() override;
 
     void OnRead(std::string s) override;
 

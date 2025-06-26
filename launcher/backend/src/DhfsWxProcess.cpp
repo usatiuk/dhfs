@@ -10,5 +10,5 @@ DhfsWxProcess::DhfsWxProcess(DhfsInstance& parent): wxProcess(wxPROCESS_REDIRECT
 }
 
 void DhfsWxProcess::OnTerminate(int pid, int status) {
-    _instance.stop();
+    _instance.OnTerminateInternal(pid, status);
 }

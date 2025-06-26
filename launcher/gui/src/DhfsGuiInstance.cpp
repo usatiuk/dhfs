@@ -9,8 +9,8 @@
 DhfsGuiInstance::DhfsGuiInstance(LauncherAppMainFrame& parent): _parent(parent) {
 }
 
-void DhfsGuiInstance::OnTerminate(int pid, int status) {
-    wxCommandEvent* event = new wxCommandEvent(SHUTDOWN_EVENT, _parent.GetId());
+void DhfsGuiInstance::OnStateChange() {
+    wxCommandEvent* event = new wxCommandEvent(DHFS_STATE_CHANGE_EVENT, _parent.GetId());
     event->SetEventObject(&_parent);
     _parent.GetEventHandler()->QueueEvent(event);
 }
