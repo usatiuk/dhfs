@@ -12,15 +12,12 @@ LauncherAppMainFrame::LauncherAppMainFrame(wxWindow* parent)
     : MainFrame(parent) {
     m_javaHomeDirPicker->SetPath(wxFileConfig::Get()->Read(kJavaHomeSettingsKey));
     m_mountPathDirPicker->SetPath(wxFileConfig::Get()->Read(kMountPointSettingsKey));
-    wxGridSizer* bSizer4;
-    bSizer4 = new wxGridSizer(1, 0, 0);
+    m_dataPathDirPicker->SetPath(wxFileConfig::Get()->Read(kDataDirSettingsKey));
 
-    m_panel5->SetSizer(bSizer4);
+    m_webViewSizer = new wxGridSizer(1, 0, 0);
+    m_panel5->SetSizer(m_webViewSizer);
     m_panel5->Layout();
-    bSizer4->Fit(m_panel5);
-    m_webView = wxWebView::New(m_panel5, wxID_ANY);
-    bSizer4->Add(m_webView, 0, wxALL | wxEXPAND);
-    m_webView->LoadURL("http://localhost:8080");
+    m_webViewSizer->Fit(m_panel5);
 
     Bind(NEW_LINE_OUTPUT_EVENT, &LauncherAppMainFrame::onNewLineOutput, this);
     Bind(SHUTDOWN_EVENT, &LauncherAppMainFrame::onShutdown, this);
@@ -40,7 +37,6 @@ void LauncherAppMainFrame::updateState() {
             m_statusBar1->SetStatusText("Running", 0);
             break;
         case DhfsInstanceState::STOPPED: {
-            // wxFileConfig::Get()->Read(kJavaHomeSettingsKey).ToStdString();
             m_statusText->SetLabel("Stopped");
             m_startStopButton->SetLabel("Start");
             m_statusBar1->SetStatusText("Stopped", 0);
@@ -59,11 +55,12 @@ void LauncherAppMainFrame::OnStartStopButtonClick(wxCommandEvent& event) {
         case DhfsInstanceState::STOPPED: {
             DhfsStartOptions options;
             options.java_home = wxFileConfig::Get()->Read(kJavaHomeSettingsKey);
-            options.xmx = "512m"; // Default memory allocation, can be changed
+            options.xmx = "512m";
             options.mount_path = wxFileConfig::Get()->Read(kMountPointSettingsKey);
-            options.data_path = "/Users/stepus53/dhfs_test/launcher/data";
-            options.jar_path = "/Users/stepus53/projects/dhfs/dhfs-parent/dhfs-fuse/target/quarkus-app/quarkus-run.jar";
-            options.webui_path = "/Users/stepus53/projects/dhfs/webui/dist";
+            options.data_path = wxFileConfig::Get()->Read(kDataDirSettingsKey);
+            std::string bundlePath = wxGetenv("DHFS_BUNDLE_PATH");
+            options.jar_path = bundlePath + "/app/Server/quarkus-run.jar";
+            options.webui_path = bundlePath + "/app/Webui";
 
             _dhfsInstance.start(options);
             break;
@@ -82,11 +79,37 @@ void LauncherAppMainFrame::OnMountPathChanged(wxFileDirPickerEvent& event) {
     wxFileConfig::Get()->Write(kMountPointSettingsKey, event.GetPath());
 }
 
+void LauncherAppMainFrame::OnDataPathChanged(wxFileDirPickerEvent& event) {
+    wxFileConfig::Get()->Write(kDataDirSettingsKey, event.GetPath());
+}
+
 void LauncherAppMainFrame::onNewLineOutput(wxCommandEvent& event) {
     m_logOutputTextCtrl->AppendText(event.GetString());
 }
 
+void LauncherAppMainFrame::OnNotebookPageChanged(wxBookCtrlEvent& event) {
+}
+
+void LauncherAppMainFrame::OnNotebookPageChanging(wxBookCtrlEvent& event) {
+    if (event.GetSelection() == 4) prepareWebview();
+    else unloadWebview();
+}
+
 void LauncherAppMainFrame::onShutdown(wxCommandEvent& event) {
-    m_logOutputTextCtrl->AppendText("Shutdown");
     updateState();
+}
+
+void LauncherAppMainFrame::unloadWebview() {
+    if (m_webView != nullptr) {
+        m_webViewSizer->Detach(m_webView);
+        m_webView->Destroy();
+        m_webView = nullptr;
+    }
+}
+
+void LauncherAppMainFrame::prepareWebview() {
+    m_webView = wxWebView::New(m_panel5, wxID_ANY);
+    m_webViewSizer->Add(m_webView, 0, wxALL | wxEXPAND);
+    m_webView->LoadURL("http://localhost:8080");
+    m_panel5->Layout();
 }

@@ -36,11 +36,12 @@ public:
     virtual void OnRead(std::string s) = 0;
 
 protected:
-    std::unique_ptr<wxProcess> process = std::make_unique<DhfsWxProcess>(*this);
+    std::unique_ptr<DhfsWxProcess> process = std::make_unique<DhfsWxProcess>(*this);
 
 private:
     DhfsInstanceState _state = DhfsInstanceState::STOPPED;
     std::thread _readThread;
+    std::thread _readThreadErr;
     std::mutex _mutex;
 };
 

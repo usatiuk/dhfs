@@ -11,7 +11,7 @@
 
 MainFrame::MainFrame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPoint& pos, const wxSize& size, long style, const wxString& name ) : wxFrame( parent, id, title, pos, size, style, name )
 {
-	this->SetSizeHints( wxSize( 100,50 ), wxDefaultSize );
+	this->SetSizeHints( wxSize( 600,400 ), wxDefaultSize );
 
 	m_statusBar1 = this->CreateStatusBar( 1, wxSTB_SIZEGRIP, wxID_ANY );
 	wxBoxSizer* bSizer3;
@@ -53,7 +53,7 @@ MainFrame::MainFrame( wxWindow* parent, wxWindowID id, const wxString& title, co
 	m_panel1->SetSizer( bSizer2 );
 	m_panel1->Layout();
 	bSizer2->Fit( m_panel1 );
-	m_notebook1->AddPage( m_panel1, _("Info"), true );
+	m_notebook1->AddPage( m_panel1, _("Info"), false );
 	m_panel3 = new wxPanel( m_notebook1, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
 	wxGridSizer* gSizer1;
 	gSizer1 = new wxGridSizer( 1, 1, 0, 0 );
@@ -65,7 +65,7 @@ MainFrame::MainFrame( wxWindow* parent, wxWindowID id, const wxString& title, co
 	m_panel3->SetSizer( gSizer1 );
 	m_panel3->Layout();
 	gSizer1->Fit( m_panel3 );
-	m_notebook1->AddPage( m_panel3, _("Logs"), false );
+	m_notebook1->AddPage( m_panel3, _("Logs"), true );
 	m_panel2 = new wxPanel( m_notebook1, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
 	wxBoxSizer* bSizer5;
 	bSizer5 = new wxBoxSizer( wxVERTICAL );
@@ -111,8 +111,15 @@ MainFrame::MainFrame( wxWindow* parent, wxWindowID id, const wxString& title, co
 	m_staticText6->Wrap( -1 );
 	gbSizer3->Add( m_staticText6, wxGBPosition( 0, 0 ), wxGBSpan( 1, 1 ), wxALIGN_CENTER_VERTICAL|wxALL, 5 );
 
-	m_mountPathDirPicker = new wxDirPickerCtrl( sbSizer41->GetStaticBox(), wxID_ANY, wxEmptyString, _("Select a folder"), wxDefaultPosition, wxDefaultSize, wxDIRP_DEFAULT_STYLE|wxDIRP_USE_TEXTCTRL );
+	m_staticText61 = new wxStaticText( sbSizer41->GetStaticBox(), wxID_ANY, _("Data path"), wxDefaultPosition, wxDefaultSize, 0 );
+	m_staticText61->Wrap( -1 );
+	gbSizer3->Add( m_staticText61, wxGBPosition( 1, 0 ), wxGBSpan( 1, 1 ), wxALIGN_CENTER_VERTICAL|wxALL, 5 );
+
+	m_mountPathDirPicker = new wxDirPickerCtrl( sbSizer41->GetStaticBox(), wxID_ANY, wxEmptyString, _("Select a folder"), wxDefaultPosition, wxDefaultSize, wxDIRP_USE_TEXTCTRL );
 	gbSizer3->Add( m_mountPathDirPicker, wxGBPosition( 0, 1 ), wxGBSpan( 1, 1 ), wxALL|wxEXPAND, 5 );
+
+	m_dataPathDirPicker = new wxDirPickerCtrl( sbSizer41->GetStaticBox(), wxID_ANY, wxEmptyString, _("Select a folder"), wxDefaultPosition, wxDefaultSize, wxDIRP_USE_TEXTCTRL );
+	gbSizer3->Add( m_dataPathDirPicker, wxGBPosition( 1, 1 ), wxGBSpan( 1, 1 ), wxALL|wxEXPAND, 5 );
 
 
 	gbSizer3->AddGrowableCol( 1 );
@@ -141,9 +148,12 @@ MainFrame::MainFrame( wxWindow* parent, wxWindowID id, const wxString& title, co
 	this->Centre( wxBOTH );
 
 	// Connect Events
+	m_notebook1->Connect( wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED, wxNotebookEventHandler( MainFrame::OnNotebookPageChanged ), NULL, this );
+	m_notebook1->Connect( wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGING, wxNotebookEventHandler( MainFrame::OnNotebookPageChanging ), NULL, this );
 	m_startStopButton->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( MainFrame::OnStartStopButtonClick ), NULL, this );
 	m_javaHomeDirPicker->Connect( wxEVT_COMMAND_DIRPICKER_CHANGED, wxFileDirPickerEventHandler( MainFrame::OnJavaHomeChanged ), NULL, this );
 	m_mountPathDirPicker->Connect( wxEVT_COMMAND_DIRPICKER_CHANGED, wxFileDirPickerEventHandler( MainFrame::OnMountPathChanged ), NULL, this );
+	m_dataPathDirPicker->Connect( wxEVT_COMMAND_DIRPICKER_CHANGED, wxFileDirPickerEventHandler( MainFrame::OnDataPathChanged ), NULL, this );
 }
 
 MainFrame::~MainFrame()

@@ -52,19 +52,24 @@ class MainFrame : public wxFrame
 		wxDirPickerCtrl* m_javaHomeDirPicker;
 		wxStaticText* m_staticText2;
 		wxStaticText* m_staticText6;
+		wxStaticText* m_staticText61;
 		wxDirPickerCtrl* m_mountPathDirPicker;
+		wxDirPickerCtrl* m_dataPathDirPicker;
 		wxPanel* m_panel4;
 		wxPanel* m_panel5;
 
 		// Virtual event handlers, override them in your derived class
+		virtual void OnNotebookPageChanged( wxNotebookEvent& event ) { event.Skip(); }
+		virtual void OnNotebookPageChanging( wxNotebookEvent& event ) { event.Skip(); }
 		virtual void OnStartStopButtonClick( wxCommandEvent& event ) { event.Skip(); }
 		virtual void OnJavaHomeChanged( wxFileDirPickerEvent& event ) { event.Skip(); }
 		virtual void OnMountPathChanged( wxFileDirPickerEvent& event ) { event.Skip(); }
+		virtual void OnDataPathChanged( wxFileDirPickerEvent& event ) { event.Skip(); }
 
 
 	public:
 
-		MainFrame( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("DHFS"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( 499,341 ), long style = wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL, const wxString& name = wxT("DHFS") );
+		MainFrame( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("DHFS"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( 600,400 ), long style = wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL, const wxString& name = wxT("DHFS") );
 
 		~MainFrame();
 
