@@ -79,6 +79,8 @@ void LauncherAppMainFrame::OnStartStopButtonClick(wxCommandEvent& event) {
             options.xmx = "512m";
             options.mount_path = wxFileConfig::Get()->Read(kMountPointSettingsKey);
             options.data_path = wxFileConfig::Get()->Read(kDataDirSettingsKey);
+            if (wxGetenv("DHFS_BUNDLE_PATH") == NULL)
+                throw Exception("DHFS_BUNDLE_PATH environment variable is not set");
             std::string bundlePath = wxGetenv("DHFS_BUNDLE_PATH");
             options.jar_path = bundlePath + "/app/Server/quarkus-run.jar";
             options.webui_path = bundlePath + "/app/Webui";
