@@ -113,11 +113,11 @@ void LauncherAppMainFrame::onNewLineOutput(wxCommandEvent& event) {
 }
 
 void LauncherAppMainFrame::OnNotebookPageChanged(wxBookCtrlEvent& event) {
+    if (event.GetSelection() == 4) prepareWebview();
+    else unloadWebview();
 }
 
 void LauncherAppMainFrame::OnNotebookPageChanging(wxBookCtrlEvent& event) {
-    if (event.GetSelection() == 4) prepareWebview();
-    else unloadWebview();
 }
 
 void LauncherAppMainFrame::onDhfsInstanceStateChange(wxCommandEvent& event) {
