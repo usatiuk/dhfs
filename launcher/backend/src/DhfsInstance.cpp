@@ -13,6 +13,7 @@ DhfsInstance::DhfsInstance() {
 }
 
 DhfsInstance::~DhfsInstance() {
+    stop();
 }
 
 DhfsInstanceState DhfsInstance::state() {
@@ -45,11 +46,11 @@ void DhfsInstance::start(DhfsStartOptions options) {
         throw Exception("Failed to start DHFS");
     }
 
-    OnRead("Started! " + std::to_string(ret) + " PID: " + std::to_string(process->GetPid()));
+    OnRead("Started! " + std::to_string(ret) + " PID: " + std::to_string(process->GetPid()) + "\n");
 
     _readThread = std::thread([&]() {
         auto stream = process->GetInputStream();
-        while (!stream->Eof()) {
+        while (!stream->Eof() || stream->CanRead()) {
             char buffer[1024];
             size_t bytesRead = stream->Read(buffer, sizeof(buffer) - 1).LastRead();
             if (bytesRead > 0) {
@@ -59,7 +60,19 @@ void DhfsInstance::start(DhfsStartOptions options) {
                 break; // EOF reached
             }
         }
-        OnRead("Stream end");
+    });
+    _readThreadErr = std::thread([&]() {
+        auto stream = process->GetErrorStream();
+        while (!stream->Eof() || stream->CanRead()) {
+            char buffer[1024];
+            size_t bytesRead = stream->Read(buffer, sizeof(buffer) - 1).LastRead();
+            if (bytesRead > 0) {
+                buffer[bytesRead] = '\0'; // Null-terminate the string
+                OnRead(std::string(buffer));
+            } else if (bytesRead == 0) {
+                break; // EOF reached
+            }
+        }
     });
 }
 
@@ -77,9 +90,11 @@ void DhfsInstance::stop() {
     _state = DhfsInstanceState::STOPPED;
 
     int err = wxProcess::Kill(process->GetPid(), wxSIGTERM, wxKILL_CHILDREN);
-    if (err != wxKILL_OK) {
-        throw Exception("Failed to stop DHFS: " + std::to_string(err));
-    }
     _readThread.join();
-    OnRead("Stopped!");
+    _readThreadErr.join();
+    OnRead("Stopped!\n");
+    if (err != wxKILL_OK) {
+        OnRead("Failed to stop DHFS: " + std::to_string(err) + "\n");
+    }
+    OnTerminate(0, 0);
 }

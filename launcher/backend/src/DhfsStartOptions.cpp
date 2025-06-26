@@ -16,9 +16,9 @@ std::vector<std::string> DhfsStartOptions::getOptions() {
     out.emplace_back("--add-exports");
     out.emplace_back("java.base/jdk.internal.access=ALL-UNNAMED");
     out.emplace_back("--add-opens=java.base/java.nio=ALL-UNNAMED");
-    // out.emplace_back("-Dquarkus.http.host=0.0.0.0");
-    // out.emplace_back("-Dquarkus.log.category.\"com.usatiuk\".level=INFO");
-    // out.emplace_back("-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=INFO");
+    out.emplace_back("-Dquarkus.http.host=0.0.0.0");
+    out.emplace_back("-Dquarkus.log.category.\"com.usatiuk\".level=INFO");
+    out.emplace_back("-Dquarkus.log.category.\"com.usatiuk.dhfs\".level=INFO");
     out.emplace_back("-Ddhfs.fuse.root=" + mount_path);
     out.emplace_back("-Ddhfs.objects.persistence.root=" + data_path);
     out.emplace_back("-Ddhfs.webui.root=" + webui_path);
