@@ -91,7 +91,7 @@
         <property name="permission">none</property>
         <object class="sizeritem" expanded="true">
           <property name="border">5</property>
-          <property name="flag">wxALL|wxEXPAND</property>
+          <property name="flag">wxEXPAND</property>
           <property name="proportion">1</property>
           <object class="wxNotebook" expanded="true">
             <property name="BottomDockable">1</property>
@@ -146,7 +146,7 @@
             <property name="tooltip"></property>
             <property name="window_extra_style"></property>
             <property name="window_name"></property>
-            <property name="window_style"></property>
+            <property name="window_style">wxBORDER_NONE</property>
             <event name="OnNotebookPageChanged">OnNotebookPageChanged</event>
             <event name="OnNotebookPageChanging">OnNotebookPageChanging</event>
             <object class="notebookpage" expanded="true">
@@ -205,16 +205,16 @@
                 <property name="window_extra_style"></property>
                 <property name="window_name"></property>
                 <property name="window_style">wxTAB_TRAVERSAL</property>
-                <object class="wxBoxSizer" expanded="true">
+                <object class="wxBoxSizer" expanded="false">
                   <property name="minimum_size"></property>
                   <property name="name">bSizer2</property>
                   <property name="orient">wxVERTICAL</property>
                   <property name="permission">none</property>
-                  <object class="sizeritem" expanded="true">
+                  <object class="sizeritem" expanded="false">
                     <property name="border">5</property>
                     <property name="flag">wxALL|wxEXPAND</property>
                     <property name="proportion">1</property>
-                    <object class="wxStaticBoxSizer" expanded="true">
+                    <object class="wxStaticBoxSizer" expanded="false">
                       <property name="id">wxID_ANY</property>
                       <property name="label">Status</property>
                       <property name="minimum_size"></property>
@@ -527,7 +527,7 @@
                       <property name="value"></property>
                       <property name="window_extra_style"></property>
                       <property name="window_name"></property>
-                      <property name="window_style"></property>
+                      <property name="window_style">wxBORDER_NONE</property>
                     </object>
                   </object>
                 </object>
