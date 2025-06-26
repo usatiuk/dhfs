@@ -39,7 +39,7 @@ protected:
 
     void onNewLineOutput(wxCommandEvent& event);
 
-    void onShutdown(wxCommandEvent& event);
+    void onDhfsInstanceStateChange(wxCommandEvent& event);
 
     void updateState();
 
