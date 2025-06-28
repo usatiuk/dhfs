@@ -2,11 +2,20 @@
 
 #include <iostream>
 #include <wx/fileconf.h>
+#include <wx/stdpaths.h>
+#include <filesystem>
 
 #include "Exception.h"
 
 wxDEFINE_EVENT(NEW_LINE_OUTPUT_EVENT, wxCommandEvent);
 wxDEFINE_EVENT(DHFS_STATE_CHANGE_EVENT, wxCommandEvent);
+
+std::string getBundlePath() {
+    if (wxGetenv("DHFS_BUNDLE_PATH") == NULL)
+        return std::filesystem::path(wxStandardPaths::Get().GetExecutablePath().ToStdString())
+                .parent_path().parent_path().string();
+    return wxGetenv("DHFS_BUNDLE_PATH");
+}
 
 LauncherAppMainFrame::LauncherAppMainFrame(wxWindow* parent)
     : MainFrame(parent) {
@@ -79,11 +88,8 @@ void LauncherAppMainFrame::OnStartStopButtonClick(wxCommandEvent& event) {
             options.xmx = "512m";
             options.mount_path = wxFileConfig::Get()->Read(kMountPointSettingsKey);
             options.data_path = wxFileConfig::Get()->Read(kDataDirSettingsKey);
-            if (wxGetenv("DHFS_BUNDLE_PATH") == NULL)
-                throw Exception("DHFS_BUNDLE_PATH environment variable is not set");
-            std::string bundlePath = wxGetenv("DHFS_BUNDLE_PATH");
-            options.jar_path = bundlePath + "/app/Server/quarkus-run.jar";
-            options.webui_path = bundlePath + "/app/Webui";
+            options.jar_path = getBundlePath() + "/app/Server/quarkus-run.jar";
+            options.webui_path = getBundlePath() + "/app/Webui";
 
             _dhfsInstance.start(options);
             break;
