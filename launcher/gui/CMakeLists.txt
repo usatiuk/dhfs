@@ -1,9 +1,3 @@
-
-find_package(wxWidgets REQUIRED COMPONENTS net core base webview)
-if (wxWidgets_USE_FILE) # not defined in CONFIG mode
-    include(${wxWidgets_USE_FILE})
-endif ()
-
 add_executable(launcher
         src/LauncherApp.cpp
         src/GLauncherApp.cpp

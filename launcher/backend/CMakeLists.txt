@@ -1,8 +1,3 @@
-find_package(wxWidgets REQUIRED COMPONENTS base)
-if (wxWidgets_USE_FILE) # not defined in CONFIG mode
-    include(${wxWidgets_USE_FILE})
-endif ()
-
 add_library(backend
         src/DhfsInstance.cpp
         include_public/DhfsInstance.hpp
