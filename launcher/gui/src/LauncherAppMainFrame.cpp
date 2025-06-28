@@ -13,7 +13,10 @@ wxDEFINE_EVENT(DHFS_STATE_CHANGE_EVENT, wxCommandEvent);
 std::string getBundlePath() {
     if (wxGetenv("DHFS_BUNDLE_PATH") == NULL)
         return std::filesystem::path(wxStandardPaths::Get().GetExecutablePath().ToStdString())
-                .parent_path().parent_path().string();
+#ifndef __APPLE__
+    .parent_path()
+#endif
+                .parent_path().string();
     return wxGetenv("DHFS_BUNDLE_PATH");
 }
 
