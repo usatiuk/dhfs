@@ -6,18 +6,19 @@
 
 #include "LauncherAppMainFrame.h"
 
-DhfsGuiInstance::DhfsGuiInstance(LauncherAppMainFrame& parent): _parent(parent) {
+wxDEFINE_EVENT(NEW_LINE_OUTPUT_EVENT, wxCommandEvent);
+wxDEFINE_EVENT(DHFS_STATE_CHANGE_EVENT, wxCommandEvent);
+
+DhfsGuiInstance::DhfsGuiInstance(wxEvtHandler& parent): _evtHandler(parent) {
 }
 
 void DhfsGuiInstance::OnStateChange() {
-    wxCommandEvent* event = new wxCommandEvent(DHFS_STATE_CHANGE_EVENT, _parent.GetId());
-    event->SetEventObject(&_parent);
-    _parent.GetEventHandler()->QueueEvent(event);
+    wxCommandEvent* event = new wxCommandEvent(DHFS_STATE_CHANGE_EVENT);
+    _evtHandler.QueueEvent(event);
 }
 
 void DhfsGuiInstance::OnRead(std::string s) {
-    wxCommandEvent* event = new wxCommandEvent(NEW_LINE_OUTPUT_EVENT, _parent.GetId());
-    event->SetEventObject(&_parent);
+    wxCommandEvent* event = new wxCommandEvent(NEW_LINE_OUTPUT_EVENT);
     event->SetString(std::move(s));
-    _parent.GetEventHandler()->QueueEvent(event);
+    _evtHandler.QueueEvent(event);
 }
