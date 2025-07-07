@@ -18,9 +18,6 @@ static constexpr auto kJavaHomeSettingsKey = "DHFS/JavaHome";
 static constexpr auto kMountPointSettingsKey = "DHFS/MountDir";
 static constexpr auto kDataDirSettingsKey = "DHFS/DataDir";
 
-wxDECLARE_EVENT(NEW_LINE_OUTPUT_EVENT, wxCommandEvent);
-wxDECLARE_EVENT(DHFS_STATE_CHANGE_EVENT, wxCommandEvent);
-
 /** Implementing MainFrame */
 class LauncherAppMainFrame : public MainFrame {
 protected:
@@ -44,7 +41,14 @@ protected:
     void updateState();
 
     void unloadWebview();
+
     void prepareWebview();
+
+    void OnActivate(wxActivateEvent& event) override;
+
+    void OnActivateApp(wxActivateEvent& event) override;
+
+    void OnClose(wxCloseEvent& event) override;
 
 public:
     /** Constructor */
@@ -55,8 +59,6 @@ public:
 private:
     wxWebView* m_webView = nullptr;
     wxGridSizer* m_webViewSizer;
-
-    DhfsGuiInstance _dhfsInstance{*this};
 };
 
 #endif // __LauncherAppMainFrame__

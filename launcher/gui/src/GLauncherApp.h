@@ -59,6 +59,9 @@ class MainFrame : public wxFrame
 		wxPanel* m_panel5;
 
 		// Virtual event handlers, override them in your derived class
+		virtual void OnActivate( wxActivateEvent& event ) { event.Skip(); }
+		virtual void OnActivateApp( wxActivateEvent& event ) { event.Skip(); }
+		virtual void OnClose( wxCloseEvent& event ) { event.Skip(); }
 		virtual void OnNotebookPageChanged( wxNotebookEvent& event ) { event.Skip(); }
 		virtual void OnNotebookPageChanging( wxNotebookEvent& event ) { event.Skip(); }
 		virtual void OnStartStopButtonClick( wxCommandEvent& event ) { event.Skip(); }

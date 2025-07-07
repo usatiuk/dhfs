@@ -5,10 +5,12 @@
 #include <wx/stdpaths.h>
 #include <filesystem>
 
-#include "Exception.h"
+#ifdef __APPLE__
+#include "macos/utils.h"
+#endif
 
-wxDEFINE_EVENT(NEW_LINE_OUTPUT_EVENT, wxCommandEvent);
-wxDEFINE_EVENT(DHFS_STATE_CHANGE_EVENT, wxCommandEvent);
+#include "LauncherApp.h"
+#include "Exception.h"
 
 std::string getBundlePath() {
     if (wxGetenv("DHFS_BUNDLE_PATH") == NULL)
@@ -39,10 +41,17 @@ LauncherAppMainFrame::LauncherAppMainFrame(wxWindow* parent)
                          wxFontWeight::wxFONTWEIGHT_NORMAL);
     m_logOutputTextCtrl->SetFont(font);
     updateState();
+#ifdef __APPLE__
+    SetAppAsRegular();
+#endif
+}
+
+static DhfsInstance& getDhfsInstance() {
+    return wxGetApp().m_dhfsInstance;
 }
 
 void LauncherAppMainFrame::updateState() {
-    switch (_dhfsInstance.state()) {
+    switch (getDhfsInstance().state()) {
         case DhfsInstanceState::RUNNING: {
             m_statusText->SetLabel("Running");
             m_startStopButton->SetLabel("Stop");
@@ -53,24 +62,28 @@ void LauncherAppMainFrame::updateState() {
                     m_webView->LoadURL("http://localhost:8080");
             }
 
+            wxGetApp().SetExitOnFrameDelete(false);
             break;
         }
         case DhfsInstanceState::STARTING: {
             m_statusText->SetLabel("Starting");
             m_startStopButton->SetLabel("Stop");
             m_statusBar1->SetStatusText("Starting", 0);
+            wxGetApp().SetExitOnFrameDelete(false);
             break;
         }
         case DhfsInstanceState::STOPPED: {
             m_statusText->SetLabel("Stopped");
             m_startStopButton->SetLabel("Start");
             m_statusBar1->SetStatusText("Stopped", 0);
+            wxGetApp().SetExitOnFrameDelete(true);
             break;
         }
         case DhfsInstanceState::STOPPING: {
             m_statusText->SetLabel("Stopping");
             m_startStopButton->SetLabel("Kill");
             m_statusBar1->SetStatusText("Stopping", 0);
+            wxGetApp().SetExitOnFrameDelete(false);
             break;
         }
         default:
@@ -79,10 +92,10 @@ void LauncherAppMainFrame::updateState() {
 }
 
 void LauncherAppMainFrame::OnStartStopButtonClick(wxCommandEvent& event) {
-    switch (_dhfsInstance.state()) {
+    switch (getDhfsInstance().state()) {
         case DhfsInstanceState::RUNNING:
         case DhfsInstanceState::STARTING: {
-            _dhfsInstance.stop();
+            getDhfsInstance().stop();
             break;
         }
         case DhfsInstanceState::STOPPED: {
@@ -94,7 +107,7 @@ void LauncherAppMainFrame::OnStartStopButtonClick(wxCommandEvent& event) {
             options.jar_path = getBundlePath() + "/app/Server/quarkus-run.jar";
             options.webui_path = getBundlePath() + "/app/Webui";
 
-            _dhfsInstance.start(options);
+            getDhfsInstance().start(options);
             break;
         }
         case DhfsInstanceState::STOPPING: {
@@ -148,4 +161,21 @@ void LauncherAppMainFrame::prepareWebview() {
     m_webViewSizer->Add(m_webView, 0, wxALL | wxEXPAND);
     m_webView->LoadURL("http://localhost:8080");
     m_panel5->Layout();
+}
+
+
+void LauncherAppMainFrame::OnActivate(wxActivateEvent& event) {
+    MainFrame::OnActivate(event);
+}
+
+void LauncherAppMainFrame::OnActivateApp(wxActivateEvent& event) {
+    MainFrame::OnActivateApp(event);
+}
+
+void LauncherAppMainFrame::OnClose(wxCloseEvent& event) {
+#ifdef __APPLE__
+    SetAppAsAccessory();
+#endif
+    wxGetApp().OnTopFrameClose(event);
+    MainFrame::OnClose(event);
 }

@@ -60,6 +60,9 @@
       <property name="window_name">DHFS</property>
       <property name="window_style">wxTAB_TRAVERSAL</property>
       <property name="xrc_skip_sizer">1</property>
+      <event name="OnActivate">OnActivate</event>
+      <event name="OnActivateApp">OnActivateApp</event>
+      <event name="OnClose">OnClose</event>
       <object class="wxStatusBar" expanded="true">
         <property name="bg"></property>
         <property name="context_help"></property>
@@ -91,7 +94,7 @@
         <property name="permission">none</property>
         <object class="sizeritem" expanded="true">
           <property name="border">5</property>
-          <property name="flag">wxEXPAND</property>
+          <property name="flag">wxBOTTOM|wxEXPAND|wxTOP</property>
           <property name="proportion">1</property>
           <object class="wxNotebook" expanded="true">
             <property name="BottomDockable">1</property>
