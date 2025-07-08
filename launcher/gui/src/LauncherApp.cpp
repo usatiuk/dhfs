@@ -2,21 +2,38 @@
 // Created by Stepan Usatiuk on 11.07.2024.
 //
 
-// For compilers that don't support precompilation, include "wx/wx.h"
 #include "wx/notebook.h"
 
 #include "LauncherApp.h"
 
+#include <filesystem>
+
 #include "LauncherAppMainFrame.h"
 #include "wx/taskbar.h"
 #include <wx/fileconf.h>
+#include <wx/stdpaths.h>
+
 #include "wx/snglinst.h"
 
 IMPLEMENT_APP(LauncherApp)
 
+static std::string getServerSocket() {
+#ifdef __WIN32__
+    return "dhfs-sock-" + wxGetUserId().ToStdString();
+#else
+    return wxStandardPaths::Get().GetUserLocalDataDir().ToStdString()
+           + "/" + "dhfs-sock-" + wxGetUserId().ToStdString();
+#endif
+}
+
 // This is executed upon startup, like 'main()' in non-wxWidgets programs.
 bool LauncherApp::OnInit() {
     m_checker = new wxSingleInstanceChecker;
+    if (!std::filesystem::is_directory(wxStandardPaths::Get().GetUserLocalDataDir().ToStdString())
+        && !std::filesystem::create_directories(wxStandardPaths::Get().GetUserLocalDataDir().ToStdString())) {
+        wxLogError("Couldn't create data directory: %s", wxStandardPaths::Get().GetUserLocalDataDir());
+        return false;
+    }
     if (m_checker->IsAnotherRunning()) {
         // wxLogError(_("Another program instance is already running, aborting."));
 
@@ -24,13 +41,16 @@ bool LauncherApp::OnInit() {
         m_checker = NULL;
 
         auto clinet = new wxClient();
-        auto conn = clinet->MakeConnection("dhfs", "/Users/stepus53/dhfs-sock", "dhfs");
+        auto conn = clinet->MakeConnection("dhfs", getServerSocket(), "dhfs");
         conn->Execute("wakeup");
 
         return false;
     }
 
-    m_server.Create("/Users/stepus53/dhfs-sock");
+    if (!m_server.Create(getServerSocket())) {
+        wxLogError("Couldn't create server!");
+        return false;
+    }
 
     wxFrame* frame = new LauncherAppMainFrame(NULL);
     frame->Show(true);
