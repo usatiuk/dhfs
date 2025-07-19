@@ -128,7 +128,9 @@ public class DhfsFuse extends FuseStubFS {
             opts.add("-o");
             opts.add("gid=" + gid);
         }
+        Log.info("FUSE options: " + opts);
         mount(Paths.get(root), false, debug, opts.toArray(String[]::new));
+        Log.info("Mounted");
     }
 
     void shutdown(@Observes @Priority(1) ShutdownEvent event) {
