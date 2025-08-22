@@ -165,7 +165,6 @@ public class TransactionService {
                     toUnlock.add(lock);
                 }
 
-                commitSnapshot = writebackObjectPersistentStore.getSnapshot();
             } else {
                 Log.trace("Committing transaction - no changes");
 
@@ -201,7 +200,10 @@ public class TransactionService {
             Log.trace("Committing transaction start");
             var snapshotId = tx.snapshot().id();
 
-            if (snapshotId != commitSnapshot.id()) {
+            // All dependencies are locked and could not be changed concurrently now
+            if (snapshotId != writebackObjectPersistentStore.getLastCommitId()) {
+                commitSnapshot = writebackObjectPersistentStore.getSnapshot();
+
                 for (var read : readSet.entrySet()) {
                     var current = commitSnapshot.readObject(read.getKey());
 

@@ -308,6 +308,15 @@ public class WritebackObjectPersistentStore {
     }
 
     /**
+     * Get the last committed transaction ID.
+     *
+     * @return the last committed transaction ID
+     */
+    public long getLastCommitId() {
+        return _lastCommittedId.get();
+    }
+
+    /**
      * Get a snapshot of the persistent store, including the pending writes.
      *
      * @return a snapshot of the store
