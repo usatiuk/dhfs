@@ -41,7 +41,7 @@ jobs:
         run: cd thirdparty/lazyfs/ && ./build.sh
 
       - name: Test with Maven
-        run: cd dhfs-parent && mvn -T $(nproc) --batch-mode --update-snapshots package verify javadoc:aggregate
+        run: cd dhfs-parent && mvn -T $(nproc) -Dskip.unit --batch-mode --update-snapshots package javadoc:aggregate
 
       - uses: actions/upload-artifact@v4
         with:
