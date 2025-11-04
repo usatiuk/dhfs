@@ -125,7 +125,7 @@ jobs:
         if: matrix.package_format == 'appimage'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libfuse2 squashfs-tools libgtk-3-dev libglib2.0-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libwebkit2gtk-4.1-dev
+          sudo apt-get install -y libfuse2 squashfs-tools libgtk-3-dev libglib2.0-dev libwebkit2gtk-4.1-dev
 
       - name: Download appimagetool
         if: matrix.package_format == 'appimage'
