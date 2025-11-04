@@ -148,6 +148,9 @@ else ()
     install(TARGETS DhfsLauncher RUNTIME DESTINATION bin COMPONENT launcher)
     set(DHFS_SERVER_INSTALL_DEST "${DHFS_SHARE_ROOT}/app/Server")
     set(DHFS_WEBUI_INSTALL_DEST "${DHFS_SHARE_ROOT}/app/Webui")
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/resources/dhfs-launcher.png"
+            DESTINATION "share/icons/hicolor/256x256/apps"
+            COMPONENT launcher)
 
     if (UNIX)
         set(DHFS_APPIMAGE_APPRUN "${CMAKE_BINARY_DIR}/AppRun")
@@ -216,6 +219,8 @@ if (UNIX AND NOT APPLE)
                 COMMAND "${CMAKE_COMMAND}" -E copy_directory "${DHFS_INSTALL_PREFIX}/share" "${DHFS_APPIMAGE_DIR}/usr/share"
                 COMMAND "${CMAKE_COMMAND}" -E make_directory "${DHFS_APPIMAGE_DIR}/usr/share/applications"
                 COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/resources/dhfs-launcher.desktop" "${DHFS_APPIMAGE_DIR}/usr/share/applications/dhfs-launcher.desktop"
+                COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/resources/dhfs-launcher.desktop" "${DHFS_APPIMAGE_DIR}/dhfs-launcher.desktop"
+                COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/resources/dhfs-launcher.png" "${DHFS_APPIMAGE_DIR}/dhfs-launcher.png"
                 COMMAND "${CMAKE_COMMAND}" -E copy "${DHFS_APPIMAGE_APPRUN}" "${DHFS_APPIMAGE_DIR}/AppRun"
                 COMMAND chmod +x "${DHFS_APPIMAGE_DIR}/AppRun"
                 COMMAND "${CMAKE_COMMAND}" -E env "ARCH=${CPACK_SYSTEM_PROCESSOR}" "APPIMAGE_EXTRACT_AND_RUN=1"
