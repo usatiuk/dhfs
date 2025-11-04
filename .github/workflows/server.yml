@@ -133,7 +133,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DwxWidgets_IN_TREE_BUILD=ON \
             -DDHFS_PACKAGE_USE_PREBUILT=ON \
-            -DDHFS_PREBUILT_SERVER_DIR="${{ github.workspace }}/artifacts/dhfs-server/quarkus-app" \
+            -DDHFS_PREBUILT_SERVER_DIR="${{ github.workspace }}/artifacts/dhfs-server" \
             -DDHFS_PREBUILT_WEBUI_DIR="${{ github.workspace }}/artifacts/webui"
 
       - name: Build launcher bundle
