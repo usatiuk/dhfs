@@ -15,6 +15,7 @@ option(DHFS_PACKAGE_USE_PREBUILT "Use prebuilt DHFS server and Web UI artifacts 
 set(DHFS_PREBUILT_SERVER_DIR "" CACHE PATH "Path to a prebuilt Quarkus app directory (quarkus-app)")
 set(DHFS_PREBUILT_WEBUI_DIR "" CACHE PATH "Path to a prebuilt Web UI distribution directory (e.g. dist)")
 set(DHFS_MAVEN_JAVA_HOME "$ENV{JAVA_HOME}" CACHE PATH "Java home used for building DHFS payloads (must be Java 21)")
+set(DHFS_APPIMAGETOOL "$ENV{DHFS_APPIMAGETOOL}" CACHE FILEPATH "Path to the appimagetool binary (for Linux AppImage packaging)")
 
 get_filename_component(DHFS_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
 set(DHFS_PARENT_DIR "${DHFS_SOURCE_ROOT}/dhfs-parent")
@@ -186,12 +187,9 @@ set(CPACK_COMPONENTS_ALL launcher)
 if (APPLE)
     set(CPACK_GENERATOR "ZIP")
 else ()
+    set(CPACK_GENERATOR "TGZ;DEB")
     if (UNIX)
-        set(CPACK_GENERATOR "AppImage;TGZ;DEB")
         set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
-        set(CPACK_APPIMAGE_INSTALL_PREFIX "/usr")
-    else ()
-        set(CPACK_GENERATOR "TGZ;DEB")
     endif ()
 endif ()
 
@@ -203,3 +201,30 @@ endif ()
 string(REPLACE " " "_" CPACK_SYSTEM_NAME "${CMAKE_SYSTEM_NAME}")
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${PROJECT_VERSION}-${CPACK_SYSTEM_NAME}-${CPACK_SYSTEM_PROCESSOR}")
 include(CPack)
+
+if (UNIX AND NOT APPLE)
+    set(DHFS_APPIMAGE_DIR "${CMAKE_BINARY_DIR}/AppDir")
+    set(DHFS_APPIMAGE_OUTPUT "${DHFS_BUNDLE_ROOT}/dhfs-launcher-${CPACK_SYSTEM_NAME}-${CPACK_SYSTEM_PROCESSOR}.AppImage")
+
+    if (DHFS_APPIMAGETOOL)
+        add_custom_target(dhfs_package_appimage
+                COMMAND "${CMAKE_COMMAND}" -E rm -rf "${DHFS_APPIMAGE_DIR}"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${DHFS_APPIMAGE_DIR}/usr"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${DHFS_APPIMAGE_DIR}/usr/bin"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${DHFS_APPIMAGE_DIR}/usr/share"
+                COMMAND "${CMAKE_COMMAND}" -E copy_directory "${DHFS_INSTALL_PREFIX}/bin" "${DHFS_APPIMAGE_DIR}/usr/bin"
+                COMMAND "${CMAKE_COMMAND}" -E copy_directory "${DHFS_INSTALL_PREFIX}/share" "${DHFS_APPIMAGE_DIR}/usr/share"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${DHFS_APPIMAGE_DIR}/usr/share/applications"
+                COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/resources/dhfs-launcher.desktop" "${DHFS_APPIMAGE_DIR}/usr/share/applications/dhfs-launcher.desktop"
+                COMMAND "${CMAKE_COMMAND}" -E copy "${DHFS_APPIMAGE_APPRUN}" "${DHFS_APPIMAGE_DIR}/AppRun"
+                COMMAND chmod +x "${DHFS_APPIMAGE_DIR}/AppRun"
+                COMMAND "${CMAKE_COMMAND}" -E env "ARCH=${CPACK_SYSTEM_PROCESSOR}" "APPIMAGE_EXTRACT_AND_RUN=1"
+                        "${DHFS_APPIMAGETOOL}" "${DHFS_APPIMAGE_DIR}" "${DHFS_APPIMAGE_OUTPUT}"
+                BYPRODUCTS "${DHFS_APPIMAGE_OUTPUT}"
+                DEPENDS dhfs_package_bundle
+                COMMENT "Creating DHFS AppImage"
+        )
+    else ()
+        message(STATUS "DHFS_APPIMAGETOOL not set; AppImage packaging target will not be generated.")
+    endif ()
+endif ()

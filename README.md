@@ -82,9 +82,11 @@ The desktop launcher can assemble a distributable bundle that already contains t
 cmake -S launcher -B launcher/build
 cmake --build launcher/build
 cmake --build launcher/build --target dhfs_package_bundle
+# On Linux (with appimagetool available)
+# cmake --build launcher/build --target dhfs_package_appimage
 ```
 
-The bundle is created under `launcher/build/bundle`. On macOS this yields `DhfsLauncher.app`, with the server and web resources stored under `Contents/Resources/app`. On Linux the bundle lives under `launcher/build/bundle/dhfs-launcher`, containing the launcher in `bin/` alongside the server and web UI under `share/dhfs-launcher/app`. When the bundle builds the artifacts itself, ensure `JAVA_HOME` points to a Java 21 installation (or set `-DDHFS_MAVEN_JAVA_HOME=/path/to/jdk-21`). If you already have prebuilt artifacts, configure CMake with `-DDHFS_PACKAGE_USE_PREBUILT=ON`, `-DDHFS_PREBUILT_SERVER_DIR=/path/to/quarkus-app`, and `-DDHFS_PREBUILT_WEBUI_DIR=/path/to/webui/dist` to reuse them instead of rebuilding. You can also install the bundle into any prefix with `cmake --install launcher/build --component launcher --prefix /desired/output`. For archives, run `cpack -G ZIP` on macOS or `cpack -G TGZ`/`cpack -G DEB` on Linux from the build directory.
+The bundle is created under `launcher/build/bundle`. On macOS this yields `DhfsLauncher.app`, with the server and web resources stored under `Contents/Resources/app`. On Linux the bundle lives under `launcher/build/bundle/dhfs-launcher`, containing the launcher in `bin/` alongside the server and web UI under `share/dhfs-launcher/app`. When the bundle builds the artifacts itself, ensure `JAVA_HOME` points to a Java 21 installation (or set `-DDHFS_MAVEN_JAVA_HOME=/path/to/jdk-21`). If you already have prebuilt artifacts, configure CMake with `-DDHFS_PACKAGE_USE_PREBUILT=ON`, `-DDHFS_PREBUILT_SERVER_DIR=/path/to/quarkus-app`, and `-DDHFS_PREBUILT_WEBUI_DIR=/path/to/webui/dist` to reuse them instead of rebuilding. You can also install the bundle into any prefix with `cmake --install launcher/build --component launcher --prefix /desired/output`. For archives, run `cpack -G ZIP` on macOS or `cpack -G TGZ`/`cpack -G DEB` on Linux from the build directory. On Linux, provide the `appimagetool` path via `-DDHFS_APPIMAGETOOL=/path/to/appimagetool.AppImage` and build the `dhfs_package_appimage` target to produce an AppImage under `launcher/build/bundle`.
 
 ## Other notes
 

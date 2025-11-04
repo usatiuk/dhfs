@@ -125,16 +125,27 @@ jobs:
         if: matrix.package_format == 'appimage'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libfuse2 squashfs-tools libgtk-3-dev libglib2.0-dev libwebkit2gtk-4.1-dev
+          sudo apt-get install -y libfuse2 squashfs-tools libgtk-3-dev libglib2.0-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libwebkit2gtk-4.1-dev
+
+      - name: Download appimagetool
+        if: matrix.package_format == 'appimage'
+        run: |
+          curl -L "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${{ matrix.appimage_arch }}.AppImage" -o appimagetool.AppImage
+          chmod +x appimagetool.AppImage
 
       - name: Configure launcher
         run: |
+          EXTRA_ARGS=""
+          if [ "${{ matrix.package_format }}" = "appimage" ]; then
+            EXTRA_ARGS="-DDHFS_APPIMAGETOOL=${{ github.workspace }}/appimagetool.AppImage"
+          fi
           cmake -S launcher -B build-launcher \
             -DCMAKE_BUILD_TYPE=Release \
             -DwxWidgets_IN_TREE_BUILD=ON \
             -DDHFS_PACKAGE_USE_PREBUILT=ON \
             -DDHFS_PREBUILT_SERVER_DIR="${{ github.workspace }}/artifacts/dhfs-server" \
-            -DDHFS_PREBUILT_WEBUI_DIR="${{ github.workspace }}/artifacts/webui"
+            -DDHFS_PREBUILT_WEBUI_DIR="${{ github.workspace }}/artifacts/webui" \
+            ${EXTRA_ARGS}
 
       - name: Build launcher bundle
         run: |
@@ -147,11 +158,10 @@ jobs:
           cd build-launcher
           cpack -G ZIP --config CPackConfig.cmake
 
-      - name: Run CPack (AppImage)
+      - name: Build AppImage
         if: matrix.package_format == 'appimage'
         run: |
-          cd build-launcher
-          cpack -G AppImage --config CPackConfig.cmake
+          cmake --build build-launcher --config Release --target dhfs_package_appimage --parallel
 
       - name: Upload launcher artifact (ZIP)
         if: matrix.package_format == 'zip'
@@ -165,7 +175,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: DHFS Launcher ${{ matrix.artifact_suffix }}
-          path: build-launcher/dhfs-launcher-*-${{ matrix.appimage_arch }}.AppImage
+          path: build-launcher/bundle/dhfs-launcher-Linux-${{ matrix.appimage_arch }}.AppImage
   publish-run-wrapper:
     runs-on: ubuntu-latest
     permissions:
