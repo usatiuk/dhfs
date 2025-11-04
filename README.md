@@ -74,6 +74,18 @@ In case of errors, the standard output is redirected to `quarkus.log` in the `ap
 
 Then, a web interface will be available at `losthost:8080` (or whatever the HTTP port is), that can be used to connect with other peers. Peers on local network should be available to be connected to automatically.
 
+### Launcher packaging
+
+The desktop launcher can assemble a distributable bundle that already contains the Quarkus server and the Web UI. From the repository root:
+
+```bash
+cmake -S launcher -B launcher/build
+cmake --build launcher/build
+cmake --build launcher/build --target dhfs_package_bundle
+```
+
+The bundle is created under `launcher/build/bundle`. On macOS this yields `DhfsLauncher.app`, with the server and web resources stored under `Contents/Resources/app`. On Linux the bundle lives under `launcher/build/bundle/dhfs-launcher`, containing the launcher in `bin/` alongside the server and web UI under `share/dhfs-launcher/app`. When the bundle builds the artifacts itself, ensure `JAVA_HOME` points to a Java 21 installation (or set `-DDHFS_MAVEN_JAVA_HOME=/path/to/jdk-21`). If you already have prebuilt artifacts, configure CMake with `-DDHFS_PACKAGE_USE_PREBUILT=ON`, `-DDHFS_PREBUILT_SERVER_DIR=/path/to/quarkus-app`, and `-DDHFS_PREBUILT_WEBUI_DIR=/path/to/webui/dist` to reuse them instead of rebuilding. You can also install the bundle into any prefix with `cmake --install launcher/build --component launcher --prefix /desired/output`. For archives, run `cpack -G ZIP` on macOS or `cpack -G TGZ`/`cpack -G DEB` on Linux from the build directory.
+
 ## Other notes
 
 ### Running tests

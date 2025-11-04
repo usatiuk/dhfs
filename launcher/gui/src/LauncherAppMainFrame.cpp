@@ -13,13 +13,19 @@
 #include "Exception.h"
 
 std::string getBundlePath() {
-    if (wxGetenv("DHFS_BUNDLE_PATH") == NULL)
-        return std::filesystem::path(wxStandardPaths::Get().GetExecutablePath().ToStdString())
-#ifndef __APPLE__
-    .parent_path()
+    if (const char* bundleEnv = wxGetenv("DHFS_BUNDLE_PATH"); bundleEnv != NULL) {
+        return bundleEnv;
+    }
+
+    const std::filesystem::path executablePath(wxStandardPaths::Get().GetExecutablePath().ToStdString());
+#ifdef __APPLE__
+    const auto contentsPath = executablePath.parent_path().parent_path();
+    return (contentsPath / "Resources").string();
+#else
+    const auto binDir = executablePath.parent_path();
+    const auto prefixDir = binDir.parent_path();
+    return (prefixDir / "share" / "dhfs-launcher").string();
 #endif
-                .parent_path().string();
-    return wxGetenv("DHFS_BUNDLE_PATH");
 }
 
 LauncherAppMainFrame::LauncherAppMainFrame(wxWindow* parent)
