@@ -4,4 +4,5 @@ Name=DHFS Launcher
 Comment=Start the DHFS desktop launcher
 Exec=DhfsLauncher
 Terminal=false
+Icon=dhfs-launcher
 Categories=Utility;
