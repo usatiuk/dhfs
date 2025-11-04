@@ -1,0 +1,4 @@
+#!/bin/sh
+APPDIR="$(dirname "$0")"
+export DHFS_BUNDLE_PATH="$APPDIR/usr/share/dhfs-launcher/app"
+exec "$APPDIR/usr/bin/DhfsLauncher" "$@"

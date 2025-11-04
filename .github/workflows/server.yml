@@ -83,6 +83,88 @@ jobs:
           name: Webui
           path: webui/dist
 
+  package-launcher:
+    needs: [build-webui, build-dhfs]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-zip
+            os: macos-14
+            artifact_suffix: macos-arm64
+            package_format: zip
+          - name: linux-appimage-x86_64
+            os: ubuntu-24.04
+            artifact_suffix: linux-x86_64
+            package_format: appimage
+            appimage_arch: x86_64
+          - name: linux-appimage-aarch64
+            os: ubuntu-24.04-arm64
+            artifact_suffix: linux-aarch64
+            package_format: appimage
+            appimage_arch: aarch64
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download DHFS server package
+        uses: actions/download-artifact@v4
+        with:
+          name: DHFS Server Package
+          path: artifacts/dhfs-server
+
+      - name: Download WebUI bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: Webui
+          path: artifacts/webui
+
+      - name: Install AppImage dependencies
+        if: matrix.package_format == 'appimage'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2 squashfs-tools
+
+      - name: Configure launcher
+        run: |
+          cmake -S launcher -B build-launcher \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DDHFS_PACKAGE_USE_PREBUILT=ON \
+            -DDHFS_PREBUILT_SERVER_DIR="${{ github.workspace }}/artifacts/dhfs-server/quarkus-app" \
+            -DDHFS_PREBUILT_WEBUI_DIR="${{ github.workspace }}/artifacts/webui"
+
+      - name: Build launcher bundle
+        run: |
+          cmake --build build-launcher --config Release
+          cmake --build build-launcher --config Release --target dhfs_package_bundle
+
+      - name: Run CPack (ZIP)
+        if: matrix.package_format == 'zip'
+        run: |
+          cd build-launcher
+          cpack -G ZIP --config CPackConfig.cmake
+
+      - name: Run CPack (AppImage)
+        if: matrix.package_format == 'appimage'
+        run: |
+          cd build-launcher
+          cpack -G AppImage --config CPackConfig.cmake
+
+      - name: Upload launcher artifact (ZIP)
+        if: matrix.package_format == 'zip'
+        uses: actions/upload-artifact@v4
+        with:
+          name: DHFS Launcher ${{ matrix.artifact_suffix }}
+          path: build-launcher/dhfs-launcher-*.zip
+
+      - name: Upload launcher artifact (AppImage)
+        if: matrix.package_format == 'appimage'
+        uses: actions/upload-artifact@v4
+        with:
+          name: DHFS Launcher ${{ matrix.artifact_suffix }}
+          path: build-launcher/dhfs-launcher-*-${{ matrix.appimage_arch }}.AppImage
   publish-run-wrapper:
     runs-on: ubuntu-latest
     permissions:
