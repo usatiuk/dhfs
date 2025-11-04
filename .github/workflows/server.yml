@@ -138,8 +138,8 @@ jobs:
 
       - name: Build launcher bundle
         run: |
-          cmake --build build-launcher --config Release --parallel
-          cmake --build build-launcher --config Release --target dhfs_package_bundle --parallel
+          cmake --build build-launcher --config Release
+          cmake --build build-launcher --config Release --target dhfs_package_bundle
 
       - name: Run CPack (ZIP)
         if: matrix.package_format == 'zip'
