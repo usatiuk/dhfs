@@ -149,8 +149,9 @@ jobs:
 
       - name: Build launcher bundle
         run: |
-          cmake --build build-launcher --config Release
-          cmake --build build-launcher --config Release --target dhfs_package_bundle
+          JOBS=$(python3 -c "import os; n=os.cpu_count() or 2; print(max(n-1, 1))")
+          cmake --build build-launcher --config Release --parallel ${JOBS}
+          cmake --build build-launcher --config Release --target dhfs_package_bundle --parallel ${JOBS}
 
       - name: Run CPack (ZIP)
         if: matrix.package_format == 'zip'
@@ -161,7 +162,8 @@ jobs:
       - name: Build AppImage
         if: matrix.package_format == 'appimage'
         run: |
-          cmake --build build-launcher --config Release --target dhfs_package_appimage --parallel
+          JOBS=$(python3 -c "import os; n=os.cpu_count() or 2; print(max(n-1, 1))")
+          cmake --build build-launcher --config Release --target dhfs_package_appimage --parallel ${JOBS}
 
       - name: Upload launcher artifact (ZIP)
         if: matrix.package_format == 'zip'
