@@ -94,12 +94,12 @@ jobs:
             artifact_suffix: macos-arm64
             package_format: zip
           - name: linux-appimage-x86_64
-            os: ubuntu-24.04
+            os: ubuntu-22.04
             artifact_suffix: linux-x86_64
             package_format: appimage
             appimage_arch: x86_64
           - name: linux-appimage-aarch64
-            os: ubuntu-24.04-arm64
+            os: ubuntu-22.04-arm
             artifact_suffix: linux-aarch64
             package_format: appimage
             appimage_arch: aarch64
@@ -125,7 +125,7 @@ jobs:
         if: matrix.package_format == 'appimage'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libfuse2 squashfs-tools
+          sudo apt-get install -y libfuse2 squashfs-tools libgtk-3-dev libglib2.0-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libwebkit2gtk-4.1-dev
 
       - name: Configure launcher
         run: |
