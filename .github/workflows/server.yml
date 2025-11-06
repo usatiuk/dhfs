@@ -187,15 +187,6 @@ jobs:
           cd build-launcher
           cpack -G ZIP --config CPackConfig.cmake
 
-      - name: Prepare ZIP artifact
-        if: matrix.package_format == 'zip'
-        run: |
-          cd build-launcher
-          STANDARD_ZIP=$(ls *.zip | grep -v '\-with-java' | head -n1 || true)
-          if [ -n "$STANDARD_ZIP" ] && [ "$STANDARD_ZIP" != "dhfs-launcher-${{ matrix.artifact_suffix }}.zip" ]; then
-            mv "$STANDARD_ZIP" "dhfs-launcher-${{ matrix.artifact_suffix }}.zip"
-          fi
-
       - name: Create ZIP with bundled Java
         if: matrix.package_format == 'zip' && env.DHFS_PREBUILT_JAVA_DIR != ''
         run: |
@@ -210,21 +201,6 @@ jobs:
           cmake --build build-launcher --config Release --target dhfs_package_appimage --parallel ${JOBS}
           if [ -n "${DHFS_PREBUILT_JAVA_DIR:-}" ]; then
             cmake --build build-launcher --config Release --target dhfs_package_appimage_with_java --parallel ${JOBS}
-          fi
-
-      - name: Prepare AppImage artifacts
-        if: matrix.package_format == 'appimage'
-        run: |
-          cd build-launcher
-          STANDARD_APP=$(ls bundle/*.AppImage 2>/dev/null | head -n1 || true)
-          if [ -n "$STANDARD_APP" ] && [ "$STANDARD_APP" != "bundle/dhfs-launcher-Linux-${{ matrix.appimage_arch }}.AppImage" ]; then
-            mv "$STANDARD_APP" "bundle/dhfs-launcher-Linux-${{ matrix.appimage_arch }}.AppImage"
-          fi
-          if [ -n "${DHFS_PREBUILT_JAVA_DIR:-}" ]; then
-            JAVA_APP=$(ls bundle-with-java/*.AppImage 2>/dev/null | head -n1 || true)
-            if [ -n "$JAVA_APP" ] && [ "$JAVA_APP" != "bundle-with-java/dhfs-launcher-Linux-${{ matrix.appimage_arch }}-with-java.AppImage" ]; then
-              mv "$JAVA_APP" "bundle-with-java/dhfs-launcher-Linux-${{ matrix.appimage_arch }}-with-java.AppImage"
-            fi
           fi
 
       - name: Upload launcher artifact (ZIP)
