@@ -7,6 +7,7 @@
 #include "LauncherApp.h"
 
 #include <filesystem>
+#include <cstdlib>
 
 #include "LauncherAppMainFrame.h"
 #include "wx/taskbar.h"
@@ -14,6 +15,32 @@
 #include <wx/stdpaths.h>
 
 #include "wx/snglinst.h"
+
+#ifdef __APPLE__
+#ifndef DHFS_BUNDLED_JAVA_SUBDIR
+#define DHFS_BUNDLED_JAVA_SUBDIR "java"
+#endif
+#endif
+
+#ifdef __APPLE__
+static void EnsureBundledJavaEnv() {
+    if (const char* existing = std::getenv("DHFS_BUNDLED_JAVA_HOME"); existing && existing[0] != '\0') {
+        if (std::getenv("JAVA_HOME") == nullptr) {
+            setenv("JAVA_HOME", existing, 0);
+        }
+        return;
+    }
+    std::filesystem::path resources(wxStandardPaths::Get().GetResourcesDir().ToStdString());
+    auto candidate = resources / DHFS_BUNDLED_JAVA_SUBDIR;
+    if (std::filesystem::exists(candidate)) {
+        std::string path = candidate.string();
+        setenv("DHFS_BUNDLED_JAVA_HOME", path.c_str(), 0);
+        if (std::getenv("JAVA_HOME") == nullptr) {
+            setenv("JAVA_HOME", path.c_str(), 0);
+        }
+    }
+}
+#endif
 
 IMPLEMENT_APP(LauncherApp)
 
@@ -28,6 +55,9 @@ static std::string getServerSocket() {
 
 // This is executed upon startup, like 'main()' in non-wxWidgets programs.
 bool LauncherApp::OnInit() {
+#ifdef __APPLE__
+    EnsureBundledJavaEnv();
+#endif
     m_checker = new wxSingleInstanceChecker;
     if (!std::filesystem::is_directory(wxStandardPaths::Get().GetUserLocalDataDir().ToStdString())
         && !std::filesystem::create_directories(wxStandardPaths::Get().GetUserLocalDataDir().ToStdString())) {

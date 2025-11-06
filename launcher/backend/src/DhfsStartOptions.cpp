@@ -6,7 +6,10 @@
 
 std::vector<std::string> DhfsStartOptions::getOptions() {
     std::vector<std::string> out;
-    out.emplace_back(java_home + "/bin/java");
+    if (!java_home.empty())
+        out.emplace_back(java_home + "/bin/java");
+    else
+        out.emplace_back("java");
     out.emplace_back("--enable-preview");
     out.emplace_back("-Xmx" + xmx);
     out.emplace_back("-Ddhfs.objects.writeback.limit=16777216");

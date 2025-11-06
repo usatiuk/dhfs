@@ -20,6 +20,7 @@ endif ()
 
 target_link_libraries(DhfsLauncher ${wxWidgets_LIBRARIES})
 target_link_libraries(DhfsLauncher backend utils)
+target_compile_definitions(DhfsLauncher PRIVATE DHFS_BUNDLED_JAVA_SUBDIR="java")
 
 set_target_properties(DhfsLauncher PROPERTIES
         MACOSX_BUNDLE TRUE

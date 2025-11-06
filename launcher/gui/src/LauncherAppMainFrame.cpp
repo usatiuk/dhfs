@@ -4,6 +4,7 @@
 #include <wx/fileconf.h>
 #include <wx/stdpaths.h>
 #include <filesystem>
+#include <cstdlib>
 
 #ifdef __APPLE__
 #include "macos/utils.h"
@@ -106,7 +107,14 @@ void LauncherAppMainFrame::OnStartStopButtonClick(wxCommandEvent& event) {
         }
         case DhfsInstanceState::STOPPED: {
             DhfsStartOptions options;
-            options.java_home = wxFileConfig::Get()->Read(kJavaHomeSettingsKey);
+            auto configuredJava = wxFileConfig::Get()->Read(kJavaHomeSettingsKey);
+            if (!configuredJava.empty()) {
+                options.java_home = configuredJava.ToStdString();
+            } else if (const char* bundledJava = std::getenv("DHFS_BUNDLED_JAVA_HOME"); bundledJava && bundledJava[0] != '\0') {
+                options.java_home = bundledJava;
+            } else {
+                options.java_home.clear();
+            }
             options.xmx = "512m";
             options.mount_path = wxFileConfig::Get()->Read(kMountPointSettingsKey);
             options.data_path = wxFileConfig::Get()->Read(kDataDirSettingsKey);
