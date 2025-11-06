@@ -42,6 +42,7 @@ void DhfsInstance::start(DhfsStartOptions options) {
     for (const auto& option: readyOptions) {
         args.push_back(const_cast<char*>(option.c_str()));
     }
+    args.push_back(nullptr);
 
     long ret = wxExecute(args.data(), wxEXEC_ASYNC | wxEXEC_HIDE_CONSOLE | wxEXEC_MAKE_GROUP_LEADER, process.get(),
                          nullptr);
