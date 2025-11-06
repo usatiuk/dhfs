@@ -1,0 +1,11 @@
+#!/bin/sh
+APPDIR="$(dirname "$0")"
+export DHFS_BUNDLE_PATH="$APPDIR/usr/share/dhfs-launcher"
+JAVA_DIR="$APPDIR/usr/share/dhfs-launcher/java"
+if [ -d "$JAVA_DIR" ]; then
+    export DHFS_BUNDLED_JAVA_HOME="$JAVA_DIR"
+    if [ -z "${JAVA_HOME:-}" ]; then
+        export JAVA_HOME="$JAVA_DIR"
+    fi
+fi
+exec "$APPDIR/usr/bin/DhfsLauncher" "$@"

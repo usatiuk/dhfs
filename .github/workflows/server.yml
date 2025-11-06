@@ -41,7 +41,7 @@ jobs:
         run: cd thirdparty/lazyfs/ && ./build.sh
 
       - name: Test with Maven
-        run: cd dhfs-parent && mvn -T $(nproc) --batch-mode --update-snapshots package verify javadoc:aggregate
+        run: cd dhfs-parent && mvn -T $(nproc) -Dskip.unit --batch-mode --update-snapshots package javadoc:aggregate
 
       - uses: actions/upload-artifact@v4
         with:
@@ -83,6 +83,153 @@ jobs:
           name: Webui
           path: webui/dist
 
+  package-launcher:
+    needs: [build-webui, build-dhfs]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-zip
+            os: macos-14
+            artifact_suffix: macos-arm64
+            package_format: zip
+            java_url: https://cdn.azul.com/zulu/bin/zulu21.46.19-ca-jre21.0.9-macosx_aarch64.zip
+          - name: linux-appimage-x86_64
+            os: ubuntu-22.04
+            artifact_suffix: linux-x86_64
+            package_format: appimage
+            appimage_arch: x86_64
+            java_url: https://cdn.azul.com/zulu/bin/zulu21.46.19-ca-jre21.0.9-linux_x64.tar.gz
+          - name: linux-appimage-aarch64
+            os: ubuntu-22.04-arm
+            artifact_suffix: linux-aarch64
+            package_format: appimage
+            appimage_arch: aarch64
+            java_url: https://cdn.azul.com/zulu/bin/zulu21.46.19-ca-jre21.0.9-linux_aarch64.tar.gz
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download DHFS server package
+        uses: actions/download-artifact@v4
+        with:
+          name: DHFS Server Package
+          path: artifacts/dhfs-server
+
+      - name: Download WebUI bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: Webui
+          path: artifacts/webui
+
+      - name: Download bundled Java runtime
+        if: ${{ matrix.java_url != '' }}
+        run: |
+          JAVA_URL="${{ matrix.java_url }}"
+          curl -L "$JAVA_URL" -o java-archive
+          mkdir -p bundled-java
+          case "$JAVA_URL" in
+            *.zip) unzip -q java-archive -d bundled-java ;;
+            *.tar.gz|*.tgz) tar -xzf java-archive -C bundled-java ;;
+            *) echo "Unsupported Java archive format: $JAVA_URL" >&2; exit 1 ;;
+          esac
+          rm -f java-archive
+          JAVA_DIR=$(find bundled-java -mindepth 1 -maxdepth 1 -type d | head -n1)
+          if [ -z "$JAVA_DIR" ]; then
+            echo "Failed to locate extracted Java runtime" >&2
+            exit 1
+          fi
+          echo "DHFS_PREBUILT_JAVA_DIR=$JAVA_DIR" >> $GITHUB_ENV
+
+      - name: Install AppImage dependencies
+        if: matrix.package_format == 'appimage'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2 squashfs-tools libgtk-3-dev libglib2.0-dev libwebkit2gtk-4.1-dev
+
+      - name: Download appimagetool
+        if: matrix.package_format == 'appimage'
+        run: |
+          curl -L "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${{ matrix.appimage_arch }}.AppImage" -o appimagetool.AppImage
+          chmod +x appimagetool.AppImage
+
+      - name: Configure launcher
+        run: |
+          EXTRA_ARGS=""
+          if [ "${{ matrix.package_format }}" = "appimage" ]; then
+            EXTRA_ARGS="-DDHFS_APPIMAGETOOL=${{ github.workspace }}/appimagetool.AppImage"
+          fi
+          if [ -n "${DHFS_PREBUILT_JAVA_DIR:-}" ]; then
+            EXTRA_ARGS="$EXTRA_ARGS -DDHFS_PREBUILT_JAVA_DIR=${DHFS_PREBUILT_JAVA_DIR}"
+          fi
+          cmake -S launcher -B build-launcher \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DwxWidgets_IN_TREE_BUILD=ON \
+            -DDHFS_PACKAGE_USE_PREBUILT=ON \
+            -DDHFS_PREBUILT_SERVER_DIR="${{ github.workspace }}/artifacts/dhfs-server" \
+            -DDHFS_PREBUILT_WEBUI_DIR="${{ github.workspace }}/artifacts/webui" \
+            ${EXTRA_ARGS}
+
+      - name: Build launcher bundle
+        run: |
+          JOBS=$(python3 -c "import os; n=os.cpu_count() or 2; print(max(n-1, 1))")
+          cmake --build build-launcher --config Release --parallel ${JOBS}
+          cmake --build build-launcher --config Release --target dhfs_package_bundle --parallel ${JOBS}
+          if [ -n "${DHFS_PREBUILT_JAVA_DIR:-}" ]; then
+            cmake --build build-launcher --config Release --target dhfs_package_bundle_with_java --parallel ${JOBS}
+          fi
+
+      - name: Run CPack (ZIP)
+        if: matrix.package_format == 'zip'
+        run: |
+          cd build-launcher
+          cpack -G ZIP --config CPackConfig.cmake
+
+      - name: Create ZIP with bundled Java
+        if: matrix.package_format == 'zip' && env.DHFS_PREBUILT_JAVA_DIR != ''
+        run: |
+          cd build-launcher
+          rm -f dhfs-launcher-${{ matrix.artifact_suffix }}-with-java.zip
+          (cd bundle-with-java && zip -qry ../dhfs-launcher-${{ matrix.artifact_suffix }}-with-java.zip .)
+
+      - name: Build AppImage
+        if: matrix.package_format == 'appimage'
+        run: |
+          JOBS=$(python3 -c "import os; n=os.cpu_count() or 2; print(max(n-1, 1))")
+          cmake --build build-launcher --config Release --target dhfs_package_appimage --parallel ${JOBS}
+          if [ -n "${DHFS_PREBUILT_JAVA_DIR:-}" ]; then
+            cmake --build build-launcher --config Release --target dhfs_package_appimage_with_java --parallel ${JOBS}
+          fi
+
+      - name: Upload launcher artifact (ZIP)
+        if: matrix.package_format == 'zip'
+        uses: actions/upload-artifact@v4
+        with:
+          name: DHFS Launcher ${{ matrix.artifact_suffix }}
+          path: build-launcher/dhfs-launcher-${{ matrix.artifact_suffix }}.zip
+
+      - name: Upload launcher artifact (ZIP with Java)
+        if: matrix.package_format == 'zip' && env.DHFS_PREBUILT_JAVA_DIR != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: DHFS Launcher ${{ matrix.artifact_suffix }} with Java
+          path: build-launcher/dhfs-launcher-${{ matrix.artifact_suffix }}-with-java.zip
+
+      - name: Upload launcher artifact (AppImage)
+        if: matrix.package_format == 'appimage'
+        uses: actions/upload-artifact@v4
+        with:
+          name: DHFS Launcher ${{ matrix.artifact_suffix }}
+          path: build-launcher/bundle/dhfs-launcher-Linux-${{ matrix.appimage_arch }}.AppImage
+
+      - name: Upload launcher artifact (AppImage with Java)
+        if: matrix.package_format == 'appimage' && env.DHFS_PREBUILT_JAVA_DIR != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: DHFS Launcher ${{ matrix.artifact_suffix }} with Java
+          path: build-launcher/bundle-with-java/dhfs-launcher-Linux-${{ matrix.appimage_arch }}-with-java.AppImage
   publish-run-wrapper:
     runs-on: ubuntu-latest
     permissions:

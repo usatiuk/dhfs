@@ -1,0 +1,290 @@
+cmake_minimum_required(VERSION 3.10)
+project(launcher VERSION 0.1.0)
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    enable_language(OBJC)
+    enable_language(OBJCXX)
+endif ()
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED YES)
+
+option(DHFS_PACKAGE_USE_PREBUILT "Use prebuilt DHFS server and Web UI artifacts when packaging the launcher bundle" OFF)
+set(DHFS_PREBUILT_SERVER_DIR "" CACHE PATH "Path to a prebuilt Quarkus app directory (quarkus-app)")
+set(DHFS_PREBUILT_WEBUI_DIR "" CACHE PATH "Path to a prebuilt Web UI distribution directory (e.g. dist)")
+set(DHFS_MAVEN_JAVA_HOME "$ENV{JAVA_HOME}" CACHE PATH "Java home used for building DHFS payloads (must be Java 21)")
+set(DHFS_APPIMAGETOOL "$ENV{DHFS_APPIMAGETOOL}" CACHE FILEPATH "Path to the appimagetool binary (for Linux AppImage packaging)")
+set(DHFS_PREBUILT_JAVA_DIR "" CACHE PATH "Path to a prebuilt Java runtime to include in distributable bundles")
+
+get_filename_component(DHFS_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+set(DHFS_PARENT_DIR "${DHFS_SOURCE_ROOT}/dhfs-parent")
+set(DHFS_WEBUI_DIR "${DHFS_SOURCE_ROOT}/webui")
+
+set(DHFS_BUNDLE_ROOT "${CMAKE_BINARY_DIR}/bundle")
+set(DHFS_STAMP_DIR "${CMAKE_BINARY_DIR}/.dhfs-stamps")
+set(DHFS_BUNDLE_WITH_JAVA_ROOT "${DHFS_BUNDLE_ROOT}-with-java")
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    #    if (NOT DEFINED SANITIZE)
+    #        set(SANITIZE YES)
+    #    endif ()
+endif ()
+
+if (SANITIZE STREQUAL "YES")
+    message(STATUS "Enabling sanitizers!")
+    add_compile_options(-Werror -O0 -Wall -Wextra -pedantic -Wno-unused-parameter -Wno-unused-variable
+            -Wno-error=unused-function
+            -Wshadow -Wformat=2 -Wfloat-equal -D_GLIBCXX_DEBUG -Wconversion)
+    add_compile_options(-fsanitize=address -fno-sanitize-recover)
+    add_link_options(-fsanitize=address -fno-sanitize-recover)
+endif ()
+
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif ()
+
+if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(-O3)
+    add_link_options(-O3)
+endif ()
+
+include(wxWidgets)
+
+add_subdirectory(utils)
+add_subdirectory(backend)
+add_subdirectory(gui)
+
+file(MAKE_DIRECTORY "${DHFS_STAMP_DIR}")
+
+set(DHFS_HAS_BUNDLED_JAVA FALSE)
+if (NOT DHFS_PREBUILT_JAVA_DIR STREQUAL "")
+    get_filename_component(DHFS_PREBUILT_JAVA_DIR_ABS "${DHFS_PREBUILT_JAVA_DIR}" ABSOLUTE)
+    if (IS_DIRECTORY "${DHFS_PREBUILT_JAVA_DIR_ABS}")
+        set(DHFS_HAS_BUNDLED_JAVA TRUE)
+    else ()
+        message(FATAL_ERROR "DHFS_PREBUILT_JAVA_DIR (${DHFS_PREBUILT_JAVA_DIR}) does not exist or is not a directory")
+    endif ()
+endif ()
+
+set(DHFS_SERVER_PREPARE_TARGET "dhfs_prepare_server")
+if (DHFS_PACKAGE_USE_PREBUILT)
+    if (DHFS_PREBUILT_SERVER_DIR STREQUAL "")
+        message(FATAL_ERROR "DHFS_PREBUILT_SERVER_DIR must be set when DHFS_PACKAGE_USE_PREBUILT is ON")
+    endif ()
+    if (NOT IS_DIRECTORY "${DHFS_PREBUILT_SERVER_DIR}")
+        message(FATAL_ERROR "DHFS_PREBUILT_SERVER_DIR (${DHFS_PREBUILT_SERVER_DIR}) does not exist or is not a directory")
+    endif ()
+    get_filename_component(DHFS_SERVER_SOURCE_DIR "${DHFS_PREBUILT_SERVER_DIR}" ABSOLUTE)
+    add_custom_target(${DHFS_SERVER_PREPARE_TARGET})
+else ()
+    set(DHFS_SERVER_SOURCE_DIR "${DHFS_PARENT_DIR}/dhfs-fuse/target/quarkus-app")
+    set(DHFS_SERVER_BUILD_STAMP "${DHFS_STAMP_DIR}/dhfs_server_build.stamp")
+    if (DHFS_MAVEN_JAVA_HOME STREQUAL "")
+        find_package(Java 21 REQUIRED COMPONENTS Development)
+        if (Java_JAVA_EXECUTABLE)
+            get_filename_component(_dhfs_java_bin "${Java_JAVA_EXECUTABLE}" DIRECTORY)
+            get_filename_component(_dhfs_java_home "${_dhfs_java_bin}" DIRECTORY)
+            set(DHFS_MAVEN_JAVA_HOME "${_dhfs_java_home}" CACHE PATH "Java home used for building DHFS payloads (must be Java 21)" FORCE)
+        endif ()
+    endif ()
+    if (DHFS_MAVEN_JAVA_HOME STREQUAL "")
+        message(FATAL_ERROR "Unable to determine Java home for building DHFS artifacts. Set JAVA_HOME or DHFS_MAVEN_JAVA_HOME to a Java 21 installation.")
+    endif ()
+    if (NOT EXISTS "${DHFS_MAVEN_JAVA_HOME}/bin/java")
+        message(FATAL_ERROR "DHFS_MAVEN_JAVA_HOME (${DHFS_MAVEN_JAVA_HOME}) does not contain bin/java")
+    endif ()
+    set(_DHFS_MAVEN_ENV "JAVA_HOME=${DHFS_MAVEN_JAVA_HOME}")
+    add_custom_command(
+            OUTPUT "${DHFS_SERVER_BUILD_STAMP}"
+            COMMAND "${CMAKE_COMMAND}" -E env
+                "${_DHFS_MAVEN_ENV}"
+                mvn -f "${DHFS_PARENT_DIR}/pom.xml"
+                -pl dhfs-fuse -am
+                --batch-mode
+                -DskipTests
+                -DskipITs
+                -Dmaven.test.skip=true
+                package
+            COMMAND "${CMAKE_COMMAND}" -E touch "${DHFS_SERVER_BUILD_STAMP}"
+            WORKING_DIRECTORY "${DHFS_PARENT_DIR}"
+            COMMENT "Building DHFS server (Quarkus)"
+            VERBATIM
+    )
+    add_custom_target(${DHFS_SERVER_PREPARE_TARGET} DEPENDS "${DHFS_SERVER_BUILD_STAMP}")
+endif ()
+
+set(DHFS_WEBUI_PREPARE_TARGET "dhfs_prepare_webui")
+if (DHFS_PACKAGE_USE_PREBUILT)
+    if (DHFS_PREBUILT_WEBUI_DIR STREQUAL "")
+        message(FATAL_ERROR "DHFS_PREBUILT_WEBUI_DIR must be set when DHFS_PACKAGE_USE_PREBUILT is ON")
+    endif ()
+    if (NOT IS_DIRECTORY "${DHFS_PREBUILT_WEBUI_DIR}")
+        message(FATAL_ERROR "DHFS_PREBUILT_WEBUI_DIR (${DHFS_PREBUILT_WEBUI_DIR}) does not exist or is not a directory")
+    endif ()
+    get_filename_component(DHFS_WEBUI_SOURCE_DIR "${DHFS_PREBUILT_WEBUI_DIR}" ABSOLUTE)
+    add_custom_target(${DHFS_WEBUI_PREPARE_TARGET})
+else ()
+    set(DHFS_WEBUI_SOURCE_DIR "${DHFS_WEBUI_DIR}/dist")
+    set(DHFS_WEBUI_BUILD_STAMP "${DHFS_STAMP_DIR}/dhfs_webui_build.stamp")
+    add_custom_command(
+            OUTPUT "${DHFS_WEBUI_BUILD_STAMP}"
+            COMMAND npm install
+            COMMAND npm run build
+            COMMAND "${CMAKE_COMMAND}" -E touch "${DHFS_WEBUI_BUILD_STAMP}"
+            WORKING_DIRECTORY "${DHFS_WEBUI_DIR}"
+            COMMENT "Building DHFS Web UI"
+            VERBATIM
+    )
+    add_custom_target(${DHFS_WEBUI_PREPARE_TARGET} DEPENDS "${DHFS_WEBUI_BUILD_STAMP}")
+endif ()
+
+add_custom_target(dhfs_prepare_payload DEPENDS ${DHFS_SERVER_PREPARE_TARGET} ${DHFS_WEBUI_PREPARE_TARGET})
+
+install(CODE [[
+    set(_args --build "${CMAKE_BINARY_DIR}" --target dhfs_prepare_payload)
+    if(NOT "${CMAKE_INSTALL_CONFIG_NAME}" STREQUAL "")
+        list(APPEND _args --config "${CMAKE_INSTALL_CONFIG_NAME}")
+    endif()
+    execute_process(COMMAND "${CMAKE_COMMAND}" ${_args})
+]])
+
+if (APPLE)
+    set(DHFS_APP_CONTENTS "DhfsLauncher.app/Contents")
+    set(DHFS_SERVER_INSTALL_DEST "${DHFS_APP_CONTENTS}/Resources/app/Server")
+    set(DHFS_WEBUI_INSTALL_DEST "${DHFS_APP_CONTENTS}/Resources/app/Webui")
+    install(TARGETS DhfsLauncher BUNDLE DESTINATION . COMPONENT launcher)
+else ()
+    set(DHFS_SHARE_ROOT "share/dhfs-launcher")
+    install(TARGETS DhfsLauncher RUNTIME DESTINATION bin COMPONENT launcher)
+    set(DHFS_SERVER_INSTALL_DEST "${DHFS_SHARE_ROOT}/app/Server")
+    set(DHFS_WEBUI_INSTALL_DEST "${DHFS_SHARE_ROOT}/app/Webui")
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/resources/dhfs-launcher.png"
+            DESTINATION "share/icons/hicolor/256x256/apps"
+            COMPONENT launcher)
+
+    if (UNIX)
+        set(DHFS_APPIMAGE_APPRUN "${CMAKE_BINARY_DIR}/AppRun")
+        configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/AppImage/AppRun.in "${DHFS_APPIMAGE_APPRUN}" @ONLY)
+        execute_process(COMMAND chmod +x "${DHFS_APPIMAGE_APPRUN}")
+        set(CPACK_APPIMAGE_APP_RUN_SCRIPT "${DHFS_APPIMAGE_APPRUN}")
+        set(CPACK_APPIMAGE_DESKTOP_FILE "${CMAKE_CURRENT_SOURCE_DIR}/resources/dhfs-launcher.desktop")
+    endif ()
+endif ()
+
+install(DIRECTORY "${DHFS_SERVER_SOURCE_DIR}/" DESTINATION "${DHFS_SERVER_INSTALL_DEST}" COMPONENT launcher)
+install(DIRECTORY "${DHFS_WEBUI_SOURCE_DIR}/" DESTINATION "${DHFS_WEBUI_INSTALL_DEST}" COMPONENT launcher)
+
+set(DHFS_INSTALL_CONFIG_ARGS "")
+if (CMAKE_CONFIGURATION_TYPES)
+    set(DHFS_INSTALL_CONFIG_ARGS --config $<CONFIG>)
+endif ()
+
+if (APPLE)
+    set(DHFS_INSTALL_PREFIX "${DHFS_BUNDLE_ROOT}")
+else ()
+    set(DHFS_INSTALL_PREFIX "${DHFS_BUNDLE_ROOT}/dhfs-launcher")
+endif ()
+
+add_custom_target(dhfs_package_bundle
+        COMMAND "${CMAKE_COMMAND}" -E rm -rf "${DHFS_BUNDLE_ROOT}"
+        COMMAND "${CMAKE_COMMAND}" --install "${CMAKE_BINARY_DIR}" ${DHFS_INSTALL_CONFIG_ARGS} --component launcher --prefix "${DHFS_INSTALL_PREFIX}"
+        DEPENDS dhfs_prepare_payload DhfsLauncher
+        COMMENT "Preparing DHFS launcher bundle"
+)
+
+if (DHFS_HAS_BUNDLED_JAVA)
+    if (APPLE)
+        set(DHFS_JAVA_BUNDLE_DEST_REL "DhfsLauncher.app/Contents/Resources/java")
+    else ()
+        set(DHFS_JAVA_BUNDLE_DEST_REL "dhfs-launcher/share/dhfs-launcher/java")
+    endif ()
+
+    add_custom_target(dhfs_package_bundle_with_java
+            COMMAND "${CMAKE_COMMAND}" -E rm -rf "${DHFS_BUNDLE_WITH_JAVA_ROOT}"
+            COMMAND "${CMAKE_COMMAND}" -E copy_directory "${DHFS_BUNDLE_ROOT}" "${DHFS_BUNDLE_WITH_JAVA_ROOT}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${DHFS_BUNDLE_WITH_JAVA_ROOT}/${DHFS_JAVA_BUNDLE_DEST_REL}"
+            COMMAND "${CMAKE_COMMAND}" -E copy_directory "${DHFS_PREBUILT_JAVA_DIR_ABS}/" "${DHFS_BUNDLE_WITH_JAVA_ROOT}/${DHFS_JAVA_BUNDLE_DEST_REL}"
+            DEPENDS dhfs_package_bundle
+            COMMENT "Preparing DHFS launcher bundle with bundled Java"
+    )
+endif ()
+
+set(CPACK_PACKAGE_NAME "dhfs-launcher")
+set(CPACK_PACKAGE_VENDOR "DHFS")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "DHFS Launcher with bundled server and Web UI")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}")
+set(CPACK_COMPONENTS_ALL launcher)
+if (APPLE)
+    set(CPACK_GENERATOR "ZIP")
+else ()
+    set(CPACK_GENERATOR "TGZ;DEB")
+    if (UNIX)
+        set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
+    endif ()
+endif ()
+
+if (CMAKE_SYSTEM_PROCESSOR)
+    string(REPLACE " " "_" CPACK_SYSTEM_PROCESSOR "${CMAKE_SYSTEM_PROCESSOR}")
+else ()
+    set(CPACK_SYSTEM_PROCESSOR "unknown")
+endif ()
+string(REPLACE " " "_" CPACK_SYSTEM_NAME "${CMAKE_SYSTEM_NAME}")
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${PROJECT_VERSION}-${CPACK_SYSTEM_NAME}-${CPACK_SYSTEM_PROCESSOR}")
+include(CPack)
+
+if (UNIX AND NOT APPLE)
+    set(DHFS_APPIMAGE_DIR "${CMAKE_BINARY_DIR}/AppDir")
+    set(DHFS_APPIMAGE_OUTPUT "${DHFS_BUNDLE_ROOT}/dhfs-launcher-${CPACK_SYSTEM_NAME}-${CPACK_SYSTEM_PROCESSOR}.AppImage")
+
+    if (DHFS_APPIMAGETOOL)
+        add_custom_target(dhfs_package_appimage
+                COMMAND "${CMAKE_COMMAND}" -E rm -rf "${DHFS_APPIMAGE_DIR}"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${DHFS_APPIMAGE_DIR}/usr"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${DHFS_APPIMAGE_DIR}/usr/bin"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${DHFS_APPIMAGE_DIR}/usr/share"
+                COMMAND "${CMAKE_COMMAND}" -E copy_directory "${DHFS_INSTALL_PREFIX}/bin" "${DHFS_APPIMAGE_DIR}/usr/bin"
+                COMMAND "${CMAKE_COMMAND}" -E copy_directory "${DHFS_INSTALL_PREFIX}/share" "${DHFS_APPIMAGE_DIR}/usr/share"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${DHFS_APPIMAGE_DIR}/usr/share/applications"
+                COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/resources/dhfs-launcher.desktop" "${DHFS_APPIMAGE_DIR}/usr/share/applications/dhfs-launcher.desktop"
+                COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/resources/dhfs-launcher.desktop" "${DHFS_APPIMAGE_DIR}/dhfs-launcher.desktop"
+                COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/resources/dhfs-launcher.png" "${DHFS_APPIMAGE_DIR}/dhfs-launcher.png"
+                COMMAND "${CMAKE_COMMAND}" -E copy "${DHFS_APPIMAGE_APPRUN}" "${DHFS_APPIMAGE_DIR}/AppRun"
+                COMMAND chmod +x "${DHFS_APPIMAGE_DIR}/AppRun"
+                COMMAND "${CMAKE_COMMAND}" -E env "ARCH=${CPACK_SYSTEM_PROCESSOR}" "APPIMAGE_EXTRACT_AND_RUN=1"
+                        "${DHFS_APPIMAGETOOL}" "${DHFS_APPIMAGE_DIR}" "${DHFS_APPIMAGE_OUTPUT}"
+                BYPRODUCTS "${DHFS_APPIMAGE_OUTPUT}"
+                DEPENDS dhfs_package_bundle
+                COMMENT "Creating DHFS AppImage"
+        )
+    else ()
+        message(STATUS "DHFS_APPIMAGETOOL not set; AppImage packaging target will not be generated.")
+    endif ()
+
+    if (DHFS_HAS_BUNDLED_JAVA AND DHFS_APPIMAGETOOL)
+        set(DHFS_APPIMAGE_WITH_JAVA_DIR "${CMAKE_BINARY_DIR}/AppDirWithJava")
+        set(DHFS_APPIMAGE_WITH_JAVA_OUTPUT "${DHFS_BUNDLE_WITH_JAVA_ROOT}/dhfs-launcher-${CPACK_SYSTEM_NAME}-${CPACK_SYSTEM_PROCESSOR}-with-java.AppImage")
+
+        add_custom_target(dhfs_package_appimage_with_java
+                COMMAND "${CMAKE_COMMAND}" -E rm -rf "${DHFS_APPIMAGE_WITH_JAVA_DIR}"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${DHFS_APPIMAGE_WITH_JAVA_DIR}/usr"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${DHFS_APPIMAGE_WITH_JAVA_DIR}/usr/bin"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${DHFS_APPIMAGE_WITH_JAVA_DIR}/usr/share"
+                COMMAND "${CMAKE_COMMAND}" -E copy_directory "${DHFS_BUNDLE_WITH_JAVA_ROOT}/dhfs-launcher/bin" "${DHFS_APPIMAGE_WITH_JAVA_DIR}/usr/bin"
+                COMMAND "${CMAKE_COMMAND}" -E copy_directory "${DHFS_BUNDLE_WITH_JAVA_ROOT}/dhfs-launcher/share" "${DHFS_APPIMAGE_WITH_JAVA_DIR}/usr/share"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${DHFS_APPIMAGE_WITH_JAVA_DIR}/usr/share/applications"
+                COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/resources/dhfs-launcher.desktop" "${DHFS_APPIMAGE_WITH_JAVA_DIR}/usr/share/applications/dhfs-launcher.desktop"
+                COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/resources/dhfs-launcher.desktop" "${DHFS_APPIMAGE_WITH_JAVA_DIR}/dhfs-launcher.desktop"
+                COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/resources/dhfs-launcher.png" "${DHFS_APPIMAGE_WITH_JAVA_DIR}/dhfs-launcher.png"
+                COMMAND "${CMAKE_COMMAND}" -E copy "${DHFS_APPIMAGE_APPRUN}" "${DHFS_APPIMAGE_WITH_JAVA_DIR}/AppRun"
+                COMMAND chmod +x "${DHFS_APPIMAGE_WITH_JAVA_DIR}/AppRun"
+                COMMAND "${CMAKE_COMMAND}" -E env "ARCH=${CPACK_SYSTEM_PROCESSOR}" "APPIMAGE_EXTRACT_AND_RUN=1"
+                        "${DHFS_APPIMAGETOOL}" "${DHFS_APPIMAGE_WITH_JAVA_DIR}" "${DHFS_APPIMAGE_WITH_JAVA_OUTPUT}"
+                BYPRODUCTS "${DHFS_APPIMAGE_WITH_JAVA_OUTPUT}"
+                DEPENDS dhfs_package_bundle_with_java
+                COMMENT "Creating DHFS AppImage with bundled Java"
+        )
+    endif ()
+endif ()

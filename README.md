@@ -74,6 +74,22 @@ In case of errors, the standard output is redirected to `quarkus.log` in the `ap
 
 Then, a web interface will be available at `losthost:8080` (or whatever the HTTP port is), that can be used to connect with other peers. Peers on local network should be available to be connected to automatically.
 
+### Launcher packaging
+
+The desktop launcher can assemble a distributable bundle that already contains the Quarkus server and the Web UI. From the repository root:
+
+```bash
+cmake -S launcher -B launcher/build
+cmake --build launcher/build
+cmake --build launcher/build --target dhfs_package_bundle
+# On Linux (with appimagetool available)
+# cmake --build launcher/build --target dhfs_package_appimage
+```
+
+The bundle is created under `launcher/build/bundle`. On macOS this yields `DhfsLauncher.app`, with the server and web resources stored under `Contents/Resources/app`. On Linux the bundle lives under `launcher/build/bundle/dhfs-launcher`, containing the launcher in `bin/` alongside the server and web UI under `share/dhfs-launcher/app`. When the bundle builds the artifacts itself, ensure `JAVA_HOME` points to a Java 21 installation (or set `-DDHFS_MAVEN_JAVA_HOME=/path/to/jdk-21`). If you already have prebuilt artifacts, configure CMake with `-DDHFS_PACKAGE_USE_PREBUILT=ON`, `-DDHFS_PREBUILT_SERVER_DIR=/path/to/quarkus-app`, and `-DDHFS_PREBUILT_WEBUI_DIR=/path/to/webui/dist` to reuse them instead of rebuilding. You can also install the bundle into any prefix with `cmake --install launcher/build --component launcher --prefix /desired/output`. For archives, run `cpack -G ZIP` on macOS or `cpack -G TGZ`/`cpack -G DEB` on Linux from the build directory. On Linux, provide the `appimagetool` path via `-DDHFS_APPIMAGETOOL=/path/to/appimagetool.AppImage` and build the `dhfs_package_appimage` target to produce an AppImage under `launcher/build/bundle`.
+
+To produce variants that embed a Java runtime, unpack an Azul Zulu JRE/JDK somewhere and pass `-DDHFS_PREBUILT_JAVA_DIR=/path/to/jre`. This enables additional targets: `dhfs_package_bundle_with_java` creates a copy of the bundle with the runtime under `launcher/build/bundle-with-java`, and `dhfs_package_appimage_with_java` builds an AppImage that ships the runtime alongside the server. When these bundles are used, `DHFS_BUNDLED_JAVA_HOME` is set automatically and the launcher falls back to it whenever no Java home is configured in the GUI.
+
 ## Other notes
 
 ### Running tests
