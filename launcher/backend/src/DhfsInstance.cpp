@@ -124,6 +124,6 @@ void DhfsInstance::OnTerminateInternal(int pid, int status) {
 
     _readThread.join();
     _readThreadErr.join();
-    OnRead("Stopped!\n");
+    OnRead("Stopped! " + std::to_string(pid) + " " + std::to_string(status) + " \n");
     OnStateChange();
 }
