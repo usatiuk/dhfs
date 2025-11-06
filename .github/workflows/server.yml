@@ -210,12 +210,26 @@ jobs:
           name: DHFS Launcher ${{ matrix.artifact_suffix }}
           path: build-launcher/dhfs-launcher-*.zip
 
+      - name: Upload launcher artifact (ZIP with Java)
+        if: matrix.package_format == 'zip' && env.DHFS_PREBUILT_JAVA_DIR != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: DHFS Launcher ${{ matrix.artifact_suffix }} with Java
+          path: build-launcher/dhfs-launcher-with-java.zip
+
       - name: Upload launcher artifact (AppImage)
         if: matrix.package_format == 'appimage'
         uses: actions/upload-artifact@v4
         with:
           name: DHFS Launcher ${{ matrix.artifact_suffix }}
-          path: build-launcher/bundle/dhfs-launcher-Linux-${{ matrix.appimage_arch }}*.AppImage
+          path: build-launcher/bundle/dhfs-launcher-Linux-${{ matrix.appimage_arch }}.AppImage
+
+      - name: Upload launcher artifact (AppImage with Java)
+        if: matrix.package_format == 'appimage' && env.DHFS_PREBUILT_JAVA_DIR != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: DHFS Launcher ${{ matrix.artifact_suffix }} with Java
+          path: build-launcher/bundle-with-java/dhfs-launcher-Linux-${{ matrix.appimage_arch }}-with-java.AppImage
   publish-run-wrapper:
     runs-on: ubuntu-latest
     permissions:
